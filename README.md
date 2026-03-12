@@ -15,8 +15,21 @@
     <!-- Example -->
     */30 * * * * /path-to-directory/data_storage.py >> /path-to-monitor-logs/logfile.log 2>&1
     ```
+3. update database settings in config.py
+    ```text
+    <!-- Example -->
+    nano config.py
+    ```
+    By default, config.py is set to pull data from the START_DATE = '2025-12-01' and USE_LOCALHOST = False (will use DB_CONFIG and SSH_CONFIG).
 
-3. Start gunicorn in development or production by running start_dev or start_prod
+    pull first data using below
+    ```text
+    <!-- Example -->
+    source venv/bin/activate
+    python3 data_storage.py
+    ```
+
+4. Start gunicorn in development or production by running start_dev or start_prod
     ```bash
     chmod +x start_dev.sh
     ./start_dev.sh
@@ -27,7 +40,7 @@
     ./start_prod.sh
     ```
 
-4. Kill process (kills production. For dev use CTRL + C)
+5. Kill process (kills production. For dev use CTRL + C)
     ```bash
     chmod +x stop.sh
     ./stop.sh

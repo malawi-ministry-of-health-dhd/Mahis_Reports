@@ -503,7 +503,6 @@ class DataFetcher:
         """Process all records for a single day in batches"""
         day_df = pd.DataFrame()
         processed_count = 0
-
         while True:
             # Build query for current batch
             date_str = current_date.strftime('%Y-%m-%d')

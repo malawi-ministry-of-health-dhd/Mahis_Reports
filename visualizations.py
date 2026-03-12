@@ -793,7 +793,7 @@ def create_horizontal_bar_chart(df, label_col, value_col, title, x_title, y_titl
 
     return fig
 
-def create_count(df, unique_column=ENCOUNTER_ID_, filter_col1=None, filter_value1=None, filter_col2=None, filter_value2=None, 
+def create_count(df, unique_column=PERSON_ID_, filter_col1=None, filter_value1=None, filter_col2=None, filter_value2=None, 
                  filter_col3=None, filter_value3=None, filter_col4=None, filter_value4=None,
                  filter_col5=None, filter_value5=None, filter_col6=None, filter_value6=None, 
                  filter_col7=None, filter_value7=None, filter_col8=None, filter_value8=None,
@@ -814,7 +814,7 @@ def create_count(df, unique_column=ENCOUNTER_ID_, filter_col1=None, filter_value
     
     unique_visits = data.drop_duplicates(subset=[unique_column, DATE_])
 
-    return str(len(unique_visits))
+    return len(unique_visits[unique_column].dropna().unique())
 
 def create_count_sets(
     df,
@@ -830,18 +830,6 @@ def create_count_sets(
     filter_col9=None, filter_value9=None,
     filter_col10=None, filter_value10=None
 ):
-    """
-    Count unique IDs that satisfy ALL provided filters.
-
-    Supports:
-        - Single-column filters:
-              filter_col="col", filter_value="X"
-        - Multi-column filters (paired):
-              filter_col=[col1, col2], filter_value=[X, Y]
-
-    Each filter block is applied independently.
-    Results are merged (INNER JOIN) on unique_column.
-    """
 
     data = df.copy()
 
@@ -849,51 +837,94 @@ def create_count_sets(
         filter_col1, filter_col2, filter_col3, filter_col4, filter_col5,
         filter_col6, filter_col7, filter_col8, filter_col9, filter_col10
     ]
-    filter_values = [
+
+    filter_vals = [
         filter_value1, filter_value2, filter_value3, filter_value4, filter_value5,
         filter_value6, filter_value7, filter_value8, filter_value9, filter_value10
     ]
 
-    filtered_dfs = []
+    if not isinstance(filter_value1, list) or len(filter_value1) <= 1:
 
-    for cols, vals in zip(filter_cols, filter_values):
+        data = _apply_filter(data, filter_col1, filter_value1)
+        data = _apply_filter(data, filter_col2, filter_value2)
+        data = _apply_filter(data, filter_col3, filter_value3)
+        data = _apply_filter(data, filter_col4, filter_value4)
+        data = _apply_filter(data, filter_col5, filter_value5)
+        data = _apply_filter(data, filter_col6, filter_value6)
+        data = _apply_filter(data, filter_col7, filter_value7)
+        data = _apply_filter(data, filter_col8, filter_value8)
+        data = _apply_filter(data, filter_col9, filter_value9)
+        data = _apply_filter(data, filter_col10, filter_value10)
 
-        if cols is None or vals is None:
+        unique_visits = data.drop_duplicates(subset=[unique_column, DATE_])
+        return len(unique_visits)
+
+    if not isinstance(filter_value2, list):
+        raise ValueError(
+            "filter_value2 must be a list when filter_value1 is a list"
+        )
+
+    if len(filter_value1) != len(filter_value2):
+        raise ValueError(
+            "filter_value1 and filter_value2 must have equal lengths"
+        )
+
+    set_length = len(filter_value1)
+
+    # Validate remaining list filters
+    for v in filter_vals[2:]:
+        if isinstance(v, list) and len(v) != set_length:
+            raise ValueError(
+                "All list filter values must have equal lengths"
+            )
+
+    sets = []
+
+    for i in range(set_length):
+
+        df_f = data.copy()
+
+        for col, val in zip(filter_cols, filter_vals):
+
+            if col is None or val is None:
+                continue
+
+            if isinstance(val, list):
+
+                # list filters participate in set construction
+                df_f = _apply_filter(df_f, col, val[i])
+
+        ids = set(
+            df_f[[unique_column, DATE_]]
+            .drop_duplicates()
+            .apply(tuple, axis=1)
+        )
+
+        sets.append(ids)
+
+    # intersection
+    final_set = sets[0]
+    for s in sets[1:]:
+        final_set = final_set.intersection(s)
+
+
+    remaining_df = data[
+        data[[unique_column, DATE_]]
+        .apply(tuple, axis=1)
+        .isin(final_set)
+    ]
+
+    for col, val in zip(filter_cols, filter_vals):
+
+        if col is None or val is None:
             continue
 
-        if isinstance(cols, str):
-            cols = [cols]
+        if not isinstance(val, list):
+            remaining_df = _apply_filter(remaining_df, col, val)
 
-            vals = vals if isinstance(vals, list) else [vals]
+    unique_visits = remaining_df.drop_duplicates(subset=[unique_column, DATE_])
 
-        elif isinstance(cols, list):
-            if not isinstance(vals, list):
-                raise ValueError(
-                    f"When filter_col is a list, filter_value must also be a list. Got: {vals}"
-                )
-            if len(cols) != len(vals):
-                raise ValueError(
-                    f"Column list and value list must match length: {cols} vs {vals}"
-                )
-        else:
-            raise ValueError(f"Invalid filter_col type: {cols}")
-        df_f = data.copy()
-        for col, val in zip(cols, vals):
-            df_f = _apply_filter(df_f, col, val)
-
-        df_f = df_f[[unique_column] + cols + [DATE_]].drop_duplicates()
-
-        filtered_dfs.append(df_f)
-    if not filtered_dfs:
-        return 0
-
-    final_df = filtered_dfs[0]
-    for temp_df in filtered_dfs[1:]:
-        final_df = pd.merge(final_df, temp_df, on=[unique_column]+ [DATE_], how="inner")
-
-    unique_visits = final_df.drop_duplicates(subset=[unique_column, DATE_])
-
-    return str(len(unique_visits))
+    return len(unique_visits)
 
 def create_count_unique(df, unique_column=PERSON_ID_, filter_col1=None, filter_value1=None, filter_col2=None, filter_value2=None, 
                  filter_col3=None, filter_value3=None, filter_col4=None, filter_value4=None,
@@ -906,9 +937,9 @@ def create_count_unique(df, unique_column=PERSON_ID_, filter_col1=None, filter_v
     data = _apply_filter(data, filter_col3, filter_value3)
     data = _apply_filter(data, filter_col4, filter_value4)
     data = _apply_filter(data, filter_col5, filter_value5)
-    data = _apply_filter(data, filter_col6, filter_value6)
+    data = _apply_filter(data, filter_col6, filter_value6) 
     
-    return str(len(data[unique_column].unique()))
+    return len(data[unique_column].dropna().unique())
 
 def create_sum(df, num_field='ValueN', filter_col1=None, filter_value1=None, filter_col2=None, filter_value2=None, 
                  filter_col3=None, filter_value3=None, filter_col4=None, filter_value4=None,
