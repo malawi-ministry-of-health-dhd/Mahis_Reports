@@ -4,12 +4,7 @@
 
 
 ## Installation steps - Bash
-1. Execute install.sh. This will install ubuntu and python dependencies
-    ```bash
-    chmod +x install.sh
-    ./install.sh
-    ```
-2. update database settings in config.py
+1. Update database settings in config.py
     ```text
     <!-- Example -->
     cp config.example.py config.py
@@ -22,6 +17,12 @@
     <!-- Example -->
     source venv/bin/activate
     python3 data_storage.py
+    ```
+
+2. Execute install.sh. This will install ubuntu and python dependencies
+    ```bash
+    chmod +x install.sh
+    ./install.sh
     ```
 
 3. Be sure to add data_storage.py to crontab or taskscheduler as per install.sh or
