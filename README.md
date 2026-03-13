@@ -9,24 +9,25 @@
     chmod +x install.sh
     ./install.sh
     ```
-
-2. Be sure to add data_storage.py to crontab or taskscheduler as per install.sh or
+2. update database settings in config.py
     ```text
     <!-- Example -->
-    */10 * * * * /home/$(whoami)/Mahis_Reports/venv/bin/python3 /home/$(whoami)/Mahis_Reports/data_storage.py >> /home/$(whoami)/Mahis_Reports/log.txt 2>&1
-    ```
-3. update database settings in config.py
-    ```text
-    <!-- Example -->
+    cp config.example.py config.py
     nano config.py
     ```
-    By default, config.py is set to pull data from the START_DATE = '2025-12-01' and USE_LOCALHOST = False (will use DB_CONFIG and SSH_CONFIG).
+    By default, config.py is set to pull data from the START_DATE and USE_LOCALHOST = True (will use DB_CONFIG and SSH_CONFIG).
 
-    pull first data using below
+    Test pulling the data using below
     ```text
     <!-- Example -->
     source venv/bin/activate
     python3 data_storage.py
+    ```
+
+3. Be sure to add data_storage.py to crontab or taskscheduler as per install.sh or
+    ```text
+    <!-- Example -->
+    */10 * * * * /home/$(whoami)/Mahis_Reports/venv/bin/python3 /home/$(whoami)/Mahis_Reports/data_storage.py >> /home/$(whoami)/Mahis_Reports/log.txt 2>&1
     ```
 
 4. Start gunicorn in development or production by running start_dev or start_prod

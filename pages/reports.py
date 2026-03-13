@@ -19,7 +19,9 @@ import io
 import base64
 from data_storage import DataStorage
 
-from config import DATE_, FACILITY_, AGE_GROUP_, GENDER_, NEW_REVISIT_, HOME_DISTRICT_, TA_, VILLAGE_, FACILITY_CODE_, DATA_FILE_NAME_
+from config import (DATE_, FACILITY_, AGE_GROUP_, GENDER_, 
+                    NEW_REVISIT_, HOME_DISTRICT_, TA_, VILLAGE_, 
+                    FACILITY_CODE_, DATA_FILE_NAME_, actual_keys_in_data)
 
 
 dash.register_page(__name__, path="/hmis_reports")
@@ -288,7 +290,6 @@ def update_table(clicks,
         return html.Div("Missing Report Parameters"), 0, None
     
     path = os.getcwd()
-    parquet_path = os.path.join(path, 'data', 'latest_data_opd.parquet')
     reports_json = os.path.join(path, 'data', 'hmis_reports.json')
     with open(reports_json, "r") as f:
         json_data = json.load(f)
@@ -302,11 +303,7 @@ def update_table(clicks,
                     None
                 )
     if not report:
-        return html.Div("Report Not Found")
-    # Validate file exists
-    if not os.path.exists(parquet_path):
-        error_msg = f""
-        return html.Div(error_msg)
+        return html.Div("Report Not Found"), 0, None
     
     if urlparams.get('Location', [None])[0]:
         location = urlparams.get('Location', [None])[0]
@@ -319,8 +316,13 @@ def update_table(clicks,
         WHERE {FACILITY_CODE_} = '{location}'
         """
     
-    data = DataStorage.query_duckdb(SQL)
-    data[DATE_] = pd.to_datetime(data[DATE_], format='mixed')
+    try:
+        data = DataStorage.query_duckdb(SQL)
+    except Exception as e:
+        return html.Div('Missing Data. ' \
+            'Ensure that the config file has correct database credentials.'
+            ,style={'color':'red'}), 0, None # Empty DataFrame with expected columns
+    
     data[GENDER_] = data[GENDER_].replace({"M":"Male","F":"Female"})
     data["DateValue"] = pd.to_datetime(data[DATE_]).dt.date
     today = dt.today().date()
@@ -417,7 +419,7 @@ def update_table(clicks,
             
     except ValueError as e:
         print(f"Error: {e}")
-        return html.Div(f"Error: {str(e)}")
+        return html.Div(f"Error: {str(e)}"),0, None
     
 @callback(
         Output('download-report-blob', 'data'),

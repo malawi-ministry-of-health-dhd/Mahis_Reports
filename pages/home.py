@@ -251,7 +251,13 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
             WHERE Date >= TIMESTAMP '{last_7_days}'
             AND {FACILITY_CODE_} = '{location}'
             """
-        data = DataStorage.query_duckdb(SQL)
+        try:
+            data = DataStorage.query_duckdb(SQL)
+        except Exception as e:
+            return html.Div('Missing Data. ' \
+            'Ensure that the config file has correct database credentials'
+            ,style={'color':'red'}), [], '', ''  # Empty DataFrame with expected columns
+
         data[DATE_] = pd.to_datetime(data[DATE_], format='mixed')
         data[GENDER_] = data[GENDER_].replace({"M":"Male","F":"Female"})
         data["DateValue"] = pd.to_datetime(data[DATE_]).dt.date

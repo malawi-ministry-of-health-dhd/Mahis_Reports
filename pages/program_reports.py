@@ -29,7 +29,7 @@ from config import (actual_keys_in_data,
                     VALUE_NAME_)
 
 dash.register_page(__name__, path="/program_reports")
-data = pd.read_parquet('data/latest_data_opd.parquet')
+# data = pd.read_parquet('data/latest_data_opd.parquet')
 
 from datetime import datetime, timedelta
 from dash import html, dcc
@@ -220,8 +220,13 @@ def generate_chart(n_clicks, urlparams, report_name, start_date, end_date, hf):
                 SELECT * FROM 'data/{DATA_FILE_NAME_}'
                 WHERE Date BETWEEN '{start_dt}' AND '{end_dt}'
                """
-        data = DataStorage.query_duckdb(SQL)
-        data = DataStorage.query_duckdb(SQL)
+        try:
+            data = DataStorage.query_duckdb(SQL)
+        except Exception as e:
+            return html.Div('Missing Data. ' \
+            'Ensure that the config file has correct database credentials'
+            ,style={'color':'red'}), [], ''  # Empty DataFrame with expected columns
+        
         data[DATE_] = pd.to_datetime(data[DATE_], format='mixed').dt.strftime('%Y-%m-%d')
         data[GENDER_] = data[GENDER_].replace({"M":"Male","F":"Female"})
         data["DateValue"] = pd.to_datetime(data[DATE_]).dt.date

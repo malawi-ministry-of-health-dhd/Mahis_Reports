@@ -1,8 +1,8 @@
 import os
 
-USE_LOCALHOST = False
+USE_LOCALHOST = True
 START_DATE = '2025-12-01'
-LOAD_FRESH_DATA = True # Set to True to always start from START_DATE and fetch fresh data. Not recommended for large datasets.
+LOAD_FRESH_DATA = False # Set to True to always start from START_DATE and fetch fresh data. Not recommended for large datasets.
 PREFIX_NAME = '/'  # Set to your desired prefix for https paths, e.g., '/myapp'
 
 
@@ -40,22 +40,6 @@ PARQUET_FILE_PATH = os.path.join(os.getcwd(), 'data', 'latest_data_opd.parquet')
 CACHE_FILE_PATH = os.path.join(os.getcwd(), 'data', 'cache_opd.parquet')
 TIMESTAMP_FILE_PATH = os.path.join(os.getcwd(), 'data', 'TimeStamp.csv')
 
-DB_CONFIG = {
-    'host': 'hostname',
-    'user': 'user',
-    'password': 'password',
-    'database': 'database',
-    'port': 3306
-}
-
-SSH_CONFIG = {
-    'ssh_host': 'aws_host',
-    'ssh_port': 22,
-    'ssh_user': 'ubuntu',
-    'ssh_pkey': 'key.pem',  # Path to your private key
-    'remote_bind_address': ('path_to_db_endpoint', 3306)
-}
-
 # For local database connection
 DB_CONFIG_LOCAL = {
     'host': 'localhost',
@@ -65,6 +49,24 @@ DB_CONFIG_LOCAL = {
     'port': 3306
 }
 
+# for production database connection
+DB_CONFIG = {
+    'host': 'hostname',
+    'user': 'user',
+    'password': 'password',
+    'database': 'database',
+    'port': 3306
+}
+
+# SSH configuration for production database connection
+SSH_CONFIG = {
+    'ssh_host': 'aws_host',
+    'ssh_port': 22,
+    'ssh_user': 'ubuntu',
+    'ssh_password': 'password',  # OR use ssh_pkey if using key
+    # 'ssh_pkey': 'key.pem',  #private key name stored in ssh directory
+    'remote_bind_address': ('path_to_db_endpoint', 3306)
+}
 
 # on production remove COLLATE utf8mb3_general_ci
 QERY = """
