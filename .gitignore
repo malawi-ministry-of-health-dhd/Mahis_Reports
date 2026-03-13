@@ -10,7 +10,7 @@ venv/
 app copy.py
 dashboardsxx.json
 pages/archived
-data/hmis_reports.json
+# data/hmis_reports.json
 data/visualizations/dashboards_duplicate.json
 data/visualizations/home.json
 data/visualizations/master.json
@@ -28,5 +28,3 @@ data/TimeStamp.csv
 # start_dev.sh
 data/users_data.csv
 data/TimeStamp.csv
-data
-data/visualizations
