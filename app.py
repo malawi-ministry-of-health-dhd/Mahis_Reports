@@ -49,21 +49,78 @@ server = app.server
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
     dcc.Store(id='url-params-store', storage_type='session'),
-    html.Nav([
-        dcc.Store(id='nav-store', data={}),
-        html.Ul([
-            html.Li(html.A("Dashboard", href=f"{pathname_prefix}home", className="nav-link",id="home-link")),
-            html.Li(html.A("HMIS DataSet Reports", href=f"{pathname_prefix}hmis_reports", className="nav-link",id="hmis-reports-link")),
-            html.Li(html.A("Program Reports", href=f"{pathname_prefix}program_reports", className="nav-link",id="programs-link")),
-            html.Li(html.A("Configure Reports", href="#", className="nav-link",id="admin-link",
-                          style={'visibility': 'hidden', 'pointer-events': 'none', 'cursor': 'default'}),
-                 style={'visibility': 'hidden'}),
-            html.Div("Last updated: Today", style={"color":"grey","font-size":"0.9rem","margin-top":"5px","font-style":"italic"}, id='last_updated')
-        ], className="nav-list")
-    ], className="navbar"),
+    html.Div(id="nav-container"),
     page_container,
     
 ], style={ 'margin': '20px', 'fontFamily': 'Arial, sans-serif'})
+
+@app.callback(
+    Output("nav-container", "children"),
+    Input("url-params-store", "data")
+)
+def render_nav(url_params):
+    try:
+        location = url_params.get('Location', [None])[0] if url_params else None
+        uuid = url_params.get('uuid', [None])[0] if url_params else None
+        path = os.getcwd()
+        timestamp_path = os.path.join(path, 'data','TimeStamp.csv')
+        users_path = os.path.join(path, 'data','users_data.csv')
+        last_updated = pd.read_csv(timestamp_path)['saving_time'].to_list()[0]
+        users = pd.read_csv(users_path)
+
+        query = ""
+        if location and uuid:
+            query = f"?Location={location}&uuid={uuid}"
+        elif location:
+            query = f"?Location={location}"
+        elif uuid:
+            query = f"?uuid={uuid}"
+
+        nav_with_admin = html.Nav([
+                            html.Ul([
+                                html.Li(html.A("Dashboard", href=f"{pathname_prefix}home{query}", className="nav-link")),
+                                html.Li(html.A("HMIS DataSet Reports", href=f"{pathname_prefix}hmis_reports{query}", className="nav-link")),
+                                html.Li(html.A("Program Reports", href=f"{pathname_prefix}program_reports{query}", className="nav-link")),
+                                html.Li(html.A("Configure Reports", href=f"{pathname_prefix}reports_config{query}", className="nav-link")),
+                                html.Div(
+                                    f"Last updated on: {last_updated}",
+                                    style={"color":"grey","font-size":"0.9rem","margin-top":"5px","font-style":"italic"}
+                                )
+                            ], className="nav-list")
+                        ], className="navbar")
+        nav_without_admin = html.Nav([
+                                html.Ul([
+                                    html.Li(html.A("Dashboard", href=f"{pathname_prefix}home{query}", className="nav-link")),
+                                    html.Li(html.A("HMIS DataSet Reports", href=f"{pathname_prefix}hmis_reports{query}", className="nav-link")),
+                                    html.Li(html.A("Program Reports", href=f"{pathname_prefix}program_reports{query}", className="nav-link")),
+                                    html.Li(html.A("Configure Reports", href=f"{pathname_prefix}reports_config{query}", className="nav-link",
+                                                style={'visibility': 'hidden', 'pointer-events': 'none', 'cursor': 'default'}),
+                                                    style={'visibility': 'hidden'}),
+                                    html.Div(
+                                        f"Last updated on: {last_updated}",
+                                        style={"color":"grey","font-size":"0.9rem","margin-top":"5px","font-style":"italic"}
+                                    )
+                                ], className="nav-list")
+                            ], className="navbar")
+        
+        if uuid in users['user_id'].tolist():
+            role_string = users.query(f'user_id == "{uuid}"')['role'].iloc[0]
+            roles_list = [r.strip() for r in role_string.split(',')]
+            print(roles_list)
+
+            if "Superuser,Superuser," in roles_list:
+                return nav_with_admin
+            else:
+                return nav_without_admin
+        elif uuid == 'm3his@dhd':
+            return nav_with_admin
+        else:
+            return 
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return nav_without_admin
+
 @callback(
     Output('url-params-store', 'data'),
     Input('url', 'href')
@@ -74,7 +131,6 @@ def store_url_params(href):
     parsed_url = urllib.parse.urlparse(href)
     params = urllib.parse.parse_qs(parsed_url.query)
     
-    # location = location_param.get('Location', [None])[0]
     return params
 
 @app.callback(
@@ -97,20 +153,29 @@ def redirect_to_home(pathname):
     Input('url-params-store', 'data')
 )
 def update_nav_links(url_params):
-    location = url_params.get('Location', [None])[0] if url_params else None
-    uuid = url_params.get('uuid', [None])[0] if url_params else None
-    query = f"?Location={location}&uuid={uuid}" if location and uuid else f"?Location={location}" if location else f"?uuid={uuid}" if uuid else ""
-    path = os.getcwd()
-    json_path = os.path.join(path, 'data','TimeStamp.csv')
-    last_updated = pd.read_csv(json_path)['saving_time'].to_list()[0]
+    try:
+        location = url_params.get('Location', [None])[0] if url_params else None
+        uuid = url_params.get('uuid', [None])[0] if url_params else None
+        query = f"?Location={location}&uuid={uuid}" if location and uuid else f"?Location={location}" if location else f"?uuid={uuid}" if uuid else ""
+        path = os.getcwd()
+        json_path = os.path.join(path, 'data','TimeStamp.csv')
+        last_updated = pd.read_csv(json_path)['saving_time'].to_list()[0]
 
-    return (
-        f"{pathname_prefix}home{query}",
-        f"{pathname_prefix}hmis_reports{query}",
-        f"{pathname_prefix}program_reports{query}",
-        f"{pathname_prefix}reports_config{query}",
-        f"Last updated on: {last_updated}"
-    )
+        return (
+            f"{pathname_prefix}home{query}",
+            f"{pathname_prefix}hmis_reports{query}",
+            f"{pathname_prefix}program_reports{query}",
+            f"{pathname_prefix}reports_config{query}",
+            f"Last updated on: {last_updated}"
+        )
+    except Exception as e:
+        return (
+            f"{pathname_prefix}home{query}",
+            f"{pathname_prefix}hmis_reports{query}",
+            f"{pathname_prefix}program_reports{query}",
+            f"{pathname_prefix}reports_config{query}",
+            f"Error loading last updated: {str(e)}"
+        )
 
 
 # Helper functions for date ranges (replicated from pages/reports.py)

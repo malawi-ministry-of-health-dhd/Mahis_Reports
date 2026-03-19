@@ -44,7 +44,10 @@ min_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 max_date = datetime.now().replace(hour=23, minute=59, second=59, microsecond=0)
 
 path = os.getcwd()
-last_refreshed = pd.read_csv(f'{path}/data/TimeStamp.csv')['saving_time'].to_list()[0]
+try:
+    last_refreshed = pd.read_csv(f'{path}/data/TimeStamp.csv')['saving_time'].to_list()[0]
+except Exception as e:
+    last_refreshed = "Unknown"
 
 
 # BUILD CHARTS
@@ -254,6 +257,8 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
         try:
             data = DataStorage.query_duckdb(SQL)
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return html.Div('Missing Data. ' \
             'Ensure that the config file has correct database credentials'
             ,style={'color':'red'}), [], '', ''  # Empty DataFrame with expected columns

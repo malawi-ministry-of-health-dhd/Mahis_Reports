@@ -116,7 +116,7 @@ def create_column_chart(df, x_col, y_col, title, x_title, y_title,
     data = _apply_filter(data, filter_col3, filter_value3)
 
     
-    data = data.drop_duplicates(subset=[unique_column, DATE_])
+    # data = data.drop_duplicates(subset=[unique_column, DATE_])
 
     if color:
         # Group by both x_col and color column
@@ -160,7 +160,12 @@ def create_column_chart(df, x_col, y_col, title, x_title, y_title,
     
     return fig
 
-def create_line_chart(df, date_col, y_col, title, x_title, y_title, unique_column=PERSON_ID_, legend_title=None, color=None, filter_col1=None, filter_value1=None, filter_col2=None, filter_value2=None, filter_col3=None, filter_value3=None):
+def create_line_chart(df, date_col, y_col, title, x_title, 
+                      y_title, unique_column=PERSON_ID_, 
+                      legend_title=None, color=None, filter_col1=None, 
+                      filter_value1=None, filter_col2=None, 
+                      filter_value2=None, filter_col3=None, 
+                      filter_value3=None, aggregation='count'):
     """
     Create a time series chart using Plotly Express.
     """
@@ -171,7 +176,7 @@ def create_line_chart(df, date_col, y_col, title, x_title, y_title, unique_colum
     data = _apply_filter(data, filter_col2, filter_value2)
     data = _apply_filter(data, filter_col3, filter_value3)
 
-    data = data.drop_duplicates(subset=[unique_column, DATE_])
+    # data = data.drop_duplicates(subset=[unique_column, DATE_])
 
     # Ensure date column is in datetime format
     if not pd.api.types.is_datetime64_any_dtype(data[date_col]):
@@ -184,9 +189,9 @@ def create_line_chart(df, date_col, y_col, title, x_title, y_title, unique_colum
     data[date_col] = pd.to_datetime(data[date_col]).dt.date
 
     if color:
-        summary = data.groupby([date_col, color])[y_col].nunique().reset_index(name='count')
+        summary = data.groupby([date_col, color])[y_col].agg(aggregation).reset_index(name='count')
     else:
-        summary = data.groupby(date_col)[y_col].nunique().reset_index(name='count')
+        summary = data.groupby(date_col)[y_col].agg(aggregation).reset_index(name='count')
 
     fig = px.line(
         summary,
@@ -224,7 +229,11 @@ def create_line_chart(df, date_col, y_col, title, x_title, y_title, unique_colum
     
     return fig
 
-def create_pie_chart(df, names_col, values_col, title, unique_column=PERSON_ID_, filter_col1=None, filter_value1=None, filter_col2=None, filter_value2=None, filter_col3=None, filter_value3=None, colormap=None):
+def create_pie_chart(df, names_col, values_col, title, 
+                     unique_column=PERSON_ID_, filter_col1=None, 
+                     filter_value1=None, filter_col2=None, 
+                     filter_value2=None, filter_col3=None, 
+                     filter_value3=None, colormap=None, aggregation='count'):
     """
     Create a pie chart using Plotly Express.
     """
@@ -235,9 +244,9 @@ def create_pie_chart(df, names_col, values_col, title, unique_column=PERSON_ID_,
     data = _apply_filter(data, filter_col2, filter_value2)
     data = _apply_filter(data, filter_col3, filter_value3)
     
-    data = data.drop_duplicates(subset=[unique_column, DATE_])
+    # data = data.drop_duplicates(subset=[unique_column, DATE_])
     
-    df_summary = data.groupby(names_col)[values_col].nunique().reset_index()
+    df_summary = data.groupby(names_col)[values_col].agg(aggregation).reset_index()
     df_summary.columns = [names_col, values_col]
 
     colormap = {}
@@ -267,6 +276,7 @@ def create_pivot_table(df, index_col, columns_col, values_col, title, unique_col
                      filter_col1=None, filter_value1=None, 
                      filter_col2=None, filter_value2=None,
                      filter_col3=None, filter_value3=None,
+                     aggregation='count',
                      rename={}, replace={}):
     """
     Create a pivot table from the DataFrame.
@@ -696,7 +706,8 @@ def create_age_gender_histogram(
     df, age_col, gender_col, title, xtitle, ytitle, bin_size,
     filter_col1=None, filter_value1=None,
     filter_col2=None, filter_value2=None,
-    filter_col3=None, filter_value3=None
+    filter_col3=None, filter_value3=None,
+    aggregation='count'
 ):
     """
     Create an age–gender histogram with labeled bins and data labels.

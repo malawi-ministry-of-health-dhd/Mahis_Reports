@@ -1457,6 +1457,7 @@ a1976b08-e9cb-413e-8cc3-11f16e7d7109,Clinician
 175391d6-955f-44ae-8d61-ad6359d7a193,Clinician
 a16867c1-34dc-4a8e-a1fc-1f52d680bfcb,Clinician
 da40075e-3585-4fb7-bca4-6b2e7e41f946,Clinician
+2c269a02-e639-4aca-ac71-1db199e79ec7,Lab
 2c269a02-e639-4aca-ac71-1db199e79ec7,Superuser
 2c269a02-e639-4aca-ac71-1db199e79ec7,"Superuser,Superuser,"
 2c269a02-e639-4aca-ac71-1db199e79ec7,Supervisor
@@ -1549,7 +1550,6 @@ bf6a590d-6b0f-41c3-a1b0-fb0b1eb42760,Clinician
 756405a1-b47b-4161-8fc5-fd4fa5c5def9,Superuser
 11f2b499-a49b-401d-98cc-3c1f1258d0a7,District Superuser
 11f2b499-a49b-401d-98cc-3c1f1258d0a7,Superuser
-cd55fb45-2b6c-43b6-a2b0-1e36f39ddc08,District Superuser
 cd55fb45-2b6c-43b6-a2b0-1e36f39ddc08,Superuser
 146bb8a7-8cb0-4781-9afa-79137666b824,Superuser
 030c0188-ed53-4616-87aa-b26ae1390d40,District Superuser
@@ -1579,3 +1579,4 @@ cd55fb45-2b6c-43b6-a2b0-1e36f39ddc08,Superuser
 56018ad9-177a-4988-83ac-1a7d02263e67,Superuser
 a751b2f9-6a34-49bf-8016-f06772ba147c,Superuser
 a751b2f9-6a34-49bf-8016-f06772ba147c,"Superuser,Superuser,"
+e826f911-f0d3-4ef6-bd93-b2311e92767e,Clinician

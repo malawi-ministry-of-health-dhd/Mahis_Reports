@@ -212,8 +212,9 @@ def create_line_chart_from_config(data_opd, delta_days, filters):
     filter_val2    = parse_filter_value(filters.get('filter_val2'))
     filter_col3    = filters.get('filter_col3') or None
     filter_val3    = parse_filter_value(filters.get('filter_val3'))
+    aggregation   = filters.get('measure') or 'count'
 
-    return create_line_chart(filtered_data, date_col, y_col, title, x_title, y_title, unique_column, legend_title, color, filter_col1, filter_val1, filter_col2, filter_val2, filter_col3, filter_val3)
+    return create_line_chart(filtered_data, date_col, y_col, title, x_title, y_title, unique_column, legend_title, color, filter_col1, filter_val1, filter_col2, filter_val2, filter_col3, filter_val3,aggregation)
 
 def create_pie_chart_from_config(filtered, filters):
     """
@@ -250,8 +251,9 @@ def create_pie_chart_from_config(filtered, filters):
     filter_col3    = filters.get('filter_col3') or None
     filter_val3    = parse_filter_value(filters.get('filter_val3'))
     colormap        = filters.get('colormap') or None
+    aggregation   = filters.get('measure') or 'count'
     
-    return create_pie_chart(filtered, names_col, values_col, title, unique_column, filter_col1, filter_val1, filter_col2, filter_val2, filter_col3, filter_val3, colormap)
+    return create_pie_chart(filtered, names_col, values_col, title, unique_column, filter_col1, filter_val1, filter_col2, filter_val2, filter_col3, filter_val3, colormap, aggregation)
 
 def create_column_chart_from_config(filtered, filters):
     """
@@ -365,12 +367,13 @@ def create_histogram_from_config(filtered, filters):
     filter_val2    = parse_filter_value(filters.get('filter_val2'))
     filter_col3    = filters.get('filter_col3') or None
     filter_val3    = parse_filter_value(filters.get('filter_val3'))
+    aggregation   = filters.get('measure') or 'count'
 
     # print(f"my bin size {filtered}")
 
     return create_age_gender_histogram(
         filtered, age_col, gender_col, title, x_title, y_title, bin_size,
-        filter_col1, filter_val1, filter_col2, filter_val2, filter_col3, filter_val3
+        filter_col1, filter_val1, filter_col2, filter_val2, filter_col3, filter_val3,aggregation
     )
 
 def create_pivot_table_from_config(filtered, filters):
@@ -406,12 +409,13 @@ def create_pivot_table_from_config(filtered, filters):
     filter_val2    = parse_filter_value(filters.get('filter_val2'))
     filter_col3    = filters.get('filter_col3') or None
     filter_val3    = parse_filter_value(filters.get('filter_val3'))
+    aggregation   = filters.get('measure') or 'count'
     rename        = filters.get("rename") or {}
     replace       = filters.get("replace") or {}
 
     return create_pivot_table(
         filtered, index_col, columns, values_co, title, unique_column, aggfunc,
-        filter_col1, filter_val1, filter_col2, filter_val2, filter_col3, filter_val3, rename, replace
+        filter_col1, filter_val1, filter_col2, filter_val2, filter_col3, filter_val3, aggregation, rename, replace
     )
 
 
