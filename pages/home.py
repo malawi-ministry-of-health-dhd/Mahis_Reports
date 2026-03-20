@@ -9,6 +9,7 @@ from dash.exceptions import PreventUpdate
 import os
 from flask import request
 from helpers import build_charts_section, build_metrics_section
+from dashboard_layouts import build_premium_dashboard
 from datetime import datetime
 from datetime import datetime as dt
 from data_storage import DataStorage
@@ -51,20 +52,26 @@ except Exception as e:
 
 
 # BUILD CHARTS
-def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json):
+PREMIUM_DASHBOARD_REPORTS = {"Maternal and Child Health"}
+
+
+def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json, filter_summary=None):
     # Load JSON configuration
     config = dashboards_json
-    
+
     filtered = filtered.copy()
     filtered['Residence'] = filtered[HOME_DISTRICT_] + ', TA-' + filtered[TA_] + ', ' + filtered[VILLAGE_]
     delta_days = 7 if delta_days <= 0 else delta_days
-    
+
+    if config.get("report_name") in PREMIUM_DASHBOARD_REPORTS:
+        return build_premium_dashboard(filtered, data_opd, delta_days, config, filter_summary=filter_summary)
+
     # Build metrics from counts section
     metrics = build_metrics_section(filtered, config["visualization_types"]["counts"])
-    
+
     # Build charts from sections
     charts = build_charts_section(filtered, data_opd, delta_days, config["visualization_types"]["charts"]["sections"])
-    
+
     return html.Div([
         html.Div(className="card-container-5", children=metrics),
         charts
@@ -305,7 +312,14 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
         delta_days = (end_dt - start_dt).days
         hf_options = filtered_data[FACILITY_].sort_values().unique().tolist() + ["This Facility"]
 
-        return build_charts_from_json(filtered_data_date, filtered_data, delta_days, dashboard_json), hf_options, hf_options[0],  clicked_name
+        filter_summary = {
+            "Facility Code": location,
+            "Facility": hf or "This facility",
+            "Age Group": age or "All ages",
+            "Period": f"{start_dt.date()} to {end_dt.date()}",
+        }
+
+        return build_charts_from_json(filtered_data_date, filtered_data, delta_days, dashboard_json, filter_summary=filter_summary), hf_options, hf_options[0],  clicked_name
     except Exception as e:
         import traceback
         traceback.print_exc()
