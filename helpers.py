@@ -138,8 +138,8 @@ def build_section_items(filtered, data_opd, delta_days, items_config):
     
     return html.Div(items)
 
-def build_single_chart(filtered, data_opd, delta_days, item_config,user_role=None, style = "card-2"):
-    """Build a single chart based on configuration"""
+def build_single_chart(filtered, data_opd, delta_days, item_config,user_role=None, style = "card-2", theme_name=None):
+    """Build a single chart based on configuration."""
     chart_type = item_config["type"]
     filters = item_config["filters"]
     
@@ -162,14 +162,103 @@ def build_single_chart(filtered, data_opd, delta_days, item_config,user_role=Non
     else:
         # Default empty figure for unknown chart types
         figure = create_empty_figure()
+    figure = apply_figure_theme(figure, chart_type, theme_name)
     if chart_type in ["Line","Pie","Column","Bar","Histogram","PivotTable"]:
         return dcc.Graph(
             id=item_config["filters"]["unique"],
             figure=figure,
-            className=style
+            className=style,
+            config={
+                "displaylogo": False,
+                "responsive": True,
+                "modeBarButtonsToRemove": ["select2d", "lasso2d", "autoScale2d"],
+            },
         )
     else:
         return figure
+
+
+def apply_figure_theme(figure, chart_type, theme_name=None):
+    """Apply a scoped figure theme when the parent dashboard requests one."""
+    if theme_name != "premium_mch" or not hasattr(figure, "update_layout"):
+        return figure
+
+    # Clinical palette: cool primaries, restrained success tones, and a single warm alert accent.
+    palette = ["#155eef", "#0f766e", "#3b82f6", "#14b8a6", "#f59e0b", "#64748b"]
+    figure.update_layout(
+        template="plotly_white",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#f8fbfd",
+        colorway=palette,
+        font=dict(family="Segoe UI, Tahoma, sans-serif", color="#12344d", size=13),
+        margin=dict(l=26, r=18, t=58, b=28),
+        title=dict(
+            x=0.02,
+            xanchor="left",
+            font=dict(size=18, family="Segoe UI, Tahoma, sans-serif", color="#0f2740"),
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
+            x=0,
+            bgcolor="rgba(255,255,255,0.85)",
+            bordercolor="#d5e2ea",
+            borderwidth=1,
+        ),
+        hoverlabel=dict(
+            bgcolor="#0f2740",
+            bordercolor="#0f2740",
+            font=dict(color="#ffffff", family="Segoe UI, Tahoma, sans-serif"),
+        ),
+        transition_duration=220,
+    )
+
+    if hasattr(figure, "update_xaxes"):
+        figure.update_xaxes(
+            showgrid=False,
+            linecolor="#d7e3ea",
+            tickfont=dict(color="#5f7283"),
+            title_font=dict(color="#12344d"),
+        )
+    if hasattr(figure, "update_yaxes"):
+        figure.update_yaxes(
+            gridcolor="#e4edf3",
+            zeroline=False,
+            tickfont=dict(color="#5f7283"),
+            title_font=dict(color="#12344d"),
+        )
+
+    if chart_type in ["Column", "Bar", "Histogram"]:
+        figure.update_traces(
+            marker_line_color="#ffffff",
+            marker_line_width=1.2,
+            opacity=0.92,
+            selector=lambda trace: getattr(trace, "type", None) in ["bar", "histogram"],
+        )
+    elif chart_type == "Line":
+        figure.update_traces(
+            line=dict(width=3),
+            marker=dict(size=8, line=dict(width=2, color="#ffffff")),
+            selector=lambda trace: getattr(trace, "type", None) == "scatter",
+        )
+    elif chart_type == "Pie":
+        figure.update_traces(
+            hole=0.54,
+            marker=dict(line=dict(color="#ffffff", width=2)),
+            textfont=dict(color="#16354f", family="Segoe UI, Tahoma, sans-serif"),
+            textposition="inside",
+            insidetextorientation="horizontal",
+        )
+    elif chart_type == "PivotTable":
+        figure.update_traces(
+            header=dict(fill_color="#155eef", font=dict(color="#ffffff", size=12)),
+            cells=dict(fill_color="#ffffff", font=dict(color="#16354f", size=11)),
+            selector=dict(type="table"),
+        )
+
+    return figure
 
 
 def create_line_chart_from_config(data_opd, delta_days, filters):
