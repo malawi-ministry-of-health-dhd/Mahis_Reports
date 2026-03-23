@@ -258,7 +258,6 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
             SELECT *
             FROM 'data/{DATA_FILE_NAME_}'
             WHERE Date >= TIMESTAMP '{last_7_days}'
-            AND {FACILITY_CODE_} = '{location}'
             """
         try:
             data = DataStorage.query_duckdb(SQL)
@@ -290,8 +289,10 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
 
         # Apply Dropdown Filters
         mask = pd.Series(True, index=data.index)
-        # if hf:
-        #     mask &= (data[FACILITY_] == hf)
+        if hf and hf not in ["All facilities", "This facility"]:
+            mask &= (data[FACILITY_] == hf)
+        elif hf == "This facility":
+            mask &= (data[FACILITY_CODE_] == location)
         if age:
             mask &= (data[AGE_GROUP_] == age)
             
@@ -309,7 +310,8 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
         dashboard_json = next((d for d in menu_json if d['report_name'] == clicked_name), menu_json[0])
 
         delta_days = (end_dt - start_dt).days
-        hf_options = filtered_data[FACILITY_].sort_values().unique().tolist() + ["This Facility"]
+        facility_list = sorted(filtered_data[FACILITY_].dropna().unique().tolist())
+        hf_options = ["All facilities", "This facility"] + facility_list
 
         filter_summary = {
             "Facility Code": location,
@@ -318,7 +320,7 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
             "Period": f"{start_dt.date()} to {end_dt.date()}",
         }
 
-        return build_charts_from_json(filtered_data_date, filtered_data, delta_days, dashboard_json, filter_summary=filter_summary), hf_options, hf_options[0],  clicked_name
+        return build_charts_from_json(filtered_data_date, filtered_data, delta_days, dashboard_json, filter_summary=filter_summary), hf_options, (hf or "This facility"),  clicked_name
     except Exception as e:
         import traceback
         traceback.print_exc()

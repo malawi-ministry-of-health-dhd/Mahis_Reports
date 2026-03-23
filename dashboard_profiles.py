@@ -23,5 +23,15 @@ DASHBOARD_PROFILES = {
         ],
         "tracker_title": "Priority intervention coverage tracker",
         "tracker_target": 80,
+        "indicator_targets": {
+            "ANC Clients Screened for Anemia": 80,
+            "ANC Clients Screened for Infection": 80,
+            "ANC Clients Screened for High BP": 80,
+            "POCUS With Gestational Age Recorded": 50,
+            "Deliveries With Digital Monitoring": 70,
+            "PPH Treatment Bundle Completed": 70,
+            "PNC Mothers Within 48 Hours": 80,
+            "Babies Receiving BCG": 90,
+        },
     }
 }

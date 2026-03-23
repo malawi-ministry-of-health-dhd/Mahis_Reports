@@ -804,6 +804,117 @@ def create_horizontal_bar_chart(df, label_col, value_col, title, x_title, y_titl
 
     return fig
 
+
+def create_metric_heatmap(
+    df,
+    title,
+    metrics,
+    date_col=DATE_,
+    unique_column=PERSON_ID_,
+    month_format="%b %Y",
+    mode="month_metric",
+    category_col="Facility",
+):
+    """Build a performance heatmap across metric/month or facility/metric dimensions."""
+    data = df.copy()
+    if data.empty:
+        return go.Figure()
+
+    data[date_col] = pd.to_datetime(data[date_col], errors="coerce")
+    data = data.dropna(subset=[date_col]).copy()
+    data["metric_month"] = data[date_col].dt.to_period("M").dt.to_timestamp()
+
+    rows = []
+    for metric in metrics:
+        metric_df = data.copy()
+        for filter_col, filter_value in metric.get("filters", []):
+            metric_df = _apply_filter(metric_df, filter_col, filter_value)
+
+        if metric_df.empty:
+            continue
+
+        target = metric.get("target", 80)
+        if mode == "facility_metric":
+            summary = (
+                metric_df.drop_duplicates(subset=[unique_column, date_col])
+                .groupby(category_col)[unique_column]
+                .nunique()
+                .reset_index(name="count")
+            )
+            summary["progress"] = summary["count"].apply(lambda value: round((value / target) * 100) if target else 0)
+            summary["metric"] = metric["label"]
+            summary["text"] = summary.apply(
+                lambda row: f"{int(row['count'])} ({int(row['progress'])}%)",
+                axis=1,
+            )
+            rows.append(summary[[category_col, "metric", "progress", "text"]])
+        else:
+            summary = (
+                metric_df.drop_duplicates(subset=[unique_column, date_col])
+                .groupby("metric_month")[unique_column]
+                .nunique()
+                .reset_index(name="count")
+            )
+            summary["progress"] = summary["count"].apply(lambda value: round((value / target) * 100) if target else 0)
+            summary["metric"] = metric["label"]
+            summary["month_label"] = summary["metric_month"].dt.strftime(month_format)
+            summary["text"] = summary.apply(
+                lambda row: f"{int(row['count'])} ({int(row['progress'])}%)",
+                axis=1,
+            )
+            rows.append(summary[["month_label", "metric", "progress", "text"]])
+
+    if not rows:
+        return go.Figure()
+
+    final_df = pd.concat(rows, ignore_index=True)
+    if mode == "facility_metric":
+        matrix = final_df.pivot(index=category_col, columns="metric", values="progress").fillna(0)
+        text_matrix = final_df.pivot(index=category_col, columns="metric", values="text").fillna("")
+        x_values = matrix.columns.tolist()
+        y_values = matrix.index.tolist()
+        hovertemplate = "<b>%{y}</b><br>Indicator: %{x}<br>Achievement: %{z}%<extra></extra>"
+        xaxis_title = "Indicator"
+        yaxis_title = category_col
+    else:
+        month_order = list(dict.fromkeys(final_df["month_label"].tolist()))
+        metric_order = [metric["label"] for metric in metrics if metric["label"] in final_df["metric"].unique()]
+        matrix = final_df.pivot(index="metric", columns="month_label", values="progress").reindex(index=metric_order, columns=month_order).fillna(0)
+        text_matrix = final_df.pivot(index="metric", columns="month_label", values="text").reindex(index=metric_order, columns=month_order).fillna("")
+        x_values = matrix.columns.tolist()
+        y_values = matrix.index.tolist()
+        hovertemplate = "<b>%{y}</b><br>Month: %{x}<br>Achievement: %{z}%<extra></extra>"
+        xaxis_title = "Month"
+        yaxis_title = "Indicator"
+
+    heatmap = go.Figure(
+        data=go.Heatmap(
+            x=x_values,
+            y=y_values,
+            z=matrix.values,
+            text=text_matrix.values,
+            texttemplate="%{text}",
+            textfont={"size": 10},
+            colorscale=[
+                [0.0, "#D2222D"],
+                [0.49, "#FFBF00"],
+                [0.5, "#FFBF00"],
+                [1.0, "#238823"],
+            ],
+            zmin=0,
+            zmax=max(100, float(final_df["progress"].max())),
+            colorbar={"title": "Target %"},
+            hovertemplate=hovertemplate,
+        )
+    )
+    heatmap.update_layout(
+        title=title,
+        xaxis_title=xaxis_title,
+        yaxis_title=yaxis_title,
+        template="plotly_white",
+    )
+    return heatmap
+
 def create_count(df, unique_column=PERSON_ID_, filter_col1=None, filter_value1=None, filter_col2=None, filter_value2=None, 
                  filter_col3=None, filter_value3=None, filter_col4=None, filter_value4=None,
                  filter_col5=None, filter_value5=None, filter_col6=None, filter_value6=None, 

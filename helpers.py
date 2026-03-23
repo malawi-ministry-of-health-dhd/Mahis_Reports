@@ -7,7 +7,8 @@ from visualizations import (create_column_chart,
                           create_line_chart,
                           create_age_gender_histogram,
                           create_horizontal_bar_chart,
-                          create_pivot_table,create_crosstab_table, create_line_list)
+                          create_pivot_table,create_crosstab_table, create_line_list,
+                          create_metric_heatmap)
 from datetime import datetime
 from config import (actual_keys_in_data, 
                     FIRST_NAME_, LAST_NAME_,
@@ -155,6 +156,8 @@ def build_single_chart(filtered, data_opd, delta_days, item_config,user_role=Non
         figure = create_histogram_from_config(filtered, filters)
     elif chart_type == "PivotTable":
         figure = create_pivot_table_from_config(filtered, filters)
+    elif chart_type == "Heatmap":
+        figure = create_heatmap_from_config(filtered, filters)
     elif chart_type == "CrossTab":
         figure = create_crosstab_from_config(filtered, filters)
     elif chart_type == "LineList":
@@ -163,11 +166,13 @@ def build_single_chart(filtered, data_opd, delta_days, item_config,user_role=Non
         # Default empty figure for unknown chart types
         figure = create_empty_figure()
     figure = apply_figure_theme(figure, chart_type, theme_name, chart_name=item_config.get("name", ""))
-    if chart_type in ["Line","Pie","Column","Bar","Histogram","PivotTable"]:
+    if chart_type in ["Line","Pie","Column","Bar","Histogram","PivotTable","Heatmap"]:
         graph_style = {"width": "100%"}
         if style == "mnid-graph":
             if chart_type == "Line":
                 graph_style["height"] = "320px"
+            elif chart_type == "Heatmap":
+                graph_style["height"] = "360px"
             elif chart_type in ["Bar", "Column", "Histogram", "PivotTable"]:
                 graph_style["height"] = "280px"
             else:
@@ -198,32 +203,52 @@ def apply_figure_theme(figure, chart_type, theme_name=None, chart_name=""):
     chart_name_lower = (chart_name or "").lower()
 
     def _palette_for_chart():
+        if any(term in chart_name_lower for term in ["anc", "coverage", "pocus", "gestational", "hiv testing", "family planning", "breastfeeding", "immunisation", "bcg"]):
+            return {
+                "primary": "#009AD0",
+                "secondary": "#5580F4",
+                "accent": "#B666D2",
+                "fill": "rgba(0,154,208,0.12)",
+                "pie": ["#009AD0", "#5580F4", "#B666D2", "#D88DBC", "#FFD6E8"],
+            }
+        if any(term in chart_name_lower for term in ["performance", "heatmap", "target", "readiness", "quality"]):
+            return {
+                "primary": "#238823",
+                "secondary": "#FFBF00",
+                "accent": "#D2222D",
+                "fill": "rgba(35,136,35,0.12)",
+                "pie": ["#238823", "#FFBF00", "#D2222D", "#009AD0", "#B666D2"],
+            }
         if any(term in chart_name_lower for term in ["mortality", "death", "pph", "complication", "hemorrhage"]):
             return {
-                "primary": "#c85b5a",
-                "secondary": "#e6a3a1",
-                "accent": "#f2d4d2",
-                "fill": "rgba(200,91,90,0.12)",
+                "primary": "#D2222D",
+                "secondary": "#FF6B73",
+                "accent": "#FFD6E8",
+                "fill": "rgba(210,34,45,0.12)",
+                "pie": ["#D2222D", "#FFBF00", "#238823", "#009AD0", "#B666D2"],
             }
         if any(term in chart_name_lower for term in ["neonatal", "newborn", "baby", "resuscitation", "kmc", "cpap"]):
             return {
-                "primary": "#2f5f8f",
-                "secondary": "#7aa4c7",
-                "accent": "#dbe7f1",
-                "fill": "rgba(47,95,143,0.12)",
+                "primary": "#009AD0",
+                "secondary": "#7FD6FF",
+                "accent": "#5580F4",
+                "fill": "rgba(0,154,208,0.12)",
+                "pie": ["#009AD0", "#7FD6FF", "#5580F4", "#B666D2", "#D88DBC"],
             }
         if any(term in chart_name_lower for term in ["staff", "facility", "cadre", "referral"]):
             return {
-                "primary": "#6e8b3d",
-                "secondary": "#9cb476",
-                "accent": "#e2ead2",
-                "fill": "rgba(110,139,61,0.12)",
+                "primary": "#5580F4",
+                "secondary": "#A285D1",
+                "accent": "#D88DBC",
+                "fill": "rgba(85,128,244,0.12)",
+                "pie": ["#5580F4", "#A285D1", "#D88DBC", "#009AD0", "#7FD6FF"],
             }
         return {
-            "primary": "#b67a16",
-            "secondary": "#d1a04a",
-            "accent": "#f0e0bf",
-            "fill": "rgba(182,122,22,0.12)",
+            "primary": "#009AD0",
+            "secondary": "#5580F4",
+            "accent": "#B666D2",
+            "fill": "rgba(85,128,244,0.12)",
+            "pie": ["#009AD0", "#5580F4", "#B666D2", "#D88DBC", "#FFD6E8"],
         }
 
     chart_palette = _palette_for_chart()
@@ -269,6 +294,8 @@ def apply_figure_theme(figure, chart_type, theme_name=None, chart_name=""):
         figure.update_layout(height=240)
     elif chart_type == "PivotTable":
         figure.update_layout(height=300)
+    elif chart_type == "Heatmap":
+        figure.update_layout(height=360)
 
     if hasattr(figure, "update_xaxes"):
         figure.update_xaxes(
@@ -303,13 +330,7 @@ def apply_figure_theme(figure, chart_type, theme_name=None, chart_name=""):
             selector=lambda trace: getattr(trace, "type", None) == "scatter",
         )
     elif chart_type == "Pie":
-        pie_palette = [
-            chart_palette["primary"],
-            chart_palette["secondary"],
-            "#d3cec2",
-            "#8b8578",
-            chart_palette["accent"],
-        ]
+        pie_palette = chart_palette["pie"]
         figure.update_traces(
             hole=0.54,
             marker=dict(colors=pie_palette, line=dict(color="#ffffff", width=2)),
@@ -318,11 +339,20 @@ def apply_figure_theme(figure, chart_type, theme_name=None, chart_name=""):
             insidetextorientation="horizontal",
             textinfo="percent",
         )
+        figure.update_layout(showlegend=True)
     elif chart_type == "PivotTable":
         figure.update_traces(
             header=dict(fill_color="#2f5f8f", font=dict(color="#ffffff", size=12)),
             cells=dict(fill_color="#ffffff", font=dict(color="#3f3c37", size=11)),
             selector=dict(type="table"),
+        )
+    elif chart_type == "Heatmap":
+        figure.update_layout(
+            coloraxis_colorbar=dict(
+                outlinewidth=0,
+                tickfont=dict(color="#5d5a53", size=11),
+                title=dict(font=dict(color="#5d5a53", size=11)),
+            )
         )
 
     return figure
@@ -572,6 +602,28 @@ def create_pivot_table_from_config(filtered, filters):
     return create_pivot_table(
         filtered, index_col, columns, values_co, title, unique_column, aggfunc,
         filter_col1, filter_val1, filter_col2, filter_val2, filter_col3, filter_val3, aggregation, rename, replace
+    )
+
+
+def create_heatmap_from_config(filtered, filters):
+    """Create a metric heatmap from JSON configuration."""
+    title = filters.get("title") or "Performance Heatmap"
+    date_col = filters.get("date_col") or "Date"
+    unique_column = filters.get("unique_column") or "person_id"
+    month_format = filters.get("month_format") or "%b %Y"
+    metrics = filters.get("metrics") or []
+    mode = filters.get("mode") or "month_metric"
+    category_col = filters.get("category_col") or "Facility"
+
+    return create_metric_heatmap(
+        filtered,
+        title=title,
+        metrics=metrics,
+        date_col=date_col,
+        unique_column=unique_column,
+        month_format=month_format,
+        mode=mode,
+        category_col=category_col,
     )
 
 

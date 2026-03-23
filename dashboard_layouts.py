@@ -65,10 +65,10 @@ def _metric_status(value, target):
 def _get_metric_section_href(label):
     label_lower = label.lower()
     if any(term in label_lower for term in ["anc", "anemia", "infection", "blood pressure", "pocus", "gestational", "tetanus"]):
-        return "#mnid-section-0"
-    if any(term in label_lower for term in ["deliver", "labour", "digital monitoring", "pph", "corticosteroid", "azithromycin", "staff"]):
         return "#mnid-section-1"
-    return "#mnid-section-2"
+    if any(term in label_lower for term in ["deliver", "labour", "digital monitoring", "pph", "corticosteroid", "azithromycin", "staff"]):
+        return "#mnid-section-2"
+    return "#mnid-section-3"
 
 
 def _build_reference_metric_card(value, label, tone, target):
@@ -134,7 +134,6 @@ def _build_alert_banner(metric_items):
 
 
 def _build_tracker(metric_items, profile):
-    target = profile.get("tracker_target", 80)
     tracker_items = []
     for item in metric_items[:6]:
         pct = min(item["progress"], 100)
@@ -169,7 +168,7 @@ def _build_tracker(metric_items, profile):
 def _build_reference_chart_card(filtered, data_opd, delta_days, item_config, theme_name):
     chart_type = item_config.get("type", "")
     card_class = "mnid-card mnid-card-chart"
-    if chart_type == "Line":
+    if chart_type in ["Line", "Heatmap"]:
         card_class += " mnid-card-chart-wide"
     elif chart_type in ["Bar", "Column", "PivotTable", "CrossTab", "LineList"]:
         card_class += " mnid-card-chart-mid"
@@ -210,8 +209,11 @@ def build_mnid_light_dashboard(filtered, data_opd, delta_days, dashboard_config,
         }
         for count_config in counts[:8]
     ]
-    target = profile.get("tracker_target", 80)
+    indicator_targets = profile.get("indicator_targets", {})
+    default_target = profile.get("tracker_target", 80)
     for item in metric_items:
+        target = indicator_targets.get(item["label"], default_target)
+        item["target"] = target
         item["progress"] = _metric_progress(item["value"], target)
         item["tone"] = _metric_status(item["value"], target)
 
@@ -249,7 +251,7 @@ def build_mnid_light_dashboard(filtered, data_opd, delta_days, dashboard_config,
                     html.Summary(
                         children=[
                             html.Span(section["section_name"], className="mnid-section-summary-title"),
-                            html.Span(f"{len(section_items)} visuals", className="mnid-section-summary-meta"),
+                            html.Span(f"{len(section['items'])} visuals", className="mnid-section-summary-meta"),
                         ],
                         className="mnid-section-summary",
                     ),
@@ -290,7 +292,7 @@ def build_mnid_light_dashboard(filtered, data_opd, delta_days, dashboard_config,
                 id="mnid-overview",
                 className="mnid-kpi-row",
                 children=[
-                    _build_reference_metric_card(item["value"], item["label"], item["tone"], target)
+                    _build_reference_metric_card(item["value"], item["label"], item["tone"], item["target"])
                     for item in metric_items[:6]
                 ],
             ),
