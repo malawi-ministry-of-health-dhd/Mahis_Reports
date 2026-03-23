@@ -162,12 +162,24 @@ def build_single_chart(filtered, data_opd, delta_days, item_config,user_role=Non
     else:
         # Default empty figure for unknown chart types
         figure = create_empty_figure()
-    figure = apply_figure_theme(figure, chart_type, theme_name)
+    figure = apply_figure_theme(figure, chart_type, theme_name, chart_name=item_config.get("name", ""))
     if chart_type in ["Line","Pie","Column","Bar","Histogram","PivotTable"]:
+        graph_style = {"width": "100%"}
+        if style == "mnid-graph":
+            if chart_type == "Line":
+                graph_style["height"] = "320px"
+            elif chart_type in ["Bar", "Column", "Histogram", "PivotTable"]:
+                graph_style["height"] = "280px"
+            else:
+                graph_style["height"] = "240px"
+        else:
+            graph_style["height"] = "100%"
+
         return dcc.Graph(
-            id=item_config["filters"]["unique"],
+            id=item_config.get("id", f"chart-{chart_type.lower()}"),
             figure=figure,
             className=style,
+            style=graph_style,
             config={
                 "displaylogo": False,
                 "responsive": True,
@@ -178,60 +190,106 @@ def build_single_chart(filtered, data_opd, delta_days, item_config,user_role=Non
         return figure
 
 
-def apply_figure_theme(figure, chart_type, theme_name=None):
+def apply_figure_theme(figure, chart_type, theme_name=None, chart_name=""):
     """Apply a scoped figure theme when the parent dashboard requests one."""
     if theme_name != "premium_mch" or not hasattr(figure, "update_layout"):
         return figure
 
-    # Clinical palette: cool primaries, restrained success tones, and a single warm alert accent.
-    palette = ["#155eef", "#0f766e", "#3b82f6", "#14b8a6", "#f59e0b", "#64748b"]
+    chart_name_lower = (chart_name or "").lower()
+
+    def _palette_for_chart():
+        if any(term in chart_name_lower for term in ["mortality", "death", "pph", "complication", "hemorrhage"]):
+            return {
+                "primary": "#c85b5a",
+                "secondary": "#e6a3a1",
+                "accent": "#f2d4d2",
+                "fill": "rgba(200,91,90,0.12)",
+            }
+        if any(term in chart_name_lower for term in ["neonatal", "newborn", "baby", "resuscitation", "kmc", "cpap"]):
+            return {
+                "primary": "#2f5f8f",
+                "secondary": "#7aa4c7",
+                "accent": "#dbe7f1",
+                "fill": "rgba(47,95,143,0.12)",
+            }
+        if any(term in chart_name_lower for term in ["staff", "facility", "cadre", "referral"]):
+            return {
+                "primary": "#6e8b3d",
+                "secondary": "#9cb476",
+                "accent": "#e2ead2",
+                "fill": "rgba(110,139,61,0.12)",
+            }
+        return {
+            "primary": "#b67a16",
+            "secondary": "#d1a04a",
+            "accent": "#f0e0bf",
+            "fill": "rgba(182,122,22,0.12)",
+        }
+
+    chart_palette = _palette_for_chart()
+    # Palette aligned to the light mockup: warm amber, muted red, clinical blue, and soft neutrals.
+    palette = ["#b67a16", "#2f5f8f", "#c85b5a", "#6e8b3d", "#8b8578", "#d3cec2"]
     figure.update_layout(
         template="plotly_white",
+        autosize=True,
         paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="#f8fbfd",
+        plot_bgcolor="#ffffff",
         colorway=palette,
-        font=dict(family="Segoe UI, Tahoma, sans-serif", color="#12344d", size=13),
-        margin=dict(l=26, r=18, t=58, b=28),
+        font=dict(family="Georgia, 'Times New Roman', serif", color="#3f3c37", size=12),
+        margin=dict(l=26, r=18, t=24, b=36),
         title=dict(
             x=0.02,
             xanchor="left",
-            font=dict(size=18, family="Segoe UI, Tahoma, sans-serif", color="#0f2740"),
+            font=dict(size=16, family="Georgia, 'Times New Roman', serif", color="#2f2b28"),
         ),
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=1.02,
+            y=1.01,
             xanchor="left",
             x=0,
-            bgcolor="rgba(255,255,255,0.85)",
-            bordercolor="#d5e2ea",
-            borderwidth=1,
+            bgcolor="rgba(255,255,255,0.96)",
+            bordercolor="#ece7db",
+            borderwidth=0,
+            font=dict(color="#5d5a53", size=11),
         ),
         hoverlabel=dict(
-            bgcolor="#0f2740",
-            bordercolor="#0f2740",
-            font=dict(color="#ffffff", family="Segoe UI, Tahoma, sans-serif"),
+            bgcolor="#faf8f2",
+            bordercolor="#e5dfd1",
+            font=dict(color="#2f2b28", family="Georgia, 'Times New Roman', serif"),
         ),
         transition_duration=220,
     )
 
+    if chart_type == "Line":
+        figure.update_layout(height=320)
+    elif chart_type in ["Bar", "Column", "Histogram"]:
+        figure.update_layout(height=280)
+    elif chart_type == "Pie":
+        figure.update_layout(height=240)
+    elif chart_type == "PivotTable":
+        figure.update_layout(height=300)
+
     if hasattr(figure, "update_xaxes"):
         figure.update_xaxes(
             showgrid=False,
-            linecolor="#d7e3ea",
-            tickfont=dict(color="#5f7283"),
-            title_font=dict(color="#12344d"),
+            linecolor="#e7e1d4",
+            tickfont=dict(color="#7b756b"),
+            title_font=dict(color="#4a463f"),
+            automargin=True,
         )
     if hasattr(figure, "update_yaxes"):
         figure.update_yaxes(
-            gridcolor="#e4edf3",
+            gridcolor="#f1ece2",
             zeroline=False,
-            tickfont=dict(color="#5f7283"),
-            title_font=dict(color="#12344d"),
+            tickfont=dict(color="#7b756b"),
+            title_font=dict(color="#4a463f"),
+            automargin=True,
         )
 
     if chart_type in ["Column", "Bar", "Histogram"]:
         figure.update_traces(
+            marker_color=chart_palette["primary"],
             marker_line_color="#ffffff",
             marker_line_width=1.2,
             opacity=0.92,
@@ -239,22 +297,31 @@ def apply_figure_theme(figure, chart_type, theme_name=None):
         )
     elif chart_type == "Line":
         figure.update_traces(
-            line=dict(width=3),
-            marker=dict(size=8, line=dict(width=2, color="#ffffff")),
+            line=dict(width=2.2, color=chart_palette["primary"]),
+            marker=dict(size=6, line=dict(width=1.5, color="#ffffff"), color=chart_palette["primary"]),
+            fillcolor=chart_palette["fill"],
             selector=lambda trace: getattr(trace, "type", None) == "scatter",
         )
     elif chart_type == "Pie":
+        pie_palette = [
+            chart_palette["primary"],
+            chart_palette["secondary"],
+            "#d3cec2",
+            "#8b8578",
+            chart_palette["accent"],
+        ]
         figure.update_traces(
             hole=0.54,
-            marker=dict(line=dict(color="#ffffff", width=2)),
-            textfont=dict(color="#16354f", family="Segoe UI, Tahoma, sans-serif"),
-            textposition="inside",
+            marker=dict(colors=pie_palette, line=dict(color="#ffffff", width=2)),
+            textfont=dict(color="#5d5a53", family="Georgia, 'Times New Roman', serif"),
+            textposition="outside",
             insidetextorientation="horizontal",
+            textinfo="percent",
         )
     elif chart_type == "PivotTable":
         figure.update_traces(
-            header=dict(fill_color="#155eef", font=dict(color="#ffffff", size=12)),
-            cells=dict(fill_color="#ffffff", font=dict(color="#16354f", size=11)),
+            header=dict(fill_color="#2f5f8f", font=dict(color="#ffffff", size=12)),
+            cells=dict(fill_color="#ffffff", font=dict(color="#3f3c37", size=11)),
             selector=dict(type="table"),
         )
 

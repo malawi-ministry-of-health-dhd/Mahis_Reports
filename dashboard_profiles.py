@@ -3,6 +3,7 @@
 DASHBOARD_PROFILES = {
     "Maternal and Child Health": {
         "layout": "premium",
+        "variant": "mnid_light",
         "theme": "premium_mch",
         "brand": "Maternal & Child",
         "kicker": "Strategic Overview",
@@ -15,5 +16,12 @@ DASHBOARD_PROFILES = {
             "and donor reviewers can assess service coverage, intervention quality, and referral burden quickly."
         ),
         "section_chip_label": "Focus Areas",
+        "topbar_pills": [
+            {"label": "M-NID view", "tone": "blue"},
+            {"label": "Clinical quality", "tone": "green"},
+            {"label": "Facility dashboard", "tone": "amber"},
+        ],
+        "tracker_title": "Priority intervention coverage tracker",
+        "tracker_target": 80,
     }
 }
