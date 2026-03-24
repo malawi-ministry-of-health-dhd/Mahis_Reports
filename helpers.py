@@ -252,8 +252,13 @@ def apply_figure_theme(figure, chart_type, theme_name=None, chart_name=""):
         }
 
     chart_palette = _palette_for_chart()
-    # Palette aligned to the light mockup: warm amber, muted red, clinical blue, and soft neutrals.
-    palette = ["#b67a16", "#2f5f8f", "#c85b5a", "#6e8b3d", "#8b8578", "#d3cec2"]
+    palette = [
+        chart_palette["primary"],
+        chart_palette["secondary"],
+        chart_palette["accent"],
+        "#7FD6FF",
+        "#FFD6E8",
+    ]
     figure.update_layout(
         template="plotly_white",
         autosize=True,
@@ -261,7 +266,7 @@ def apply_figure_theme(figure, chart_type, theme_name=None, chart_name=""):
         plot_bgcolor="#ffffff",
         colorway=palette,
         font=dict(family="Georgia, 'Times New Roman', serif", color="#3f3c37", size=12),
-        margin=dict(l=26, r=18, t=24, b=36),
+        margin=dict(l=22, r=14, t=18, b=20),
         title=dict(
             x=0.02,
             xanchor="left",
@@ -270,7 +275,7 @@ def apply_figure_theme(figure, chart_type, theme_name=None, chart_name=""):
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=1.01,
+            y=1.02,
             xanchor="left",
             x=0,
             bgcolor="rgba(255,255,255,0.96)",
@@ -287,15 +292,15 @@ def apply_figure_theme(figure, chart_type, theme_name=None, chart_name=""):
     )
 
     if chart_type == "Line":
-        figure.update_layout(height=320)
+        figure.update_layout(height=300)
     elif chart_type in ["Bar", "Column", "Histogram"]:
-        figure.update_layout(height=280)
+        figure.update_layout(height=260)
     elif chart_type == "Pie":
         figure.update_layout(height=240)
     elif chart_type == "PivotTable":
-        figure.update_layout(height=300)
+        figure.update_layout(height=280)
     elif chart_type == "Heatmap":
-        figure.update_layout(height=360)
+        figure.update_layout(height=330)
 
     if hasattr(figure, "update_xaxes"):
         figure.update_xaxes(
@@ -354,6 +359,23 @@ def apply_figure_theme(figure, chart_type, theme_name=None, chart_name=""):
                 title=dict(font=dict(color="#5d5a53", size=11)),
             )
         )
+
+    if chart_type == "Pie":
+        labels = []
+        if figure.data and hasattr(figure.data[0], "labels") and figure.data[0].labels is not None:
+            labels = [str(label).lower() for label in figure.data[0].labels]
+        if labels:
+            semantic_colors = []
+            for label in labels:
+                if any(term in label for term in ["screened", "yes", "stable", "completed", "reactive done", "exclusive", "this facility", "facility"]):
+                    semantic_colors.append("#009AD0")
+                elif any(term in label for term in ["no", "not", "referred", "died", "death", "stillbirth"]):
+                    semantic_colors.append("#B666D2")
+                elif any(term in label for term in ["partial", "mixed", "unknown"]):
+                    semantic_colors.append("#D88DBC")
+                else:
+                    semantic_colors.append(pie_palette[len(semantic_colors) % len(pie_palette)])
+            figure.update_traces(marker=dict(colors=semantic_colors, line=dict(color="#ffffff", width=2)))
 
     return figure
 
@@ -607,7 +629,9 @@ def create_pivot_table_from_config(filtered, filters):
 
 def create_heatmap_from_config(filtered, filters):
     """Create a metric heatmap from JSON configuration."""
-    title = filters.get("title") or "Performance Heatmap"
+    title = filters.get("title")
+    if title is None:
+        title = "Performance Heatmap"
     date_col = filters.get("date_col") or "Date"
     unique_column = filters.get("unique_column") or "person_id"
     month_format = filters.get("month_format") or "%b %Y"

@@ -834,32 +834,69 @@ def create_metric_heatmap(
             continue
 
         target = metric.get("target", 80)
+        denominator_filters = metric.get("denominator_filters") or metric.get("benchmark_filters") or []
         if mode == "facility_metric":
-            summary = (
+            numerator = (
                 metric_df.drop_duplicates(subset=[unique_column, date_col])
                 .groupby(category_col)[unique_column]
                 .nunique()
                 .reset_index(name="count")
             )
-            summary["progress"] = summary["count"].apply(lambda value: round((value / target) * 100) if target else 0)
+            if denominator_filters:
+                denominator_df = data.copy()
+                for filter_col, filter_value in denominator_filters:
+                    denominator_df = _apply_filter(denominator_df, filter_col, filter_value)
+                denominator = (
+                    denominator_df.drop_duplicates(subset=[unique_column, date_col])
+                    .groupby(category_col)[unique_column]
+                    .nunique()
+                    .reset_index(name="denominator")
+                )
+                summary = numerator.merge(denominator, on=category_col, how="left").fillna({"denominator": 0})
+                summary["progress"] = summary.apply(
+                    lambda row: round((row["count"] / row["denominator"]) * 100) if row["denominator"] else 0,
+                    axis=1,
+                )
+            else:
+                summary = numerator.copy()
+                summary["denominator"] = 0
+                summary["progress"] = summary["count"].apply(lambda value: round((value / target) * 100) if target else 0)
             summary["metric"] = metric["label"]
             summary["text"] = summary.apply(
-                lambda row: f"{int(row['count'])} ({int(row['progress'])}%)",
+                lambda row: f"{int(row['count'])}/{int(row['denominator'])} ({int(row['progress'])}%)" if row["denominator"] else f"{int(row['count'])} ({int(row['progress'])}%)",
                 axis=1,
             )
             rows.append(summary[[category_col, "metric", "progress", "text"]])
         else:
-            summary = (
+            numerator = (
                 metric_df.drop_duplicates(subset=[unique_column, date_col])
                 .groupby("metric_month")[unique_column]
                 .nunique()
                 .reset_index(name="count")
             )
-            summary["progress"] = summary["count"].apply(lambda value: round((value / target) * 100) if target else 0)
+            if denominator_filters:
+                denominator_df = data.copy()
+                for filter_col, filter_value in denominator_filters:
+                    denominator_df = _apply_filter(denominator_df, filter_col, filter_value)
+                denominator = (
+                    denominator_df.drop_duplicates(subset=[unique_column, date_col])
+                    .groupby("metric_month")[unique_column]
+                    .nunique()
+                    .reset_index(name="denominator")
+                )
+                summary = numerator.merge(denominator, on="metric_month", how="left").fillna({"denominator": 0})
+                summary["progress"] = summary.apply(
+                    lambda row: round((row["count"] / row["denominator"]) * 100) if row["denominator"] else 0,
+                    axis=1,
+                )
+            else:
+                summary = numerator.copy()
+                summary["denominator"] = 0
+                summary["progress"] = summary["count"].apply(lambda value: round((value / target) * 100) if target else 0)
             summary["metric"] = metric["label"]
             summary["month_label"] = summary["metric_month"].dt.strftime(month_format)
             summary["text"] = summary.apply(
-                lambda row: f"{int(row['count'])} ({int(row['progress'])}%)",
+                lambda row: f"{int(row['count'])}/{int(row['denominator'])} ({int(row['progress'])}%)" if row["denominator"] else f"{int(row['count'])} ({int(row['progress'])}%)",
                 axis=1,
             )
             rows.append(summary[["month_label", "metric", "progress", "text"]])

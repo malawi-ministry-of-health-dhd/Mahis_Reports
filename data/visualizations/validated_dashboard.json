@@ -2283,6 +2283,16 @@
                                                     "obs_value_coded",
                                                     "Screened"
                                                 ]
+                                            ],
+                                            "denominator_filters": [
+                                                [
+                                                    "Encounter",
+                                                    "ANC VISIT"
+                                                ],
+                                                [
+                                                    "concept_name",
+                                                    "Anemia screening"
+                                                ]
                                             ]
                                         },
                                         {
@@ -2300,6 +2310,16 @@
                                                 [
                                                     "obs_value_coded",
                                                     "Screened"
+                                                ]
+                                            ],
+                                            "denominator_filters": [
+                                                [
+                                                    "Encounter",
+                                                    "ANC VISIT"
+                                                ],
+                                                [
+                                                    "concept_name",
+                                                    "Infection screening"
                                                 ]
                                             ]
                                         },
@@ -2319,6 +2339,16 @@
                                                     "obs_value_coded",
                                                     "Screened"
                                                 ]
+                                            ],
+                                            "denominator_filters": [
+                                                [
+                                                    "Encounter",
+                                                    "ANC VISIT"
+                                                ],
+                                                [
+                                                    "concept_name",
+                                                    "High blood pressure screening"
+                                                ]
                                             ]
                                         },
                                         {
@@ -2336,6 +2366,16 @@
                                                 [
                                                     "obs_value_coded",
                                                     "Yes"
+                                                ]
+                                            ],
+                                            "denominator_filters": [
+                                                [
+                                                    "Encounter",
+                                                    "ANC VISIT"
+                                                ],
+                                                [
+                                                    "concept_name",
+                                                    "Gestational age recorded"
                                                 ]
                                             ]
                                         },
@@ -2355,6 +2395,16 @@
                                                     "obs_value_coded",
                                                     "Used"
                                                 ]
+                                            ],
+                                            "denominator_filters": [
+                                                [
+                                                    "Encounter",
+                                                    "LABOUR AND DELIVERY"
+                                                ],
+                                                [
+                                                    "concept_name",
+                                                    "Digital intrapartum monitoring"
+                                                ]
                                             ]
                                         },
                                         {
@@ -2372,6 +2422,16 @@
                                                 [
                                                     "obs_value_coded",
                                                     "Completed"
+                                                ]
+                                            ],
+                                            "denominator_filters": [
+                                                [
+                                                    "Encounter",
+                                                    "LABOUR AND DELIVERY"
+                                                ],
+                                                [
+                                                    "concept_name",
+                                                    "PPH treatment bundle"
                                                 ]
                                             ]
                                         },
@@ -2391,6 +2451,16 @@
                                                     "obs_value_coded",
                                                     "Up to 48 hrs or before discharge"
                                                 ]
+                                            ],
+                                            "denominator_filters": [
+                                                [
+                                                    "Encounter",
+                                                    "POSTNATAL CARE"
+                                                ],
+                                                [
+                                                    "concept_name",
+                                                    "Postnatal check period"
+                                                ]
                                             ]
                                         },
                                         {
@@ -2408,6 +2478,16 @@
                                                 [
                                                     "obs_value_coded",
                                                     "BCG"
+                                                ]
+                                            ],
+                                            "denominator_filters": [
+                                                [
+                                                    "Encounter",
+                                                    "POSTNATAL CARE"
+                                                ],
+                                                [
+                                                    "concept_name",
+                                                    "Immunisation given"
                                                 ]
                                             ]
                                         }
@@ -2441,6 +2521,16 @@
                                                     "obs_value_coded",
                                                     "Screened"
                                                 ]
+                                            ],
+                                            "denominator_filters": [
+                                                [
+                                                    "Encounter",
+                                                    "ANC VISIT"
+                                                ],
+                                                [
+                                                    "concept_name",
+                                                    "Anemia screening"
+                                                ]
                                             ]
                                         },
                                         {
@@ -2458,6 +2548,16 @@
                                                 [
                                                     "obs_value_coded",
                                                     "Screened"
+                                                ]
+                                            ],
+                                            "denominator_filters": [
+                                                [
+                                                    "Encounter",
+                                                    "ANC VISIT"
+                                                ],
+                                                [
+                                                    "concept_name",
+                                                    "High blood pressure screening"
                                                 ]
                                             ]
                                         },
@@ -2477,6 +2577,16 @@
                                                     "obs_value_coded",
                                                     "Yes"
                                                 ]
+                                            ],
+                                            "denominator_filters": [
+                                                [
+                                                    "Encounter",
+                                                    "ANC VISIT"
+                                                ],
+                                                [
+                                                    "concept_name",
+                                                    "Gestational age recorded"
+                                                ]
                                             ]
                                         },
                                         {
@@ -2494,6 +2604,16 @@
                                                 [
                                                     "obs_value_coded",
                                                     "Used"
+                                                ]
+                                            ],
+                                            "denominator_filters": [
+                                                [
+                                                    "Encounter",
+                                                    "LABOUR AND DELIVERY"
+                                                ],
+                                                [
+                                                    "concept_name",
+                                                    "Digital intrapartum monitoring"
                                                 ]
                                             ]
                                         },
@@ -2513,6 +2633,16 @@
                                                     "obs_value_coded",
                                                     "Completed"
                                                 ]
+                                            ],
+                                            "denominator_filters": [
+                                                [
+                                                    "Encounter",
+                                                    "LABOUR AND DELIVERY"
+                                                ],
+                                                [
+                                                    "concept_name",
+                                                    "PPH treatment bundle"
+                                                ]
                                             ]
                                         },
                                         {
@@ -2531,9 +2661,117 @@
                                                     "obs_value_coded",
                                                     "Up to 48 hrs or before discharge"
                                                 ]
+                                            ],
+                                            "denominator_filters": [
+                                                [
+                                                    "Encounter",
+                                                    "POSTNATAL CARE"
+                                                ],
+                                                [
+                                                    "concept_name",
+                                                    "Postnatal check period"
+                                                ]
                                             ]
                                         }
                                     ]
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "section_name": "Outcomes and Mortality",
+                        "items": [
+                            {
+                                "id": "chart_mnh_out_001",
+                                "name": "Maternal Deaths Reported Over Time",
+                                "type": "Line",
+                                "filters": {
+                                    "measure": "nunique",
+                                    "unique": "any",
+                                    "duration_default": "any",
+                                    "title": "Maternal Deaths Reported Over Time",
+                                    "date_col": "Date",
+                                    "y_col": "person_id",
+                                    "x_title": "Date",
+                                    "y_title": "Cases",
+                                    "unique_column": "person_id",
+                                    "legend_title": "Legend",
+                                    "color": "",
+                                    "filter_col1": "Encounter",
+                                    "filter_val1": "POSTNATAL CARE",
+                                    "filter_col2": "concept_name",
+                                    "filter_val2": "Status of the mother",
+                                    "filter_col3": "obs_value_coded",
+                                    "filter_val3": "Death"
+                                }
+                            },
+                            {
+                                "id": "chart_mnh_out_002",
+                                "name": "Stillbirths Recorded Over Time",
+                                "type": "Line",
+                                "filters": {
+                                    "measure": "nunique",
+                                    "unique": "any",
+                                    "duration_default": "any",
+                                    "title": "Stillbirths Recorded Over Time",
+                                    "date_col": "Date",
+                                    "y_col": "person_id",
+                                    "x_title": "Date",
+                                    "y_title": "Cases",
+                                    "unique_column": "person_id",
+                                    "legend_title": "Legend",
+                                    "color": "",
+                                    "filter_col1": "Encounter",
+                                    "filter_val1": "LABOUR AND DELIVERY",
+                                    "filter_col2": "concept_name",
+                                    "filter_val2": "Outcome of the delivery",
+                                    "filter_col3": "obs_value_coded",
+                                    "filter_val3": "Stillbirth"
+                                }
+                            },
+                            {
+                                "id": "chart_mnh_out_003",
+                                "name": "Neonatal Deaths Reported Over Time",
+                                "type": "Line",
+                                "filters": {
+                                    "measure": "nunique",
+                                    "unique": "any",
+                                    "duration_default": "any",
+                                    "title": "Neonatal Deaths Reported Over Time",
+                                    "date_col": "Date",
+                                    "y_col": "person_id",
+                                    "x_title": "Date",
+                                    "y_title": "Cases",
+                                    "unique_column": "person_id",
+                                    "legend_title": "Legend",
+                                    "color": "",
+                                    "filter_col1": "Encounter",
+                                    "filter_val1": "POSTNATAL CARE",
+                                    "filter_col2": "concept_name",
+                                    "filter_val2": "Status of baby",
+                                    "filter_col3": "obs_value_coded",
+                                    "filter_val3": "Died"
+                                }
+                            },
+                            {
+                                "id": "chart_mnh_out_004",
+                                "name": "Delivery Outcome Distribution",
+                                "type": "Bar",
+                                "filters": {
+                                    "measure": "nunique",
+                                    "unique": "any",
+                                    "duration_default": "any",
+                                    "title": "Delivery Outcome Distribution",
+                                    "label_col": "obs_value_coded",
+                                    "value_col": "person_id",
+                                    "x_title": "Count",
+                                    "y_title": "Patients",
+                                    "unique_column": "person_id",
+                                    "top_n": 10,
+                                    "filter_col1": "concept_name",
+                                    "filter_val1": "Outcome of the delivery",
+                                    "filter_col2": "Encounter",
+                                    "filter_val2": "LABOUR AND DELIVERY"
                                 }
                             }
                         ]
@@ -3192,6 +3430,90 @@
                                     "filter_val1": "Stockout tracking linked",
                                     "filter_col2": "Encounter",
                                     "filter_val2": "POSTNATAL CARE"
+                                }
+                            },
+                            {
+                                "id": "chart_mnh_dq_007",
+                                "name": "CPAP Equipment Status",
+                                "type": "Bar",
+                                "filters": {
+                                    "measure": "nunique",
+                                    "unique": "any",
+                                    "duration_default": "any",
+                                    "title": "CPAP Equipment Status",
+                                    "label_col": "obs_value_coded",
+                                    "value_col": "person_id",
+                                    "x_title": "Count",
+                                    "y_title": "Facilities",
+                                    "unique_column": "person_id",
+                                    "top_n": 10,
+                                    "filter_col1": "concept_name",
+                                    "filter_val1": "CPAP equipment status",
+                                    "filter_col2": "Encounter",
+                                    "filter_val2": "LABOUR AND DELIVERY"
+                                }
+                            },
+                            {
+                                "id": "chart_mnh_dq_008",
+                                "name": "Phototherapy Unit Status",
+                                "type": "Bar",
+                                "filters": {
+                                    "measure": "nunique",
+                                    "unique": "any",
+                                    "duration_default": "any",
+                                    "title": "Phototherapy Unit Status",
+                                    "label_col": "obs_value_coded",
+                                    "value_col": "person_id",
+                                    "x_title": "Count",
+                                    "y_title": "Facilities",
+                                    "unique_column": "person_id",
+                                    "top_n": 10,
+                                    "filter_col1": "concept_name",
+                                    "filter_val1": "Phototherapy unit status",
+                                    "filter_col2": "Encounter",
+                                    "filter_val2": "LABOUR AND DELIVERY"
+                                }
+                            },
+                            {
+                                "id": "chart_mnh_dq_009",
+                                "name": "Uterine Balloon Tamponade Availability",
+                                "type": "Bar",
+                                "filters": {
+                                    "measure": "nunique",
+                                    "unique": "any",
+                                    "duration_default": "any",
+                                    "title": "Uterine Balloon Tamponade Availability",
+                                    "label_col": "obs_value_coded",
+                                    "value_col": "person_id",
+                                    "x_title": "Count",
+                                    "y_title": "Facilities",
+                                    "unique_column": "person_id",
+                                    "top_n": 10,
+                                    "filter_col1": "concept_name",
+                                    "filter_val1": "Uterine balloon tamponade availability",
+                                    "filter_col2": "Encounter",
+                                    "filter_val2": "LABOUR AND DELIVERY"
+                                }
+                            },
+                            {
+                                "id": "chart_mnh_dq_010",
+                                "name": "Newborn Resuscitation Equipment Status",
+                                "type": "Bar",
+                                "filters": {
+                                    "measure": "nunique",
+                                    "unique": "any",
+                                    "duration_default": "any",
+                                    "title": "Newborn Resuscitation Equipment Status",
+                                    "label_col": "obs_value_coded",
+                                    "value_col": "person_id",
+                                    "x_title": "Count",
+                                    "y_title": "Facilities",
+                                    "unique_column": "person_id",
+                                    "top_n": 10,
+                                    "filter_col1": "concept_name",
+                                    "filter_val1": "Newborn resuscitation equipment status",
+                                    "filter_col2": "Encounter",
+                                    "filter_val2": "LABOUR AND DELIVERY"
                                 }
                             }
                         ]
