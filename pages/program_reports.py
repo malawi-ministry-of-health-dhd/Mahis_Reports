@@ -77,11 +77,10 @@ report_config_panel = html.Div(
                         html.Label("Date Range", className="form-label"),
                         dcc.DatePickerRange(
                             id="prog-date-range-picker",
-                            # Adjust to your data’s earliest date if you have it
                             min_date_allowed="2023-01-01",
                             max_date_allowed=datetime.now(),
                             initial_visible_month=datetime.now(),
-                            start_date=datetime.now().replace(hour=0, minute=0, second=0, microsecond=0),
+                            start_date=(datetime.now() - timedelta(days=30)).replace(hour=0, minute=0, second=0, microsecond=0),
                             end_date=datetime.now().replace(hour=23, minute=59, second=59, microsecond=0),
                             display_format='YYYY-MM-DD',
                             minimum_nights=0,
@@ -280,6 +279,6 @@ def generate_chart(n_clicks, urlparams, report_name, start_date, end_date, hf):
 )
 def update_date_range(n):
     today = datetime.now()
-    start = today.replace(hour=0, minute=0, second=0, microsecond=0)
+    start = (today - timedelta(days=30)).replace(hour=0, minute=0, second=0, microsecond=0)
     end = today.replace(hour=23, minute=59, second=59, microsecond=0)
     return start, end

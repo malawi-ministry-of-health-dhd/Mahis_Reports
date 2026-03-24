@@ -1,13 +1,11 @@
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import dash
 import operator
 from dash import dash_table, html
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Optional, Dict, Union, Callable
-import json
 
 from config import PERSON_ID_, ENCOUNTER_ID_, DATE_
 

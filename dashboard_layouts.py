@@ -64,12 +64,22 @@ def _metric_status(value, target):
 
 
 def _get_metric_section_href(label):
+    """Route metric clicks to the matching clinical section.
+
+    Section order (post-reorder): 0=Outcomes, 1=ANC, 2=Labour, 3=Neonatal, 4=PNC, 5=Quality.
+    """
     label_lower = label.lower()
-    if any(term in label_lower for term in ["anc", "anemia", "infection", "blood pressure", "pocus", "gestational", "tetanus"]):
+    if any(t in label_lower for t in ["anc", "anemia", "infection", "blood pressure", "pocus", "gestational", "tetanus", "hiv test"]):
         return "#mnid-section-1"
-    if any(term in label_lower for term in ["deliver", "labour", "digital monitoring", "pph", "corticosteroid", "azithromycin", "staff"]):
+    if any(t in label_lower for t in ["deliver", "labour", "digital monitoring", "pph", "corticosteroid", "azithromycin", "staff", "caesarean"]):
         return "#mnid-section-2"
-    return "#mnid-section-3"
+    if any(t in label_lower for t in ["neonatal", "resuscitation", "ikmc", "phototherapy", "hypothermic", "cpap", "antibiotic"]):
+        return "#mnid-section-3"
+    if any(t in label_lower for t in ["pnc", "postnatal", "bcg", "breastfeed", "48 hour"]):
+        return "#mnid-section-4"
+    if any(t in label_lower for t in ["record", "completeness", "medicine", "emonce", "ssnc", "stockout"]):
+        return "#mnid-section-5"
+    return "#mnid-section-0"
 
 
 def _build_reference_metric_card(value, label, tone, target):
@@ -93,6 +103,45 @@ def _build_pill(pill):
         href=pill.get("href", "#mnid-overview"),
         className=f"mnid-pill mnid-pill-{pill.get('tone', 'blue')}",
     )
+
+
+def _build_spotlight_strip(spotlight_names, metric_lookup):
+    """5-card priority KPI row — donut gauge + label + target, M-NID style."""
+    cards = []
+    for name in spotlight_names:
+        if name not in metric_lookup:
+            continue
+        item = metric_lookup[name]
+        pct = item["coverage"]
+        tone = item["tone"]
+        short_label = (
+            name.replace("ANC Clients Screened for ", "")
+                .replace(" Completed", "")
+                .replace(" Provided", "")
+                .replace("PNC Mothers ", "PNC ")
+        )
+        cards.append(
+            html.Div(
+                className=f"mnid-spot-card mnid-spot-card-{tone}",
+                children=[
+                    html.Div(short_label, className="mnid-spot-label"),
+                    _donut_ring(pct, tone),
+                    html.Div(
+                        className="mnid-spot-footer",
+                        children=[
+                            html.Span(
+                                f"Target {item['target']}%",
+                                className=f"mnid-spot-target mnid-spot-target-{tone}",
+                            ),
+                            html.Span(f"{item['value']:,} clients", className="mnid-spot-count"),
+                        ],
+                    ),
+                ],
+            )
+        )
+    if not cards:
+        return html.Div()
+    return html.Div(cards, className="mnid-spotlight-row")
 
 
 def _build_alert_banner(metric_items):
@@ -355,8 +404,14 @@ def _build_cluster_grid(clusters, metric_lookup):
                                 className=f"mnid-cluster-metric mnid-cluster-metric-{item['tone']}",
                                 children=[
                                     html.Div(item["label"], className="mnid-cluster-label"),
-                                    html.Div(f"{item['value']:,}", className="mnid-cluster-value"),
-                                    html.Div(f"Observed coverage {item['coverage']}% | Benchmark {item['target']}%", className="mnid-cluster-sub"),
+                                    html.Div(
+                                        className="mnid-cluster-pct-row",
+                                        children=[
+                                            html.Span(f"{item['coverage']}%", className=f"mnid-cluster-pct mnid-cluster-pct-{item['tone']}"),
+                                            html.Span(f"of {item['target']}% target", className="mnid-cluster-pct-target"),
+                                        ],
+                                    ),
+                                    html.Div(f"{item['value']:,} clients", className="mnid-cluster-sub"),
                                 ],
                             )
                             for item in cluster_metrics
@@ -424,6 +479,37 @@ def _distribution_summary(filtered, item_config):
     }
 
 
+def _donut_ring(pct, tone):
+    """CSS conic-gradient donut ring — no external SVG library required."""
+    arc_colors = {
+        "ok":     "#52C41A",
+        "info":   "#1890FF",
+        "warn":   "#FA8C16",
+        "danger": "#FF4D4F",
+    }
+    color = arc_colors.get(tone, "#1890FF")
+    safe_pct = min(max(int(pct), 0), 100)
+    return html.Div(
+        className="mnid-donut-wrap",
+        children=[
+            html.Div(
+                className="mnid-donut-ring",
+                style={
+                    "background": (
+                        f"conic-gradient({color} 0% {safe_pct}%, #EFF1F5 {safe_pct}% 100%)"
+                    ),
+                },
+                children=[
+                    html.Div(
+                        className=f"mnid-donut-hole mnid-donut-{tone}",
+                        children=[html.Span(f"{pct}%", className="mnid-donut-pct")],
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
 def _build_distribution_card(filtered, item_config):
     distribution = _distribution_summary(filtered, item_config)
     if distribution is None:
@@ -431,7 +517,7 @@ def _build_distribution_card(filtered, item_config):
             className="mnid-card mnid-distribution-card",
             children=[
                 html.Div(item_config.get("name", ""), className="mnid-card-title"),
-                html.Div("No data available for the current filters.", className="mnid-overview-copy"),
+                html.Div("No data for current filters.", className="mnid-overview-copy"),
             ],
         )
 
@@ -439,6 +525,24 @@ def _build_distribution_card(filtered, item_config):
     total = distribution["total"]
     primary_label = distribution["primary_label"]
     gauge_value = distribution["gauge_value"]
+
+    # Derive tone from gauge value for sensible coloring
+    if gauge_value >= 70:
+        tone = "ok"
+    elif gauge_value >= 40:
+        tone = "info"
+    elif gauge_value >= 20:
+        tone = "warn"
+    else:
+        tone = "danger"
+
+    bar_colors = {
+        "ok":     "#52C41A",
+        "info":   "#1890FF",
+        "warn":   "#FA8C16",
+        "danger": "#FF4D4F",
+    }
+    bar_color = bar_colors.get(tone, "#1890FF")
 
     return html.Div(
         className="mnid-card mnid-distribution-card",
@@ -450,20 +554,14 @@ def _build_distribution_card(filtered, item_config):
                     html.Div(
                         className="mnid-gauge-card",
                         children=[
+                            _donut_ring(gauge_value, tone),
                             html.Div(
-                                className="mnid-gauge-ring",
-                                style={"--mnid-gauge-value": f"{gauge_value}%"},
+                                className="mnid-gauge-footer",
                                 children=[
-                                    html.Div(
-                                        className="mnid-gauge-inner",
-                                        children=[
-                                            html.Strong(f"{gauge_value}%"),
-                                            html.Span(str(primary_label)),
-                                        ],
-                                    )
+                                    html.Span(str(primary_label), className="mnid-gauge-primary-label"),
+                                    html.Span(f"{total:,} total", className="mnid-gauge-caption"),
                                 ],
                             ),
-                            html.Div(f"{total:,} clients in current cohort", className="mnid-gauge-caption"),
                         ],
                     ),
                     html.Div(
@@ -481,7 +579,10 @@ def _build_distribution_card(filtered, item_config):
                                                 children=[
                                                     html.Div(
                                                         className="mnid-distribution-fill",
-                                                        style={"width": f"{int(row['percent'])}%"},
+                                                        style={
+                                                            "width": f"{int(row['percent'])}%",
+                                                            "background": bar_color if str(row["label"]) == primary_label else "#CBD2E0",
+                                                        },
                                                     )
                                                 ],
                                             ),
@@ -496,7 +597,7 @@ def _build_distribution_card(filtered, item_config):
                                     ),
                                 ],
                             )
-                            for _, row in summary.head(4).iterrows()
+                            for _, row in summary.head(5).iterrows()
                         ],
                     ),
                 ],
@@ -677,73 +778,57 @@ def build_mnid_light_dashboard(filtered, data_opd, delta_days, dashboard_config,
     ]
 
     topbar_meta = " | ".join(f"{label}: {value}" for label, value in filter_summary.items() if value)
-    performance_items = sections[0]["items"][:2] if sections else []
-    featured_item_ids = {item.get("id") for item in performance_items}
-    performance_stage = []
-    if performance_items:
-        performance_stage.append(
-            html.Div(
-                className="mnid-grid-2 mnid-performance-stage",
-                children=[
-                    _build_reference_chart_card(filtered, data_opd, delta_days, performance_items[0], theme_name),
-                    _build_facility_comparison_panel(filtered, metric_registry, profile),
-                ],
-            )
-        )
-        if len(performance_items) > 1:
-            performance_stage.append(
-                html.Div(
-                    className="mnid-grid-2",
-                    children=[
-                        _build_reference_chart_card(filtered, data_opd, delta_days, performance_items[1], theme_name),
-                        _build_indicator_status_card(metric_items),
-                    ],
-                )
-            )
+
+    # Featured outcome charts: first two charts of section 0 (Outcomes & Mortality)
+    outcome_items = sections[0]["items"][:2] if sections else []
+    featured_item_ids = {item.get("id") for item in outcome_items}
 
     section_nav = [
         html.A("Overview", href="#mnid-overview", className="mnid-nav-chip mnid-nav-chip-active")
     ]
     section_nav.extend(
-        html.A(section["section_name"], href=f"#mnid-section-{section_index}", className="mnid-nav-chip")
-        for section_index, section in enumerate(sections)
+        html.A(section["section_name"], href=f"#mnid-section-{idx}", className="mnid-nav-chip")
+        for idx, section in enumerate(sections)
     )
 
     section_cards = []
     for section_index, section in enumerate(sections):
         section_items = section["items"]
+        # Suppress the 2 outcome charts already pinned above the fold
         if section_index == 0:
-            section_items = [
-                item for item in section_items
-                if item.get("id") not in featured_item_ids
-            ]
+            section_items = [i for i in section_items if i.get("id") not in featured_item_ids]
         if not section_items:
             continue
 
+        # First chart: full-width stage card (Line / Heatmap look best wide)
+        # Remaining: 3-column compact grid
+        wide_item = section_items[0]
+        compact_items = section_items[1:]
+
         section_cards.append(
             html.Details(
-                open=True if section_index == 0 else False,
+                open=(section_index == 0),
                 id=f"mnid-section-{section_index}",
                 className="mnid-section-details",
                 children=[
                     html.Summary(
+                        className="mnid-section-summary",
                         children=[
                             html.Span(section["section_name"], className="mnid-section-summary-title"),
                             html.Span(f"{len(section_items)} visuals", className="mnid-section-summary-meta"),
                         ],
-                        className="mnid-section-summary",
                     ),
                     html.Div(
-                        className="mnid-grid-2 mnid-section-stage",
-                        children=[_build_reference_chart_card(filtered, data_opd, delta_days, section_items[0], theme_name)],
+                        className="mnid-section-stage",
+                        children=[_build_reference_chart_card(filtered, data_opd, delta_days, wide_item, theme_name)],
                     ),
                     html.Div(
                         className="mnid-grid-3",
                         children=[
                             _build_reference_chart_card(filtered, data_opd, delta_days, item_config, theme_name)
-                            for item_config in section_items[1:]
+                            for item_config in compact_items
                         ],
-                    ),
+                    ) if compact_items else None,
                 ],
             )
         )
@@ -751,6 +836,7 @@ def build_mnid_light_dashboard(filtered, data_opd, delta_days, dashboard_config,
     return html.Div(
         className="premium-dashboard premium-theme-mch mnid-light-shell",
         children=[
+            # ── Top bar ──────────────────────────────────────────────────────
             html.Div(
                 className="mnid-topbar",
                 children=[
@@ -767,18 +853,54 @@ def build_mnid_light_dashboard(filtered, data_opd, delta_days, dashboard_config,
                     ),
                 ],
             ),
+            # ── Priority spotlight — 5 key coverage indicators ────────────────
+            html.Div("Priority coverage indicators", className="mnid-section-label"),
+            _build_spotlight_strip(profile.get("spotlight_metrics", []), metric_lookup),
+            # ── Clinical alert banner ────────────────────────────────────────
             _build_alert_banner(metric_items),
+            # ── Section navigation ───────────────────────────────────────────
             html.Div(className="mnid-nav-row", children=section_nav),
-            html.Div("Key facility indicators", className="mnid-section-label"),
-            html.Div(id="mnid-overview", className="mnid-clusters-wrap", children=[_build_cluster_grid(profile.get("indicator_clusters", []), metric_lookup)]),
+            # ── Cluster KPI grid (coverage % per care phase) ─────────────────
+            html.Div("Intervention coverage by care phase", className="mnid-section-label"),
+            html.Div(
+                id="mnid-overview",
+                className="mnid-clusters-wrap",
+                children=[_build_cluster_grid(profile.get("indicator_clusters", []), metric_lookup)],
+            ),
+            # ── Full-width tracker + attention card ───────────────────────────
+            html.Div(
+                className="mnid-tracker-row",
+                children=[
+                    _build_tracker(primary_metric_items or metric_items, profile),
+                ],
+            ),
             html.Div(
                 className="mnid-grid-2",
                 children=[
-                    _build_tracker(primary_metric_items or metric_items, profile),
                     _build_attention_card(metric_items, filter_summary),
+                    _build_indicator_status_card(metric_items),
                 ],
             ),
-            html.Div(performance_stage),
+            # ── Pinned outcome charts + facility comparison ───────────────────
+            html.Div("Outcomes and facility benchmarks", className="mnid-section-label"),
+            html.Div(
+                className="mnid-grid-2 mnid-outcome-stage",
+                children=[
+                    _build_reference_chart_card(filtered, data_opd, delta_days, outcome_items[0], theme_name)
+                    if outcome_items else html.Div(),
+                    _build_facility_comparison_panel(filtered, metric_registry, profile),
+                ],
+            ),
+            html.Div(
+                className="mnid-grid-2",
+                children=[
+                    _build_reference_chart_card(filtered, data_opd, delta_days, outcome_items[1], theme_name)
+                    if len(outcome_items) > 1 else html.Div(),
+                    _build_reference_chart_card(filtered, data_opd, delta_days, outcome_items[2], theme_name)
+                    if len(outcome_items) > 2 else html.Div(),
+                ],
+            ) if len(outcome_items) > 1 else html.Div(),
+            # ── Detailed clinical sections ────────────────────────────────────
             html.Div(section_cards, className="mnid-sections"),
         ],
     )
