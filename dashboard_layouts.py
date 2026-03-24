@@ -779,7 +779,7 @@ def build_mnid_light_dashboard(filtered, data_opd, delta_days, dashboard_config,
 
     topbar_meta = " | ".join(f"{label}: {value}" for label, value in filter_summary.items() if value)
 
-    # Featured outcome charts: first two charts of section 0 (Outcomes & Mortality)
+    # Featured outcome charts
     outcome_items = sections[0]["items"][:2] if sections else []
     featured_item_ids = {item.get("id") for item in outcome_items}
 
@@ -794,14 +794,11 @@ def build_mnid_light_dashboard(filtered, data_opd, delta_days, dashboard_config,
     section_cards = []
     for section_index, section in enumerate(sections):
         section_items = section["items"]
-        # Suppress the 2 outcome charts already pinned above the fold
         if section_index == 0:
             section_items = [i for i in section_items if i.get("id") not in featured_item_ids]
         if not section_items:
             continue
 
-        # First chart: full-width stage card (Line / Heatmap look best wide)
-        # Remaining: 3-column compact grid
         wide_item = section_items[0]
         compact_items = section_items[1:]
 
@@ -836,7 +833,7 @@ def build_mnid_light_dashboard(filtered, data_opd, delta_days, dashboard_config,
     return html.Div(
         className="premium-dashboard premium-theme-mch mnid-light-shell",
         children=[
-            # ── Top bar ──────────────────────────────────────────────────────
+            # Top bar
             html.Div(
                 className="mnid-topbar",
                 children=[
@@ -853,21 +850,21 @@ def build_mnid_light_dashboard(filtered, data_opd, delta_days, dashboard_config,
                     ),
                 ],
             ),
-            # ── Priority spotlight — 5 key coverage indicators ────────────────
+            # Priority spotlight
             html.Div("Priority coverage indicators", className="mnid-section-label"),
             _build_spotlight_strip(profile.get("spotlight_metrics", []), metric_lookup),
-            # ── Clinical alert banner ────────────────────────────────────────
+            # Clinical alert banner
             _build_alert_banner(metric_items),
-            # ── Section navigation ───────────────────────────────────────────
+            # Section navigation
             html.Div(className="mnid-nav-row", children=section_nav),
-            # ── Cluster KPI grid (coverage % per care phase) ─────────────────
+            # Cluster KPI grid
             html.Div("Intervention coverage by care phase", className="mnid-section-label"),
             html.Div(
                 id="mnid-overview",
                 className="mnid-clusters-wrap",
                 children=[_build_cluster_grid(profile.get("indicator_clusters", []), metric_lookup)],
             ),
-            # ── Full-width tracker + attention card ───────────────────────────
+            # Full width tracker and attention card
             html.Div(
                 className="mnid-tracker-row",
                 children=[
@@ -881,7 +878,7 @@ def build_mnid_light_dashboard(filtered, data_opd, delta_days, dashboard_config,
                     _build_indicator_status_card(metric_items),
                 ],
             ),
-            # ── Pinned outcome charts + facility comparison ───────────────────
+            #  Pinned outcome charts and facility comparison
             html.Div("Outcomes and facility benchmarks", className="mnid-section-label"),
             html.Div(
                 className="mnid-grid-2 mnid-outcome-stage",
@@ -900,7 +897,7 @@ def build_mnid_light_dashboard(filtered, data_opd, delta_days, dashboard_config,
                     if len(outcome_items) > 2 else html.Div(),
                 ],
             ) if len(outcome_items) > 1 else html.Div(),
-            # ── Detailed clinical sections ────────────────────────────────────
+            # Detailed clinical sections
             html.Div(section_cards, className="mnid-sections"),
         ],
     )

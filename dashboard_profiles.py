@@ -99,7 +99,7 @@ DASHBOARD_PROFILES = {
             "PNC Mothers Within 48 Hours",
         ],
         "supplemental_metrics": [
-            # ── ANC screening (cluster 1) ───────────────────────────────────
+            # ANC screening
             {
                 "name": "ANC Clients Screened for Anemia",
                 "filters": {
@@ -130,7 +130,7 @@ DASHBOARD_PROFILES = {
                     "variable4": "obs_value_coded", "value4": "Screened",
                 },
             },
-            # ── Labour (cluster 2) ──────────────────────────────────────────
+            # Labour
             {
                 "name": "POCUS With Gestational Age Recorded",
                 "filters": {
@@ -161,7 +161,7 @@ DASHBOARD_PROFILES = {
                     "variable4": "obs_value_coded", "value4": "Completed",
                 },
             },
-            # ── PNC / newborn (cluster 3) ───────────────────────────────────
+            # PNC / newborn
             {
                 "name": "PNC Mothers Within 48 Hours",
                 "filters": {
@@ -183,7 +183,7 @@ DASHBOARD_PROFILES = {
                     "variable4": "obs_value_coded", "value4": "BCG",
                 },
             },
-            # ── Intrapartum interventions (cluster 4) ──────────────────────
+            # Intrapartum interventions
             {
                 "name": "Antenatal Corticosteroids Given",
                 "filters": {
@@ -424,7 +424,7 @@ DASHBOARD_PROFILES = {
                     "value3": "Phototherapy unit status",
                 },
             },
-            # ── New from MNID PDF ──────────────────────────────────────────
+            # From MNID 
             {
                 "name": "HIV Testing Coverage",
                 "filters": {
@@ -787,7 +787,7 @@ DASHBOARD_PROFILES = {
             "EmONC Competency Assessed": 85,
             "CPAP Equipment Available": 90,
             "Phototherapy Unit Available": 90,
-            # ── New from MNID PDF ──────────────────────────────────────────
+            # MNID
             "HIV Testing Coverage": 95,
             "Parenteral Antibiotics for Neonates": 90,
             "CPAP Support Provided": 80,
