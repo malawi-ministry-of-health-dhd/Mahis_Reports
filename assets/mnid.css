@@ -1,0 +1,426 @@
+/* ===================================================================
+   MNID Dashboard — design tokens matching mnid_overview_light.html
+   =================================================================== */
+
+/* Smooth scrolling */
+html { scroll-behavior: smooth; }
+
+/* Layout */
+.mnid-bg {
+  background: #F5F4F0;
+  padding: 16px 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* ── Top bar ─────────────────────────────────────────────────── */
+.mnid-topbar {
+  background: #fff;
+  border: 0.5px solid #E0DED6;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.mnid-topbar h1 {
+  font-size: 15px;
+  font-weight: 500;
+  color: #1A1A18;
+  margin: 0 0 3px;
+}
+.mnid-topbar p {
+  font-size: 11px;
+  color: #73726C;
+  margin: 0;
+}
+.mnid-pills {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.mnid-pill {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 20px;
+  border: 0.5px solid;
+  white-space: nowrap;
+}
+.mnid-pill-blue  { background: #E6F1FB; color: #0C447C; border-color: #B5D4F4; }
+.mnid-pill-amber { background: #FAEEDA; color: #633806; border-color: #FAC775; }
+.mnid-pill-green { background: #EAF3DE; color: #27500A; border-color: #C0DD97; }
+.mnid-pill-red   { background: #FCEBEB; color: #791F1F; border-color: #F7C1C1; }
+
+/* ── Alert banner ─────────────────────────────────────────────── */
+.mnid-alert {
+  background: #FCEBEB;
+  border: 0.5px solid #F7C1C1;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.mnid-alert-ok {
+  background: #EAF3DE;
+  border: 0.5px solid #C0DD97;
+}
+.mnid-alert-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #E24B4A;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.mnid-alert-ok .mnid-alert-icon { background: #3B6D11; }
+.mnid-alert-icon svg { width: 10px; height: 10px; }
+.mnid-alert p { font-size: 11px; color: #791F1F; line-height: 1.55; margin: 0; }
+.mnid-alert-ok p { color: #27500A; }
+.mnid-alert strong { font-weight: 500; }
+
+/* ── Section label ────────────────────────────────────────────── */
+.mnid-section-lbl {
+  font-size: 10px;
+  font-weight: 500;
+  color: #888780;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+  margin-top: 4px;
+}
+
+/* ── KPI cards ────────────────────────────────────────────────── */
+.mnid-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.mnid-kpi {
+  background: #fff;
+  border: 0.5px solid #E0DED6;
+  border-radius: 10px;
+  padding: 12px 14px;
+  position: relative;
+  overflow: hidden;
+}
+.mnid-kpi::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  border-radius: 10px 0 0 10px;
+}
+.mnid-kpi.ok::before     { background: #3B6D11; }
+.mnid-kpi.warn::before   { background: #BA7517; }
+.mnid-kpi.danger::before { background: #A32D2D; }
+.mnid-kpi.info::before   { background: #185FA5; }
+.mnid-kpi .kpi-lbl { font-size: 11px; color: #73726C; margin-bottom: 4px; line-height: 1.3; }
+.mnid-kpi .kpi-val { font-size: 22px; font-weight: 500; color: #1A1A18; line-height: 1; }
+.mnid-kpi .kpi-sub { font-size: 10px; color: #888780; margin-top: 3px; line-height: 1.3; }
+
+/* ── Generic card ─────────────────────────────────────────────── */
+.mnid-card {
+  background: #fff;
+  border: 0.5px solid #E0DED6;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.mnid-card-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: #444441;
+  margin-bottom: 10px;
+}
+
+/* ── Progress bar rows ────────────────────────────────────────── */
+.mnid-prog-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.mnid-prog-lbl {
+  font-size: 11px;
+  color: #73726C;
+  width: 210px;
+  flex-shrink: 0;
+  line-height: 1.3;
+}
+.mnid-prog-track {
+  flex: 1;
+  height: 7px;
+  background: #F1EFE8;
+  border-radius: 4px;
+  position: relative;
+  overflow: visible;
+}
+.mnid-prog-fill {
+  height: 7px;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+.mnid-prog-fill.ok     { background: #3B6D11; }
+.mnid-prog-fill.warn   { background: #BA7517; }
+.mnid-prog-fill.danger { background: #E24B4A; }
+.mnid-prog-fill.info   { background: #185FA5; }
+.mnid-prog-target {
+  position: absolute;
+  top: -3px;
+  height: 13px;
+  width: 1.5px;
+  background: #888780;
+  border-radius: 1px;
+}
+.mnid-prog-val {
+  font-size: 11px;
+  font-weight: 500;
+  color: #1A1A18;
+  width: 60px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.mnid-target-note {
+  font-size: 10px;
+  color: #B4B2A9;
+  padding-left: 218px;
+  margin-top: 2px;
+  margin-bottom: 6px;
+}
+
+/* ── Status tags ──────────────────────────────────────────────── */
+.mnid-tag {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+  white-space: nowrap;
+}
+.mnid-tag-red    { background: #FCEBEB; color: #791F1F; }
+.mnid-tag-amber  { background: #FAEEDA; color: #633806; }
+.mnid-tag-green  { background: #EAF3DE; color: #27500A; }
+.mnid-tag-blue   { background: #E6F1FB; color: #0C447C; }
+
+/* ── Stat rows (inside cards) ─────────────────────────────────── */
+.mnid-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 0.5px solid #F1EFE8;
+  font-size: 11px;
+}
+.mnid-stat-row:last-child { border-bottom: none; }
+.mnid-stat-lbl { color: #73726C; }
+.mnid-stat-val { font-weight: 500; color: #1A1A18; }
+
+/* ── Grid layouts ─────────────────────────────────────────────── */
+.mnid-grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.mnid-grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.mnid-grid5 {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+/* ── Legend ───────────────────────────────────────────────────── */
+.mnid-legend { display: flex; gap: 14px; margin-top: 8px; flex-wrap: wrap; }
+.mnid-legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #73726C; }
+.mnid-legend-sq { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+
+/* ── Tabs ─────────────────────────────────────────────────────── */
+.mnid-tabs { margin-bottom: 12px; }
+.mnid-tab-list {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid #E0DED6;
+  margin-bottom: 14px;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+}
+.mnid-tab-btn {
+  font-size: 12px;
+  color: #73726C;
+  background: none;
+  border: none;
+  padding: 8px 14px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.mnid-tab-btn:hover { color: #1A1A18; }
+.mnid-tab-btn.active {
+  color: #185FA5;
+  border-bottom-color: #185FA5;
+  font-weight: 500;
+}
+
+/* ── Phase coverage cards ─────────────────────────────────────── */
+.mnid-phase-card {
+  background: #fff;
+  border: 0.5px solid #E0DED6;
+  border-radius: 10px;
+  padding: 12px;
+}
+.mnid-phase-title {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888780;
+  margin-bottom: 10px;
+}
+.mnid-metric-lbl  { font-size: 10px; color: #73726C; line-height: 1.3; margin-bottom: 2px; }
+.mnid-metric-val  { font-size: 18px; font-weight: 500; line-height: 1; }
+.mnid-metric-sub  { font-size: 10px; color: #888780; margin-top: 2px; margin-bottom: 8px; }
+.mnid-metric-val.ok     { color: #3B6D11; }
+.mnid-metric-val.warn   { color: #BA7517; }
+.mnid-metric-val.danger { color: #A32D2D; }
+.mnid-metric-val.info   { color: #185FA5; }
+
+/* ── Indicator cards (accordion panels) ───────────────────────────── */
+.mnid-ind-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+  padding: 4px 0;
+}
+.mnid-ind-card {
+  background: #fff;
+  border: 0.5px solid #E0DED6;
+  border-radius: 8px;
+  border-left: 3px solid #E0DED6;
+  padding: 12px 14px 10px;
+  position: relative;
+}
+.mnid-ind-card.ok     { border-left-color: #3B6D11; }
+.mnid-ind-card.warn   { border-left-color: #BA7517; }
+.mnid-ind-card.danger { border-left-color: #E24B4A; }
+.mnid-ind-card.awaiting { border-left-color: #FAC775; background: #FDFCF9; }
+
+.mnid-ind-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: #73726C;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+  margin-bottom: 8px;
+}
+.mnid-ind-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+.mnid-ind-pct {
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1;
+  color: #1A1A18;
+}
+.mnid-ind-pct.ok     { color: #3B6D11; }
+.mnid-ind-pct.warn   { color: #BA7517; }
+.mnid-ind-pct.danger { color: #A32D2D; }
+.mnid-ind-pct.info   { color: #888780; }
+
+.mnid-ind-sub {
+  font-size: 10px;
+  color: #B4B2A9;
+  margin-bottom: 2px;
+  line-height: 1.3;
+}
+.mnid-ind-note {
+  font-size: 10px;
+  color: #B4B2A9;
+  margin-top: 8px;
+  line-height: 1.4;
+  font-style: italic;
+}
+
+/* ── Analysis chart grid ──────────────────────────────────────────── */
+.mnid-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+  padding: 4px 0;
+}
+.mnid-chart-card {
+  background: #fff;
+  border: 0.5px solid #E0DED6;
+  border-radius: 8px;
+  padding: 10px 12px 6px;
+  overflow: hidden;
+}
+
+/* ── Sticky nav bar ───────────────────────────────────────────── */
+.mnid-nav {
+  background: #fff;
+  border: 0.5px solid #E0DED6;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  padding: 8px 14px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.mnid-nav-btn {
+  font-size: 11px;
+  font-weight: 500;
+  color: #73726C;
+  background: #F5F4F0;
+  border: 0.5px solid #E0DED6;
+  border-radius: 6px;
+  padding: 5px 10px;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.mnid-nav-btn:hover {
+  background: #E6F1FB;
+  color: #0C447C;
+  border-color: #B5D4F4;
+}
+
+/* ── Section anchor offset (accounts for sticky nav height) ─── */
+.mnid-section-anchor {
+  display: block;
+  height: 0;
+  margin-top: -60px;
+  padding-top: 60px;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .mnid-grid2, .mnid-grid3, .mnid-grid5 { grid-template-columns: 1fr; }
+  .mnid-prog-lbl { width: 140px; }
+  .mnid-target-note { padding-left: 148px; }
+  .mnid-ind-grid { grid-template-columns: 1fr; }
+  .mnid-chart-grid { grid-template-columns: 1fr; }
+}

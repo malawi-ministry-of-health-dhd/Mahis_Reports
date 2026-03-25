@@ -9,6 +9,7 @@ from dash.exceptions import PreventUpdate
 import os
 from flask import request
 from helpers import build_charts_section, build_metrics_section
+from mnid_renderer import render_mnid_dashboard
 from datetime import datetime
 from datetime import datetime as dt
 from data_storage import DataStorage
@@ -51,20 +52,30 @@ except Exception as e:
 
 
 # BUILD CHARTS
-def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json):
-    # Load JSON configuration
+def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json,
+                           start_date=None, end_date=None, facility_code=None):
     config = dashboards_json
-    
+
+    # ── MNID dashboard: use DMC renderer ──────────────────────────────────────
+    if config.get('dashboard_type') == 'mnid':
+        return render_mnid_dashboard(
+            filtered=filtered,
+            data_opd=data_opd,
+            delta_days=delta_days,
+            config=config,
+            facility_code=facility_code or 'Unknown',
+            start_date=str(start_date)[:10] if start_date else '',
+            end_date=str(end_date)[:10] if end_date else '',
+        )
+
+    # ── Generic dashboard: existing Bootstrap/Plotly renderer ─────────────────
     filtered = filtered.copy()
     filtered['Residence'] = filtered[HOME_DISTRICT_] + ', TA-' + filtered[TA_] + ', ' + filtered[VILLAGE_]
     delta_days = 7 if delta_days <= 0 else delta_days
-    
-    # Build metrics from counts section
+
     metrics = build_metrics_section(filtered, config["visualization_types"]["counts"])
-    
-    # Build charts from sections
-    charts = build_charts_section(filtered, data_opd, delta_days, config["visualization_types"]["charts"]["sections"])
-    
+    charts  = build_charts_section(filtered, data_opd, delta_days,
+                                    config["visualization_types"]["charts"]["sections"])
     return html.Div([
         html.Div(className="card-container-5", children=metrics),
         charts
@@ -305,7 +316,10 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
         delta_days = (end_dt - start_dt).days
         hf_options = filtered_data[FACILITY_].sort_values().unique().tolist() + ["This Facility"]
 
-        return build_charts_from_json(filtered_data_date, filtered_data, delta_days, dashboard_json), hf_options, hf_options[0],  clicked_name
+        return build_charts_from_json(
+            filtered_data_date, filtered_data, delta_days, dashboard_json,
+            start_date=start_dt, end_date=end_dt, facility_code=location,
+        ), hf_options, hf_options[0], clicked_name
     except Exception as e:
         import traceback
         traceback.print_exc()
