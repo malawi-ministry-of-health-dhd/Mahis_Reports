@@ -612,10 +612,20 @@ def _build_heatmap_fig(stored: dict, view: str, year: str,
                           height=height, margin=dict(l=220, r=80, t=16, b=60))
         return fig
 
+    _customdata = None
+    if y_targets and all(t is not None for t in y_targets):
+        _customdata = [[tgt] * len(x_labels) for tgt, _ in zip(y_targets, z)]
+    _hover = '<b>%{y}</b><br>%{x}: <b>%{z:.0f}%</b><extra></extra>'
+    if _customdata is not None:
+        _hover = ('<b>%{y}</b><br>%{x}: <b>%{z:.0f}%</b>'
+                  '<br>Target: %{customdata[0]}%<extra></extra>')
     fig = go.Figure(go.Heatmap(
         z=z, x=x_labels, y=y_labels,
         colorscale=HEATMAP_CS,
         zmin=0, zmax=100,
+        zsmooth=False,
+        hoverongaps=False,
+        customdata=_customdata,
         colorbar=dict(
             thickness=14,
             title=dict(text='Coverage %', side='right',
@@ -625,7 +635,7 @@ def _build_heatmap_fig(stored: dict, view: str, year: str,
             ticktext=['0%', '40%', '65%', '80%', '88%', '100%'],
             len=0.85,
         ),
-        hovertemplate='<b>%{y}</b><br>%{x}: <b>%{z:.0f}%</b><extra></extra>',
+        hovertemplate=_hover,
         ygap=1.5, xgap=1.5,
     ))
 
@@ -1112,6 +1122,50 @@ def update_heatmap_view(view, year, district, sel_inds, stored):
     return fig, panel
 
 
+@callback(
+    Output('mnid-compare-fac-pie-a', 'figure'),
+    Output('mnid-compare-fac-pie-b', 'figure'),
+    Output('mnid-compare-dist-pie-a', 'figure'),
+    Output('mnid-compare-dist-pie-b', 'figure'),
+    Input('mnid-compare-fac-a', 'value'),
+    Input('mnid-compare-fac-b', 'value'),
+    Input('mnid-compare-dist-a', 'value'),
+    Input('mnid-compare-dist-b', 'value'),
+    State('mnid-compare-store', 'data'),
+)
+def update_compare_pies(fac_a, fac_b, dist_a, dist_b, stored_inds):
+    try:
+        df_all   = pd.read_parquet('data/latest_data_opd.parquet')
+        mch_full = df_all[df_all['Program'].str.contains(
+            'Maternal|Neonatal', case=False, na=False)].copy()
+    except Exception:
+        mch_full = pd.DataFrame()
+
+    tracked = stored_inds or []
+
+    def _fac_fig(fac_code):
+        if not len(mch_full) or not tracked:
+            return _build_compare_pie('Facility comparison', {'On target': 0, 'Below target': 0, 'No data': 0})
+        fdf = mch_full[mch_full['Facility_CODE'] == fac_code]
+        name = _FACILITY_NAMES.get(fac_code, fac_code)
+        counts = _compare_status_counts(fdf, tracked)
+        return _build_compare_pie(f'Facility — {name}', counts)
+
+    def _dist_fig(dist):
+        if not len(mch_full) or not tracked or 'District' not in mch_full.columns:
+            return _build_compare_pie('District comparison', {'On target': 0, 'Below target': 0, 'No data': 0})
+        ddf = mch_full[mch_full['District'] == dist]
+        counts = _compare_status_counts(ddf, tracked)
+        return _build_compare_pie(f'District — {dist}', counts)
+
+    fac_a = fac_a or _ALL_FACILITIES[0]
+    fac_b = fac_b or (_ALL_FACILITIES[1] if len(_ALL_FACILITIES) > 1 else _ALL_FACILITIES[0])
+    dist_a = dist_a or _ALL_DISTRICTS[0]
+    dist_b = dist_b or (_ALL_DISTRICTS[1] if len(_ALL_DISTRICTS) > 1 else _ALL_DISTRICTS[0])
+
+    return _fac_fig(fac_a), _fac_fig(fac_b), _dist_fig(dist_a), _dist_fig(dist_b)
+
+
 # ── Main heatmap section layout ────────────────────────────────────────────
 
 def _coverage_heatmap_section(indicators: list, facility_code: str) -> html.Div:
@@ -1532,6 +1586,470 @@ def _system_readiness(df, supply_inds, wf_inds, dq_inds):
     ])
 
 
+def _compare_status_counts(df: pd.DataFrame, tracked: list) -> dict:
+    """Counts indicators by status for a given filtered dataframe."""
+    on_tgt = 0
+    below  = 0
+    no_dat = 0
+    for ind in tracked:
+        num, den, pct = _cov(df, ind['numerator_filters'], ind['denominator_filters'])
+        if den <= 0:
+            no_dat += 1
+        else:
+            if pct >= ind.get('target', 0):
+                on_tgt += 1
+            else:
+                below += 1
+    return {'On target': on_tgt, 'Below target': below, 'No data': no_dat}
+
+
+def _build_compare_pie(title: str, counts: dict) -> go.Figure:
+    labels = list(counts.keys())
+    values = list(counts.values())
+    colors = [OK_C, WARN_C, '#D6D3CB']
+
+    fig = go.Figure(go.Pie(
+        labels=labels,
+        values=values,
+        hole=0.35,
+        marker=dict(colors=colors, line=dict(color='#fff', width=1)),
+        textinfo='percent',
+        hovertemplate='<b>%{label}</b><br>%{value} indicators (%{percent})<extra></extra>',
+    ))
+    fig.update_layout(**_CHART_LAYOUT)
+    fig.update_layout(
+        title=dict(text=title,
+                   font=dict(size=12, color='#444441', family=FONT),
+                   x=0, xanchor='left', y=0.98),
+        height=260,
+        margin=dict(l=10, r=10, t=36, b=10),
+        legend=dict(orientation='h', x=0, y=-0.08, xanchor='left',
+                    font=dict(size=9, color=DIM)),
+    )
+    return fig
+
+
+# comparative analysis section
+
+def _comparative_analysis_section(indicators: list, facility_code: str) -> html.Div:
+    """Side-by-side coverage comparison across facilities and districts."""
+    try:
+        df_all   = pd.read_parquet('data/latest_data_opd.parquet')
+        mch_full = df_all[df_all['Program'].str.contains(
+            'Maternal|Neonatal', case=False, na=False)].copy()
+        if 'Date' in mch_full.columns:
+            mch_full['Date'] = pd.to_datetime(mch_full['Date'], errors='coerce')
+    except Exception:
+        mch_full = pd.DataFrame()
+
+    tracked = [i for i in indicators if i.get('status') == 'tracked']
+    charts  = []
+    fac_opts = [{'label': _FACILITY_NAMES.get(f, f), 'value': f} for f in _ALL_FACILITIES]
+    dist_opts = [{'label': d, 'value': d} for d in _ALL_DISTRICTS]
+
+    if len(mch_full) and tracked:
+        fac_palette = [INFO_C, OK_C, WARN_C, '#7C3AED', DANGER_C, '#0891B2']
+
+        # ── 1. Indicator Coverage by Facility ────────────────────────────
+        fac_cov = {}
+        for fac in _ALL_FACILITIES:
+            fdf = mch_full[mch_full['Facility_CODE'] == fac]
+            fac_cov[fac] = {}
+            for ind in tracked:
+                num, den, pct = _cov(fdf, ind['numerator_filters'],
+                                     ind['denominator_filters'])
+                fac_cov[fac][ind['id']] = pct if den > 0 else None
+
+        labels = [ind['label'][:28] for ind in tracked]
+        fig1   = go.Figure()
+        for i, fac in enumerate(_ALL_FACILITIES):
+            name = _FACILITY_NAMES.get(fac, fac)
+            fig1.add_trace(go.Bar(
+                name=name,
+                x=labels,
+                y=[fac_cov[fac].get(ind['id'], 0) for ind in tracked],
+                marker=dict(
+                    color=fac_palette[i % len(fac_palette)],
+                    opacity=1.0 if fac == facility_code else 0.60,
+                    line=dict(color='rgba(0,0,0,0)'),
+                ),
+                hovertemplate=f'{name}<br>%{{x}}: %{{y:.1f}}%<extra></extra>',
+            ))
+        fig1.add_trace(go.Scatter(
+            x=labels,
+            y=[ind['target'] for ind in tracked],
+            mode='markers',
+            marker=dict(symbol='line-ew', size=20, color=DANGER_C,
+                        line=dict(color=DANGER_C, width=2)),
+            name='Target',
+            hovertemplate='Target: %{y:.0f}%<extra></extra>',
+        ))
+        fig1.update_layout(
+            **_CHART_LAYOUT,
+            title=dict(text='Indicator Coverage by Facility',
+                       font=dict(size=12, color='#444441', family=FONT),
+                       x=0, xanchor='left', y=0.98),
+            barmode='group', height=300,
+            xaxis=dict(tickfont=dict(size=9, color=DIM), tickangle=-30,
+                       showgrid=False, zeroline=False, showline=False),
+            yaxis=dict(showgrid=True, gridcolor=GRID_C, zeroline=False,
+                       showline=False, ticksuffix='%',
+                       tickfont=dict(size=10, color=MUTED), range=[0, 115]),
+        )
+        charts.append(html.Div(
+            className='mnid-chart-card',
+            style={'gridColumn': '1 / -1'},
+            children=[dcc.Graph(figure=fig1, config={'displayModeBar': False},
+                                style={'height': '300px'})],
+        ))
+
+        # ── 2. Category Averages by Facility ─────────────────────────────
+        cats = ['ANC', 'Labour', 'Newborn', 'PNC']
+        fig2 = go.Figure()
+        for i, fac in enumerate(_ALL_FACILITIES):
+            name = _FACILITY_NAMES.get(fac, fac)
+            fdf  = mch_full[mch_full['Facility_CODE'] == fac]
+            cat_avgs = []
+            for cat in cats:
+                cat_inds = [ind for ind in tracked if ind.get('category') == cat]
+                if cat_inds:
+                    pcts = []
+                    for ind in cat_inds:
+                        num, den, pct = _cov(fdf, ind['numerator_filters'],
+                                             ind['denominator_filters'])
+                        if den > 0:
+                            pcts.append(pct)
+                    cat_avgs.append(round(sum(pcts) / len(pcts), 1) if pcts else None)
+                else:
+                    cat_avgs.append(None)
+            fig2.add_trace(go.Bar(
+                name=name,
+                x=cats,
+                y=cat_avgs,
+                marker=dict(
+                    color=fac_palette[i % len(fac_palette)],
+                    opacity=1.0 if fac == facility_code else 0.60,
+                    line=dict(color='rgba(0,0,0,0)'),
+                ),
+                hovertemplate=f'{name}<br>%{{x}}: %{{y:.1f}}%<extra></extra>',
+            ))
+        fig2.update_layout(
+            **_CHART_LAYOUT,
+            title=dict(text='Avg Coverage by Care Category & Facility',
+                       font=dict(size=12, color='#444441', family=FONT),
+                       x=0, xanchor='left', y=0.98),
+            barmode='group', height=300,
+            xaxis=dict(tickfont=dict(size=11, color=DIM), showgrid=False,
+                       zeroline=False, showline=False),
+            yaxis=dict(showgrid=True, gridcolor=GRID_C, zeroline=False,
+                       showline=False, ticksuffix='%',
+                       tickfont=dict(size=10, color=MUTED), range=[0, 115]),
+        )
+        charts.append(html.Div(
+            className='mnid-chart-card',
+            children=[dcc.Graph(figure=fig2, config={'displayModeBar': False},
+                                style={'height': '300px'})],
+        ))
+
+        # ── 3. District Average Coverage ──────────────────────────────────
+        if 'District' in mch_full.columns:
+            dist_avgs = []
+            for dist in _ALL_DISTRICTS:
+                ddf  = mch_full[mch_full['District'] == dist]
+                pcts = []
+                for ind in tracked:
+                    num, den, pct = _cov(ddf, ind['numerator_filters'],
+                                         ind['denominator_filters'])
+                    if den > 0:
+                        pcts.append(pct)
+                dist_avgs.append(round(sum(pcts) / len(pcts), 1) if pcts else None)
+
+            bar_colors = []
+            bar_texts  = []
+            bar_hover  = []
+            for a in dist_avgs:
+                if a is None:
+                    bar_colors.append('#D6D3CB')
+                    bar_texts.append('—')
+                    bar_hover.append('No data')
+                else:
+                    bar_colors.append(OK_C if a >= 80 else (WARN_C if a >= 68 else DANGER_C))
+                    bar_texts.append(f'{a:.0f}%')
+                    bar_hover.append(f'{a:.1f}%')
+
+            fig3 = go.Figure(go.Bar(
+                x=_ALL_DISTRICTS,
+                y=dist_avgs,
+                marker=dict(
+                    color=bar_colors,
+                    line=dict(color='rgba(0,0,0,0)'),
+                ),
+                text=bar_texts,
+                textposition='outside',
+                textfont=dict(size=11, color=DIM),
+                hovertext=bar_hover,
+                hovertemplate='%{x}: %{hovertext}<extra></extra>',
+            ))
+            fig3.update_layout(
+                **_CHART_LAYOUT,
+                title=dict(text='Average Coverage by District',
+                           font=dict(size=12, color='#444441', family=FONT),
+                           x=0, xanchor='left', y=0.98),
+                height=300,
+                xaxis=dict(tickfont=dict(size=11, color=DIM), showgrid=False,
+                           zeroline=False, showline=False),
+                yaxis=dict(showgrid=True, gridcolor=GRID_C, zeroline=False,
+                           showline=False, ticksuffix='%',
+                           tickfont=dict(size=10, color=MUTED), range=[0, 115]),
+            )
+            charts.append(html.Div(
+                className='mnid-chart-card',
+                children=[dcc.Graph(figure=fig3, config={'displayModeBar': False},
+                                    style={'height': '300px'})],
+            ))
+
+        # ── 4. Indicator × Facility Heatmap ──────────────────────────────
+        fac_names_h  = [_FACILITY_NAMES.get(f, f) for f in _ALL_FACILITIES]
+        ind_labels_h = [ind['label'][:32] for ind in tracked]
+        z4 = []
+        cdata4 = []
+        targets4 = [ind.get('target') for ind in tracked]
+        for ind in tracked:
+            row, cd_row = [], []
+            for fac in _ALL_FACILITIES:
+                fdf = mch_full[mch_full['Facility_CODE'] == fac]
+                num, den, pct = _cov(fdf, ind['numerator_filters'],
+                                     ind['denominator_filters'])
+                row.append(pct if den > 0 else None)
+                cd_row.append(ind['target'])
+            z4.append(row)
+            cdata4.append(cd_row)
+
+        h4 = max(len(tracked) * 28 + 140, 340)
+        ann4 = []
+        if len(_ALL_FACILITIES) <= 8:
+            for ii, row in enumerate(z4):
+                for jj, val in enumerate(row):
+                    if val is not None:
+                        txt_col = '#fff' if val < 65 else '#222'
+                        ann4.append(dict(
+                            x=fac_names_h[jj], y=ind_labels_h[ii],
+                            text=f'{val:.0f}%', showarrow=False,
+                            font=dict(size=9, color=txt_col, family=FONT),
+                        ))
+
+        custom4 = None
+        if targets4 and all(t is not None for t in targets4):
+            custom4 = cdata4
+        hover4 = '<b>%{y}</b><br>%{x}: <b>%{z:.0f}%</b><extra></extra>'
+        if custom4 is not None:
+            hover4 = ('<b>%{y}</b><br>%{x}: <b>%{z:.0f}%</b>'
+                      '<br>Target: %{customdata[0]}%<extra></extra>')
+
+        fig4 = go.Figure(go.Heatmap(
+            z=z4, x=fac_names_h, y=ind_labels_h,
+            colorscale=HEATMAP_CS,
+            zmin=0, zmax=100,
+            zsmooth=False,
+            hoverongaps=False,
+            customdata=custom4,
+            colorbar=dict(
+                thickness=12,
+                title=dict(text='Coverage %', side='right',
+                           font=dict(size=9, color=DIM)),
+                tickfont=dict(size=9, color=DIM),
+                tickvals=[0, 40, 65, 80, 88, 100],
+                ticktext=['0%', '40%', '65%', '80%', '88%', '100%'],
+                len=0.85,
+            ),
+            hovertemplate=hover4,
+            ygap=1.5, xgap=1.5,
+        ))
+        fig4.update_layout(**_CHART_LAYOUT)
+        fig4.update_layout(
+            title=dict(text='Indicator × Facility Coverage',
+                       font=dict(size=12, color='#444441', family=FONT),
+                       x=0, xanchor='left', y=0.98),
+            height=h4,
+            margin=dict(l=240, r=90, t=36, b=60),
+            xaxis=dict(tickangle=-30, tickfont=dict(size=10, color=DIM),
+                       showgrid=False, side='bottom'),
+            yaxis=dict(tickfont=dict(size=10, color=DIM),
+                       showgrid=False, autorange='reversed'),
+            annotations=ann4,
+            hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
+        )
+        charts.append(html.Div(
+            className='mnid-chart-card',
+            style={'gridColumn': '1 / -1'},
+            children=[dcc.Graph(figure=fig4, config={'displayModeBar': False},
+                                style={'height': f'{h4}px'})],
+        ))
+
+        # ── 5. Care Category × District Heatmap ───────────────────────────
+        if 'District' in mch_full.columns:
+            cats5 = ['ANC', 'Labour', 'Newborn', 'PNC']
+            z5 = []
+            cdata5 = []
+            has_targets5 = True
+            for cat in cats5:
+                cat_inds = [ind for ind in tracked if ind.get('category') == cat]
+                row, cd_row = [], []
+                for dist in _ALL_DISTRICTS:
+                    ddf = mch_full[mch_full['District'] == dist]
+                    if cat_inds and len(ddf):
+                        pcts = []
+                        for ind in cat_inds:
+                            num, den, pct = _cov(ddf, ind['numerator_filters'],
+                                                 ind['denominator_filters'])
+                            if den > 0:
+                                pcts.append(pct)
+                        val = round(sum(pcts) / len(pcts), 1) if pcts else None
+                    else:
+                        val = None
+                    row.append(val)
+                    tgts = [ind.get('target') for ind in cat_inds] if cat_inds else []
+                    if not tgts or any(t is None for t in tgts):
+                        has_targets5 = False
+                        cd_row.append(None)
+                    else:
+                        cd_row.append(round(sum(tgts) / len(tgts)))
+                z5.append(row)
+                cdata5.append(cd_row)
+
+            ann5 = []
+            for ii, row in enumerate(z5):
+                for jj, val in enumerate(row):
+                    if val is not None:
+                        txt_col = '#fff' if val < 65 else '#222'
+                        ann5.append(dict(
+                            x=_ALL_DISTRICTS[jj], y=cats5[ii],
+                            text=f'{val:.0f}%', showarrow=False,
+                            font=dict(size=11, color=txt_col, family=FONT),
+                        ))
+
+            custom5 = cdata5 if has_targets5 else None
+            hover5 = '<b>%{y}</b><br>%{x}: <b>%{z:.0f}%</b><extra></extra>'
+            if custom5 is not None:
+                hover5 = ('<b>%{y}</b><br>%{x}: <b>%{z:.0f}%</b>'
+                          '<br>Avg target: %{customdata[0]}%<extra></extra>')
+
+            fig5 = go.Figure(go.Heatmap(
+                z=z5, x=_ALL_DISTRICTS, y=cats5,
+                colorscale=HEATMAP_CS,
+                zmin=0, zmax=100,
+                zsmooth=False,
+                hoverongaps=False,
+                customdata=custom5,
+                colorbar=dict(
+                    thickness=12,
+                    title=dict(text='Avg Coverage %', side='right',
+                               font=dict(size=9, color=DIM)),
+                    tickfont=dict(size=9, color=DIM),
+                    tickvals=[0, 40, 65, 80, 88, 100],
+                    ticktext=['0%', '40%', '65%', '80%', '88%', '100%'],
+                    len=0.85,
+                ),
+                hovertemplate=hover5,
+                ygap=2, xgap=2,
+            ))
+            fig5.update_layout(**_CHART_LAYOUT)
+            fig5.update_layout(
+                title=dict(text='Care Category × District Avg Coverage',
+                           font=dict(size=12, color='#444441', family=FONT),
+                           x=0, xanchor='left', y=0.98),
+                height=320,
+                margin=dict(l=100, r=90, t=36, b=60),
+                xaxis=dict(tickangle=0, tickfont=dict(size=11, color=DIM),
+                           showgrid=False, side='bottom'),
+                yaxis=dict(tickfont=dict(size=11, color=DIM),
+                           showgrid=False, autorange='reversed'),
+                annotations=ann5,
+                hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
+            )
+            charts.append(html.Div(
+                className='mnid-chart-card',
+                children=[dcc.Graph(figure=fig5, config={'displayModeBar': False},
+                                    style={'height': '320px'})],
+            ))
+
+    if not charts:
+        charts = [html.Div(
+            'No data available for comparison.',
+            className='mnid-ind-note',
+            style={'padding': '24px', 'textAlign': 'center'},
+        )]
+
+    compare_selector = html.Div(className='mnid-chart-card mnid-compare-card', children=[
+        html.Div('SELECT COMPARISONS', className='mnid-card-title'),
+        html.Div(style={'display': 'grid', 'gridTemplateColumns': '1fr 1fr',
+                        'gap': '12px', 'alignItems': 'start'}, children=[
+            html.Div(children=[
+                html.Div('Facilities vs Facilities', className='mnid-ind-sub'),
+                html.Div(style={'display': 'grid', 'gridTemplateColumns': '1fr 1fr',
+                                'gap': '8px'}, children=[
+                    dcc.Dropdown(
+                        id='mnid-compare-fac-a',
+                        options=fac_opts,
+                        value=_ALL_FACILITIES[0] if _ALL_FACILITIES else None,
+                        clearable=False,
+                    ),
+                    dcc.Dropdown(
+                        id='mnid-compare-fac-b',
+                        options=fac_opts,
+                        value=_ALL_FACILITIES[1] if len(_ALL_FACILITIES) > 1 else (_ALL_FACILITIES[0] if _ALL_FACILITIES else None),
+                        clearable=False,
+                    ),
+                ]),
+                html.Div(style={'display': 'grid', 'gridTemplateColumns': '1fr 1fr',
+                                'gap': '8px', 'marginTop': '6px'}, children=[
+                    dcc.Graph(id='mnid-compare-fac-pie-a',
+                              config={'displayModeBar': False},
+                              style={'height': '300px'}),
+                    dcc.Graph(id='mnid-compare-fac-pie-b',
+                              config={'displayModeBar': False},
+                              style={'height': '300px'}),
+                ]),
+            ]),
+            html.Div(children=[
+                html.Div('Districts vs Districts', className='mnid-ind-sub'),
+                html.Div(style={'display': 'grid', 'gridTemplateColumns': '1fr 1fr',
+                                'gap': '8px'}, children=[
+                    dcc.Dropdown(
+                        id='mnid-compare-dist-a',
+                        options=dist_opts,
+                        value=_ALL_DISTRICTS[0] if _ALL_DISTRICTS else None,
+                        clearable=False,
+                    ),
+                    dcc.Dropdown(
+                        id='mnid-compare-dist-b',
+                        options=dist_opts,
+                        value=_ALL_DISTRICTS[1] if len(_ALL_DISTRICTS) > 1 else (_ALL_DISTRICTS[0] if _ALL_DISTRICTS else None),
+                        clearable=False,
+                    ),
+                ]),
+                html.Div(style={'display': 'grid', 'gridTemplateColumns': '1fr 1fr',
+                                'gap': '8px', 'marginTop': '6px'}, children=[
+                    dcc.Graph(id='mnid-compare-dist-pie-a',
+                              config={'displayModeBar': False},
+                              style={'height': '300px'}),
+                    dcc.Graph(id='mnid-compare-dist-pie-b',
+                              config={'displayModeBar': False},
+                              style={'height': '300px'}),
+                ]),
+            ]),
+        ]),
+    ])
+
+    charts.append(compare_selector)
+
+    return html.Div(id='mnid-comparative', children=[
+        dcc.Store(id='mnid-compare-store', data=tracked),
+        html.Div('COMPARATIVE ANALYSIS', className='mnid-section-lbl'),
+        html.Div(className='mnid-chart-grid', children=charts),
+    ])
+
+
 # top-bar / alert / KPIs / nav
 
 def _topbar(facility, period, n_tracked, n_await):
@@ -1558,6 +2076,7 @@ def _nav_bar():
         ('Trends',    '#mnid-trends'),
         ('Map',       '#mnid-heatmap'),
         ('Analysis',  '#mnid-analysis'),
+        ('Compare',   '#mnid-comparative'),
         ('Readiness', '#mnid-readiness'),
     ]
     return html.Div(
@@ -1731,7 +2250,8 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     ]
     analysis_acc = [a for a in analysis_acc if a]
 
-    heatmap_div = _coverage_heatmap_section(all_inds, facility_code)
+    heatmap_div      = _coverage_heatmap_section(all_inds, facility_code)
+    comparative_div  = _comparative_analysis_section(all_inds, facility_code)
 
     return html.Div(className='mnid-bg', children=[
 
@@ -1779,6 +2299,10 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
                 'panel':   {'padding': '0 16px 2px'},
             },
         ),
+
+        # Comparative Analysis
+        _section_anchor('mnid-comparative'),
+        comparative_div,
 
         # Readiness
         _section_anchor('mnid-readiness'),
