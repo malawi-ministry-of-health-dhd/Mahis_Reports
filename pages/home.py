@@ -241,6 +241,13 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
         ctx = callback_context
         triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else None
 
+        if not urlparams:
+            urlparams = {"Location": ["LL040033"], "uuid": ["m3his@dhd"]}
+        if not urlparams.get("Location"):
+            urlparams["Location"] = ["LL040033"]
+        if not urlparams.get("uuid"):
+            urlparams["uuid"] = ["m3his@dhd"]
+
 
         # Determine which report to show
         clicked_name = current_active
@@ -256,7 +263,7 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
         if urlparams.get('Location', [None])[0]:
             location = urlparams.get('Location', [None])[0]
         else:
-            return html.Div("Missing Parameters"), no_update, no_update, clicked_name
+            location = "LL040033"
 
         # Load Data
         SQL = f"""
