@@ -369,7 +369,7 @@ html { scroll-behavior: smooth; }
 /* ── Analysis chart grid ──────────────────────────────────────────── */
 .mnid-chart-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
   gap: 10px;
   padding: 4px 0;
 }
@@ -379,6 +379,12 @@ html { scroll-behavior: smooth; }
   border-radius: 8px;
   padding: 10px 12px 6px;
   overflow: hidden;
+}
+
+.mnid-compare-card {
+  padding: 14px 16px 10px;
+  min-height: 560px;
+  grid-column: 1 / -1;
 }
 
 /* ── Map filter dropdown overrides ───────────────────────────── */
