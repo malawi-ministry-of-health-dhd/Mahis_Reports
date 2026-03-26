@@ -9,15 +9,16 @@ Structure:
   6. Clinical analysis: themed charts in collapsible accordion sections
   7. System readiness: equipment / workforce / data quality
 """
-from dash import html, dcc
+from dash import html, dcc, clientside_callback, callback, Input, Output, State, ALL
 import dash_mantine_components as dmc
 from helpers import create_count_from_config
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
+import json
 
 
-# ══ palette ════════════════════════════════════════════════════════════════════
+# palette
 OK_C    = '#3B6D11';  WARN_C  = '#BA7517';  DANGER_C = '#E24B4A'
 INFO_C  = '#185FA5';  MUTED   = '#B4B2A9';  GRID_C   = '#F1EFE8'
 BG      = '#fff';     BORDER  = '#E0DED6';  TEXT     = '#1A1A18'
@@ -58,8 +59,17 @@ _FACILITY_DISTRICT = {
 _ALL_FACILITIES = ['LL040033', 'MZ120004', 'BL050022', 'BT020011']
 _ALL_DISTRICTS  = ['Lilongwe', 'Mzuzu', 'Blantyre']
 
+_FACILITY_COORDS = {
+    'LL040033': (-13.9626, 33.7741, 'Lilongwe Central Hospital',  'Lilongwe'),
+    'BT020011': (-13.9780, 33.7853, 'Bwaila District Hospital',   'Lilongwe'),
+    'MZ120004': (-11.4534, 34.0192, 'Mzuzu Urban Health Centre',  'Mzuzu'),
+    'BL050022': (-15.7861, 35.0058, 'Blantyre South Health Centre','Blantyre'),
+}
 
-# ══ data helpers ═══════════════════════════════════════════════════════════════
+_FACILITY_NAMES = {k: v[2] for k, v in _FACILITY_COORDS.items()}
+
+
+# data helpers
 
 def _cov(df, n_cfg, d_cfg):
     try:   num = int(create_count_from_config(df, n_cfg) or 0)
@@ -104,7 +114,7 @@ def _monthly_visits(df, encounter_val, unique_col='person_id'):
     return out
 
 
-# ══ themed chart builders ══════════════════════════════════════════════════════
+# themed chart builders 
 
 def _empty_card(title):
     return html.Div(className='mnid-chart-card', children=[
@@ -197,107 +207,142 @@ def _line(monthly_df, title, color=INFO_C, y_label='Clients'):
     return fig
 
 
-# ══ TREND SWITCHER ════════════════════════════════════════════════════════════
+# TREND SWITCHER
 
-def _trend_switcher(df: pd.DataFrame, indicators: list) -> html.Div:
-    """
-    One Plotly figure with all indicator trends.
-    Category buttons (ANC / Labour / Newborn / PNC) toggle which traces are visible.
-    hovermode='x unified' — NO staticPlot.
-    """
-    tracked = [i for i in indicators if i.get('status') == 'tracked']
-    by_cat = {}
-    for ind in tracked:
-        by_cat.setdefault(ind.get('category','Other'), []).append(ind)
+_CAT_LABELS = {'ANC': 'ANC', 'Labour': 'Labour & Delivery', 'Newborn': 'Newborn', 'PNC': 'PNC'}
+_CAT_ORDER  = ['ANC', 'Labour', 'Newborn', 'PNC']
 
-    cat_order = ['ANC', 'Labour', 'Newborn', 'PNC']
 
+def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str) -> go.Figure:
+    palette = CAT_PALETTES.get(cat, [INFO_C])
     fig = go.Figure()
-    trace_cats = []
 
-    for cat in cat_order:
-        palette = CAT_PALETTES.get(cat, [INFO_C])
-        for j, ind in enumerate(by_cat.get(cat, [])):
-            pts = _monthly(df, ind['numerator_filters'], ind['denominator_filters'])
-            if len(pts) < 2:
-                trace_cats.append(cat)
-                fig.add_trace(go.Scatter(
-                    x=[], y=[], name=ind['label'],
-                    visible=(cat == 'ANC'),
-                    showlegend=True,
-                    line=dict(color=palette[j % len(palette)], width=2),
-                ))
-                continue
-            xs = [p['x'] for p in pts]
-            ys = [p['pct'] for p in pts]
-            c  = palette[j % len(palette)]
-            r, g, b = int(c[1:3],16), int(c[3:5],16), int(c[5:7],16)
+    if not len(df) or not cat_inds:
+        fig.add_annotation(text='No data available for this category',
+                           xref='paper', yref='paper', x=0.5, y=0.5,
+                           showarrow=False, font=dict(size=12, color=MUTED))
+        fig.update_layout(paper_bgcolor=BG, plot_bgcolor=BG,
+                          height=300, margin=dict(l=8, r=8, t=12, b=24))
+        return fig
+
+    # Vectorised monthly: one groupby per indicator across all months
+    if 'Date' not in df.columns:
+        return fig
+    d2 = df.copy()
+    d2['_m'] = pd.to_datetime(d2['Date']).dt.to_period('M')
+    periods = sorted(d2['_m'].dropna().unique())[-12:]  # last 12 months
+
+    n_by_m = {}; d_by_m = {}
+    for ind in cat_inds:
+        nm = _mask(d2, ind['numerator_filters'])
+        dm = _mask(d2, ind['denominator_filters'])
+        n_by_m[ind['id']] = d2[nm].groupby('_m')['person_id'].nunique().to_dict()
+        d_by_m[ind['id']] = d2[dm].groupby('_m')['person_id'].nunique().to_dict()
+
+    for j, ind in enumerate(cat_inds):
+        c = palette[j % len(palette)]
+        r, g, b = int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16)
+        xs, ys = [], []
+        for p in periods:
+            n = n_by_m[ind['id']].get(p, 0)
+            d = d_by_m[ind['id']].get(p, 0)
+            xs.append(pd.Period(p, 'M').to_timestamp().to_pydatetime())
+            ys.append(round(n / d * 100, 1) if d > 0 else None)
+
+        has_data = any(y is not None for y in ys)
+        if has_data:
             fig.add_trace(go.Scatter(
                 x=xs, y=ys, name=ind['label'],
-                visible=(cat == 'ANC'),
                 mode='lines+markers',
                 line=dict(color=c, width=2.5, shape='spline'),
                 marker=dict(size=6, color=c, line=dict(color='#fff', width=1.5)),
                 fill='tozeroy', fillcolor=f'rgba({r},{g},{b},0.05)',
+                connectgaps=True,
                 hovertemplate=f'%{{x|%b %Y}}<br>{ind["label"]}: %{{y:.0f}}%<extra></extra>',
             ))
-            trace_cats.append(cat)
-            if cat == 'ANC':
-                fig.add_shape(type='line',
-                              x0=xs[0], x1=xs[-1],
+            non_none_xs = [x for x, y in zip(xs, ys) if y is not None]
+            if len(non_none_xs) >= 2:
+                fig.add_shape(type='line', x0=non_none_xs[0], x1=non_none_xs[-1],
                               y0=ind['target'], y1=ind['target'],
-                              line=dict(color=c, width=1, dash='dot'),
-                              layer='below')
-
-    # Build category toggle buttons
-    buttons = []
-    for cat in cat_order:
-        vis = [tc == cat for tc in trace_cats]
-        buttons.append(dict(
-            label=cat if cat != 'Labour' else 'Labour & Delivery',
-            method='update',
-            args=[{'visible': vis},
-                  {'title.text': f'{cat} — Coverage Trend (%)'}],
-        ))
-
+                              line=dict(color=c, width=1, dash='dot'), layer='below')
+        else:
+            fig.add_trace(go.Scatter(x=[], y=[], name=ind['label'],
+                                     line=dict(color=c), showlegend=True))
     fig.update_layout(
         paper_bgcolor=BG, plot_bgcolor=BG,
         font=dict(family=FONT, color=TEXT, size=11),
         hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
         height=300,
-        margin=dict(l=4, r=4, t=64, b=20),
-        title=dict(text='ANC — Coverage Trend (%)',
-                   font=dict(size=12, color='#444441', family=FONT),
-                   x=0, xanchor='left', y=0.97),
-        updatemenus=[dict(
-            type='buttons', direction='right',
-            buttons=buttons,
-            x=0, y=1.22, xanchor='left', yanchor='top',
-            pad=dict(r=6, t=0),
-            bgcolor='#F5F4F0', bordercolor=BORDER, borderwidth=1,
-            font=dict(size=11, color=TEXT, family=FONT),
-            showactive=True,
-            active=0,
-        )],
+        margin=dict(l=8, r=8, t=12, b=24),
         xaxis=dict(showgrid=False, zeroline=False, showline=False,
                    tickformat='%b %y', tickfont=dict(size=10, color=MUTED)),
-        yaxis=dict(showgrid=True, gridcolor=GRID_C, zeroline=False,
-                   showline=False, tickfont=dict(size=10, color=MUTED),
-                   range=[0, 105],
+        yaxis=dict(showgrid=True, gridcolor=GRID_C, zeroline=False, showline=False,
+                   tickfont=dict(size=10, color=MUTED), range=[0, 105],
                    title=dict(text='Coverage %', font=dict(size=10, color=MUTED))),
         legend=dict(font=dict(size=10, color=DIM), bgcolor='rgba(0,0,0,0)',
                     orientation='v', x=1.01, y=1, xanchor='left', yanchor='top'),
         hovermode='x unified',
     )
+    return fig
+
+
+# Register clientside callback once at module level
+clientside_callback(
+    """
+    function(n_clicks_list, stored_figs) {
+        if (!stored_figs) return window.dash_clientside.no_update;
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.triggered || !ctx.triggered.length)
+            return window.dash_clientside.no_update;
+        var prop_id = ctx.triggered[0].prop_id;
+        var id_part = prop_id.split('.')[0];
+        try { var id_obj = JSON.parse(id_part); } catch(e) {
+            return window.dash_clientside.no_update;
+        }
+        var cat = id_obj.index;
+        if (!stored_figs[cat]) return window.dash_clientside.no_update;
+        return JSON.parse(stored_figs[cat]);
+    }
+    """,
+    Output('mnid-trend-graph', 'figure'),
+    Input({'type': 'trend-cat-btn', 'index': ALL}, 'n_clicks'),
+    State('mnid-trend-store', 'data'),
+    prevent_initial_call=True,
+)
+
+
+def _trend_switcher(df: pd.DataFrame, indicators: list) -> html.Div:
+    tracked = [i for i in indicators if i.get('status') == 'tracked']
+    stored_figs = {}
+    for cat in _CAT_ORDER:
+        cat_inds = [i for i in tracked if i.get('category') == cat]
+        stored_figs[cat] = _cat_trend_fig(df, cat_inds, cat).to_json()  # handles datetime
+
+    default_inds = [i for i in tracked if i.get('category') == 'ANC']
+    default_fig  = _cat_trend_fig(df, default_inds, 'ANC')
 
     return html.Div(className='mnid-card', style={'marginBottom': '12px'}, children=[
-        html.Div('COVERAGE TREND', className='mnid-section-lbl'),
-        dcc.Graph(figure=fig, config={'displayModeBar': False},
-                  style={'height': '300px'}),
+        html.Div(style={'display': 'flex', 'alignItems': 'center',
+                        'justifyContent': 'space-between', 'marginBottom': '8px'}, children=[
+            html.Div('COVERAGE TREND', className='mnid-section-lbl',
+                     style={'marginBottom': '0'}),
+            html.Div(className='mnid-filter-row', children=[
+                html.Button(
+                    _CAT_LABELS.get(c, c),
+                    id={'type': 'trend-cat-btn', 'index': c},
+                    className='mnid-filter-btn' + (' active' if c == 'ANC' else ''),
+                    n_clicks=0,
+                )
+                for c in _CAT_ORDER
+            ]),
+        ]),
+        dcc.Store(id='mnid-trend-store', data=stored_figs),
+        dcc.Graph(id='mnid-trend-graph', figure=default_fig,
+                  config={'displayModeBar': False}, style={'height': '300px'}),
     ])
 
 
-# ══ HEATMAP ════════════════════════════════════════════════════════════════════
+# HELPERS (vectorised coverage matrix, kept for potential future use)
 
 def _mask(df: pd.DataFrame, cfg: dict) -> pd.Series:
     """Build boolean row mask from a filter config dict without calling create_count."""
@@ -366,224 +411,834 @@ def _matrix_monthly(df: pd.DataFrame, inds: list) -> tuple:
     return x_labels, z
 
 
-def _build_heatmap(df_full: pd.DataFrame, indicators: list, facility_code: str) -> html.Div:
-    """
-    Multi-view indicator coverage heatmap.
-    4 views × 3 year filters = 12 traces.  Only one visible at a time.
-    Views: Monthly | District Facilities | All Districts | All Facilities
-    Year filters: All | 2025 | 2026
-    """
-    # Load full MCH data
-    try:
-        df_all = pd.read_parquet('data/latest_data_opd.parquet')
-        mch_full = df_all[df_all['Program'].str.contains('Maternal|Neonatal', case=False, na=False)].copy()
-        if 'Date' in mch_full.columns:
-            mch_full['Date'] = pd.to_datetime(mch_full['Date'], errors='coerce')
-    except Exception:
-        mch_full = pd.DataFrame()
+def _cov_color(pct):
+    if pct is None: return '#E0DED6'
+    if pct >= 88:   return OK_C
+    if pct >= 80:   return '#C0DD97'
+    if pct >= 65:   return WARN_C
+    if pct >= 40:   return '#E8A830'
+    return DANGER_C
 
-    tracked = [i for i in indicators if i.get('status') == 'tracked']
-    if not tracked:
-        return html.Div()
 
-    cat_order = ['ANC', 'Labour', 'Newborn', 'PNC']
-    sorted_inds = []
-    for cat in cat_order:
-        sorted_inds.extend([i for i in tracked if i.get('category') == cat])
-    # any uncategorised
-    sorted_inds.extend([i for i in tracked if i not in sorted_inds])
+# ── Vectorised facility coverage computation ───────────────────────────────
 
-    y_labels = [i['label'][:28] for i in sorted_inds]
-    n_inds = len(sorted_inds)
+# ── Heatmap pre-computation ───────────────────────────────────────────────
 
+def _compute_heatmap_store(mch_full: pd.DataFrame, tracked: list,
+                           facility_code: str) -> dict:
+    """Pre-compute all view × year matrices into a JSON-serialisable store."""
     current_district = _FACILITY_DISTRICT.get(facility_code, '')
-    district_facs = [f for f in _ALL_FACILITIES
-                     if _FACILITY_DISTRICT.get(f) == current_district]
+    sorted_inds = []
+    for cat in ['ANC', 'Labour', 'Newborn', 'PNC']:
+        sorted_inds.extend(i for i in tracked if i.get('category') == cat)
+    sorted_inds.extend(i for i in tracked if i not in sorted_inds)
 
-    def _year_slice(df, year_val):
-        if year_val is None or not len(df) or 'Date' not in df.columns:
-            return df
-        return df[df['Date'].dt.year == year_val]
+    y_labels  = [i['label'][:32] for i in sorted_inds]
+    y_targets = [i['target']     for i in sorted_inds]
 
-    # Pre-compute all 4 views × 3 year filters = 12 sets of (x_labels, z)
-    year_filters = [None, 2025, 2026]
-    all_traces_data = []  # (x_labels, z, view_idx, year_idx)
+    store = {
+        'y_labels': y_labels, 'y_targets': y_targets,
+        'current_fac': facility_code, 'current_district': current_district,
+        'monthly': {}, 'by_facility': {}, 'by_district': {},
+        'by_district_facs': {d: {} for d in _ALL_DISTRICTS},
+        'yearly': {}, 'district_avgs': {},
+    }
 
-    for year_idx, year_val in enumerate(year_filters):
-        mch_y = _year_slice(mch_full, year_val)
+    if not len(mch_full) or not sorted_inds:
+        return store
 
-        # View 0: This Facility — Monthly
-        fac_df = mch_y[mch_y['Facility_CODE'] == facility_code] if len(mch_y) else mch_y
+    year_options = {'All years': None, '2025': 2025, '2026': 2026}
+    district_facs_map = {
+        d: [f for f in _ALL_FACILITIES if _FACILITY_DISTRICT.get(f) == d]
+        for d in _ALL_DISTRICTS
+    }
+
+    for ylbl, yval in year_options.items():
+        df = mch_full[mch_full['Date'].dt.year == yval].copy() if yval else mch_full.copy()
+        if not len(df):
+            for key in ['monthly', 'by_facility', 'by_district']:
+                store[key][ylbl] = {'x': [], 'z': [], 'tick_angle': 0}
+            for d in _ALL_DISTRICTS:
+                store['by_district_facs'][d][ylbl] = {'x': [], 'z': [], 'tick_angle': -30}
+            store['district_avgs'][ylbl] = {d: None for d in _ALL_DISTRICTS}
+            continue
+
+        # Monthly — current facility only
+        fac_df = df[df['Facility_CODE'] == facility_code]
         if len(fac_df):
-            x0, z0 = _matrix_monthly(fac_df, sorted_inds)
+            x_m, z_m = _matrix_monthly(fac_df, sorted_inds)
         else:
-            x0, z0 = [], []
-        all_traces_data.append((x0, z0, 0, year_idx))
+            x_m, z_m = [], []
+        store['monthly'][ylbl] = {'x': x_m, 'z': z_m, 'tick_angle': 0}
 
-        # View 1: District Facilities (same district as current)
-        x1 = [f'{f}*' if f == facility_code else f for f in district_facs]
-        z1 = _matrix_by_group(mch_y, sorted_inds, 'Facility_CODE', district_facs) if len(mch_y) else []
-        all_traces_data.append((x1, z1, 1, year_idx))
+        # Vectorised groupby for facility and district — one pass per indicator
+        n_by_fac  = {}; d_by_fac  = {}
+        n_by_dist = {}; d_by_dist = {}
+        has_dist  = 'District' in df.columns
 
-        # View 2: All Districts
-        x2 = _ALL_DISTRICTS[:]
-        z2 = _matrix_by_group(mch_y, sorted_inds, 'District', _ALL_DISTRICTS) if len(mch_y) else []
-        all_traces_data.append((x2, z2, 2, year_idx))
+        for ind in sorted_inds:
+            nm = _mask(df, ind['numerator_filters'])
+            dm = _mask(df, ind['denominator_filters'])
+            n_by_fac[ind['id']]  = df[nm].groupby('Facility_CODE')['person_id'].nunique().to_dict()
+            d_by_fac[ind['id']]  = df[dm].groupby('Facility_CODE')['person_id'].nunique().to_dict()
+            if has_dist:
+                n_by_dist[ind['id']] = df[nm].groupby('District')['person_id'].nunique().to_dict()
+                d_by_dist[ind['id']] = df[dm].groupby('District')['person_id'].nunique().to_dict()
 
-        # View 3: All Facilities
-        x3 = [f'{f}*' if f == facility_code else f for f in _ALL_FACILITIES]
-        z3 = _matrix_by_group(mch_y, sorted_inds, 'Facility_CODE', _ALL_FACILITIES) if len(mch_y) else []
-        all_traces_data.append((x3, z3, 3, year_idx))
+        def _cell(n_dict, d_dict, ind_id, key):
+            n = n_dict.get(ind_id, {}).get(key, 0)
+            d = d_dict.get(ind_id, {}).get(key, 0)
+            return round(n / d * 100, 1) if d > 0 else None
 
-    # Trace index = view_idx * 3 + year_idx  (view outer, year inner)
-    # total: 12 traces
-    n_total = 12
+        # All facilities
+        x_f = [f'{f}*' if f == facility_code else f for f in _ALL_FACILITIES]
+        z_f = [[_cell(n_by_fac, d_by_fac, ind['id'], fac) for fac in _ALL_FACILITIES]
+               for ind in sorted_inds]
+        store['by_facility'][ylbl] = {
+            'x': x_f, 'z': z_f, 'tick_angle': -30,
+            'districts': [_FACILITY_DISTRICT.get(f, '') for f in _ALL_FACILITIES],
+        }
 
-    fig = go.Figure()
+        # All districts
+        if has_dist:
+            z_d = [[_cell(n_by_dist, d_by_dist, ind['id'], dist) for dist in _ALL_DISTRICTS]
+                   for ind in sorted_inds]
+            store['by_district'][ylbl] = {'x': _ALL_DISTRICTS[:], 'z': z_d, 'tick_angle': -20}
+            d_avgs = {}
+            for di, dist in enumerate(_ALL_DISTRICTS):
+                vals = [z_d[ii][di] for ii in range(len(sorted_inds))
+                        if ii < len(z_d) and di < len(z_d[ii]) and z_d[ii][di] is not None]
+                d_avgs[dist] = round(sum(vals) / len(vals), 1) if vals else None
+            store['district_avgs'][ylbl] = d_avgs
+        else:
+            store['by_district'][ylbl]   = {'x': [], 'z': [], 'tick_angle': -20}
+            store['district_avgs'][ylbl] = {d: None for d in _ALL_DISTRICTS}
 
-    for year_idx in range(3):
-        for view_idx in range(4):
-            trace_idx = view_idx * 3 + year_idx
-            # find matching data
-            entry = next((e for e in all_traces_data
-                          if e[2] == view_idx and e[3] == year_idx), None)
-            if entry is None or not entry[0]:
-                x_labels, z = [], [[None]*1 for _ in sorted_inds]
+        # Per-district facility breakdowns
+        for dist in _ALL_DISTRICTS:
+            dfacs = district_facs_map[dist]
+            x_df  = [f'{f}*' if f == facility_code else f for f in dfacs]
+            z_df  = [[_cell(n_by_fac, d_by_fac, ind['id'], fac) for fac in dfacs]
+                     for ind in sorted_inds]
+            store['by_district_facs'][dist][ylbl] = {'x': x_df, 'z': z_df, 'tick_angle': -30}
+
+    # Year-over-year for current facility
+    fac_full = mch_full[mch_full['Facility_CODE'] == facility_code]
+    if len(fac_full) and 'Date' in fac_full.columns:
+        years = sorted(fac_full['Date'].dt.year.dropna().astype(int).unique().tolist())
+        n_yr = {}; d_yr = {}
+        for ind in sorted_inds:
+            nm = _mask(fac_full, ind['numerator_filters'])
+            dm = _mask(fac_full, ind['denominator_filters'])
+            yr_col = fac_full['Date'].dt.year.astype(int)
+            n_yr[ind['id']] = fac_full[nm].groupby(yr_col)['person_id'].nunique().to_dict()
+            d_yr[ind['id']] = fac_full[dm].groupby(yr_col)['person_id'].nunique().to_dict()
+        x_yr = [str(y) for y in years]
+        z_yr  = [[round(n_yr[ind['id']].get(yr, 0) / d_yr[ind['id']].get(yr, 0) * 100, 1)
+                  if d_yr[ind['id']].get(yr, 0) > 0 else None
+                  for yr in years] for ind in sorted_inds]
+        store['yearly'] = {'x': x_yr, 'z': z_yr, 'tick_angle': 0}
+
+    # ── Encounter volume counts (for right-panel stats) ─────────────────────
+    counts: dict = {}
+    if 'Encounter' in mch_full.columns:
+        enc_col = mch_full['Encounter'].fillna('').str.upper()
+        fac_mask = mch_full['Facility_CODE'] == facility_code
+        for ylbl, yval in {'All years': None, '2025': 2025, '2026': 2026}.items():
+            if yval and 'Date' in mch_full.columns:
+                yr_mask = mch_full['Date'].dt.year == yval
             else:
-                x_labels, z = entry[0], entry[1]
+                yr_mask = pd.Series(True, index=mch_full.index)
+            df_yr = mch_full[yr_mask & fac_mask]
+            enc_yr = df_yr['Encounter'].fillna('').str.upper() if len(df_yr) else pd.Series(dtype=str)
+            counts[ylbl] = {
+                'ANC visits':   int(df_yr[enc_yr.str.contains('ANC',      na=False)]['person_id'].nunique()),
+                'Deliveries':   int(df_yr[enc_yr.str.contains('LABOUR|DELIVERY|BIRTH', na=False)]['person_id'].nunique()),
+                'PNC visits':   int(df_yr[enc_yr.str.contains('PNC|POSTNATAL|POST.NATAL', na=False)]['person_id'].nunique()),
+                'All MCH encounters': int(df_yr['person_id'].nunique()),
+            }
+    store['counts'] = counts
 
-            fig.add_trace(go.Heatmap(
-                z=z,
-                x=x_labels,
-                y=y_labels,
-                colorscale=HEATMAP_CS,
-                zmin=0, zmax=100,
-                colorbar=dict(
-                    thickness=14,
-                    title=dict(text='Coverage %', side='right',
-                               font=dict(size=10, color=DIM)),
-                    tickfont=dict(size=9, color=DIM),
-                    len=0.9,
-                ),
-                hovertemplate='%{y}<br>%{x}: %{z:.0f}%<extra></extra>',
-                visible=(trace_idx == 0),  # only first trace visible initially
-                showscale=(trace_idx == 0),
-            ))
+    return store
 
-    height = max(n_inds * 26 + 120, 400)
 
-    # Build view buttons (updatemenus row 1)
-    view_labels = ['This Facility — Monthly', 'District Facilities', 'All Districts', 'All Facilities']
-    view_buttons = []
-    for vi in range(4):
-        # when this view button is clicked, keep the current year filter
-        # we activate traces for this view across all years, then hide all but
-        # the one matching the active year — but since year state is not stored,
-        # clicking a view button defaults to year=All (year_idx=0)
-        vis = [False] * n_total
-        active_trace = vi * 3 + 0  # default to year=All
-        vis[active_trace] = True
-        # update colorbar visibility: only visible trace shows scale
-        showscale_updates = [False] * n_total
-        showscale_updates[active_trace] = True
-        xangle = 0 if vi == 0 else -40
-        view_buttons.append(dict(
-            label=view_labels[vi],
-            method='update',
-            args=[
-                {'visible': vis, 'showscale': showscale_updates},
-                {'xaxis.tickangle': xangle},
-            ],
-        ))
+# ── Heatmap figure builder ─────────────────────────────────────────────────
 
-    # Build year buttons (updatemenus row 2)
-    year_labels = ['All', '2025', '2026']
-    year_buttons = []
-    for yi in range(3):
-        # default to view=0 (monthly) when clicking year; ideally we'd keep
-        # current view but without callbacks we default to monthly + chosen year
-        vis = [False] * n_total
-        active_trace = 0 * 3 + yi
-        vis[active_trace] = True
-        showscale_updates = [False] * n_total
-        showscale_updates[active_trace] = True
-        year_buttons.append(dict(
-            label=year_labels[yi],
-            method='update',
-            args=[
-                {'visible': vis, 'showscale': showscale_updates},
-                {},
-            ],
+def _build_heatmap_fig(stored: dict, view: str, year: str,
+                       district: str | None = None,
+                       sel_inds: list | None = None) -> go.Figure:
+    all_labels  = stored.get('y_labels', [])
+    all_targets = stored.get('y_targets', [])
+
+    # Filter rows to selected indicators (if any selection is active)
+    if sel_inds:
+        rows_idx = [i for i, lbl in enumerate(all_labels) if lbl in sel_inds]
+    else:
+        rows_idx = list(range(len(all_labels)))
+
+    y_labels  = [all_labels[i] for i in rows_idx]
+    y_targets = [all_targets[i] for i in rows_idx]
+    n_inds    = len(y_labels)
+    height    = max(n_inds * 30 + 150, 380)
+
+    if view == 'monthly':
+        data = stored.get('monthly', {}).get(year, {})
+    elif view == 'by_facility':
+        data = stored.get('by_facility', {}).get(year, {})
+    elif view == 'by_district':
+        data = stored.get('by_district', {}).get(year, {})
+    elif view == 'district_facs':
+        dist = district or stored.get('current_district', _ALL_DISTRICTS[0])
+        data = stored.get('by_district_facs', {}).get(dist, {}).get(year, {})
+    elif view == 'yearly':
+        data = stored.get('yearly') or {}
+    else:
+        data = {}
+
+    x_labels   = data.get('x', [])
+    z_raw      = data.get('z', [])
+    z          = [z_raw[i] for i in rows_idx if i < len(z_raw)]
+    tick_angle = data.get('tick_angle', 0)
+
+    if view in ('by_district', 'by_facility', 'district_facs'):
+        return _build_geo_heatmap_fig(stored, view, year, district, sel_inds)
+
+    if not x_labels or not z:
+        fig = go.Figure()
+        fig.add_annotation(text='No data for this selection',
+                           xref='paper', yref='paper', x=0.5, y=0.5,
+                           showarrow=False, font=dict(size=12, color=MUTED))
+        fig.update_layout(paper_bgcolor=BG, plot_bgcolor=GRID_C,
+                          height=height, margin=dict(l=220, r=80, t=16, b=60))
+        return fig
+
+    fig = go.Figure(go.Heatmap(
+        z=z, x=x_labels, y=y_labels,
+        colorscale=HEATMAP_CS,
+        zmin=0, zmax=100,
+        colorbar=dict(
+            thickness=14,
+            title=dict(text='Coverage %', side='right',
+                       font=dict(size=9, color=DIM)),
+            tickfont=dict(size=9, color=DIM),
+            tickvals=[0, 40, 65, 80, 88, 100],
+            ticktext=['0%', '40%', '65%', '80%', '88%', '100%'],
+            len=0.85,
+        ),
+        hovertemplate='<b>%{y}</b><br>%{x}: <b>%{z:.0f}%</b><extra></extra>',
+        ygap=1.5, xgap=1.5,
+    ))
+
+    # Cell value annotations for small heatmaps
+    annotations = []
+    if len(x_labels) <= 8:
+        for ii, row in enumerate(z):
+            for jj, val in enumerate(row):
+                if val is not None:
+                    txt_col = '#fff' if val < 65 else '#222'
+                    annotations.append(dict(
+                        x=x_labels[jj], y=y_labels[ii],
+                        text=f'{val:.0f}%',
+                        showarrow=False,
+                        font=dict(size=9, color=txt_col, family=FONT),
+                    ))
+
+    # Target reference: annotate indicator labels with target info
+    y_annots = []
+    for ii, (lbl, tgt) in enumerate(zip(y_labels, y_targets)):
+        on_tgt_count = sum(1 for row in ([z[ii]] if ii < len(z) else [[]])
+                           for v in row if v is not None and v >= tgt)
+        marker = ' ✓' if on_tgt_count > 0 else ''
+        y_annots.append(dict(
+            x=-0.001, y=lbl,
+            xref='paper', yref='y',
+            text=f'<span style="color:{MUTED}; font-size:8px">▶{tgt}%</span>',
+            showarrow=False, xanchor='right',
+            font=dict(size=7, color=MUTED, family=FONT),
         ))
 
     fig.update_layout(
         paper_bgcolor=BG, plot_bgcolor=BG,
         font=dict(family=FONT, color=TEXT, size=11),
         height=height,
-        margin=dict(l=220, r=100, t=90, b=60),
-        xaxis=dict(
-            tickangle=0,
-            tickfont=dict(size=10, color=DIM),
-            showgrid=False,
-            side='bottom',
-        ),
-        yaxis=dict(
-            tickfont=dict(size=10, color=DIM),
-            showgrid=False,
-            autorange='reversed',
-        ),
-        updatemenus=[
-            dict(
-                type='buttons', direction='right',
-                buttons=view_buttons,
-                x=0, y=1.12, xanchor='left', yanchor='top',
-                pad=dict(r=6, t=0),
-                bgcolor='#F5F4F0', bordercolor=BORDER, borderwidth=1,
-                font=dict(size=10, color=TEXT, family=FONT),
-                showactive=True,
-                active=0,
-            ),
-            dict(
-                type='buttons', direction='right',
-                buttons=year_buttons,
-                x=0, y=1.04, xanchor='left', yanchor='top',
-                pad=dict(r=6, t=0),
-                bgcolor='#F5F4F0', bordercolor=BORDER, borderwidth=1,
-                font=dict(size=10, color=TEXT, family=FONT),
-                showactive=True,
-                active=0,
-            ),
-        ],
-        annotations=[
-            dict(
-                text='* = current facility',
-                x=1, y=-0.08,
-                xref='paper', yref='paper',
-                xanchor='right', yanchor='top',
-                showarrow=False,
-                font=dict(size=9, color=MUTED),
-            )
-        ],
+        margin=dict(l=230, r=90, t=16, b=70),
+        xaxis=dict(tickangle=tick_angle, tickfont=dict(size=10, color=DIM),
+                   showgrid=False, side='bottom'),
+        yaxis=dict(tickfont=dict(size=10, color=DIM),
+                   showgrid=False, autorange='reversed'),
+        annotations=annotations + y_annots,
         hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
     )
+    return fig
+
+
+# ── Geographic map data for main heatmap ───────────────────────────────────
+
+_DISTRICT_POLYGONS = {
+    'Mzuzu': [
+        (4.8, 99.0), (4.2, 95.5), (4.6, 92.0), (3.9, 87.5), (4.5, 82.0),
+        (5.1, 78.0), (6.1, 74.0), (7.0, 70.0), (7.5, 66.0), (8.0, 62.0),
+        (8.7, 58.0), (9.1, 54.0), (8.7, 51.0), (7.6, 50.0), (6.7, 51.5),
+        (5.7, 53.5), (5.0, 56.0), (4.6, 60.0), (4.2, 65.0), (3.8, 71.0),
+        (3.7, 77.0), (3.9, 84.0), (4.2, 90.0), (4.6, 95.0),
+    ],
+    'Lilongwe': [
+        (4.6, 60.0), (5.0, 56.0), (5.7, 53.5), (6.7, 51.5), (7.6, 50.0),
+        (8.7, 51.0), (9.4, 48.0), (10.0, 44.0), (10.4, 40.0), (10.8, 36.0),
+        (10.9, 32.0), (10.6, 28.0), (9.8, 25.0), (9.0, 23.0), (8.1, 22.0),
+        (7.3, 23.0), (6.6, 24.5), (5.9, 26.5), (5.3, 30.0), (4.7, 34.0),
+        (4.1, 38.0), (3.8, 43.0), (3.8, 48.0), (4.1, 54.0),
+    ],
+    'Blantyre': [
+        (5.3, 30.0), (5.9, 26.5), (6.6, 24.5), (7.3, 23.0), (8.1, 22.0),
+        (9.0, 23.0), (9.8, 25.0), (10.6, 28.0), (11.3, 24.0), (11.7, 20.0),
+        (11.6, 16.0), (11.1, 12.0), (10.6, 9.0), (10.0, 6.0), (9.5, 3.5),
+        (8.7, 1.2), (7.5, 0.5), (6.5, 1.6), (5.7, 3.8), (5.1, 7.0),
+        (4.9, 11.0), (4.8, 16.0), (4.9, 21.0), (5.0, 25.0),
+    ],
+}
+
+_DISTRICT_LABEL_POS = {
+    'Mzuzu': (6.0, 75.0),
+    'Lilongwe': (7.1, 40.0),
+    'Blantyre': (7.7, 11.0),
+}
+
+_FACILITY_MAP_POS = {
+    'MZ120004': (6.1, 77.5),
+    'LL040033': (7.2, 42.5),
+    'BT020011': (6.4, 36.2),
+    'BL050022': (8.1, 12.3),
+}
+
+
+def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
+                           district: str | None = None,
+                           sel_inds: list | None = None) -> go.Figure:
+    district_avgs = stored.get('district_avgs', {}).get(year, {})
+    current_fac   = stored.get('current_fac', '')
+    current_dist  = stored.get('current_district', '')
+    all_labels    = stored.get('y_labels', [])
+
+    if sel_inds:
+        rows_idx = [i for i, lbl in enumerate(all_labels) if lbl in sel_inds]
+    else:
+        rows_idx = list(range(len(all_labels)))
+
+    def _fac_avg(fac_code):
+        by_fac = stored.get('by_facility', {}).get(year, {})
+        fac_x  = by_fac.get('x', [])
+        fac_z  = by_fac.get('z', [])
+        key    = f'{fac_code}*' if fac_code == current_fac else fac_code
+        if key not in fac_x:
+            return None
+        ci = fac_x.index(key)
+        vals = [fac_z[r][ci] for r in rows_idx
+                if r < len(fac_z) and ci < len(fac_z[r]) and fac_z[r][ci] is not None]
+        return round(sum(vals) / len(vals), 1) if vals else None
+
+    focus_dist = district or current_dist
+    highlighted = {focus_dist} if view == 'district_facs' else set(_ALL_DISTRICTS)
+
+    fig = go.Figure()
+    for dist in _ALL_DISTRICTS:
+        pts = _DISTRICT_POLYGONS.get(dist, [])
+        if not pts:
+            continue
+        xs = [p[0] for p in pts]
+        ys = [p[1] for p in pts]
+        cov = district_avgs.get(dist)
+        fig.add_trace(go.Scatter(
+            x=xs,
+            y=ys,
+            mode='lines',
+            fill='toself',
+            fillcolor=_cov_color(cov) if cov is not None else '#D6D3CB',
+            line=dict(color=INFO_C if dist in highlighted else '#FFFFFF',
+                      width=3 if dist in highlighted else 1.6),
+            opacity=1.0 if dist in highlighted else 0.28,
+            customdata=[[dist, cov]] * len(xs),
+            hovertemplate='<b>%{customdata[0]}</b><br>Avg coverage: %{customdata[1]:.1f}%<extra></extra>' if cov is not None
+                          else '<b>%{customdata[0]}</b><br>No data<extra></extra>',
+            showlegend=False,
+        ))
+
+    label_x = []
+    label_y = []
+    label_text = []
+    for dist in _ALL_DISTRICTS:
+        if view == 'district_facs' and dist != focus_dist:
+            continue
+        pos = _DISTRICT_LABEL_POS.get(dist)
+        if not pos:
+            continue
+        cov = district_avgs.get(dist)
+        label_x.append(pos[0])
+        label_y.append(pos[1])
+        label_text.append(f'<b>{dist}</b><br>{cov:.0f}%' if cov is not None else f'<b>{dist}</b><br>No data')
+    if label_x:
+        fig.add_trace(go.Scatter(
+            x=label_x,
+            y=label_y,
+            mode='text',
+            text=label_text,
+            textfont=dict(size=16, color='white', family=FONT),
+            hoverinfo='skip',
+            showlegend=False,
+        ))
+
+    if view in ('by_facility', 'district_facs'):
+        fac_codes = _ALL_FACILITIES if view == 'by_facility' else [
+            f for f in _ALL_FACILITIES if _FACILITY_DISTRICT.get(f) == focus_dist
+        ]
+        label_pos_map = {
+            'MZ120004': 'middle right',
+            'LL040033': 'top right',
+            'BT020011': 'bottom right',
+            'BL050022': 'middle right',
+        }
+        for fac in fac_codes:
+            pos = _FACILITY_MAP_POS.get(fac)
+            if not pos:
+                continue
+            avg = _fac_avg(fac)
+            fig.add_trace(go.Scatter(
+                x=[pos[0]],
+                y=[pos[1]],
+                mode='markers+text',
+                marker=dict(
+                    size=16 if fac == current_fac else 12,
+                    color=_cov_color(avg) if avg is not None else '#FFFFFF',
+                    line=dict(color=INFO_C if fac == current_fac else '#FFFFFF',
+                              width=2 if fac == current_fac else 1.3),
+                    symbol='square',
+                ),
+                text=[_FACILITY_NAMES.get(fac, fac)],
+                textposition=label_pos_map.get(fac, 'top right'),
+                textfont=dict(size=10, color=TEXT, family=FONT),
+                hovertemplate=f'<b>{_FACILITY_NAMES.get(fac, fac)}</b><br>{avg:.0f}%<extra></extra>' if avg is not None
+                              else f'<b>{_FACILITY_NAMES.get(fac, fac)}</b><br>No data<extra></extra>',
+                showlegend=False,
+            ))
+
+    title = 'District Coverage Map' if view == 'by_district' else (
+        'Facility Coverage Map' if view == 'by_facility' else f'{focus_dist} Facility Coverage Map'
+    )
+    fig.update_layout(
+        paper_bgcolor=BG,
+        plot_bgcolor=BG,
+        height=620,
+        margin=dict(l=20, r=20, t=48, b=20),
+        font=dict(family=FONT),
+        xaxis=dict(visible=False, range=[1.8, 13.6], fixedrange=True),
+        yaxis=dict(visible=False, range=[-2, 101], fixedrange=True),
+        annotations=[dict(
+            x=0.01, y=1.03, xref='paper', yref='paper',
+            text=title, showarrow=False, xanchor='left',
+            font=dict(size=15, color=TEXT, family=FONT),
+        )],
+    )
+    fig.update_yaxes(scaleanchor='x', scaleratio=0.16)
+    return fig
+
+
+# ── Right panel: stylised Malawi shape + indicator stats ──────────────────
+
+def _build_district_treemap(stored: dict, view: str, year: str,
+                             district: str | None = None,
+                             sel_inds: list | None = None) -> go.Figure:
+    """Treemap of districts/facilities colored by avg indicator coverage — looks like the screenshot."""
+    district_avgs = stored.get('district_avgs', {}).get(year, {})
+    current_fac   = stored.get('current_fac', '')
+    current_dist  = stored.get('current_district', '')
+    all_labels    = stored.get('y_labels', [])
+    all_targets   = stored.get('y_targets', [])
+
+    if sel_inds:
+        rows_idx = [i for i, lbl in enumerate(all_labels) if lbl in sel_inds]
+    else:
+        rows_idx = list(range(len(all_labels)))
+
+    def _fac_avg(fac_code):
+        by_fac = stored.get('by_facility', {}).get(year, {})
+        fac_x  = by_fac.get('x', [])
+        fac_z  = by_fac.get('z', [])
+        key    = f'{fac_code}*' if fac_code == current_fac else fac_code
+        if key not in fac_x:
+            return None
+        ci = fac_x.index(key)
+        vals = [fac_z[r][ci] for r in rows_idx
+                if r < len(fac_z) and ci < len(fac_z[r]) and fac_z[r][ci] is not None]
+        return round(sum(vals) / len(vals), 1) if vals else None
+
+    geo_w = {'Mzuzu': 26, 'Lilongwe': 43, 'Blantyre': 31}
+
+    if view in ('by_district', 'monthly', 'yearly'):
+        labels  = list(_ALL_DISTRICTS)
+        parents = [''] * len(labels)
+        values  = [float(geo_w.get(d, 33)) for d in labels]
+        covs    = [district_avgs.get(d) for d in labels]
+        hl_set  = {current_dist} if view in ('monthly', 'yearly') else set(labels)
+
+    elif view == 'by_facility':
+        dist_labels = list(_ALL_DISTRICTS)
+        fac_labels  = [f'{f}*' if f == current_fac else f for f in _ALL_FACILITIES]
+        labels  = dist_labels + fac_labels
+        parents = [''] * len(dist_labels) + [_FACILITY_DISTRICT.get(f, '') for f in _ALL_FACILITIES]
+        d_covs  = [district_avgs.get(d) for d in dist_labels]
+        f_covs  = [_fac_avg(f) for f in _ALL_FACILITIES]
+        covs    = d_covs + f_covs
+        values  = [float(geo_w.get(d, 33)) for d in dist_labels] + [1.0] * len(_ALL_FACILITIES)
+        hl_set  = set(labels)
+
+    elif view == 'district_facs':
+        dist_filter = district or current_dist
+        facs = [f for f in _ALL_FACILITIES if _FACILITY_DISTRICT.get(f) == dist_filter]
+        labels  = [f'{f}*' if f == current_fac else f for f in facs]
+        parents = [''] * len(labels)
+        values  = [1.0] * len(labels)
+        covs    = [_fac_avg(f) for f in facs]
+        hl_set  = set(labels)
+
+    else:
+        labels, parents, values, covs, hl_set = [], [], [], [], set()
+
+    texts  = [f'{c:.0f}%' if c is not None else 'No data' for c in covs]
+    colors = [_cov_color(c) if c is not None else '#C8C5BC' for c in covs]
+    opacities = [1.0 if lbl in hl_set else 0.45 for lbl in labels]
+    final_colors = []
+    for col, op in zip(colors, opacities):
+        final_colors.append('#D6D3CB' if op < 1.0 else col)
+
+    if not labels:
+        fig = go.Figure()
+        fig.update_layout(paper_bgcolor=BG, height=200,
+                          margin=dict(l=0, r=0, t=0, b=0))
+        return fig
+
+    fig = go.Figure(go.Treemap(
+        labels=labels,
+        parents=parents,
+        values=values,
+        marker=dict(
+            colors=final_colors,
+            line=dict(width=2, color='white'),
+            cornerradius=4,
+        ),
+        text=texts,
+        customdata=covs,
+        hovertemplate='<b>%{label}</b><br>Avg coverage: %{text}<extra></extra>',
+        textposition='middle center',
+        textfont=dict(size=11, color='white', family=FONT),
+        texttemplate='<b>%{label}</b><br>%{text}',
+        pathbar=dict(visible=False),
+        tiling=dict(squarifyratio=1.5),
+    ))
+
+    fig.update_layout(
+        paper_bgcolor=BG,
+        margin=dict(l=0, r=0, t=4, b=0),
+        height=200,
+        showlegend=False,
+        font=dict(family=FONT),
+    )
+    return fig
+
+
+def _build_malawi_panel(stored: dict, view: str, year: str,
+                        district: str | None = None,
+                        sel_inds: list | None = None) -> list:
+    district_avgs    = stored.get('district_avgs', {}).get(year, {})
+    current_district = stored.get('current_district', '')
+    all_labels       = stored.get('y_labels', [])
+    all_targets      = stored.get('y_targets', [])
+
+    # Apply indicator selection filter
+    if sel_inds:
+        rows_idx = [i for i, lbl in enumerate(all_labels) if lbl in sel_inds]
+    else:
+        rows_idx = list(range(len(all_labels)))
+    y_labels  = [all_labels[i] for i in rows_idx]
+    y_targets = [all_targets[i] for i in rows_idx]
+
+    # Which district is highlighted
+    if view in ('monthly', 'yearly'):
+        highlight = current_district
+    elif view == 'district_facs':
+        highlight = district or current_district
+    else:
+        highlight = None
+
+    treemap_fig  = _build_district_treemap(stored, view, year, district, sel_inds)
+    malawi_panel = dcc.Graph(
+        figure=treemap_fig,
+        config={'displayModeBar': False, 'staticPlot': False},
+        style={'marginBottom': '6px'},
+    )
+
+    # Stats from selected view data
+    if view == 'monthly':
+        data = stored.get('monthly', {}).get(year, {})
+        view_title = 'This facility — monthly'
+    elif view == 'by_facility':
+        data = stored.get('by_facility', {}).get(year, {})
+        view_title = 'All facilities'
+    elif view == 'by_district':
+        data = stored.get('by_district', {}).get(year, {})
+        view_title = 'All districts'
+    elif view == 'district_facs':
+        dist = district or current_district
+        data = stored.get('by_district_facs', {}).get(dist, {}).get(year, {})
+        view_title = f'{dist} — district facilities'
+    elif view == 'yearly':
+        data = stored.get('yearly') or {}
+        view_title = 'Year-over-year'
+    else:
+        data = {}; view_title = ''
+
+    z_raw = data.get('z', [])
+    z = [z_raw[i] for i in rows_idx if i < len(z_raw)]
+    x = data.get('x', [])
+
+    all_vals    = [v for row in z for v in row if v is not None]
+    overall_avg = round(sum(all_vals) / len(all_vals), 1) if all_vals else None
+
+    ind_stats = []
+    for ii, (lbl, tgt) in enumerate(zip(y_labels, y_targets)):
+        if ii < len(z):
+            vals = [z[ii][jj] for jj in range(len(x))
+                    if jj < len(z[ii]) and z[ii][jj] is not None]
+            if vals:
+                avg = round(sum(vals) / len(vals), 1)
+                ind_stats.append({'label': lbl, 'target': tgt, 'avg': avg,
+                                  'on_target': avg >= tgt})
+
+    on_tgt  = sum(1 for s in ind_stats if s['on_target'])
+    ind_rows = []
+    for s in sorted(ind_stats, key=lambda x: -x['avg'])[:12]:
+        col = _cov_color(s['avg'])
+        ind_rows.append(html.Div(style={
+            'display': 'flex', 'alignItems': 'center', 'gap': '6px',
+            'padding': '3px 0', 'borderBottom': f'0.5px solid {GRID_C}',
+        }, children=[
+            html.Div(style={'flex': '1', 'minWidth': '0'}, children=[
+                html.Div(s['label'], style={
+                    'fontSize': '9px', 'color': DIM,
+                    'overflow': 'hidden', 'textOverflow': 'ellipsis', 'whiteSpace': 'nowrap',
+                }),
+                html.Div(style={'height': '2px', 'background': GRID_C,
+                                'borderRadius': '1px', 'marginTop': '2px'}, children=[
+                    html.Div(style={'width': f'{min(s["avg"], 100):.0f}%', 'height': '100%',
+                                    'background': col, 'borderRadius': '1px'}),
+                ]),
+            ]),
+            html.Div(style={'textAlign': 'right', 'flexShrink': '0'}, children=[
+                html.Span(f'{s["avg"]:.0f}%',
+                          style={'fontSize': '10px', 'fontWeight': '600', 'color': col}),
+                html.Span(' ✓' if s['on_target'] else '',
+                          style={'fontSize': '9px', 'color': OK_C}),
+            ]),
+        ]))
+
+    # Colour legend
+    legend_items = [
+        (OK_C, '≥88%'), ('#C0DD97', '80-87%'),
+        (WARN_C, '65-79%'), ('#E8A830', '40-64%'), (DANGER_C, '<40%'),
+    ]
+    legend = html.Div(style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '5px',
+                              'marginTop': '8px', 'marginBottom': '6px'}, children=[
+        html.Div(style={'display': 'flex', 'alignItems': 'center', 'gap': '3px'}, children=[
+            html.Div(style={'width': '8px', 'height': '8px', 'borderRadius': '50%',
+                            'backgroundColor': c, 'flexShrink': '0'}),
+            html.Span(l, style={'fontSize': '9px', 'color': DIM}),
+        ])
+        for c, l in legend_items
+    ])
+
+    # Volume counts for this facility
+    counts_for_year = stored.get('counts', {}).get(year, {})
+    count_items = []
+    for label, val in counts_for_year.items():
+        if val > 0:
+            count_items.append(html.Div(style={
+                'display': 'flex', 'justifyContent': 'space-between',
+                'padding': '2px 0', 'borderBottom': f'0.5px solid {GRID_C}',
+            }, children=[
+                html.Span(label, style={'fontSize': '9px', 'color': DIM}),
+                html.Span(f'{val:,}', style={'fontSize': '10px', 'fontWeight': '600',
+                                             'color': INFO_C}),
+            ]))
+    counts_block = html.Div(children=count_items, style={'marginBottom': '8px'}) if count_items else None
+
+    return [
+        html.Div('MALAWI COVERAGE', className='mnid-section-lbl'),
+        malawi_panel,
+        *(([html.Div('ENCOUNTER VOLUMES', className='mnid-section-lbl'), counts_block])
+          if counts_block else []),
+        legend,
+        html.Div(style={'display': 'flex', 'justifyContent': 'space-between',
+                        'alignItems': 'baseline', 'marginBottom': '4px'}, children=[
+            html.Span(view_title, style={'fontSize': '10px', 'color': MUTED}),
+            html.Span(f'{overall_avg:.0f}%' if overall_avg is not None else '—',
+                      style={'fontSize': '18px', 'fontWeight': '700',
+                             'color': _cov_color(overall_avg)}),
+        ]),
+        html.Div(f'{on_tgt}/{len(ind_stats)} indicators on target',
+                 style={'fontSize': '10px', 'color': MUTED, 'marginBottom': '8px'}),
+        html.Div('INDICATOR BREAKDOWN', className='mnid-section-lbl'),
+        html.Div(style={'overflowY': 'auto', 'maxHeight': '220px'}, children=ind_rows),
+    ]
+
+
+# ── Module-level callback ──────────────────────────────────────────────────
+
+@callback(
+    Output('mnid-heatmap-graph', 'figure'),
+    Output('mnid-heatmap-right', 'children'),
+    Input('mnid-heatmap-view',       'value'),
+    Input('mnid-heatmap-year',       'value'),
+    Input('mnid-heatmap-district',   'value'),
+    Input('mnid-heatmap-indicators', 'value'),
+    State('mnid-heatmap-store',      'data'),
+    prevent_initial_call=True,
+)
+def update_heatmap_view(view, year, district, sel_inds, stored):
+    if not stored:
+        return go.Figure(), []
+    v = view or 'monthly'
+    y = year or 'All years'
+    fig   = _build_heatmap_fig(stored, v, y, district, sel_inds)
+    panel = _build_malawi_panel(stored, v, y, district, sel_inds)
+    return fig, panel
+
+
+# ── Main heatmap section layout ────────────────────────────────────────────
+
+def _coverage_heatmap_section(indicators: list, facility_code: str) -> html.Div:
+    """Multi-view indicator heatmap with Malawi district panel and live filters."""
+    try:
+        df_all   = pd.read_parquet('data/latest_data_opd.parquet')
+        mch_full = df_all[df_all['Program'].str.contains(
+            'Maternal|Neonatal', case=False, na=False)].copy()
+        if 'Date' in mch_full.columns:
+            mch_full['Date'] = pd.to_datetime(mch_full['Date'], errors='coerce')
+    except Exception:
+        mch_full = pd.DataFrame()
+
+    tracked = [i for i in indicators if i.get('status') == 'tracked']
+    store   = _compute_heatmap_store(mch_full, tracked, facility_code)
+
+    initial_fig   = _build_heatmap_fig(store, 'monthly', 'All years')
+    initial_panel = _build_malawi_panel(store, 'monthly', 'All years')
+
+    cur_dist   = store.get('current_district', _ALL_DISTRICTS[0])
+    has_yearly = bool(store.get('yearly', {}).get('x'))
+    all_labels = store.get('y_labels', [])
+
+    view_options = [
+        {'label': 'This Facility — Monthly',  'value': 'monthly'},
+        {'label': 'My District Facilities',   'value': 'district_facs'},
+        {'label': 'All Districts',            'value': 'by_district'},
+        {'label': 'All Facilities',           'value': 'by_facility'},
+    ]
+    if has_yearly:
+        view_options.append({'label': 'Year-over-Year', 'value': 'yearly'})
+
+    year_opts     = [{'label': y, 'value': y} for y in ['All years', '2025', '2026']]
+    district_opts = [{'label': d, 'value': d} for d in _ALL_DISTRICTS]
+    ind_opts      = [{'label': lbl, 'value': lbl} for lbl in all_labels]
+
+    _dd_style = {'fontSize': '12px', 'minWidth': '0'}
+    _lbl_style = {'fontSize': '10px', 'color': MUTED, 'fontWeight': '600',
+                  'marginBottom': '3px'}
 
     return html.Div(id='mnid-heatmap', className='mnid-card',
                     style={'marginBottom': '12px'}, children=[
+        dcc.Store(id='mnid-heatmap-store', data=store),
+
         html.Div('INDICATOR COVERAGE HEATMAP', className='mnid-section-lbl'),
+
+        # ── Filter bar ────────────────────────────────────────────────────
+        html.Div(style={
+            'display': 'grid',
+            'gridTemplateColumns': '2fr 1.1fr 1.1fr 1.3fr',
+            'gap': '10px', 'alignItems': 'end',
+            'marginBottom': '12px',
+        }, children=[
+            # View selector
+            html.Div(children=[
+                html.Div('View', style=_lbl_style),
+                dcc.Dropdown(
+                    id='mnid-heatmap-view',
+                    options=view_options,
+                    value='monthly',
+                    clearable=False,
+                    style=_dd_style,
+                ),
+            ]),
+            # Year filter
+            html.Div(children=[
+                html.Div('Year', style=_lbl_style),
+                dcc.Dropdown(
+                    id='mnid-heatmap-year',
+                    options=year_opts,
+                    value='All years',
+                    clearable=False,
+                    style=_dd_style,
+                ),
+            ]),
+            # District filter
+            html.Div(children=[
+                html.Div('District', style=_lbl_style),
+                dcc.Dropdown(
+                    id='mnid-heatmap-district',
+                    options=district_opts,
+                    value=cur_dist,
+                    clearable=False,
+                    style=_dd_style,
+                ),
+            ]),
+            # Indicator multi-select
+            html.Div(children=[
+                html.Div('Indicators', style=_lbl_style),
+                dcc.Dropdown(
+                    id='mnid-heatmap-indicators',
+                    options=ind_opts,
+                    value=all_labels,   # all selected by default
+                    multi=True,
+                    placeholder='Select indicators…',
+                    style=_dd_style,
+                ),
+            ]),
+        ]),
+
+        # ── Main content: heatmap + Malawi panel ──────────────────────────
+        html.Div(style={'display': 'grid', 'gridTemplateColumns': '1fr 230px',
+                        'gap': '12px', 'alignItems': 'start'}, children=[
+            dcc.Graph(
+                id='mnid-heatmap-graph', figure=initial_fig,
+                config={'displayModeBar': True,
+                        'modeBarButtonsToRemove': ['select2d', 'lasso2d'],
+                        'scrollZoom': True},
+            ),
+            html.Div(
+                id='mnid-heatmap-right',
+                style={'padding': '12px', 'background': '#FAFAF8',
+                       'border': f'0.5px solid {BORDER}', 'borderRadius': '10px',
+                       'maxHeight': '680px', 'overflowY': 'auto'},
+                children=initial_panel,
+            ),
+        ]),
+
+        # ── Key ───────────────────────────────────────────────────────────
         html.P(
-            'Colour: green ≥ target · amber = performing · red = below benchmark · * = current facility',
-            style={'fontSize': '10px', 'color': MUTED, 'marginBottom': '6px'},
-        ),
-        dcc.Graph(
-            figure=fig,
-            config={'displayModeBar': True,
-                    'modeBarButtonsToRemove': ['select2d', 'lasso2d']},
-            style={'height': f'{height}px'},
+            'Green ≥ 88% on target  ·  Amber 65–79% performing  ·  '
+            'Red < 65% needs review  ·  Grey = no data  ·  * = current facility',
+            style={'fontSize': '9px', 'color': MUTED, 'marginTop': '6px'},
         ),
     ])
 
-
-# ══ indicator cards ════════════════════════════════════════════════════════════
+# indicator cards
 
 def _ind_card(ind: dict, df: pd.DataFrame) -> html.Div:
     if ind.get('status') == 'awaiting_baseline':
@@ -617,7 +1272,7 @@ def _ind_card(ind: dict, df: pd.DataFrame) -> html.Div:
     ])
 
 
-# ══ accordion helpers ══════════════════════════════════════════════════════════
+# accordion helpers 
 
 def _acc_section(sec_id, title, indicators, df, default_open=False):
     tracked  = [i for i in indicators if i.get('status') == 'tracked']
@@ -664,7 +1319,7 @@ def _chart_acc_section(sec_id, title, charts):
     ])
 
 
-# ══ themed analysis charts ══════════════════════════════════════════════════════
+# themed analysis charts 
 
 def _anc_charts(df):
     monthly = _monthly_visits(df, 'ANC VISIT')
@@ -833,7 +1488,7 @@ def _newborn_charts(df):
     return charts
 
 
-# ══ system readiness ══════════════════════════════════════════════════════════
+# system readiness
 
 def _stat_row(label, num, den, pct, tgt=None):
     cls = _css(pct, tgt) if tgt else 'info'
@@ -877,7 +1532,7 @@ def _system_readiness(df, supply_inds, wf_inds, dq_inds):
     ])
 
 
-# ══ top-bar / alert / KPIs / nav ══════════════════════════════════════════════
+# top-bar / alert / KPIs / nav
 
 def _topbar(facility, period, n_tracked, n_await):
     return html.Div(className='mnid-topbar', children=[
@@ -898,10 +1553,10 @@ def _topbar(facility, period, n_tracked, n_await):
 def _nav_bar():
     """Sticky pill-row navigation with anchor links to each dashboard section."""
     nav_items = [
-        ('Summary',   '#mnid-summary'),
+        ('Overall',   '#mnid-summary'),
         ('Coverage',  '#mnid-coverage'),
         ('Trends',    '#mnid-trends'),
-        ('Heatmap',   '#mnid-heatmap'),
+        ('Map',       '#mnid-heatmap'),
         ('Analysis',  '#mnid-analysis'),
         ('Readiness', '#mnid-readiness'),
     ]
@@ -939,36 +1594,96 @@ def _alert_banner(below, strong):
     ])
 
 
-def _kpi(label, value, sub, cls):
+def _avg_ring(pct: float, color: str) -> html.Div:
+    """Prominent donut ring — the ring IS the value display for avg coverage card."""
+    p = max(0.0, min(pct, 100.0))
+    # Choose font size based on length
+    font_size = '11px' if p < 100 else '9px'
+    return html.Div(style={
+        'width': '62px', 'height': '62px', 'borderRadius': '50%',
+        'background': f'conic-gradient({color} {p:.1f}%, {GRID_C} 0)',
+        'display': 'flex', 'alignItems': 'center', 'justifyContent': 'center',
+        'flexShrink': '0',
+        'filter': 'drop-shadow(0 2px 6px rgba(0,0,0,0.10))',
+    }, children=[
+        html.Div(style={
+            'width': '44px', 'height': '44px', 'borderRadius': '50%',
+            'background': BG,
+            'display': 'flex', 'flexDirection': 'column',
+            'alignItems': 'center', 'justifyContent': 'center',
+            'gap': '1px',
+        }, children=[
+            html.Span(f'{p:.0f}%', style={
+                'fontSize': font_size, 'fontWeight': '700',
+                'color': color, 'lineHeight': '1',
+            }),
+            html.Span('avg', style={
+                'fontSize': '7px', 'color': MUTED, 'lineHeight': '1',
+            }),
+        ]),
+    ])
+
+
+def _count_bar(count: int, total: int, color: str) -> html.Div:
+    """Thin coloured bottom stripe showing proportion of total."""
+    fill = round(count / total * 100) if total else 0
+    return html.Div(style={
+        'position': 'absolute', 'bottom': '0', 'left': '0', 'right': '0',
+        'height': '3px', 'background': GRID_C, 'borderRadius': '0 0 10px 10px',
+    }, children=[
+        html.Div(style={
+            'width': f'{fill}%', 'height': '100%',
+            'background': color, 'borderRadius': '0 0 0 10px',
+            'transition': 'width 0.5s ease',
+        }),
+    ])
+
+
+def _kpi(label, value, sub, cls, bottom_bar=None, ring=None):
     return html.Div(className=f'mnid-kpi {cls}', children=[
-        html.Div(label, className='kpi-lbl'),
-        html.Div(value, className='kpi-val'),
-        html.Div(sub,   className='kpi-sub'),
+        html.Div(style={'display': 'flex', 'justifyContent': 'space-between',
+                        'alignItems': 'flex-start', 'gap': '6px'}, children=[
+            html.Div([
+                html.Div(label, className='kpi-lbl'),
+                html.Div(value, className='kpi-val'),
+                html.Div(sub,   className='kpi-sub'),
+            ]),
+            ring or html.Div(),
+        ]),
+        bottom_bar or html.Div(),
     ])
 
 
 def _kpi_row(computed):
+    n    = len(computed)
     on   = [c for c in computed if c['pct'] >= c['target']]
-    mon  = [c for c in computed if c['target']*.85 <= c['pct'] < c['target']]
-    crit = [c for c in computed if c['pct'] < c['target']*.85]
-    avg  = round(sum(c['pct'] for c in computed)/len(computed),0) if computed else 0
+    mon  = [c for c in computed if c['target'] * .85 <= c['pct'] < c['target']]
+    crit = [c for c in computed if c['pct'] < c['target'] * .85]
+    avg  = round(sum(c['pct'] for c in computed) / n, 1) if n else 0.0
+    avg_color = _cov_color(avg)
+
     return html.Div(className='mnid-kpi-row', children=[
-        _kpi('Indicators tracked', str(len(computed)), 'with live data',  'info'),
-        _kpi('On target',          str(len(on)),       '≥ benchmark',      'ok'),
-        _kpi('Performing',         str(len(mon)),      '85–99% of target', 'warn'),
-        _kpi('Needs review',       str(len(crit)),     '< 85% of target',  'danger'),
-        _kpi('Avg coverage',       f'{avg:.0f}%',      'tracked only',     'info'),
+        _kpi('Tracked',       str(n),           'indicators with live data', 'info',
+             bottom_bar=_count_bar(n, n, INFO_C)),
+        _kpi('On target',     str(len(on)),      '≥ benchmark',              'ok',
+             bottom_bar=_count_bar(len(on),  n, OK_C)),
+        _kpi('Performing',    str(len(mon)),     '85–99% of target',         'warn',
+             bottom_bar=_count_bar(len(mon), n, WARN_C)),
+        _kpi('Needs review',  str(len(crit)),    '< 85% of target',          'danger',
+             bottom_bar=_count_bar(len(crit),n, DANGER_C)),
+        _kpi('Avg coverage',  '',                'across tracked indicators','info',
+             ring=_avg_ring(avg, avg_color)),
     ])
 
 
-# ══ section anchor wrapper ════════════════════════════════════════════════════
+# section anchor wrapper
 
 def _section_anchor(anchor_id):
     """Invisible offset anchor for sticky-nav scrolling."""
     return html.Div(id=anchor_id, className='mnid-section-anchor')
 
 
-# ══ main entry point ═══════════════════════════════════════════════════════════
+# main entry point
 
 def render_mnid_dashboard(filtered, data_opd, delta_days, config,
                           facility_code, start_date, end_date):
@@ -1016,7 +1731,7 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     ]
     analysis_acc = [a for a in analysis_acc if a]
 
-    heatmap_div = _build_heatmap(filtered, all_inds, facility_code)
+    heatmap_div = _coverage_heatmap_section(all_inds, facility_code)
 
     return html.Div(className='mnid-bg', children=[
 
@@ -1024,12 +1739,12 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
         _nav_bar(),
         _alert_banner(below, strong),
 
-        # ── Summary ──────────────────────────────────────────────────
+        # Summary
         _section_anchor('mnid-summary'),
         html.Div('SUMMARY', className='mnid-section-lbl'),
         _kpi_row(computed),
 
-        # ── Coverage ─────────────────────────────────────────────────
+        # Coverage
         _section_anchor('mnid-coverage'),
         html.Div('COVERAGE INDICATORS BY CARE PHASE',
                  className='mnid-section-lbl', style={'marginTop': '8px'}),
@@ -1044,15 +1759,14 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
             },
         ),
 
-        # ── Trends ───────────────────────────────────────────────────
+        # Trends
         _section_anchor('mnid-trends'),
         _trend_switcher(filtered, all_inds),
 
-        # ── Heatmap ──────────────────────────────────────────────────
-        # id='mnid-heatmap' is set inside _build_heatmap
+        # Coverage heatmap  (id='mnid-heatmap' set inside _coverage_heatmap_section)
         heatmap_div,
 
-        # ── Analysis ─────────────────────────────────────────────────
+        #  Analysis 
         _section_anchor('mnid-analysis'),
         html.Div('CLINICAL ANALYSIS', className='mnid-section-lbl'),
         dmc.Accordion(
@@ -1066,7 +1780,7 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
             },
         ),
 
-        # ── Readiness ────────────────────────────────────────────────
+        # Readiness
         _section_anchor('mnid-readiness'),
         _system_readiness(filtered, supply_inds, wf_inds, dq_inds),
     ])

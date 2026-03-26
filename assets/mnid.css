@@ -109,9 +109,15 @@ html { scroll-behavior: smooth; }
   background: #fff;
   border: 0.5px solid #E0DED6;
   border-radius: 10px;
-  padding: 12px 14px;
+  padding: 12px 14px 16px;   /* extra bottom padding for the stripe */
   position: relative;
   overflow: hidden;
+  transition: box-shadow 0.15s, transform 0.15s;
+  cursor: default;
+}
+.mnid-kpi:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+  transform: translateY(-1px);
 }
 .mnid-kpi::before {
   content: '';
@@ -124,9 +130,9 @@ html { scroll-behavior: smooth; }
 .mnid-kpi.warn::before   { background: #BA7517; }
 .mnid-kpi.danger::before { background: #A32D2D; }
 .mnid-kpi.info::before   { background: #185FA5; }
-.mnid-kpi .kpi-lbl { font-size: 11px; color: #73726C; margin-bottom: 4px; line-height: 1.3; }
-.mnid-kpi .kpi-val { font-size: 22px; font-weight: 500; color: #1A1A18; line-height: 1; }
-.mnid-kpi .kpi-sub { font-size: 10px; color: #888780; margin-top: 3px; line-height: 1.3; }
+.mnid-kpi .kpi-lbl { font-size: 10px; color: #73726C; margin-bottom: 4px; line-height: 1.3; }
+.mnid-kpi .kpi-val { font-size: 24px; font-weight: 600; color: #1A1A18; line-height: 1; }
+.mnid-kpi .kpi-sub { font-size: 10px; color: #888780; margin-top: 4px; line-height: 1.3; }
 
 /* ── Generic card ─────────────────────────────────────────────── */
 .mnid-card {
@@ -375,6 +381,47 @@ html { scroll-behavior: smooth; }
   overflow: hidden;
 }
 
+/* ── Map filter dropdown overrides ───────────────────────────── */
+#mnid-map-fac-filter .Select-control,
+#mnid-map-fac-filter .select2-selection {
+  border: 0.5px solid #E0DED6!important;
+  border-radius: 6px!important;
+  font-size: 11px!important;
+  min-height: 34px!important;
+}
+#mnid-map-fac-filter .Select-placeholder { font-size: 11px; color: #B4B2A9; }
+#mnid-map-fac-filter .Select-multi-value-wrapper { gap: 3px; }
+
+/* ── Trend category filter buttons ───────────────────────────── */
+.mnid-filter-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.mnid-filter-btn {
+  font-size: 11px;
+  font-weight: 500;
+  color: #73726C;
+  background: #F5F4F0;
+  border: 0.5px solid #E0DED6;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.mnid-filter-btn:hover {
+  background: #E6F1FB;
+  color: #0C447C;
+  border-color: #B5D4F4;
+}
+.mnid-filter-btn.active {
+  background: #185FA5;
+  color: #fff;
+  border-color: #185FA5;
+}
+
 /* ── Sticky nav bar ───────────────────────────────────────────── */
 .mnid-nav {
   background: #fff;
@@ -414,6 +461,33 @@ html { scroll-behavior: smooth; }
   height: 0;
   margin-top: -60px;
   padding-top: 60px;
+}
+
+/* ── Heatmap filter dropdowns ─────────────────────────────────── */
+#mnid-heatmap .Select-control,
+#mnid-heatmap .Select-menu-outer {
+  font-size: 12px;
+}
+#mnid-heatmap .Select-value-label {
+  font-size: 12px;
+  color: #1A1A18;
+}
+#mnid-heatmap .Select-placeholder {
+  font-size: 11px;
+  color: #B4B2A9;
+}
+
+/* SVG Malawi map label text rendering */
+#mnid-heatmap-right svg text {
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
+  pointer-events: none;
+}
+#mnid-heatmap-right svg path {
+  transition: opacity 0.2s, stroke-width 0.2s;
+}
+#mnid-heatmap-right svg path:hover {
+  opacity: 0.85 !important;
+  cursor: pointer;
 }
 
 /* Responsive */
