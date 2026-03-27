@@ -1,0 +1,381 @@
+{
+  "dashboard_id": "mnid",
+  "dashboard_name": "MAHIS MNID — Maternal & Neonatal Indicators Dashboard",
+  "program": "Maternal and Child Health",
+  "version": "1.0",
+  "last_updated": "2026-03-27",
+  "data_source": "data/latest_data_opd.parquet",
+  "facilities": [
+    {"code": "LL040033", "name": "Lilongwe Central Hospital",  "district": "Lilongwe"},
+    {"code": "BT020011", "name": "Bwaila District Hospital",   "district": "Lilongwe"},
+    {"code": "MZ120004", "name": "Mzuzu Urban Health Centre",  "district": "Mzuzu"},
+    {"code": "BL050022", "name": "Blantyre South Health Centre","district": "Blantyre"}
+  ],
+  "color_logic": {
+    "ok":     {"condition": "pct >= target",          "hex": "#16A34A", "label": "On target"},
+    "warn":   {"condition": "pct >= target * 0.85",   "hex": "#CA8A04", "label": "Performing"},
+    "danger": {"condition": "pct < target * 0.85",    "hex": "#DC2626", "label": "Needs review"}
+  },
+  "priority_indicators": [
+
+    {"id": "mnid_anc_001", "label": "ANC screened for anaemia",
+     "category": "ANC", "target": 80, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Anemia screening",
+       "variable2": "obs_value_coded", "value2": "Screened"
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Anemia screening"
+     }},
+
+    {"id": "mnid_anc_002", "label": "ANC screened for infection",
+     "category": "ANC", "target": 80, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Infection screening",
+       "variable2": "obs_value_coded", "value2": "Screened"
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Infection screening"
+     }},
+
+    {"id": "mnid_anc_003", "label": "ANC screened for high blood pressure",
+     "category": "ANC", "target": 80, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "High blood pressure screening",
+       "variable2": "obs_value_coded", "value2": "Screened"
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "High blood pressure screening"
+     }},
+
+    {"id": "mnid_anc_004", "label": "HIV-tested + screened for anaemia + high BP",
+     "category": "ANC", "target": 80, "status": "awaiting_baseline",
+     "note": "Composite: requires same person to have HIV test AND anaemia screening AND BP screening in same encounter."},
+
+    {"id": "mnid_anc_005", "label": "POCUS with gestational age recorded",
+     "category": "ANC", "target": 50, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "POCUS completed",
+       "variable2": "obs_value_coded", "value2": "Yes"
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "POCUS completed"
+     }},
+
+    {"id": "mnid_anc_006", "label": "ANC 2+ tetanus doses",
+     "category": "ANC", "target": 80, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Number of tetanus doses",
+       "variable2": "Value",
+       "value2": ["two doses", "three doses", "four doses"]
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "Encounter", "value1": "ANC VISIT"
+     }},
+
+    {"id": "mnid_lab_001", "label": "Quality intrapartum care per guidelines",
+     "category": "Labour", "target": 80, "status": "awaiting_baseline",
+     "note": "Composite: PPH, Sepsis, PET/ET, Obstructed labour all managed per protocol."},
+
+    {"id": "mnid_lab_002", "label": "Digital intrapartum monitoring",
+     "category": "Labour", "target": 70, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Digital intrapartum monitoring",
+       "variable2": "obs_value_coded", "value2": "Used"
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Digital intrapartum monitoring"
+     }},
+
+    {"id": "mnid_lab_003", "label": "Antenatal corticosteroids (pre-term labour)",
+     "category": "Labour", "target": 70, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Antenatal corticosteroids given",
+       "variable2": "obs_value_coded", "value2": "Yes"
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Antenatal corticosteroids given",
+       "variable2": "obs_value_coded", "value2": ["Yes", "No"]
+     }},
+
+    {"id": "mnid_lab_004", "label": "Prophylactic azithromycin in labour",
+     "category": "Labour", "target": 50, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Prophylactic azithromycin given",
+       "variable2": "obs_value_coded", "value2": "Yes"
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Prophylactic azithromycin given"
+     }},
+
+    {"id": "mnid_lab_005", "label": "PPH early detection + WHO treatment bundle",
+     "category": "Labour", "target": 70, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "PPH treatment bundle",
+       "variable2": "obs_value_coded", "value2": "Completed"
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "PPH treatment bundle",
+       "variable2": "obs_value_coded", "value2": ["Completed", "Partial"]
+     }},
+
+    {"id": "mnid_lab_006", "label": "Facility deliveries",
+     "category": "Labour", "target": 80, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Place of delivery",
+       "variable2": "obs_value_coded", "value2": ["This facility", "this facility"]
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Place of delivery"
+     }},
+
+    {"id": "mnid_lab_007", "label": "Skilled delivery attendance",
+     "category": "Labour", "target": 80, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Staff conducting delivery"
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Mode of delivery"
+     }},
+
+    {"id": "mnid_nb_001", "label": "Neonatal resuscitation (eligible babies)",
+     "category": "Newborn", "target": 80, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Neonatal resuscitation provided",
+       "variable2": "obs_value_coded",
+       "value2": ["Yes", "Stimulation only", "Bag and mask"]
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Eligible for neonatal resuscitation",
+       "variable2": "obs_value_coded", "value2": "Yes"
+     }},
+
+    {"id": "mnid_nb_002", "label": "iKMC (preterm / low birth-weight babies)",
+     "category": "Newborn", "target": 80, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "iKMC initiated",
+       "variable2": "obs_value_coded", "value2": "Yes"
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "iKMC initiated",
+       "variable2": "obs_value_coded", "value2": ["Yes", "No"]
+     }},
+
+    {"id": "mnid_nb_003", "label": "Prophylactic CPAP (1000–1499g babies)",
+     "category": "Newborn", "target": 80, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "CPAP support",
+       "variable2": "obs_value_coded", "value2": ["Bubble CPAP", "Nasal oxygen"]
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "CPAP support"
+     }},
+
+    {"id": "mnid_nb_004", "label": "CPAP for eligible babies (1500–1999g)",
+     "category": "Newborn", "target": 80, "status": "awaiting_baseline",
+     "note": "Requires birth weight field to separate 1500–1999g cohort. Birth weight not yet captured as a distinct filterable concept."},
+
+    {"id": "mnid_nb_005", "label": "Phototherapy for jaundice",
+     "category": "Newborn", "target": 80, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Phototherapy given",
+       "variable2": "obs_value_coded", "value2": "Yes"
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Phototherapy given"
+     }},
+
+    {"id": "mnid_nb_006", "label": "Parenteral antibiotics for sepsis",
+     "category": "Newborn", "target": 80, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Parenteral antibiotics given",
+       "variable2": "obs_value_coded", "value2": "Yes"
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Parenteral antibiotics given"
+     }},
+
+    {"id": "mnid_nb_007", "label": "Not hypothermic on NNU admission",
+     "category": "Newborn", "target": 80, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Thermal status on admission",
+       "variable2": "obs_value_coded", "value2": "Not hypothermic"
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Thermal status on admission"
+     }},
+
+    {"id": "mnid_nb_008", "label": "Not hypothermic at any time (NNU stay)",
+     "category": "Newborn", "target": 80, "status": "awaiting_baseline",
+     "note": "Longitudinal: requires all temperature readings within NNU stay. Needs time-series logic."},
+
+    {"id": "mnid_pnc_001", "label": "PNC mothers within 48 hours",
+     "category": "PNC", "target": 80, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Postnatal check period",
+       "variable2": "obs_value_coded", "value2": "Up to 48 hrs or before discharge"
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Postnatal check period"
+     }},
+
+    {"id": "mnid_pnc_002", "label": "BCG vaccination coverage",
+     "category": "PNC", "target": 90, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name",
+       "value1": ["Type of immunization the baby received", "Immunisation given"],
+       "variable2": "obs_value_coded", "value2": ["BCG"]
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name",
+       "value1": ["Type of immunization the baby received", "Immunisation given"]
+     }},
+
+    {"id": "mnid_pnc_003", "label": "Exclusive breastfeeding",
+     "category": "PNC", "target": 80, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Breast feeding",
+       "variable2": "obs_value_coded", "value2": ["Exclusive"]
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Breast feeding"
+     }}
+  ],
+
+  "workforce_indicators": [
+    {"id": "mnid_wf_001", "label": "EmONC competency assessed",
+     "target_pct": 80, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "EmONC competency assessed",
+       "variable2": "obs_value_coded", "value2": "Assessed"
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "EmONC competency assessed"
+     }},
+    {"id": "mnid_wf_002", "label": "SSNC competency assessed",
+     "target_pct": 80, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "SSNC competency assessed",
+       "variable2": "obs_value_coded", "value2": "Assessed"
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "SSNC competency assessed"
+     }}
+  ],
+
+  "supply_indicators": [
+    {"id": "mnid_sc_001", "label": "Essential medicine availability",
+     "target_pct": 100, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Essential medicine availability",
+       "variable2": "obs_value_coded", "value2": "All available"
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Essential medicine availability"
+     }},
+    {"id": "mnid_sc_002", "label": "CPAP equipment available",
+     "target_pct": 100, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "CPAP equipment status",
+       "variable2": "obs_value_coded", "value2": "Available"
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "CPAP equipment status"
+     }},
+    {"id": "mnid_sc_003", "label": "Phototherapy unit available",
+     "target_pct": 100, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Phototherapy unit status",
+       "variable2": "obs_value_coded", "value2": "Available"
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Phototherapy unit status"
+     }},
+    {"id": "mnid_sc_004", "label": "Neonatal resuscitation equipment available",
+     "target_pct": 100, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Newborn resuscitation equipment status",
+       "variable2": "obs_value_coded", "value2": "Available"
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Newborn resuscitation equipment status"
+     }}
+  ],
+
+  "data_quality_indicators": [
+    {"id": "mnid_dq_001", "label": "Record completeness",
+     "target_pct": 95, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Record completeness",
+       "variable2": "obs_value_coded", "value2": "Complete"
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Record completeness"
+     }},
+    {"id": "mnid_dq_002", "label": "Data entered within 7 days",
+     "target_pct": 90, "status": "tracked",
+     "numerator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Data entered within 7 days",
+       "variable2": "obs_value_coded", "value2": "Yes"
+     },
+     "denominator_filters": {
+       "unique": "person_id",
+       "variable1": "concept_name", "value1": "Data entered within 7 days"
+     }}
+  ]
+}

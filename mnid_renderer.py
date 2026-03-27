@@ -19,25 +19,25 @@ import json
 
 
 # palette
-OK_C    = '#3B6D11';  WARN_C  = '#BA7517';  DANGER_C = '#E24B4A'
-INFO_C  = '#185FA5';  MUTED   = '#B4B2A9';  GRID_C   = '#F1EFE8'
-BG      = '#fff';     BORDER  = '#E0DED6';  TEXT     = '#1A1A18'
-DIM     = '#73726C';  FONT    = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+OK_C    = '#16A34A';  WARN_C  = '#CA8A04';  DANGER_C = '#DC2626'
+INFO_C  = '#15803D';  MUTED   = '#94A3B8';  GRID_C   = '#F1F5F9'
+BG      = '#fff';     BORDER  = '#E2E8F0';  TEXT     = '#0F172A'
+DIM     = '#64748B';  FONT    = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 
 CAT_PALETTES = {
-    'ANC':     ['#185FA5','#2E86D4','#5BA3E4','#89C0F0','#B5D8F8','#1A3F6E'],
+    'ANC':     ['#15803D','#22C55E','#4ADE80','#86EFAC','#BBF7D0','#14532D'],
     'Labour':  ['#BA7517','#D4881A','#E8A830','#F5C658','#FAD97A','#7C4D0A','#A35F10'],
-    'Newborn': ['#3B6D11','#4E8E18','#68B022','#86C83A','#A8D96E','#2A5009','#64A51F'],
+    'Newborn': ['#0D9488','#14B8A6','#2DD4BF','#5EEAD4','#99F6E4','#0F766E','#0E7490'],
     'PNC':     ['#7C3AED','#9D5CF0','#B683F4','#CFAAF8'],
 }
 
 HEATMAP_CS = [
-    [0.00, '#FCE4E4'],
-    [0.40, '#E24B4A'],
-    [0.65, '#BA7517'],
-    [0.80, '#FAC775'],
-    [0.88, '#C0DD97'],
-    [1.00, '#3B6D11'],
+    [0.00, '#FEF2F2'],
+    [0.40, '#DC2626'],
+    [0.65, '#CA8A04'],
+    [0.80, '#FDE68A'],
+    [0.88, '#BBF7D0'],
+    [1.00, '#16A34A'],
 ]
 
 _CHART_LAYOUT = dict(
@@ -126,7 +126,7 @@ def _empty_card(title):
 
 def _chart_card(title, fig):
     return html.Div(className='mnid-chart-card', children=[
-        dcc.Graph(figure=fig, config={'displayModeBar': False},
+        dcc.Graph(figure=fig, config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
                   style={'height': '220px'}),
     ])
 
@@ -301,6 +301,16 @@ clientside_callback(
         }
         var cat = id_obj.index;
         if (!stored_figs[cat]) return window.dash_clientside.no_update;
+
+        // Toggle active class on trend buttons (parse each element's actual Dash ID)
+        document.querySelectorAll('[id*="trend-cat-btn"]').forEach(function(el) {
+            try {
+                var parsed = JSON.parse(el.id);
+                if (parsed.index === cat) el.classList.add('active');
+                else el.classList.remove('active');
+            } catch(e) {}
+        });
+
         return JSON.parse(stored_figs[cat]);
     }
     """,
@@ -338,7 +348,7 @@ def _trend_switcher(df: pd.DataFrame, indicators: list) -> html.Div:
         ]),
         dcc.Store(id='mnid-trend-store', data=stored_figs),
         dcc.Graph(id='mnid-trend-graph', figure=default_fig,
-                  config={'displayModeBar': False}, style={'height': '300px'}),
+                  config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}}, style={'height': '300px'}),
     ])
 
 
@@ -412,11 +422,11 @@ def _matrix_monthly(df: pd.DataFrame, inds: list) -> tuple:
 
 
 def _cov_color(pct):
-    if pct is None: return '#E0DED6'
+    if pct is None: return '#E2E8F0'
     if pct >= 88:   return OK_C
-    if pct >= 80:   return '#C0DD97'
+    if pct >= 80:   return '#4ADE80'
     if pct >= 65:   return WARN_C
-    if pct >= 40:   return '#E8A830'
+    if pct >= 40:   return '#FBBF24'
     return DANGER_C
 
 
@@ -982,7 +992,7 @@ def _build_malawi_panel(stored: dict, view: str, year: str,
     treemap_fig  = _build_district_treemap(stored, view, year, district, sel_inds)
     malawi_panel = dcc.Graph(
         figure=treemap_fig,
-        config={'displayModeBar': False, 'staticPlot': False},
+        config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
         style={'marginBottom': '6px'},
     )
 
@@ -1100,6 +1110,52 @@ def _build_malawi_panel(stored: dict, view: str, year: str,
     ]
 
 
+# ── Scroll-spy: highlight active sidebar link ─────────────────────────────
+# Runs once on load via clientside_callback listening to a URL interval tick.
+# Uses IntersectionObserver to mark .mnid-sidebar-link as active.
+
+clientside_callback(
+    """
+    function(n) {
+        if (window._mnidScrollSpyActive) return '';
+        window._mnidScrollSpyActive = true;
+
+        var sectionIds = ['mnid-summary','mnid-coverage','mnid-trends',
+                          'mnid-heatmap','mnid-analysis','mnid-comparative','mnid-readiness'];
+
+        function setActive(id) {
+            sectionIds.forEach(function(sid) {
+                var a = document.querySelector('.mnid-sidebar-link[href="#' + sid + '"]');
+                if (!a) return;
+                if (sid === id) a.classList.add('active');
+                else a.classList.remove('active');
+            });
+        }
+
+        function updateActive() {
+            var threshold = 140;
+            var activeId = sectionIds[0];
+            for (var i = 0; i < sectionIds.length; i++) {
+                var el = document.getElementById(sectionIds[i]);
+                if (el && el.getBoundingClientRect().top <= threshold) {
+                    activeId = sectionIds[i];
+                }
+            }
+            setActive(activeId);
+        }
+
+        window.addEventListener('scroll', updateActive, { passive: true });
+        // Also re-check after a short delay to catch initial render
+        setTimeout(updateActive, 200);
+        updateActive();
+        return '';
+    }
+    """,
+    Output('mnid-scrollspy-out', 'data'),
+    Input('mnid-scrollspy-tick', 'n_intervals'),
+    prevent_initial_call=False,
+)
+
 # ── Module-level callback ──────────────────────────────────────────────────
 
 @callback(
@@ -1206,7 +1262,7 @@ def _coverage_heatmap_section(indicators: list, facility_code: str) -> html.Div:
     _lbl_style = {'fontSize': '10px', 'color': MUTED, 'fontWeight': '600',
                   'marginBottom': '3px'}
 
-    return html.Div(id='mnid-heatmap', className='mnid-card',
+    return html.Div(id='mnid-heatmap-inner', className='mnid-card',
                     style={'marginBottom': '12px'}, children=[
         dcc.Store(id='mnid-heatmap-store', data=store),
 
@@ -1326,7 +1382,252 @@ def _ind_card(ind: dict, df: pd.DataFrame) -> html.Div:
     ])
 
 
-# accordion helpers 
+# ── Phase gauge donuts ────────────────────────────────────────────────────
+
+def _phase_gauge_fig(avg_pct: float, color: str) -> go.Figure:
+    """Mini donut gauge for a single care phase."""
+    rest = max(0.0, 100.0 - avg_pct)
+    fig = go.Figure(go.Pie(
+        values=[avg_pct, rest],
+        hole=0.72,
+        marker=dict(colors=[color, GRID_C], line=dict(color='#fff', width=0)),
+        textinfo='none',
+        hoverinfo='skip',
+        sort=False,
+        direction='clockwise',
+        rotation=90,
+    ))
+    fig.update_layout(
+        paper_bgcolor=BG, plot_bgcolor=BG,
+        margin=dict(l=4, r=4, t=4, b=4),
+        height=100,
+        showlegend=False,
+        annotations=[dict(
+            text=f'<b>{avg_pct:.0f}%</b>',
+            x=0.5, y=0.5, xref='paper', yref='paper', showarrow=False,
+            font=dict(size=20, color=color, family=FONT),
+        )],
+    )
+    return fig
+
+
+def _phase_gauge_row(by_cat: dict, df: pd.DataFrame) -> html.Div:
+    """Row of 4 mini donut gauges — one per care phase."""
+    phases = [
+        ('ANC',     'Antenatal Care',    CAT_PALETTES['ANC'][0],     'anc'),
+        ('Labour',  'Labour & Delivery', CAT_PALETTES['Labour'][0],  'labour'),
+        ('Newborn', 'Newborn Care',       CAT_PALETTES['Newborn'][0], 'newborn'),
+        ('PNC',     'Postnatal Care',    CAT_PALETTES['PNC'][0],     'pnc'),
+    ]
+    cards = []
+    for cat_key, cat_label, cat_color, css_cls in phases:
+        inds = [i for i in by_cat.get(cat_key, []) if i.get('status') == 'tracked']
+        if not inds:
+            continue
+        computed = [_cov(df, i['numerator_filters'], i['denominator_filters'])
+                    for i in inds]
+        avg_pct = round(sum(c[2] for c in computed) / len(computed), 1) if computed else 0.0
+        on_tgt  = sum(1 for c, i in zip(computed, inds) if c[2] >= i['target'])
+        color   = _cov_color(avg_pct)
+
+        fig = _phase_gauge_fig(avg_pct, color)
+        cards.append(html.Div(className=f'mnid-phase-gauge {css_cls}', children=[
+            html.Div(cat_label, className='mnid-phase-gauge-title'),
+            dcc.Graph(figure=fig, config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
+                      style={'height': '100px'}),
+            html.Div(className='mnid-phase-gauge-on', children=[
+                html.B(f'{on_tgt}/{len(inds)}'), ' on target',
+            ]),
+        ]))
+    return html.Div(className='mnid-gauge-row', children=cards)
+
+
+# ── Key clinical outcomes (4 donuts always visible) ───────────────────────
+
+def _clinical_donuts_section(df: pd.DataFrame) -> html.Div:
+    """Always-visible donut row for key clinical outcomes."""
+    donut_specs = [
+        ('Place of delivery', 'Place of Delivery', {
+            'This facility': OK_C, 'this facility': OK_C,
+            'Referral facility': WARN_C, 'Home': DANGER_C,
+        }),
+        ('Outcome of the delivery', 'Birth Outcome', {
+            'Live births': OK_C,
+            'Fresh stillbirth': DANGER_C,
+            'Macerated stillbirth': '#92400E',
+        }),
+        ('Breast feeding', 'Breastfeeding Mode', {
+            'Exclusive': OK_C, 'Mixed': WARN_C, 'Not breastfeeding': DANGER_C,
+        }),
+        ('Thermal status on admission', 'Newborn Thermal Status', {
+            'Not hypothermic': OK_C,
+            'Mild hypothermia': WARN_C,
+            'Moderate hypothermia': DANGER_C,
+        }),
+    ]
+    cards = []
+    for concept, title, color_map in donut_specs:
+        vc  = _value_counts(df, concept)
+        fig = _donut(vc, title, color_map=color_map)
+        if fig:
+            fig.update_layout(height=200, margin=dict(l=4, r=4, t=32, b=28))
+            cards.append(html.Div(className='mnid-chart-card', children=[
+                dcc.Graph(figure=fig, config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
+                          style={'height': '200px'}),
+            ]))
+
+    if not cards:
+        return html.Div()
+
+    return html.Div([
+        html.Div('KEY CLINICAL OUTCOMES', className='mnid-section-lbl'),
+        html.Div(className='mnid-donut-grid', children=cards),
+    ])
+
+
+# ── Coverage phase bar chart ───────────────────────────────────────────────
+
+def _coverage_phase_fig(title: str, indicators: list, df: pd.DataFrame) -> go.Figure:
+    """Horizontal bar chart: one bar per indicator coloured by status vs target."""
+    rows = []
+    for ind in indicators:
+        if ind.get('status') == 'awaiting_baseline':
+            rows.append({'label': ind['label'][:36], 'pct': None,
+                         'target': ind['target'], 'cls': 'await',
+                         'sub': 'Awaiting baseline'})
+        else:
+            num, den, pct = _cov(df, ind['numerator_filters'], ind['denominator_filters'])
+            cls = _css(pct, ind['target'])
+            rows.append({'label': ind['label'][:36], 'pct': pct,
+                         'target': ind['target'], 'cls': cls,
+                         'sub': f'{num}/{den}'})
+
+    if not rows:
+        return go.Figure()
+
+    # Reversed so first indicator is at the top
+    rows = list(reversed(rows))
+    labels  = [r['label']  for r in rows]
+    values  = [r['pct'] if r['pct'] is not None else 0 for r in rows]
+    targets = [r['target'] for r in rows]
+    colors  = [{'ok': OK_C, 'warn': WARN_C, 'danger': DANGER_C}.get(r['cls'], MUTED)
+               for r in rows]
+    text_vals = [f"{r['pct']:.0f}%" if r['pct'] is not None else 'No data' for r in rows]
+
+    height = max(len(rows) * 38 + 70, 180)
+
+    fig = go.Figure()
+
+    # Bars
+    fig.add_trace(go.Bar(
+        x=values, y=labels,
+        orientation='h',
+        marker=dict(color=colors, opacity=0.88,
+                    line=dict(color='rgba(0,0,0,0)')),
+        text=text_vals,
+        textposition='outside',
+        textfont=dict(size=10, color=TEXT, family=FONT),
+        cliponaxis=False,
+        hovertemplate='<b>%{y}</b><br>Coverage: %{x:.1f}%<extra></extra>',
+        showlegend=False,
+    ))
+
+    # Target markers as a scatter overlay
+    fig.add_trace(go.Scatter(
+        x=targets, y=labels,
+        mode='markers',
+        marker=dict(symbol='line-ew', size=14, color='#64748B',
+                    line=dict(color='#64748B', width=2)),
+        name='Target',
+        hovertemplate='Target: %{x:.0f}%<extra></extra>',
+    ))
+
+    fig.update_layout(
+        paper_bgcolor=BG, plot_bgcolor=BG,
+        font=dict(family=FONT, color=TEXT, size=11),
+        height=height,
+        margin=dict(l=8, r=56, t=8, b=8),
+        xaxis=dict(range=[0, 115], showgrid=True, gridcolor=GRID_C,
+                   zeroline=False, showline=False,
+                   ticksuffix='%', tickfont=dict(size=9, color=MUTED)),
+        yaxis=dict(showgrid=False, zeroline=False, showline=False,
+                   tickfont=dict(size=10, color=DIM), automargin=True),
+        hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
+        legend=dict(orientation='h', x=0, y=-0.06, xanchor='left',
+                    font=dict(size=9, color=DIM)),
+        bargap=0.28,
+    )
+    return fig
+
+
+def _no_data_card(message: str = 'No data available for this period.') -> html.Div:
+    """Inline empty-state card for individual chart sections."""
+    return html.Div(className='mnid-chart-card', style={'gridColumn': '1 / -1'}, children=[
+        html.Div(style={
+            'display': 'flex', 'flexDirection': 'column',
+            'alignItems': 'center', 'justifyContent': 'center',
+            'padding': '40px 24px', 'gap': '10px',
+        }, children=[
+            html.Div('—', style={
+                'fontSize': '32px', 'color': MUTED, 'lineHeight': '1',
+            }),
+            html.Div(message, style={
+                'fontSize': '13px', 'color': DIM, 'fontFamily': FONT,
+                'textAlign': 'center',
+            }),
+        ]),
+    ])
+
+
+def _coverage_charts_section(by_cat: dict, df: pd.DataFrame) -> html.Div:
+    """2-column grid of per-phase coverage bar charts (replaces accordion cards)."""
+    phases = [
+        ('ANC',     'Antenatal Care (ANC)'),
+        ('Labour',  'Labour & Delivery'),
+        ('Newborn', 'Newborn Care'),
+        ('PNC',     'Postnatal Care (PNC)'),
+    ]
+    cards = []
+    for cat_key, cat_title in phases:
+        inds = by_cat.get(cat_key, [])
+        if not inds:
+            continue
+        tracked  = [i for i in inds if i.get('status') == 'tracked']
+        awaiting = [i for i in inds if i.get('status') == 'awaiting_baseline']
+        computed = [_cov(df, i['numerator_filters'], i['denominator_filters'])
+                    for i in tracked]
+        avg_pct  = round(sum(c[2] for c in computed) / len(computed), 0) if computed else None
+
+        pills = [html.Span(f'{len(tracked)} tracked', className='mnid-pill mnid-pill-green')]
+        if awaiting:
+            pills.append(html.Span(f'{len(awaiting)} awaiting', className='mnid-pill mnid-pill-amber'))
+        if avg_pct is not None:
+            pc = 'mnid-pill-green' if avg_pct >= 80 else ('mnid-pill-amber' if avg_pct >= 65 else 'mnid-pill-red')
+            pills.append(html.Span(f'Avg {avg_pct:.0f}%', className=f'mnid-pill {pc}'))
+
+        fig = _coverage_phase_fig(cat_title, inds, df)
+        h   = max(len(inds) * 38 + 70, 180)
+
+        cards.append(html.Div(className='mnid-chart-card', children=[
+            html.Div(style={'display': 'flex', 'justifyContent': 'space-between',
+                            'alignItems': 'center', 'marginBottom': '4px'}, children=[
+                html.Div(cat_title,
+                         style={'fontSize': '12px', 'fontWeight': '600', 'color': TEXT}),
+                html.Div(className='mnid-pills', children=pills),
+            ]),
+            dcc.Graph(figure=fig, config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
+                      style={'height': f'{h}px'}),
+            html.P('▏= target', style={'fontSize': '9px', 'color': MUTED,
+                                        'margin': '2px 0 0', 'textAlign': 'right'}),
+        ]))
+
+    if not cards:
+        return html.Div(className='mnid-chart-grid',
+                        children=[_no_data_card('No indicators configured for this facility.')])
+    return html.Div(className='mnid-chart-grid', children=cards)
+
+
+# accordion helpers (kept for analysis sections)
 
 def _acc_section(sec_id, title, indicators, df, default_open=False):
     tracked  = [i for i in indicators if i.get('status') == 'tracked']
@@ -1419,7 +1720,7 @@ def _labour_charts(df):
     vc = _value_counts(df, 'Place of delivery')
     fig = _donut(vc, 'Place of Delivery', color_map={
         'This facility': OK_C, 'this facility': OK_C,
-        'Home': DANGER_C, 'Referral facility': WARN_C,
+        'Home': DANGER_C, 'Referral facility': WARN_C, 'In transit': '#92400E',
     })
     if fig: charts.append(_chart_card('', fig))
 
@@ -1433,7 +1734,9 @@ def _labour_charts(df):
 
     vc = _value_counts(df, 'Outcome of the delivery')
     fig = _donut(vc, 'Birth Outcome', color_map={
-        'Live births': OK_C, 'Fresh stillbirth': DANGER_C,
+        'Live births': OK_C,
+        'Fresh stillbirth': DANGER_C,
+        'Macerated stillbirth': '#92400E',
     })
     if fig: charts.append(_chart_card('', fig))
 
@@ -1473,13 +1776,13 @@ def _pnc_charts(df):
 
     vc = _value_counts(df, 'Status of the mother')
     fig = _donut(vc, 'Mother Final Status', color_map={
-        'Alive': OK_C, 'Died': DANGER_C, 'Referred': WARN_C,
+        'Stable': OK_C, 'Death': DANGER_C, 'Referred': WARN_C,
     })
     if fig: charts.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'Status of baby')
     fig = _donut(vc, 'Baby Final Status', color_map={
-        'Alive': OK_C, 'Died': DANGER_C, 'Referred': WARN_C,
+        'Stable': OK_C, 'Died': DANGER_C, 'Referred': WARN_C,
     })
     if fig: charts.append(_chart_card('', fig))
 
@@ -1699,7 +2002,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str) -> html.
         charts.append(html.Div(
             className='mnid-chart-card',
             style={'gridColumn': '1 / -1'},
-            children=[dcc.Graph(figure=fig1, config={'displayModeBar': False},
+            children=[dcc.Graph(figure=fig1, config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
                                 style={'height': '300px'})],
         ))
 
@@ -1747,7 +2050,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str) -> html.
         )
         charts.append(html.Div(
             className='mnid-chart-card',
-            children=[dcc.Graph(figure=fig2, config={'displayModeBar': False},
+            children=[dcc.Graph(figure=fig2, config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
                                 style={'height': '300px'})],
         ))
 
@@ -1804,7 +2107,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str) -> html.
             )
             charts.append(html.Div(
                 className='mnid-chart-card',
-                children=[dcc.Graph(figure=fig3, config={'displayModeBar': False},
+                children=[dcc.Graph(figure=fig3, config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
                                     style={'height': '300px'})],
             ))
 
@@ -1882,7 +2185,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str) -> html.
         charts.append(html.Div(
             className='mnid-chart-card',
             style={'gridColumn': '1 / -1'},
-            children=[dcc.Graph(figure=fig4, config={'displayModeBar': False},
+            children=[dcc.Graph(figure=fig4, config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
                                 style={'height': f'{h4}px'})],
         ))
 
@@ -1969,7 +2272,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str) -> html.
             )
             charts.append(html.Div(
                 className='mnid-chart-card',
-                children=[dcc.Graph(figure=fig5, config={'displayModeBar': False},
+                children=[dcc.Graph(figure=fig5, config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
                                     style={'height': '320px'})],
             ))
 
@@ -2004,10 +2307,10 @@ def _comparative_analysis_section(indicators: list, facility_code: str) -> html.
                 html.Div(style={'display': 'grid', 'gridTemplateColumns': '1fr 1fr',
                                 'gap': '8px', 'marginTop': '6px'}, children=[
                     dcc.Graph(id='mnid-compare-fac-pie-a',
-                              config={'displayModeBar': False},
+                              config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
                               style={'height': '300px'}),
                     dcc.Graph(id='mnid-compare-fac-pie-b',
-                              config={'displayModeBar': False},
+                              config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
                               style={'height': '300px'}),
                 ]),
             ]),
@@ -2031,10 +2334,10 @@ def _comparative_analysis_section(indicators: list, facility_code: str) -> html.
                 html.Div(style={'display': 'grid', 'gridTemplateColumns': '1fr 1fr',
                                 'gap': '8px', 'marginTop': '6px'}, children=[
                     dcc.Graph(id='mnid-compare-dist-pie-a',
-                              config={'displayModeBar': False},
+                              config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
                               style={'height': '300px'}),
                     dcc.Graph(id='mnid-compare-dist-pie-b',
-                              config={'displayModeBar': False},
+                              config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
                               style={'height': '300px'}),
                 ]),
             ]),
@@ -2053,44 +2356,58 @@ def _comparative_analysis_section(indicators: list, facility_code: str) -> html.
 # top-bar / alert / KPIs / nav
 
 def _topbar(facility, period, n_tracked, n_await):
+    facility_name = _FACILITY_NAMES.get(facility, facility)
+    start, end = (period.split(' to ') + [''])[:2]
     return html.Div(className='mnid-topbar', children=[
-        html.Div([
-            html.H1('Maternal & Neonatal Integrated Dashboard'),
-            html.P(f'Facility: {facility}  ·  {period}'),
+        html.Div(style={'flex': '1', 'minWidth': '0'}, children=[
+            html.Div('STRATEGIC OVERVIEW', className='mnid-topbar-label'),
+            html.H1('Maternal and Child Health'),
+            html.P(
+                'Coverage, quality, and care-phase monitoring for maternal '
+                'and neonatal services.',
+            ),
         ]),
-        html.Div(className='mnid-pills', children=[
-            html.Span('M-NID', className='mnid-pill mnid-pill-blue'),
-            html.Span(f'{n_tracked} tracked',
-                      className='mnid-pill mnid-pill-green'),
-            html.Span(f'{n_await} awaiting baseline',
-                      className='mnid-pill mnid-pill-amber'),
+        html.Div(className='mnid-info-pills', children=[
+            html.Div(className='mnid-info-pill', children=[
+                html.Div('FACILITY CODE', className='mnid-info-pill-label'),
+                html.Div(facility, className='mnid-info-pill-value'),
+            ]),
+            html.Div(className='mnid-info-pill', children=[
+                html.Div('FACILITY', className='mnid-info-pill-label'),
+                html.Div(facility_name, className='mnid-info-pill-value'),
+            ]),
+            html.Div(className='mnid-info-pill', children=[
+                html.Div('PERIOD', className='mnid-info-pill-label'),
+                html.Div(period,
+                         style={'fontSize': '11px', 'fontWeight': '700',
+                                'color': TEXT, 'lineHeight': '1.2'}),
+            ]),
         ]),
     ])
 
 
-def _nav_bar():
-    """Sticky pill-row navigation with anchor links to each dashboard section."""
+def _sidebar(facility_code: str) -> html.Div:
+    """Left sidebar navigation panel."""
     nav_items = [
-        ('Overall',   '#mnid-summary'),
-        ('Coverage',  '#mnid-coverage'),
-        ('Trends',    '#mnid-trends'),
-        ('Map',       '#mnid-heatmap'),
-        ('Analysis',  '#mnid-analysis'),
-        ('Compare',   '#mnid-comparative'),
-        ('Readiness', '#mnid-readiness'),
+        ('Overview',            '#mnid-summary'),
+        ('Coverage Indicators', '#mnid-coverage'),
+        ('Trends',              '#mnid-trends'),
+        ('Heatmap',             '#mnid-heatmap'),
+        ('Clinical Analysis',   '#mnid-analysis'),
+        ('Compare',             '#mnid-comparative'),
+        ('Readiness',           '#mnid-readiness'),
     ]
-    return html.Div(
-        className='mnid-nav',
-        style={
-            'position': 'sticky',
-            'top': '0',
-            'zIndex': '100',
-        },
-        children=[
-            html.A(label, href=href, className='mnid-nav-btn')
+    return html.Div(className='mnid-sidebar', children=[
+        html.Div('Maternal & Child', className='mnid-sidebar-title'),
+        html.Div(
+            'Maternal, newborn, and postnatal monitoring dashboard.',
+            className='mnid-sidebar-desc',
+        ),
+        html.Div([
+            html.A(label, href=href, className='mnid-sidebar-link')
             for label, href in nav_items
-        ],
-    )
+        ]),
+    ])
 
 
 def _alert_banner(below, strong):
@@ -2229,12 +2546,7 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     for ind in all_inds:
         by_cat.setdefault(ind.get('category','Other'), []).append(ind)
 
-    acc_items = [
-        _acc_section('anc',     'Antenatal Care (ANC)',    by_cat.get('ANC',    []), filtered, True),
-        _acc_section('labour',  'Labour & Delivery',       by_cat.get('Labour', []), filtered),
-        _acc_section('newborn', 'Newborn Care',            by_cat.get('Newborn',[]), filtered),
-        _acc_section('pnc',     'Postnatal Care (PNC)',    by_cat.get('PNC',    []), filtered),
-    ]
+    coverage_charts  = _coverage_charts_section(by_cat, filtered)
 
     # Pre-build analysis charts
     anc_charts    = _anc_charts(filtered)
@@ -2242,69 +2554,92 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     pnc_charts    = _pnc_charts(filtered)
     nb_charts     = _newborn_charts(filtered)
 
+    # All accordion sections open by default
     analysis_acc = [
-        _chart_acc_section('ch_anc',    'ANC Analysis',               anc_charts)    if anc_charts    else None,
-        _chart_acc_section('ch_labour', 'Labour & Delivery Analysis',  labour_charts) if labour_charts else None,
-        _chart_acc_section('ch_pnc',    'PNC Analysis',               pnc_charts)    if pnc_charts    else None,
-        _chart_acc_section('ch_nb',     'Newborn Analysis',           nb_charts)     if nb_charts     else None,
+        _chart_acc_section('ch_anc',    'Antenatal Care',    anc_charts)    if anc_charts    else None,
+        _chart_acc_section('ch_labour', 'Labour & Delivery', labour_charts) if labour_charts else None,
+        _chart_acc_section('ch_pnc',    'Postnatal Care',    pnc_charts)    if pnc_charts    else None,
+        _chart_acc_section('ch_nb',     'Neonatal Care',     nb_charts)     if nb_charts     else None,
     ]
     analysis_acc = [a for a in analysis_acc if a]
 
     heatmap_div      = _coverage_heatmap_section(all_inds, facility_code)
     comparative_div  = _comparative_analysis_section(all_inds, facility_code)
 
-    return html.Div(className='mnid-bg', children=[
+    def _sec_header(title, count=None, desc=None):
+        return html.Div(className='mnid-section-header', children=[
+            html.Div([
+                html.Span(title, className='mnid-section-header-title'),
+                html.Span(f' — {desc}' if desc else '',
+                          style={'fontSize': '11px', 'color': MUTED, 'fontWeight': '400'}),
+            ]),
+            html.Span(f'{count} charts' if count else '',
+                      className='mnid-section-header-count'),
+        ])
+
+    total_analysis = sum(len(c) for c in [anc_charts, labour_charts, pnc_charts, nb_charts])
+
+    main_content = html.Div(className='mnid-main', children=[
 
         _topbar(facility_code, period, len(tracked), len(awaiting)),
-        _nav_bar(),
         _alert_banner(below, strong),
 
-        # Summary
+        # ── Overview ────────────────────────────────────────────────────
         _section_anchor('mnid-summary'),
-        html.Div('SUMMARY', className='mnid-section-lbl'),
+        _sec_header('Overview', desc=f'{len(tracked)} tracked · {len(awaiting)} awaiting'),
         _kpi_row(computed),
 
-        # Coverage
+        # ── Coverage bars per care phase ─────────────────────────────────
         _section_anchor('mnid-coverage'),
-        html.Div('COVERAGE INDICATORS BY CARE PHASE',
-                 className='mnid-section-lbl', style={'marginTop': '8px'}),
-        dmc.Accordion(
-            multiple=True, value=['anc'], variant='separated', radius='md', mb='md',
-            children=acc_items,
-            styles={
-                'item':    {'backgroundColor': BG, 'border': f'0.5px solid {BORDER}',
-                            'borderRadius': '10px', 'marginBottom': '6px'},
-                'control': {'padding': '12px 16px'},
-                'panel':   {'padding': '0 16px 2px'},
-            },
-        ),
+        _sec_header('Coverage Indicators', sum(len(v) for v in by_cat.values()),
+                    desc='Coverage % vs target · ▏= target threshold'),
+        coverage_charts,
 
-        # Trends
+        # ── Trends ───────────────────────────────────────────────────────
         _section_anchor('mnid-trends'),
+        _sec_header('Coverage Trends', desc='12-month rolling · dotted line = target'),
         _trend_switcher(filtered, all_inds),
 
-        # Coverage heatmap  (id='mnid-heatmap' set inside _coverage_heatmap_section)
+        # ── Coverage heatmap ─────────────────────────────────────────────
+        _section_anchor('mnid-heatmap'),
         heatmap_div,
 
-        #  Analysis 
+        # ── Clinical Analysis (all sections open) ─────────────────────────
         _section_anchor('mnid-analysis'),
-        html.Div('CLINICAL ANALYSIS', className='mnid-section-lbl'),
+        _sec_header('Clinical Analysis', total_analysis, desc='Care-phase deep-dives'),
         dmc.Accordion(
-            multiple=False, value='ch_anc', variant='separated', radius='md', mb='md',
+            multiple=True,
+            value=[a.value for a in analysis_acc],
+            variant='separated', radius='md', mb='md',
             children=analysis_acc,
             styles={
-                'item':    {'backgroundColor': BG, 'border': f'0.5px solid {BORDER}',
-                            'borderRadius': '10px', 'marginBottom': '6px'},
+                'item':    {'backgroundColor': BG, 'border': f'1px solid {BORDER}',
+                            'borderRadius': '12px', 'marginBottom': '8px',
+                            'boxShadow': '0 1px 3px rgba(0,0,0,0.04)'},
                 'control': {'padding': '12px 16px'},
                 'panel':   {'padding': '0 16px 2px'},
             },
         ),
 
-        # Comparative Analysis
+        # ── Comparative Analysis ──────────────────────────────────────────
         _section_anchor('mnid-comparative'),
+        _sec_header('Facility & District Comparison',
+                    desc='Cross-facility and district indicator benchmarking'),
         comparative_div,
 
-        # Readiness
+        # ── Operational Readiness ─────────────────────────────────────────
         _section_anchor('mnid-readiness'),
+        _sec_header('Operational Readiness',
+                    desc='Equipment · workforce competency · data quality'),
         _system_readiness(filtered, supply_inds, wf_inds, dq_inds),
+    ])
+
+    return html.Div(className='mnid-bg', children=[
+        # Scroll-spy components (hidden, fire once on load)
+        dcc.Interval(id='mnid-scrollspy-tick', interval=800, max_intervals=1),
+        dcc.Store(id='mnid-scrollspy-out'),
+        html.Div(className='mnid-shell', children=[
+            _sidebar(facility_code),
+            main_content,
+        ]),
     ])

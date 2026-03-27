@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E \"\\\\.\\(json|py\\)$\")",
+      "Bash(python -m py_compile mnid_renderer.py)",
+      "Bash(python -c \"import pandas as pd; df=pd.read_parquet\\(''data/latest_data_opd.parquet''\\); print\\(''\\\\n''.join\\(df[''concept_name''].dropna\\(\\).unique\\(\\).tolist\\(\\)[:60]\\)\\)\")",
+      "Bash(python -c \"import openpyxl; wb = openpyxl.load_workbook\\(''c:\\\\dev\\\\MAHIS-Reports\\\\Mahis_Reports\\\\rep\\\\MNID_Indicator_Evaluation.xlsx''\\); print\\(''Sheets:'', wb.sheetnames\\)\")",
+      "Bash(python -c \"import openpyxl; wb = openpyxl.load_workbook\\(''rep/MNID_Indicator_Evaluation.xlsx''\\); print\\(''Sheets:'', wb.sheetnames\\)\")"
+    ]
+  }
+}
