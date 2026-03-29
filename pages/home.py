@@ -269,7 +269,7 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
         SQL = f"""
             SELECT *
             FROM 'data/{DATA_FILE_NAME_}'
-            WHERE Date >= TIMESTAMP '{last_7_days}'
+            WHERE Date >= '{last_7_days}'
             AND {FACILITY_CODE_} = '{location}'
             """
         try:

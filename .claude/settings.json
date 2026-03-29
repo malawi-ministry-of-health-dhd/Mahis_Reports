@@ -5,7 +5,13 @@
       "Bash(python -m py_compile mnid_renderer.py)",
       "Bash(python -c \"import pandas as pd; df=pd.read_parquet\\(''data/latest_data_opd.parquet''\\); print\\(''\\\\n''.join\\(df[''concept_name''].dropna\\(\\).unique\\(\\).tolist\\(\\)[:60]\\)\\)\")",
       "Bash(python -c \"import openpyxl; wb = openpyxl.load_workbook\\(''c:\\\\dev\\\\MAHIS-Reports\\\\Mahis_Reports\\\\rep\\\\MNID_Indicator_Evaluation.xlsx''\\); print\\(''Sheets:'', wb.sheetnames\\)\")",
-      "Bash(python -c \"import openpyxl; wb = openpyxl.load_workbook\\(''rep/MNID_Indicator_Evaluation.xlsx''\\); print\\(''Sheets:'', wb.sheetnames\\)\")"
+      "Bash(python -c \"import openpyxl; wb = openpyxl.load_workbook\\(''rep/MNID_Indicator_Evaluation.xlsx''\\); print\\(''Sheets:'', wb.sheetnames\\)\")",
+      "Bash(find c:devMAHIS-ReportsMahis_Reports -maxdepth 2 -type f -name package.json -o -name requirements.txt -o -name *.config.* -o -name setup.py -o -name pyproject.toml)",
+      "Bash(find c:devMAHIS-ReportsMahis_Reports -name *.json -type f)",
+      "Bash(wc -l \"c:\\\\dev\\\\MAHIS-Reports\\\\Mahis_Reports\"/*.py)",
+      "Bash(find \"c:\\\\dev\\\\MAHIS-Reports\\\\Mahis_Reports\" -maxdepth 1 -type f -name \"*.py\" -exec wc -l {} +)",
+      "Bash(python -c \"import mnid_renderer\")",
+      "Bash(python -c \":*)"
     ]
   }
 }

@@ -705,6 +705,71 @@ html { scroll-behavior: smooth; }
   cursor: pointer;
 }
 
+/* ── Sidebar brand header ─────────────────────────────────────── */
+.mnid-sidebar-brand {
+  padding: 0 16px 14px;
+  border-bottom: 1px solid #E2E8F0;
+  margin-bottom: 8px;
+}
+
+/* ── Hero indicator donut row (Dashboard 3 style) ─────────────── */
+.mnid-hero-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.mnid-hero-card {
+  background: #fff;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  padding: 22px 12px 16px;
+  text-align: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  animation: fadeInUp 0.42s ease both;
+  cursor: default;
+}
+.mnid-hero-card:hover {
+  box-shadow: 0 8px 28px rgba(0,0,0,0.11);
+  transform: translateY(-3px);
+}
+
+.mnid-hero-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748B;
+  line-height: 1.35;
+  margin-top: 6px;
+  padding: 0 4px;
+}
+
+/* ── Priority indicators table ────────────────────────────────── */
+.mnid-priority-tbl {
+  width: 100%;
+  border-collapse: collapse;
+}
+.mnid-priority-tbl tr:hover td {
+  background: #FAFAFA;
+}
+
+/* ── District gauges row ──────────────────────────────────────── */
+.mnid-district-gauge-card {
+  background: #fff;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 4px 4px 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  text-align: center;
+  animation: fadeInUp 0.38s ease both;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+.mnid-district-gauge-card:hover {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.09);
+  transform: translateY(-2px);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .mnid-shell { flex-direction: column; }
