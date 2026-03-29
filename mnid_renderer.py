@@ -1214,10 +1214,12 @@ clientside_callback(
 
         function setActive(id) {
             sectionIds.forEach(function(sid) {
-                var a = document.querySelector('.mnid-sidebar-link[href="#' + sid + '"]');
-                if (!a) return;
-                if (sid === id) a.classList.add('active');
-                else a.classList.remove('active');
+                document.querySelectorAll(
+                    '.mnid-sidebar-link[href="#' + sid + '"], .mnid-nav-btn[href="#' + sid + '"]'
+                ).forEach(function(a) {
+                    if (sid === id) a.classList.add('active');
+                    else a.classList.remove('active');
+                });
             });
         }
 
@@ -2652,28 +2654,31 @@ def _pph_cascade(df):
 
 def _topbar(facility, period, n_tracked, n_await):
     facility_name = _FACILITY_NAMES.get(facility, facility)
-    start, end = (period.split(' to ') + [''])[:2]
+    district = _FACILITY_DISTRICT.get(facility, 'District not mapped')
     return html.Div(className='mnid-topbar', children=[
-        html.Div(style={'flex': '1', 'minWidth': '0'}, children=[
-            html.Div('STRATEGIC OVERVIEW', className='mnid-topbar-label'),
-            html.H1('Maternal and Child Health'),
-            html.P(
-                'Coverage, quality, and care-phase monitoring for maternal '
-                'and neonatal services.',
-            ),
+        html.Div(className='mnid-topbar-copy', children=[
+            html.Div('M-NID Dashboard', className='mnid-topbar-label'),
+            html.H1('Maternal and Neonatal Health Indicators'),
+            html.P('Clean view of performance, comparison, coverage, and readiness.'),
         ]),
         html.Div(className='mnid-info-pills', children=[
             html.Div(className='mnid-info-pill', children=[
-                html.Div('FACILITY CODE', className='mnid-info-pill-label'),
-                html.Div(facility, className='mnid-info-pill-value'),
-            ]),
-            html.Div(className='mnid-info-pill', children=[
-                html.Div('FACILITY', className='mnid-info-pill-label'),
+                html.Div('Facility', className='mnid-info-pill-label'),
                 html.Div(facility_name, className='mnid-info-pill-value'),
             ]),
             html.Div(className='mnid-info-pill', children=[
-                html.Div('PERIOD', className='mnid-info-pill-label'),
+                html.Div('District', className='mnid-info-pill-label'),
+                html.Div(district, className='mnid-info-pill-value'),
+            ]),
+            html.Div(className='mnid-info-pill', children=[
+                html.Div('Period', className='mnid-info-pill-label'),
                 html.Div(period,
+                         style={'fontSize': '11px', 'fontWeight': '700',
+                                'color': TEXT, 'lineHeight': '1.2'}),
+            ]),
+            html.Div(className='mnid-info-pill', children=[
+                html.Div('Indicators', className='mnid-info-pill-label'),
+                html.Div(f'{n_tracked} tracked / {n_await} pending',
                          style={'fontSize': '11px', 'fontWeight': '700',
                                 'color': TEXT, 'lineHeight': '1.2'}),
             ]),
@@ -2682,6 +2687,19 @@ def _topbar(facility, period, n_tracked, n_await):
 
 
 def _sidebar(facility_code: str) -> html.Div:
+    nav_items = [
+        ('Overview', '#mnid-summary'),
+        ('Trend', '#mnid-trends'),
+        ('Comparison', '#mnid-comparative'),
+        ('Heatmap', '#mnid-heatmap'),
+        ('Indicators', '#mnid-coverage'),
+        ('Readiness', '#mnid-readiness'),
+        ('Analysis', '#mnid-analysis'),
+    ]
+    return html.Div(className='mnid-nav', children=[
+        html.A(href=href, className='mnid-nav-btn', children=label)
+        for label, href in nav_items
+    ])
     """Left sidebar navigation panel with M-NID branding and icons."""
     nav_items = [
         ('▤', 'Overview',            '#mnid-summary'),
@@ -2757,6 +2775,23 @@ def _sidebar(facility_code: str) -> html.Div:
 
 
 def _alert_banner(below, strong):
+    if not below:
+        return html.Div(className='mnid-alert mnid-alert-ok', children=[
+            html.Div(className='mnid-alert-icon',
+                     children=html.Span('OK', style={'color':'#fff','fontSize':'9px',
+                                                     'fontWeight':'700'})),
+            html.P([html.Strong('On track. '),
+                    'All tracked indicators are meeting target.']),
+        ])
+    below_txt = ', '.join(f'{n} ({p:.0f}%)' for n, p in below)
+    strong_txt = ', '.join(strong[:3]) or 'None'
+    return html.Div(className='mnid-alert', children=[
+        html.Div(className='mnid-alert-icon',
+                 children=html.Span('!', style={'color': '#fff', 'fontSize': '10px',
+                                                'fontWeight': '700'})),
+        html.P([html.Strong('Needs attention. '),
+                f'Below target: {below_txt}. Strong areas: {strong_txt}.']),
+    ])
     if not below:
         return html.Div(className='mnid-alert mnid-alert-ok', children=[
             html.Div(className='mnid-alert-icon',
@@ -2843,6 +2878,18 @@ def _kpi_row(computed):
     crit = [c for c in computed if c['pct'] < c['target'] * .85]
     avg  = round(sum(c['pct'] for c in computed) / n, 1) if n else 0.0
     avg_color = _cov_color(avg)
+    return html.Div(className='mnid-kpi-row', children=[
+        _kpi('Tracked Indicators', str(n), 'live indicators', 'info',
+             bottom_bar=_count_bar(n, n, INFO_C)),
+        _kpi('On Target', str(len(on)), 'meeting benchmark', 'ok',
+             bottom_bar=_count_bar(len(on), n, OK_C)),
+        _kpi('Watch', str(len(mon)), 'near target', 'warn',
+             bottom_bar=_count_bar(len(mon), n, WARN_C)),
+        _kpi('Needs Review', str(len(crit)), 'below target', 'danger',
+             bottom_bar=_count_bar(len(crit), n, DANGER_C)),
+        _kpi('Average Coverage', '', 'across tracked indicators', 'info',
+             ring=_avg_ring(avg, avg_color)),
+    ])
 
     return html.Div(className='mnid-kpi-row', children=[
         _kpi('Tracked',       str(n),           'indicators with live data', 'info',
@@ -2870,10 +2917,10 @@ def _section_anchor(anchor_id):
 def render_mnid_dashboard(filtered, data_opd, delta_days, config,
                           facility_code, start_date, end_date):
     vt          = config.get('visualization_types', {})
-    all_inds    = vt.get('priority_indicators', [])
-    supply_inds = vt.get('supply_indicators', [])
-    wf_inds     = vt.get('workforce_indicators', [])
-    dq_inds     = vt.get('data_quality_indicators', [])
+    all_inds    = config.get('priority_indicators') or vt.get('priority_indicators', [])
+    supply_inds = config.get('supply_indicators') or vt.get('supply_indicators', [])
+    wf_inds     = config.get('workforce_indicators') or vt.get('workforce_indicators', [])
+    dq_inds     = config.get('data_quality_indicators') or vt.get('data_quality_indicators', [])
     period      = f'{start_date} to {end_date}'
 
     tracked  = [i for i in all_inds if i.get('status') == 'tracked']
@@ -2928,6 +2975,7 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     main_content = html.Div(className='mnid-main', children=[
 
         _topbar(facility_code, period, len(tracked), len(awaiting)),
+        _sidebar(facility_code),
         _alert_banner(below, strong),
 
         # ── Overview ────────────────────────────────────────────────────
@@ -2986,8 +3034,5 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
         # Scroll-spy components (hidden, fire once on load)
         dcc.Interval(id='mnid-scrollspy-tick', interval=800, max_intervals=1),
         dcc.Store(id='mnid-scrollspy-out'),
-        html.Div(className='mnid-shell', children=[
-            _sidebar(facility_code),
-            main_content,
-        ]),
+        html.Div(className='mnid-shell', children=[main_content]),
     ])
