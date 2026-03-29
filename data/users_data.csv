@@ -9,7 +9,6 @@ aaa69cb4-54aa-43ad-bb2a-e47307cad5d0,Superuser
 e17e6093-40c7-4572-9ad9-0bb11d0a6f07,Lab
 8c3db5a5-4a7f-4111-b2e3-fcb9ffaae64a,Superuser
 dc940cca-d975-4358-8dfb-403aa215cf4f,Provider
-5defb066-9fdf-48e8-b26f-ff4245b73d93,District Superuser
 5defb066-9fdf-48e8-b26f-ff4245b73d93,Superuser
 5defb066-9fdf-48e8-b26f-ff4245b73d93,"Superuser,Superuser,"
 c1ae40f0-2fe7-4e0e-9a4c-f7295487a50e,General Registration Clerk
@@ -1580,3 +1579,27 @@ cd55fb45-2b6c-43b6-a2b0-1e36f39ddc08,Superuser
 a751b2f9-6a34-49bf-8016-f06772ba147c,Superuser
 a751b2f9-6a34-49bf-8016-f06772ba147c,"Superuser,Superuser,"
 e826f911-f0d3-4ef6-bd93-b2311e92767e,Clinician
+142bbf46-8f44-4163-a473-5f4488034c10,Clinician
+142bbf46-8f44-4163-a473-5f4488034c10,Superuser
+a7282eae-e707-4f02-a6c9-097a66535a83,Clinician
+fc1d6be4-3ae5-40e7-87fa-2ce5a90108b7,Clinician
+21e1c258-e564-4e21-8da6-5ec0ea51610e,Superuser
+6a15a50e-9827-4a12-80e0-41dc2f88c9c1,Superuser
+e621ad24-f42a-4f57-94fd-04aab75adf53,Superuser
+d3ad0d16-b70d-4cee-965f-57419ca8afbb,Superuser
+121615ab-0b04-4d0a-9b3c-114fa9a3cab6,Clinician
+491686fe-a4f0-46ad-aec9-19e8c15d287d,Clinician
+2dc8f2f2-6851-46ed-aa96-1a58c98edb3e,Clinician
+ade78d24-234f-4c2f-83a7-c8289da0a47d,Clinician
+da1d7263-f557-4fa8-afc8-34d941fc18b0,Clinician
+04c64384-7a85-4c5c-9528-1bebc95b40c9,Clinician
+04c64384-7a85-4c5c-9528-1bebc95b40c9,Superuser
+04c64384-7a85-4c5c-9528-1bebc95b40c9,"Superuser,Superuser,"
+04adc057-a1d0-4114-af6c-930dd799399e,Clinician
+f0e169f7-6877-4925-b5b0-ce48f3c3d728,Clinician
+7f5fe26e-fb73-4653-8b2d-25a9d91316a2,Clinician
+08bb5f18-6884-4864-bcc2-46593c3e9e10,Clinician
+f075acdf-c8cf-4e5d-8247-1db9ccb1681e,Clinician
+45860284-68c2-4a91-bd13-2f61875b0e20,Clinician
+4da326c9-91af-45b9-8964-555d55c01a72,Clinician
+9dfe596a-ee99-4ef1-b365-40610a136771,Clinician

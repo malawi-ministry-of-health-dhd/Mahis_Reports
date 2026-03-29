@@ -40,102 +40,162 @@ dropdowns_json_path = os.path.join(path, 'data', 'dcc_dropdown_json', 'dropdowns
 
 
 report_config_panel = html.Div(
+    className="report-config-modern",
     children=[
         dcc.Store(id="report-config-store"),
+        
+        # Parameters Card
         html.Div(
+            className="config-parameters-card",
             children=[
-                # Grid of controls
-                html.Div(className="filter-container", children=[
-                    # Program
-                    html.Div(className="card-col", children=[
-                        html.Label("Select Program", className="form-label"),
-                        dcc.Dropdown(
-                            id="program-selector",
-                            options=[{"label": p, "value": p} for p in []],
-                            placeholder="Choose a program…",
-                            value="OPD Program",
-                            clearable=True,
-                            className="dropdown"
-                        ),
-                    ]),
-
-                    # Report
-                    html.Div(className="card-col", children=[
-                        html.Label("Select Report", className="form-label"),
-                        dcc.Dropdown(
-                            id="report-selector",
-                            options=[{"label": r, "value": r} for r in []],
-                            placeholder="Choose a report…",
-                            value=None,
-                            clearable=True,
-                            className="dropdown"
-                        ),
-                    ]),
-
-                    # Date Range
-                    html.Div(className="card-col", children=[
-                        html.Label("Date Range", className="form-label"),
-                        dcc.DatePickerRange(
-                            id="prog-date-range-picker",
-                            # Adjust to your data’s earliest date if you have it
-                            min_date_allowed="2023-01-01",
-                            max_date_allowed=datetime.now(),
-                            initial_visible_month=datetime.now(),
-                            start_date=datetime.now().replace(hour=0, minute=0, second=0, microsecond=0),
-                            end_date=datetime.now().replace(hour=23, minute=59, second=59, microsecond=0),
-                            display_format='YYYY-MM-DD',
-                            minimum_nights=0,
-                        ),
-                    ]),
-
-                    # Health Facility
-                    html.Div(className="card-col", children=[
-                        html.Label("Health Facility", className="form-label"),
-                        dcc.Dropdown(
-                            id="prog-hf-filter",
-                            options=[],  # Fill from your data in a callback
-                            placeholder="All facilities",
-                            value=None,
-                            clearable=True,
-                            multi=True,  # Often useful to pick multiple HFs
-                            className="dropdown"
-                        ),
-                    ]),
-                ], style={"display": "flex", "gap": "14px", "alignItems": "flex-start", "flexWrap": "wrap"}),
-
-                # Actions row
+                html.H3("Generate a Programs Report", className="config-parameters-title"),
+                
+                # Controls Grid
                 html.Div(
-                    style={"display": "flex", "justifyContent": "space-between", "alignItems": "center"},
+                    className="config-controls-grid",
                     children=[
-                        
-                        # LEFT BUTTONS
+                        # Program Selector
                         html.Div(
+                            className="config-control-group",
                             children=[
-                                html.Button("Generate Report", id="btn-generate-report", n_clicks=0, className="btn btn-primary"),
-                                html.Button("Reset", id="btn-reset-report", n_clicks=0, className="btn btn-secondary"),
-                            ],
-                            style={"display": "flex", "gap": "10px"}
+                                html.Label("Select Program", className="config-label"),
+                                dcc.Dropdown(
+                                    id="program-selector",
+                                    options=[{"label": p, "value": p} for p in []],
+                                    placeholder="Choose a program…",
+                                    value="OPD Program",
+                                    clearable=True,
+                                    className="modern-dropdown"
+                                ),
+                            ]
                         ),
-
-                        # RIGHT BUTTONS + STATUS
+                        
+                        # Report Selector
                         html.Div(
+                            className="config-control-group",
                             children=[
-                                html.Button("CSV", id="btn-csv", n_clicks=0, className="btn btn-outline-secondary"),
-                                html.Button("XLSX", id="btn-excel", n_clicks=0, className="btn btn-outline-secondary"),
-                                html.Button("PNG", id="btn-png", n_clicks=0, className="btn btn-outline-secondary"),
-                                html.Span(id="report-run-status", className="run-status", style={"marginLeft": "10px"})
-                            ],
-                            style={"display": "flex", "gap": "10px"}
+                                html.Label("Select Report", className="config-label"),
+                                dcc.Dropdown(
+                                    id="report-selector",
+                                    options=[{"label": r, "value": r} for r in []],
+                                    placeholder="Choose a report…",
+                                    value=None,
+                                    clearable=True,
+                                    className="modern-dropdown"
+                                ),
+                            ]
+                        ),
+                        
+                        # Date Range Picker
+                        html.Div(
+                            className="config-control-group",
+                            children=[
+                                html.Label("Date Range", className="config-label"),
+                                dcc.DatePickerRange(
+                                    id="prog-date-range-picker",
+                                    min_date_allowed="2023-01-01",
+                                    max_date_allowed=datetime.now(),
+                                    initial_visible_month=datetime.now(),
+                                    start_date=datetime.now().replace(hour=0, minute=0, second=0, microsecond=0),
+                                    end_date=datetime.now().replace(hour=23, minute=59, second=59, microsecond=0),
+                                    display_format='YYYY-MM-DD',
+                                    minimum_nights=0,
+                                    className="modern-datepicker-range",
+                                    style={
+                                        "width": "100%",
+                                        "border": "1px solid #ced4da",
+                                        "borderRadius": "10px",
+                                        "padding": "8px"
+                                    }
+                                ),
+                            ]
+                        ),
+                        
+                        # Health Facility Filter
+                        html.Div(
+                            className="config-control-group",
+                            children=[
+                                html.Label("Health Facility", className="config-label"),
+                                dcc.Dropdown(
+                                    id="prog-hf-filter",
+                                    options=[],
+                                    placeholder="All facilities",
+                                    value=None,
+                                    clearable=True,
+                                    multi=True,
+                                    className="modern-dropdown"
+                                ),
+                            ]
+                        ),
+                    ]
+                ),
+                
+                # Action Buttons
+                html.Div(
+                    className="config-actions",
+                    children=[
+                        # Left Actions
+                        html.Div(
+                            className="config-left-actions",
+                            children=[
+                                html.Button(
+                                    "Generate Report",
+                                    id="btn-generate-report",
+                                    n_clicks=0,
+                                    className="btn-generate-modern"
+                                ),
+                                html.Button(
+                                    "Reset",
+                                    id="btn-reset-report",
+                                    n_clicks=0,
+                                    className="btn-reset-modern"
+                                ),
+                            ]
+                        ),
+                        
+                        # Right Actions
+                        html.Div(
+                            className="config-right-actions",
+                            children=[
+                                html.Button(
+                                    "CSV",
+                                    id="btn-csv",
+                                    n_clicks=0,
+                                    className="btn-download-csv"
+                                ),
+                                html.Button(
+                                    "XLSX",
+                                    id="btn-excel",
+                                    n_clicks=0,
+                                    className="btn-download-excel"
+                                ),
+                                html.Button(
+                                    "PNG",
+                                    id="btn-png",
+                                    n_clicks=0,
+                                    className="btn-download-png"
+                                ),
+                                html.Span(
+                                    id="report-run-status",
+                                    className="run-status-modern",
+                                    style={"marginLeft": "10px"}
+                                )
+                            ]
                         ),
                     ]
                 )
-            ],
+            ]
         ),
+        
+        # Loading and Output Container
         dcc.Loading(
             id="reports-loading",
             type="circle",
             color="#006401",
-            children=html.Div(id="reports-output", className="reports-output")
+            children=html.Div(
+                id="reports-output",
+                className="reports-output-container"
+            )
         ),
     ],
     style={"marginTop": "0px"}
@@ -235,7 +295,10 @@ def generate_chart(n_clicks, urlparams, report_name, start_date, end_date, hf):
             ,style={'color':'red'}), [], ''  # Empty DataFrame with expected columns
         
         data[DATE_] = pd.to_datetime(data[DATE_], format='mixed').dt.strftime('%Y-%m-%d')
-        data[GENDER_] = data[GENDER_].replace({"M":"Male","F":"Female"})
+        data[GENDER_] = data[GENDER_].replace({"M":"Male",
+                                               "F":"Female",
+                                               '{"label"=>"Male", "value"=>"M"}':"Male",
+                                               '{"label"=>"Female", "value"=>"F"}':"Female"})
         data["DateValue"] = pd.to_datetime(data[DATE_]).dt.date
 
         # if data.empty:

@@ -12,7 +12,13 @@
             "measure": "count",
             "unique": "person_id",
             "variable1": "Program",
+            "value1": [
+              "OPD Program"
+            ],
             "variable2": "Encounter",
+            "value2": [
+              "COMPLICATIONS"
+            ],
             "variable3": "concept_name",
             "variable4": "obs_value_coded",
             "variable5": "ValueN",
@@ -114,7 +120,13 @@
                   "filter_col1": "",
                   "filter_val1": "",
                   "filter_col2": "",
-                  "filter_val2": ""
+                  "filter_val2": "",
+                  "filter_col3": "",
+                  "filter_val3": "",
+                  "filter_col4": "",
+                  "filter_val4": "",
+                  "filter_col5": "",
+                  "filter_val5": ""
                 }
               },
               {
@@ -136,7 +148,13 @@
                   "filter_col1": "",
                   "filter_val1": "",
                   "filter_col2": "",
-                  "filter_val2": ""
+                  "filter_val2": "",
+                  "filter_col3": "",
+                  "filter_val3": "",
+                  "filter_col4": "",
+                  "filter_val4": "",
+                  "filter_col5": "",
+                  "filter_val5": ""
                 }
               },
               {
@@ -151,11 +169,17 @@
                   "names_col": "new_revisit",
                   "values_col": "person_id",
                   "unique_column": "person_id",
-                  "colormap": "\"\\\"{}\\\"\"",
+                  "colormap": "{}",
                   "filter_col1": "",
                   "filter_val1": "",
                   "filter_col2": "",
-                  "filter_val2": ""
+                  "filter_val2": "",
+                  "filter_col3": "",
+                  "filter_val3": "",
+                  "filter_col4": "",
+                  "filter_val4": "",
+                  "filter_col5": "",
+                  "filter_val5": ""
                 }
               },
               {
@@ -169,15 +193,21 @@
                   "title": "Age Gender Disaggregation",
                   "age_col": "Age",
                   "gender_col": "Gender",
-                  "x_title": "Age Group",
-                  "y_title": "Number of patients",
+                  "x_title": "Program",
+                  "y_title": "person_id",
                   "unique_column": "person_id",
                   "bin_size": "10",
                   "color": "",
                   "filter_col1": "",
                   "filter_val1": "",
                   "filter_col2": "",
-                  "filter_val2": ""
+                  "filter_val2": "",
+                  "filter_col3": "",
+                  "filter_val3": "",
+                  "filter_col4": "",
+                  "filter_val4": "",
+                  "filter_col5": "",
+                  "filter_val5": ""
                 }
               },
               {
@@ -192,11 +222,17 @@
                   "names_col": "Gender",
                   "values_col": "person_id",
                   "unique_column": "person_id",
-                  "colormap": "\"\\\"{}\\\"\"",
+                  "colormap": "{}",
                   "filter_col1": "",
                   "filter_val1": "",
                   "filter_col2": "",
-                  "filter_val2": ""
+                  "filter_val2": "",
+                  "filter_col3": "",
+                  "filter_val3": "",
+                  "filter_col4": "",
+                  "filter_val4": "",
+                  "filter_col5": "",
+                  "filter_val5": ""
                 }
               },
               {
@@ -210,14 +246,20 @@
                   "title": "Active Users - All patient encounters",
                   "label_col": "User",
                   "value_col": "person_id",
-                  "x_title": "Number of Patients",
-                  "y_title": "User",
+                  "x_title": "Program",
+                  "y_title": "Number of patients",
                   "unique_column": "person_id",
                   "top_n": "10",
                   "filter_col1": "",
                   "filter_val1": "",
                   "filter_col2": "",
-                  "filter_val2": ""
+                  "filter_val2": "",
+                  "filter_col3": "",
+                  "filter_val3": "",
+                  "filter_col4": "",
+                  "filter_val4": "",
+                  "filter_col5": "",
+                  "filter_val5": ""
                 }
               }
             ]
@@ -976,7 +1018,7 @@
                 "name": "Locations",
                 "type": "PivotTable",
                 "filters": {
-                 "measure": "nunique",
+                  "measure": "nunique",
                   "unique": "any",
                   "duration_default": "any",
                   "index_col1": "Village",
@@ -1656,7 +1698,7 @@
       "counts": [
         {
           "id": "count_f3d40bex",
-          "name": "Total Neonatal Program Enrolments",
+          "name": "Enrolled Neonates",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1670,16 +1712,22 @@
               "NEONATAL TRIAGE"
             ],
             "variable3": "concept_name",
+            "value3": [],
             "variable4": "obs_value_coded",
+            "value4": "",
             "variable5": "ValueN",
+            "value5": "",
             "variable6": "Value",
+            "value6": "",
             "variable7": "Gender",
-            "variable8": "Age_Group"
+            "value7": [],
+            "variable8": "Age_Group",
+            "value8": ""
           }
         },
         {
           "id": "count_f3d40be9",
-          "name": "Neonatal Enrolled in Nursery Care",
+          "name": "Triaged Neonates",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1689,21 +1737,25 @@
             ],
             "variable2": "Encounter",
             "value2": [
-              "NEONATAL ENROLMENT",
               "NEONATAL TRIAGE"
             ],
             "variable3": "concept_name",
+            "value3": [],
             "variable4": "obs_value_coded",
+            "value4": "",
             "variable5": "ValueN",
+            "value5": "",
             "variable6": "Value",
+            "value6": "",
             "variable7": "Gender",
+            "value7": [],
             "variable8": "Age_Group",
-            "value8": "Under 5"
+            "value8": ""
           }
         },
         {
           "id": "count_1c32fed6",
-          "name": "Emergency Triage Conducted",
+          "name": "Review of Systems done",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1716,12 +1768,17 @@
               "NEONATAL TRIAGE"
             ],
             "variable3": "concept_name",
+            "value3": [],
             "variable4": "obs_value_coded",
+            "value4": "",
             "variable5": "ValueN",
+            "value5": "",
             "variable6": "Value",
+            "value6": "",
             "variable7": "Gender",
+            "value7": "",
             "variable8": "Age_Group",
-            "value8": "Under 5"
+            "value8": ""
           }
         },
         {
@@ -1739,17 +1796,22 @@
               "NEONATAL SYSTEMIC EXAMINATION"
             ],
             "variable3": "concept_name",
+            "value3": [],
             "variable4": "obs_value_coded",
+            "value4": "",
             "variable5": "ValueN",
+            "value5": "",
             "variable6": "Value",
+            "value6": "",
             "variable7": "Gender",
+            "value7": "",
             "variable8": "Age_Group",
-            "value8": "Under 5"
+            "value8": ""
           }
         },
         {
           "id": "count_1f41f4fx",
-          "name": "Review of Systems Done",
+          "name": "Treated Neonates",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1762,19 +1824,24 @@
               "NEONATAL REVIEW OF SYSTEMS"
             ],
             "variable3": "concept_name",
+            "value3": [],
             "variable4": "obs_value_coded",
+            "value4": "",
             "variable5": "ValueN",
+            "value5": "",
             "variable6": "Value",
+            "value6": "",
             "variable7": "Gender",
+            "value7": "",
             "variable8": "Age_Group",
-            "value8": "Under 5"
+            "value8": ""
           }
         },
         {
           "id": "count_b616b468",
-          "name": "Outcome Discharged Home",
+          "name": "Admitted to Nursery",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [
@@ -1789,12 +1856,17 @@
               "Admission outcome"
             ],
             "variable4": "obs_value_coded",
-            "value4": "Discharged home (Well Baby)",
+            "value4": [
+              "Admit to ward"
+            ],
             "variable5": "ValueN",
+            "value5": "",
             "variable6": "Value",
+            "value6": "",
             "variable7": "Gender",
+            "value7": "",
             "variable8": "Age_Group",
-            "value8": "Under 5"
+            "value8": ""
           }
         },
         {
@@ -1818,15 +1890,18 @@
             "variable4": "obs_value_coded",
             "value4": "Referrer to main hospital",
             "variable5": "ValueN",
+            "value5": "",
             "variable6": "Value",
+            "value6": "",
             "variable7": "Gender",
+            "value7": "",
             "variable8": "Age_Group",
-            "value8": "Under 5"
+            "value8": ""
           }
         },
         {
           "id": "count_06f2a808",
-          "name": "Absconded",
+          "name": "Outcome Death <24 Hours",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1843,17 +1918,22 @@
               "Admission outcome"
             ],
             "variable4": "obs_value_coded",
-            "value4": "Absconded",
+            "value4": [
+              "Death"
+            ],
             "variable5": "ValueN",
+            "value5": "",
             "variable6": "Value",
+            "value6": "",
             "variable7": "Gender",
+            "value7": [],
             "variable8": "Age_Group",
-            "value8": "Under 5"
+            "value8": "<=1"
           }
         },
         {
           "id": "count_1af94e5f",
-          "name": "Outcome Died",
+          "name": "Outcome Death >24 Hours",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1870,12 +1950,17 @@
               "Admission outcome"
             ],
             "variable4": "obs_value_coded",
-            "value4": "Died",
+            "value4": [
+              "Death"
+            ],
             "variable5": "ValueN",
+            "value5": "",
             "variable6": "Value",
+            "value6": "",
             "variable7": "Gender",
+            "value7": [],
             "variable8": "Age_Group",
-            "value8": "Under 5"
+            "value8": ">1"
           }
         },
         {
@@ -1909,7 +1994,7 @@
       "charts": {
         "sections": [
           {
-            "section_name": " Detailed",
+            "section_name": " Neonatal Encounters",
             "items": [
               {
                 "id": "chart_fc8d72a1",
@@ -1920,23 +2005,30 @@
                   "unique": "any",
                   "duration_default": "any",
                   "title": "Daily Neonatal Program Enrolments - Last 7 Days",
+                  "unique_column": "person_id",
+                  "filter_col1": [
+                    "Program"
+                  ],
+                  "filter_val1": "NEONATAL PROGRAM",
+                  "filter_col2": [
+                    "Encounter"
+                  ],
+                  "filter_val2": [
+                    "NEONATAL ENROLMENT",
+                    "NEONATAL TRIAGE"
+                  ],
+                  "filter_col3": [],
+                  "filter_val3": "",
+                  "filter_col4": [],
+                  "filter_val4": "",
+                  "filter_col5": [],
+                  "filter_val5": "",
                   "date_col": "Date",
                   "y_col": "person_id",
                   "x_title": "Date",
                   "y_title": "Number of Neonates",
-                  "unique_column": "encounter_id",
                   "legend_title": "Legend",
-                  "color": "",
-                  "filter_col1": "Program",
-                  "filter_val1": ["NEONATAL PROGRAM","NEONATAL TRIAGE"],
-                  "filter_col2": "Encounter",
-                  "filter_val2": ["NEONATAL PROGRAM","NEONATAL TRIAGE"],
-                  "filter_col3": "Program",
-                  "filter_val3": ["NEONATAL PROGRAM","NEONATAL TRIAGE"],
-                  "filter_col4": "Encounter",
-                  "filter_val4": ["NEONATAL PROGRAM","NEONATAL TRIAGE"],
-                  "filter_col5": "Program",
-                  "filter_val5": ["NEONATAL PROGRAM","NEONATAL TRIAGE"]
+                  "color": ""
                 }
               },
               {
@@ -1957,13 +2049,840 @@
                   "color": "",
                   "filter_col1": "Program",
                   "filter_val1": "NEONATAL PROGRAM",
-                  "filter_col2": "Age_Group",
-                  "filter_val2": "Under 5"
+                  "filter_col2": "",
+                  "filter_val2": ""
+                }
+              },
+              {
+                "id": "chart_2e694262",
+                "name": "Newborn Diseases",
+                "type": "Bar",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "7days",
+                  "title": "Newborn Diseases",
+                  "unique_column": "encounter_id",
+                  "filter_col1": [
+                    "Encounter"
+                  ],
+                  "filter_val1": "DIAGNOSIS",
+                  "filter_col2": [
+                    "Program"
+                  ],
+                  "filter_val2": "NEONATAL PROGRAM",
+                  "filter_col3": [
+                    "concept_name"
+                  ],
+                  "filter_val3": "!=Primary diagnosis",
+                  "filter_col4": [],
+                  "filter_val4": "",
+                  "filter_col5": [],
+                  "filter_val5": "",
+                  "label_col": "obs_value_coded",
+                  "value_col": "person_id",
+                  "top_n": "10",
+                  "x_title": "Date",
+                  "y_title": "Number of Patients"
+                }
+              }
+            ]
+          },
+          {
+            "section_name": "Causes of Death",
+            "items": [
+              {
+                "id": "chart_23850d26",
+                "name": "Top 10 Causes of Death",
+                "type": "Bar",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "Top 10 Causes of Death",
+                  "unique_column": "person_id",
+                  "filter_col1": [
+                    "obs_value_coded"
+                  ],
+                  "filter_val1": "Death && !=_",
+                  "filter_col2": [
+                    "Encounter"
+                  ],
+                  "filter_val2": "DIAGNOSIS",
+                  "filter_col3": [
+                    "Program"
+                  ],
+                  "filter_val3": "NEONATAL PROGRAM",
+                  "filter_col4": [],
+                  "filter_val4": "",
+                  "filter_col5": [],
+                  "filter_val5": "",
+                  "label_col": "obs_value_coded",
+                  "value_col": "person_id",
+                  "top_n": "10",
+                  "x_title": "Cause",
+                  "y_title": "Number of Patients"
+                }
+              },
+              {
+                "id": "chart_0987cbef",
+                "name": "Neonatal Admission Outcomes",
+                "type": "Column",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "7days",
+                  "title": "Neonatal Admission Outcomes",
+                  "unique_column": "encounter_id",
+                  "filter_col1": [
+                    "Program"
+                  ],
+                  "filter_val1": "NEONATAL PROGRAM",
+                  "filter_col2": [
+                    "Encounter"
+                  ],
+                  "filter_val2": "NEONATAL ADMISSION OUTCOMES",
+                  "filter_col3": [
+                    "concept_name"
+                  ],
+                  "filter_val3": "Clinical review outcome",
+                  "filter_col4": [],
+                  "filter_val4": "",
+                  "filter_col5": [],
+                  "filter_val5": "",
+                  "y_col": "encounter_id",
+                  "x_col": "obs_value_coded",
+                  "x_title": "Outcomes",
+                  "y_title": "Number of Patients",
+                  "legend_title": "Legend",
+                  "color": ""
                 }
               }
             ]
           }
         ]
+      }
+    }
+  },
+  {
+    "report_id": "report_0a89c762",
+    "report_name": "Maternal and Newborn Health",
+    "date_created": "2026-03-19",
+    "visualization_types": {
+      "counts": [
+        {
+          "id": "count_mch_001x",
+          "name": "# Women Attending ANC Program",
+          "filters": {
+            "measure": "count",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": "ANC PROGRAM",
+            "variable2": "",
+            "value2": "",
+            "variable3": "",
+            "value3": "",
+            "variable4": "",
+            "value4": "",
+            "variable5": "Gender",
+            "value5": "Female"
+          }
+        },
+        {
+          "id": "count_mch_001",
+          "name": "Women with 4+ antenatal visits",
+          "filters": {
+            "measure": "count",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": "ANC PROGRAM",
+            "variable2": "Encounter",
+            "value2": "ANC VISIT",
+            "variable3": "concept_name",
+            "value3": "Type of visit",
+            "variable4": "Value",
+            "value4": ">4",
+            "variable5": "Gender",
+            "value5": "Female"
+          }
+        },
+        {
+          "id": "count_mch_002",
+          "name": "Tetanus Immunization Coverage",
+          "filters": {
+            "measure": "count",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": "ANC PROGRAM",
+            "variable2": "Encounter",
+            "value2": "CURRENT PREGNANCY",
+            "variable3": "concept_name",
+            "value3": "Number of tetanus doses",
+            "variable4": "ValueN",
+            "value4": ">=2"
+          }
+        },
+        {
+          "id": "count_mch_003",
+          "name": "PNC Mother Final Status",
+          "filters": {
+            "measure": "count",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": "PNC PROGRAM",
+            "variable2": "Encounter",
+            "value2": "END PNC",
+            "variable3": "concept_name",
+            "value3": "maternal outcome status"
+          }
+        },
+        {
+          "id": "count_mch_004",
+          "name": "PNC Baby Final Status",
+          "filters": {
+            "measure": "count",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": "PNC PROGRAM",
+            "variable2": "Encounter",
+            "value2": "END PNC",
+            "variable3": "concept_name",
+            "value3": "baby outcome status"
+          }
+        }
+      ],
+      "charts": {
+        "sections": [
+          {
+            "section_name": "Antenatal Care (ANC)",
+            "items": [
+              {
+                "id": "chart_mch_001",
+                "name": "Antenatal Visits Over Time",
+                "type": "Line",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "Antenatal Visits Over Time",
+                  "date_col": "Date",
+                  "y_col": "person_id",
+                  "x_title": "Date",
+                  "y_title": "Number of Visits",
+                  "unique_column": "encounter_id",
+                  "legend_title": "Visit Type",
+                  "filter_col1": "Program",
+                  "filter_val1": "ANC PROGRAM",
+                  "filter_col2": "Encounter",
+                  "filter_val2": "ANC VISIT",
+                  "filter_col3": "concept_name",
+                  "filter_val3": "Reason for visit"
+                }
+              },
+              {
+                "id": "chart_mch_002",
+                "name": "Prevalence of Danger Signs in Pregnancy",
+                "type": "Bar",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "Prevalence of Danger Signs in Pregnancy",
+                  "label_col": "obs_value_coded",
+                  "value_col": "person_id",
+                  "x_title": "Number of Patients",
+                  "y_title": "Danger Sign",
+                  "unique_column": "person_id",
+                  "top_n": "10",
+                  "filter_col1": "Program",
+                  "filter_val1": "ANC PROGRAM",
+                  "filter_col2": "Encounter",
+                  "filter_val2": "ANC VISIT",
+                  "filter_col3": "concept_name",
+                  "filter_val3": "Danger signs"
+                }
+              },
+              {
+                "id": "chart_mch_003",
+                "name": "Pregnancy Planning Status",
+                "type": "Pie",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "Pregnancy Planning Status",
+                  "names_col": "obs_value_coded",
+                  "values_col": "person_id",
+                  "unique_column": "person_id",
+                  "filter_col1": "Program",
+                  "filter_val1": "ANC PROGRAM",
+                  "filter_col2": "Encounter",
+                  "filter_val2": "ANC VISIT",
+                  "filter_col3": "concept_name",
+                  "filter_val3": "Pregnancy planned",
+                  "colormap": {
+                    "Planned": "#006401",
+                    "Unplanned": "#FF6B6B",
+                    "Mistimed": "#FFD93D"
+                  }
+                }
+              },
+              {
+                "id": "chart_mch_004",
+                "name": "Symphysis-Fundal Height (SFH) Distribution",
+                "type": "Histogram",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "Symphysis-Fundal Height Distribution",
+                  "age_col": "ValueN",
+                  "gender_col": "Gender",
+                  "x_title": "SFH (cm)",
+                  "y_title": "Number of Patients",
+                  "unique_column": "person_id",
+                  "bin_size": "2",
+                  "filter_col1": "Program",
+                  "filter_val1": "ANC PROGRAM",
+                  "filter_col2": "Encounter",
+                  "filter_val2": "ABDOMINAL EXAMINATION",
+                  "filter_col3": "concept_name",
+                  "filter_val3": "Symphysis-fundal height"
+                }
+              },
+              {
+                "id": "chart_mch_005",
+                "name": "HIV Rapid Test Results",
+                "type": "Pie",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "HIV Rapid Test Results",
+                  "names_col": "obs_value_coded",
+                  "values_col": "person_id",
+                  "unique_column": "person_id",
+                  "filter_col1": "Program",
+                  "filter_val1": "ANC PROGRAM",
+                  "filter_col2": "Encounter",
+                  "filter_val2": "LAB ORDERS",
+                  "filter_col3": "concept_name",
+                  "filter_val3": "HIV test",
+                  "colormap": {
+                    "Reactive": "#FF4444",
+                    "Non-reactive": "#44FF44",
+                    "Indeterminate": "#FFBB33"
+                  }
+                }
+              },
+              {
+                "id": "chart_mch_006",
+                "name": "Syphilis Screening Results",
+                "type": "Pie",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "Syphilis Screening Results",
+                  "names_col": "obs_value_coded",
+                  "values_col": "person_id",
+                  "unique_column": "person_id",
+                  "filter_col1": "Program",
+                  "filter_val1": "ANC PROGRAM",
+                  "filter_col2": "Encounter",
+                  "filter_val2": "LAB ORDERS",
+                  "filter_col3": "concept_name",
+                  "filter_val3": "Syphilis test",
+                  "colormap": {
+                    "Positive": "#FF4444",
+                    "Negative": "#44FF44"
+                  }
+                }
+              },
+              {
+                "id": "chart_mch_007",
+                "name": "Maternal BMI Distribution",
+                "type": "Histogram",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "Maternal BMI Distribution",
+                  "age_col": "ValueN",
+                  "gender_col": "Gender",
+                  "x_title": "BMI",
+                  "y_title": "Number of Patients",
+                  "unique_column": "person_id",
+                  "bin_size": "1",
+                  "filter_col1": "Program",
+                  "filter_val1": "ANC PROGRAM",
+                  "filter_col2": "concept_name",
+                  "filter_val2": "BMI"
+                }
+              },
+              {
+                "id": "chart_mch_008",
+                "name": "Distribution of Blood Groups",
+                "type": "Bar",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "Distribution of Blood Groups",
+                  "label_col": "obs_value_coded",
+                  "value_col": "person_id",
+                  "x_title": "Number of Patients",
+                  "y_title": "Blood Group",
+                  "unique_column": "person_id",
+                  "top_n": "8",
+                  "filter_col1": "Program",
+                  "filter_val1": "ANC PROGRAM",
+                  "filter_col2": "concept_name",
+                  "filter_val2": "Blood group"
+                }
+              }
+            ]
+          },
+          {
+            "section_name": "Labour and Delivery",
+            "items": [
+              {
+                "id": "chart_mch_009",
+                "name": "Labour Delivery Place",
+                "type": "Pie",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "Labour Delivery Place",
+                  "names_col": "obs_value_coded",
+                  "values_col": "person_id",
+                  "unique_column": "person_id",
+                  "filter_col1": "Program",
+                  "filter_val1": "LABOUR AND DELIVERY PROGRAM",
+                  "filter_col2": "concept_name",
+                  "filter_val2": "Delivery place",
+                  "colormap": {
+                    "Health Facility": "#006401",
+                    "Home": "#FF6B6B",
+                    "En Route": "#FFD93D",
+                    "TBA": "#9C27B0"
+                  }
+                }
+              },
+              {
+                "id": "chart_mch_010",
+                "name": "Labour Delivery Mode",
+                "type": "Bar",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "Labour Delivery Mode",
+                  "label_col": "obs_value_coded",
+                  "value_col": "person_id",
+                  "x_title": "Number of Deliveries",
+                  "y_title": "Delivery Mode",
+                  "unique_column": "person_id",
+                  "top_n": "5",
+                  "filter_col1": "Program",
+                  "filter_val1": "LABOUR AND DELIVERY PROGRAM",
+                  "filter_col2": "concept_name",
+                  "filter_val2": "Delivery mode"
+                }
+              },
+              {
+                "id": "chart_mch_011",
+                "name": "Labour Skilled Delivery Coverage",
+                "type": "Pie",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "Labour Skilled Delivery Coverage",
+                  "names_col": "obs_value_coded",
+                  "values_col": "person_id",
+                  "unique_column": "person_id",
+                  "filter_col1": "Program",
+                  "filter_val1": "LABOUR AND DELIVERY PROGRAM",
+                  "filter_col2": "Encounter",
+                  "filter_val2": "LABOUR AND DELIVERY VISIT",
+                  "filter_col3": "concept_name",
+                  "filter_val3": "Staff conducting delivery",
+                  "colormap": {
+                    "Doctor": "#006401",
+                    "Midwife": "#292D79",
+                    "Nurse": "#FE1AD0",
+                    "TBA": "#FF6B6B",
+                    "Other": "#9C27B0"
+                  }
+                }
+              },
+              {
+                "id": "chart_mch_012",
+                "name": "Labour Obstetric Complications",
+                "type": "Bar",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "Labour Obstetric Complications",
+                  "label_col": "obs_value_coded",
+                  "value_col": "person_id",
+                  "x_title": "Number of Cases",
+                  "y_title": "Complication",
+                  "unique_column": "person_id",
+                  "top_n": "10",
+                  "filter_col1": "Program",
+                  "filter_val1": "LABOUR AND DELIVERY PROGRAM",
+                  "filter_col2": "concept_name",
+                  "filter_val2": "Obstetric complication"
+                }
+              },
+              {
+                "id": "chart_mch_013",
+                "name": "Labour Emergency Obstetric Interventions",
+                "type": "Column",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "Labour Emergency Obstetric Interventions",
+                  "x_col": "obs_value_coded",
+                  "y_col": "person_id",
+                  "x_title": "Intervention Type",
+                  "y_title": "Number of Patients",
+                  "unique_column": "person_id",
+                  "legend_title": "Intervention",
+                  "filter_col1": "Program",
+                  "filter_val1": "LABOUR AND DELIVERY PROGRAM",
+                  "filter_col2": "Encounter",
+                  "filter_val2": "LABOUR AND DELIVERY VISIT",
+                  "filter_col3": "concept_name",
+                  "filter_val3": "Oxytocin 10 IU given | Anticonvulsant administered | Blood transfusion | Manual removal done | Evacuation done | NASG"
+                }
+              },
+              {
+                "id": "chart_mch_014",
+                "name": "Labour Newborn Condition at Birth",
+                "type": "Pie",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "Labour Newborn Condition at Birth",
+                  "names_col": "obs_value_coded",
+                  "values_col": "person_id",
+                  "unique_column": "person_id",
+                  "filter_col1": "Program",
+                  "filter_val1": "LABOUR AND DELIVERY PROGRAM",
+                  "filter_col2": "concept_name",
+                  "filter_val2": "Newborn condition",
+                  "colormap": {
+                    "Alive": "#006401",
+                    "Fresh Stillbirth": "#FF4444",
+                    "Macerated Stillbirth": "#FF6B6B",
+                    "Neonatal death": "#000000"
+                  }
+                }
+              },
+              {
+                "id": "chart_mch_015",
+                "name": "Labour Number of Babies per Delivery",
+                "type": "Histogram",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "Labour Number of Babies per Delivery",
+                  "age_col": "ValueN",
+                  "gender_col": "Gender",
+                  "x_title": "Number of Babies",
+                  "y_title": "Number of Deliveries",
+                  "unique_column": "encounter_id",
+                  "bin_size": "1",
+                  "filter_col1": "Program",
+                  "filter_val1": "LABOUR AND DELIVERY PROGRAM",
+                  "filter_col2": "Encounter",
+                  "filter_val2": "LABOUR AND DELIVERY VISIT",
+                  "filter_col3": "concept_name",
+                  "filter_val3": "Number of babies"
+                }
+              },
+              {
+                "id": "chart_mch_017",
+                "name": "Labour Estimated Blood Loss Distribution",
+                "type": "Histogram",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "Labour Estimated Blood Loss Distribution",
+                  "age_col": "ValueN",
+                  "gender_col": "Gender",
+                  "x_title": "Estimated Blood Loss (ml)",
+                  "y_title": "Number of Deliveries",
+                  "unique_column": "encounter_id",
+                  "bin_size": "100",
+                  "filter_col1": "Program",
+                  "filter_val1": "LABOUR AND DELIVERY PROGRAM",
+                  "filter_col2": "Encounter",
+                  "filter_val2": "LABOUR AND DELIVERY VISIT",
+                  "filter_col3": "concept_name",
+                  "filter_val3": "Estimated blood loss"
+                }
+              },
+              {
+                "id": "chart_mch_018",
+                "name": "Labour Referral Reasons",
+                "type": "Bar",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "Labour Referral Reasons",
+                  "label_col": "obs_value_coded",
+                  "value_col": "person_id",
+                  "x_title": "Number of Referrals",
+                  "y_title": "Reason",
+                  "unique_column": "person_id",
+                  "top_n": "10",
+                  "filter_col1": "Program",
+                  "filter_val1": "LABOUR AND DELIVERY PROGRAM",
+                  "filter_col2": "Encounter",
+                  "filter_val2": "REFERRAL | END LABOUR",
+                  "filter_col3": "concept_name",
+                  "filter_val3": "reason for referring mother | reason for referring baby | referral reasons"
+                }
+              },
+              {
+                "id": "chart_mch_019",
+                "name": "Labour Maternal Outcomes",
+                "type": "Pie",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "Labour Maternal Outcomes",
+                  "names_col": "obs_value_coded",
+                  "values_col": "person_id",
+                  "unique_column": "person_id",
+                  "filter_col1": "Program",
+                  "filter_val1": "LABOUR AND DELIVERY PROGRAM",
+                  "filter_col2": "Encounter",
+                  "filter_val2": "END LABOUR",
+                  "filter_col3": "concept_name",
+                  "filter_val3": "maternal outcome status",
+                  "colormap": {
+                    "Alive": "#006401",
+                    "Maternal death": "#FF4444",
+                    "Referred": "#FFD93D",
+                    "Absconded": "#9C27B0"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "section_name": "Postnatal Care (PNC)",
+            "items": [
+              {
+                "id": "chart_mch_020",
+                "name": "PNC Mother Check-In Periods",
+                "type": "Column",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "PNC Mother Check-In Periods",
+                  "x_col": "Value",
+                  "y_col": "person_id",
+                  "x_title": "Check-In Period",
+                  "y_title": "Number of Mothers",
+                  "unique_column": "person_id",
+                  "legend_title": "Period",
+                  "filter_col1": "Program",
+                  "filter_val1": "PNC PROGRAM",
+                  "filter_col2": "Encounter",
+                  "filter_val2": "PNC VISIT",
+                  "filter_col3": "concept_name",
+                  "filter_val3": "PNC period"
+                }
+              },
+              {
+                "id": "chart_mch_021",
+                "name": "PNC Mother Final Status",
+                "type": "Pie",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "PNC Mother Final Status",
+                  "names_col": "obs_value_coded",
+                  "values_col": "person_id",
+                  "unique_column": "person_id",
+                  "filter_col1": "Program",
+                  "filter_val1": "PNC PROGRAM",
+                  "filter_col2": "Encounter",
+                  "filter_val2": "END PNC",
+                  "filter_col3": "concept_name",
+                  "filter_val3": "maternal outcome status",
+                  "colormap": {
+                    "Discharged": "#006401",
+                    "Referred": "#FFD93D",
+                    "Death": "#FF4444",
+                    "Defaulted": "#9C27B0"
+                  }
+                }
+              },
+              {
+                "id": "chart_mch_022",
+                "name": "PNC Mother Postnatal Complications",
+                "type": "Bar",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "PNC Mother Postnatal Complications",
+                  "label_col": "obs_value_coded",
+                  "value_col": "person_id",
+                  "x_title": "Number of Mothers",
+                  "y_title": "Complication",
+                  "unique_column": "person_id",
+                  "top_n": "10",
+                  "filter_col1": "Program",
+                  "filter_val1": "PNC PROGRAM",
+                  "filter_col2": "concept_name",
+                  "filter_val2": "Postnatal complication"
+                }
+              },
+              {
+                "id": "chart_mch_023",
+                "name": "PNC Essential Newborn Care",
+                "type": "Column",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "PNC Essential Newborn Care",
+                  "x_col": "obs_value_coded",
+                  "y_col": "person_id",
+                  "x_title": "Essential Care",
+                  "y_title": "Number of Babies",
+                  "unique_column": "person_id",
+                  "legend_title": "Care Type",
+                  "filter_col1": "Program",
+                  "filter_val1": "PNC PROGRAM",
+                  "filter_col2": "concept_name",
+                  "filter_val2": "Essential newborn care"
+                }
+              },
+              {
+                "id": "chart_mch_024",
+                "name": "PNC Mother HIV Status",
+                "type": "Pie",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "PNC Mother HIV Status",
+                  "names_col": "obs_value_coded",
+                  "values_col": "person_id",
+                  "unique_column": "person_id",
+                  "filter_col1": "Program",
+                  "filter_val1": "PNC PROGRAM",
+                  "filter_col2": "concept_name",
+                  "filter_val2": "HIV status",
+                  "colormap": {
+                    "Positive": "#FF4444",
+                    "Negative": "#44FF44",
+                    "Unknown": "#9C27B0"
+                  }
+                }
+              },
+              {
+                "id": "chart_mch_025",
+                "name": "PNC Baby Danger Signs",
+                "type": "Bar",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "PNC Baby Danger Signs",
+                  "label_col": "obs_value_coded",
+                  "value_col": "person_id",
+                  "x_title": "Number of Babies",
+                  "y_title": "Danger Sign",
+                  "unique_column": "person_id",
+                  "top_n": "10",
+                  "filter_col1": "Program",
+                  "filter_val1": "PNC PROGRAM",
+                  "filter_col2": "concept_name",
+                  "filter_val2": "Danger signs"
+                }
+              },
+              {
+                "id": "chart_mch_026",
+                "name": "PNC Immunization at Postnatal",
+                "type": "Column",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "PNC Immunization at Postnatal",
+                  "x_col": "Value",
+                  "y_col": "person_id",
+                  "x_title": "Vaccine",
+                  "y_title": "Number of Doses",
+                  "unique_column": "person_id",
+                  "legend_title": "Vaccine",
+                  "filter_col1": "Program",
+                  "filter_val1": "PNC PROGRAM",
+                  "filter_col2": "Encounter",
+                  "filter_val2": "TREATMENT",
+                  "filter_col3": "concept_name",
+                  "filter_val3": "Medications dispensed",
+                  "filter_col4": "Value",
+                  "filter_val4": "BCG | OPV 0 | Hep B 0"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "report_id": "report_12926547",
+    "report_name": "Innocent Wowa",
+    "date_created": "2026-03-26",
+    "visualization_types": {
+      "counts": [
+        {
+          "id": "count_d76b388b",
+          "name": "Total Registrations",
+          "filters": {
+            "measure": "count",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": [
+              "AETC PROGRAM",
+              "HIV PROGRAM",
+              "ANC PROGRAM",
+              "LABOUR AND DELIVERY PROGRAM"
+            ],
+            "variable2": "Encounter",
+            "variable3": "concept_name",
+            "variable4": "obs_value_coded",
+            "variable5": "ValueN",
+            "variable6": "Value",
+            "variable7": "Gender",
+            "variable8": "Age"
+          }
+        }
+      ],
+      "charts": {
+        "sections": []
       }
     }
   }

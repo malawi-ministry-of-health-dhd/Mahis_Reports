@@ -1,0 +1,16 @@
+{
+  "couscous": {
+    "type": "deepseek",
+    "model": "deepseek-chat",
+    "apiKey": "sk-8a04f34798354269868e9cc6e8dcdc41"
+  },
+  "couscous.conventions": [
+    "Use descriptive naming conventions",
+    "Adhere to DRY (Don't Repeat Yourself)",
+    "Handle errors gracefully",
+    "Write small, single-responsibility functions",
+    "Avoid magic numbers/strings",
+    "Avoid global mutable state",
+    "Write unit tests"
+  ]
+}
