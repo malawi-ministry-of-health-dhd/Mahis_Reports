@@ -56,7 +56,7 @@ def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json,
                            start_date=None, end_date=None, facility_code=None):
     config = dashboards_json
 
-    # ── MNID dashboard: use DMC renderer ──────────────────────────────────────
+    # Route MNID dashboard configs to the dedicated MNID renderer.
     if config.get('dashboard_type') == 'mnid':
         return render_mnid_dashboard(
             filtered=filtered,
@@ -68,7 +68,7 @@ def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json,
             end_date=str(end_date)[:10] if end_date else '',
         )
 
-    # ── Generic dashboard: existing Bootstrap/Plotly renderer ─────────────────
+    # Render all non-MNID dashboards with the generic chart builder.
     filtered = filtered.copy()
     filtered['Residence'] = filtered[HOME_DISTRICT_] + ', TA-' + filtered[TA_] + ', ' + filtered[VILLAGE_]
     delta_days = 7 if delta_days <= 0 else delta_days
@@ -203,7 +203,6 @@ layout = html.Div(className="container", children=[
         Input('active-button-store', 'data')])
 
 def update_menu(interval, color):
-    
     with open(json_path, 'r') as f:
         menu_json = json.load(f)
 
@@ -260,18 +259,36 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
         end_dt = pd.to_datetime(end_date).replace(hour=23, minute=59, second=59)
         last_7_days = start_dt - pd.Timedelta(days=7)
 
+        # Get JSON config for the report before loading data.
+        with open(json_path, 'r') as f:
+            menu_json = json.load(f)
+        dashboard_json = next((d for d in menu_json if d['report_name'] == clicked_name), menu_json[0])
+        is_mnid = dashboard_json.get('dashboard_type') == 'mnid'
+
         if urlparams.get('Location', [None])[0]:
             location = urlparams.get('Location', [None])[0]
         else:
             location = "LL040033"
 
         # Load Data
-        SQL = f"""
-            SELECT *
-            FROM 'data/{DATA_FILE_NAME_}'
-            WHERE Date >= '{last_7_days}'
-            AND {FACILITY_CODE_} = '{location}'
-            """
+        if is_mnid:
+            SQL = f"""
+                SELECT *
+                FROM 'data/{DATA_FILE_NAME_}'
+                WHERE Date >= '{start_dt}'
+                AND Date <= '{end_dt}'
+                AND (
+                    Program ILIKE '%Maternal%'
+                    OR Program ILIKE '%Neonatal%'
+                )
+                """
+        else:
+            SQL = f"""
+                SELECT *
+                FROM 'data/{DATA_FILE_NAME_}'
+                WHERE Date >= '{last_7_days}'
+                AND {FACILITY_CODE_} = '{location}'
+                """
         try:
             data = DataStorage.query_duckdb(SQL)
         except Exception as e:
@@ -300,37 +317,59 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
         if user_info.empty:
             return html.Div("Unauthorized User. Please contact system administrator."), no_update,no_update, clicked_name
 
-        # Apply Dropdown Filters
-        mask = pd.Series(True, index=data.index)
-        # if hf:
-        #     mask &= (data[FACILITY_] == hf)
-        if age:
-            mask &= (data[AGE_GROUP_] == age)
-            
-        filtered_data = data[mask].copy()
+        if is_mnid:
+            network_mask = pd.Series(True, index=data.index)
+            if age:
+                network_mask &= (data[AGE_GROUP_] == age)
+            network_data = data[network_mask].copy()
 
-        # Apply Date Mask
-        filtered_data_date = filtered_data[
-            (filtered_data[DATE_] >= start_dt) & 
-            (filtered_data[DATE_] <= end_dt)
-        ]
+            facility_mask = pd.Series(True, index=network_data.index)
+            facility_mask &= (network_data[FACILITY_CODE_] == location)
+            if hf and hf != "This Facility":
+                facility_mask &= (network_data[FACILITY_] == hf)
+            filtered_data = network_data[facility_mask].copy()
+            filtered_data_date = filtered_data[
+                (filtered_data[DATE_] >= start_dt) &
+                (filtered_data[DATE_] <= end_dt)
+            ]
+        else:
+            # Apply Dropdown Filters
+            mask = pd.Series(True, index=data.index)
+            # if hf:
+            #     mask &= (data[FACILITY_] == hf)
+            if age:
+                mask &= (data[AGE_GROUP_] == age)
 
-        # Get JSON config for the report
-        with open(json_path, 'r') as f:
-            menu_json = json.load(f)
-        dashboard_json = next((d for d in menu_json if d['report_name'] == clicked_name), menu_json[0])
+            filtered_data = data[mask].copy()
+
+            # Apply Date Mask
+            filtered_data_date = filtered_data[
+                (filtered_data[DATE_] >= start_dt) &
+                (filtered_data[DATE_] <= end_dt)
+            ]
+            network_data = filtered_data
 
         delta_days = (end_dt - start_dt).days
-        hf_options = filtered_data[FACILITY_].sort_values().unique().tolist() + ["This Facility"]
+        hf_values = filtered_data[FACILITY_].dropna().sort_values().unique().tolist() if FACILITY_ in filtered_data.columns else []
+        hf_options = hf_values + (["This Facility"] if "This Facility" not in hf_values else [])
+        hf_value = hf_options[0] if hf_options else None
 
         return build_charts_from_json(
-            filtered_data_date, filtered_data, delta_days, dashboard_json,
+            filtered_data_date, network_data, delta_days, dashboard_json,
             start_date=start_dt, end_date=end_dt, facility_code=location,
-        ), hf_options, hf_options[0], clicked_name
+        ), hf_options, hf_value, clicked_name
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return html.Div(html.P("No data found for the facility", style={"color":"grey"})), dash.no_update, dash.no_update,dash.no_update
+        return (
+            html.Div([
+                html.P("Dashboard render failed.", style={"color": "#475569", "fontWeight": "600"}),
+                html.P(str(e), style={"color": "#94A3B8", "fontSize": "12px"}),
+            ]),
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
+        )
 
 @callback(
     [Output('dashboard-date-range-picker', 'start_date'),
