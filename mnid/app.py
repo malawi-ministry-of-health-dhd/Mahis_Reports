@@ -980,8 +980,8 @@ def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
                 height=560,
                 margin=dict(l=10, r=10, t=10, b=10),
                 hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
-                xaxis=dict(visible=False, range=[-0.02, 1.02], fixedrange=True),
-                yaxis=dict(visible=False, range=[-0.02, y_scale + 0.02], fixedrange=True, scaleanchor='x', scaleratio=1),
+                xaxis=dict(visible=False, range=[-0.02, 1.02], fixedrange=False),
+                yaxis=dict(visible=False, range=[-0.02, y_scale + 0.02], fixedrange=False, scaleanchor='x', scaleratio=1),
             )
             return fig
 
@@ -1658,11 +1658,13 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
         html.Div(style={'display': 'grid', 'gridTemplateColumns': 'minmax(0, 1.65fr) minmax(280px, 320px)',
                         'gap': '12px', 'alignItems': 'start'}, children=[
             dcc.Graph(
-                id='mnid-heatmap-graph', figure=initial_fig,
-                config={'displayModeBar': True,
+                id='mnid-heatmap-graph',
+                config={'displayModeBar': 'hover',
                         'modeBarButtonsToRemove': ['select2d', 'lasso2d'],
-                        'scrollZoom': True},
+                        'scrollZoom': True}
+                , figure=initial_fig,
                 style={'height': '560px', 'width': '100%', 'minWidth': '0'},
+                clear_on_unhover=False,
             ),
             html.Div(
                 id='mnid-heatmap-right',

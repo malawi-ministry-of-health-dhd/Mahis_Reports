@@ -749,7 +749,20 @@ html { scroll-behavior: smooth; }
 .mnid-priority-tbl {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
+.mnid-priority-tbl th,
+.mnid-priority-tbl td {
+  vertical-align: middle;
+}
+.mnid-priority-tbl th:nth-child(1),
+.mnid-priority-tbl td:nth-child(1) { width: 42%; }
+.mnid-priority-tbl th:nth-child(2),
+.mnid-priority-tbl td:nth-child(2) { width: 16%; }
+.mnid-priority-tbl th:nth-child(3),
+.mnid-priority-tbl td:nth-child(3) { width: 16%; }
+.mnid-priority-tbl th:nth-child(4),
+.mnid-priority-tbl td:nth-child(4) { width: 26%; text-align: left; }
 .mnid-priority-tbl tr:hover td {
   background: #FAFAFA;
 }
