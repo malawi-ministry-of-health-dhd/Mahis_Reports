@@ -62,6 +62,21 @@ def _css(pct, tgt): return 'ok' if pct>=tgt else ('warn' if pct>=tgt*0.85 else '
 _CLR = {'ok': OK_C, 'warn': WARN_C, 'danger': DANGER_C, 'info': INFO_C}
 
 
+def _display_pct(pct):
+    if pct is None:
+        return None
+    return max(0.0, min(float(pct), 100.0))
+
+
+def _contrast_text(hex_color: str, dark: str = TEXT, light: str = '#FFFFFF') -> str:
+    color = (hex_color or '').lstrip('#')
+    if len(color) != 6:
+        return dark
+    r, g, b = int(color[0:2], 16), int(color[2:4], 16), int(color[4:6], 16)
+    luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    return dark if luminance > 0.62 else light
+
+
 def _value_counts(df, concept, col='obs_value_coded', unique_col='person_id'):
     sub = df[df['concept_name'] == concept]
     if not len(sub): return pd.DataFrame(columns=['label','n'])
@@ -92,7 +107,7 @@ def _empty_card(title):
 
 def _chart_card(title, fig):
     return html.Div(className='mnid-chart-card', children=[
-        dcc.Graph(figure=fig, config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
+        dcc.Graph(figure=fig, config={'displayModeBar': True, 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
                   style={'height': '220px'}),
     ])
 
@@ -389,10 +404,8 @@ def _matrix_monthly(df: pd.DataFrame, inds: list) -> tuple:
 
 def _cov_color(pct):
     if pct is None: return '#E2E8F0'
-    if pct >= 88:   return OK_C
-    if pct >= 80:   return '#4ADE80'
+    if pct >= 80:   return OK_C
     if pct >= 65:   return WARN_C
-    if pct >= 40:   return '#FBBF24'
     return DANGER_C
 
 # # MNID vectorized facility coverage computation
@@ -408,14 +421,21 @@ def _compute_heatmap_store(mch_full: pd.DataFrame, tracked: list,
     else:
         all_facilities = _ALL_FACILITIES[:]
 
+    geojson = _load_malawi_district_geojson()
+    geo_districts = sorted({
+        f.get('properties', {}).get('shapeName')
+        for f in (geojson or {}).get('features', [])
+        if f.get('properties', {}).get('shapeName')
+    })
     if len(mch_full) and 'District' in mch_full.columns:
-        all_districts = sorted(mch_full['District'].dropna().astype(str).unique().tolist())
+        data_districts = sorted(mch_full['District'].dropna().astype(str).unique().tolist())
     else:
-        all_districts = sorted({
+        data_districts = sorted({
             _FACILITY_DISTRICT.get(f, '')
             for f in all_facilities
             if _FACILITY_DISTRICT.get(f)
-        }) or _ALL_DISTRICTS[:]
+        })
+    all_districts = sorted(set(data_districts) | set(geo_districts)) or _ALL_DISTRICTS[:]
 
     if facility_code and facility_code not in all_facilities:
         all_facilities.insert(0, facility_code)
@@ -577,8 +597,12 @@ def _build_heatmap_fig(stored: dict, view: str, year: str,
 
     y_labels  = [all_labels[i] for i in rows_idx]
     y_targets = [all_targets[i] for i in rows_idx]
+    display_y_labels = [
+        (lbl if len(lbl) <= 34 else f"{lbl[:31]}...") if view == 'monthly' else lbl
+        for lbl in y_labels
+    ]
     n_inds    = len(y_labels)
-    height    = max(n_inds * 30 + 150, 380)
+    height    = max(n_inds * (26 if view == 'monthly' else 30) + 150, 380)
 
     if view == 'monthly':
         data = stored.get('monthly', {}).get(year, {})
@@ -596,7 +620,7 @@ def _build_heatmap_fig(stored: dict, view: str, year: str,
 
     x_labels   = data.get('x', [])
     z_raw      = data.get('z', [])
-    z          = [z_raw[i] for i in rows_idx if i < len(z_raw)]
+    z          = [[_display_pct(v) if v is not None else None for v in z_raw[i]] for i in rows_idx if i < len(z_raw)]
     tick_angle = data.get('tick_angle', 0)
 
     if view in ('by_district', 'by_facility', 'district_facs'):
@@ -619,7 +643,7 @@ def _build_heatmap_fig(stored: dict, view: str, year: str,
         _hover = ('<b>%{y}</b><br>%{x}: <b>%{z:.0f}%</b>'
                   '<br>Target: %{customdata[0]}%<extra></extra>')
     fig = go.Figure(go.Heatmap(
-        z=z, x=x_labels, y=y_labels,
+        z=z, x=x_labels, y=display_y_labels,
         colorscale=HEATMAP_CS,
         zmin=0, zmax=100,
         zsmooth=False,
@@ -630,50 +654,50 @@ def _build_heatmap_fig(stored: dict, view: str, year: str,
             title=dict(text='Coverage %', side='right',
                        font=dict(size=9, color=DIM)),
             tickfont=dict(size=9, color=DIM),
-            tickvals=[0, 40, 65, 80, 88, 100],
-            ticktext=['0%', '40%', '65%', '80%', '88%', '100%'],
+            tickvals=[0, 65, 80, 100],
+            ticktext=['0%', '65%', '80%', '100%'],
             len=0.85,
         ),
         hovertemplate=_hover,
         ygap=1.5, xgap=1.5,
     ))
 
-    # Cell value annotations for small heatmaps
+    # Cell value annotations for compact matrix views
     annotations = []
-    if len(x_labels) <= 8:
+    show_cell_values = (view == 'monthly') or (len(x_labels) <= 8)
+    if show_cell_values:
+        ann_size = 8 if view == 'monthly' else 9
         for ii, row in enumerate(z):
             for jj, val in enumerate(row):
                 if val is not None:
-                    txt_col = '#fff' if val < 65 else '#222'
+                    txt_col = '#fff' if val < 65 else ('#111827' if val < 80 else '#FFFFFF')
                     annotations.append(dict(
-                        x=x_labels[jj], y=y_labels[ii],
-                        text=f'{val:.0f}%',
+                        x=x_labels[jj], y=display_y_labels[ii],
+                        text=f'{_display_pct(val):.0f}%',
                         showarrow=False,
-                        font=dict(size=9, color=txt_col, family=FONT),
+                        font=dict(size=ann_size, color=txt_col, family=FONT),
                     ))
 
-    # Target reference: annotate indicator labels with target info
+    # Target reference markers are omitted for the monthly matrix to avoid label crowding
     y_annots = []
-    for ii, (lbl, tgt) in enumerate(zip(y_labels, y_targets)):
-        on_tgt_count = sum(1 for row in ([z[ii]] if ii < len(z) else [[]])
-                           for v in row if v is not None and v >= tgt)
-        marker = ' OK' if on_tgt_count > 0 else ''
-        y_annots.append(dict(
-            x=-0.001, y=lbl,
-            xref='paper', yref='y',
-            text=f'<span style="color:{MUTED}; font-size:8px">>{tgt}%</span>',
-            showarrow=False, xanchor='right',
-            font=dict(size=7, color=MUTED, family=FONT),
-        ))
+    if view != 'monthly':
+        for ii, (lbl, tgt) in enumerate(zip(display_y_labels, y_targets)):
+            y_annots.append(dict(
+                x=-0.001, y=lbl,
+                xref='paper', yref='y',
+                text=f'<span style="color:{MUTED}; font-size:8px">>{tgt}%</span>',
+                showarrow=False, xanchor='right',
+                font=dict(size=7, color=MUTED, family=FONT),
+            ))
 
     fig.update_layout(
         paper_bgcolor=BG, plot_bgcolor=BG,
         font=dict(family=FONT, color=TEXT, size=11),
         height=height,
-        margin=dict(l=230, r=90, t=16, b=70),
+        margin=dict(l=250 if view == 'monthly' else 230, r=90, t=16, b=70),
         xaxis=dict(tickangle=tick_angle, tickfont=dict(size=10, color=DIM),
                    showgrid=False, side='bottom'),
-        yaxis=dict(tickfont=dict(size=10, color=DIM),
+        yaxis=dict(tickfont=dict(size=9 if view == 'monthly' else 10, color=TEXT if view == 'monthly' else DIM),
                    showgrid=False, autorange='reversed'),
         annotations=annotations + y_annots,
         hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
@@ -797,13 +821,19 @@ def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
 
     geojson = _load_malawi_district_geojson()
     if geojson and view in ('by_district', 'by_facility', 'district_facs'):
+        geo_districts = sorted({
+            f.get('properties', {}).get('shapeName')
+            for f in geojson.get('features', [])
+            if f.get('properties', {}).get('shapeName')
+        })
+        display_districts = geo_districts or dyn_districts
         geo_rows = []
-        for dist in dyn_districts:
+        for dist in display_districts:
             cov = district_avgs.get(dist)
             geo_rows.append({
                 'district': dist,
                 'coverage': cov if cov is not None else -1,
-                'coverage_label': f'{cov:.1f}%' if cov is not None else 'No data',
+                'coverage_label': f'{_display_pct(cov):.1f}%' if cov is not None else 'No data',
             })
         geo_df = pd.DataFrame(geo_rows)
         if len(geo_df):
@@ -852,8 +882,8 @@ def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
                 row = geo_df[geo_df['district'] == dist].iloc[0]
                 cov = None if row['coverage'] == -1 else float(row['coverage'])
                 fill = _cov_color(cov) if cov is not None else '#E2E8F0'
-                line_color = INFO_C if (view == 'district_facs' and dist == focus_dist) else '#FFFFFF'
-                line_width = 2.4 if (view == 'district_facs' and dist == focus_dist) else 1.0
+                line_color = '#0F172A' if (view == 'district_facs' and dist == focus_dist) else '#FFFFFF'
+                line_width = 2.8 if (view == 'district_facs' and dist == focus_dist) else 1.4
                 geom = feature.get('geometry', {})
                 if geom.get('type') == 'Polygon':
                     polygons = [geom.get('coordinates', [])]
@@ -912,7 +942,7 @@ def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
                     y=label_y,
                     mode='text',
                     text=label_text,
-                    textfont=dict(size=10, color='white', family=FONT),
+                    textfont=dict(size=10, color='#FFFFFF', family=FONT),
                     hoverinfo='skip',
                     showlegend=False,
                 ))
@@ -937,7 +967,7 @@ def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
                     avg = _fac_avg(fac)
                     fac_x.append(x)
                     fac_y.append(y)
-                    fac_text.append(f'<b>{name}</b><br>{dist}<br>Avg coverage: {f"{avg:.1f}%" if avg is not None else "No data"}')
+                    fac_text.append(f'<b>{name}</b><br>{dist}<br>Avg coverage: {f"{_display_pct(avg):.1f}%" if avg is not None else "No data"}')
                     fac_size.append(14 if fac == current_fac else 10)
                     fac_color.append(_cov_color(avg) if avg is not None else '#CBD5E1')
 
@@ -965,8 +995,8 @@ def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
                         thickness=14,
                         title=dict(text='Coverage %', side='right', font=dict(size=9, color=DIM)),
                         tickfont=dict(size=9, color=DIM),
-                        tickvals=[0, 40, 65, 80, 88, 100],
-                        ticktext=['0%', '40%', '65%', '80%', '88%', '100%'],
+                        tickvals=[0, 65, 80, 100],
+                        ticktext=['0%', '65%', '80%', '100%'],
                         len=0.8,
                     ),
                 ),
@@ -980,6 +1010,8 @@ def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
                 height=560,
                 margin=dict(l=10, r=10, t=10, b=10),
                 hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
+                hovermode='closest',
+                dragmode='pan',
                 xaxis=dict(visible=False, range=[-0.02, 1.02], fixedrange=False),
                 yaxis=dict(visible=False, range=[-0.02, y_scale + 0.02], fixedrange=False, scaleanchor='x', scaleratio=1),
             )
@@ -1024,7 +1056,7 @@ def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
         label_x.append(pos[0])
         label_y.append(pos[1])
         label_text.append(
-            f'<b>{dist}</b><br>{cov:.0f}%' if cov is not None else f'<b>{dist}</b>'
+            f'<b>{dist}</b><br>{_display_pct(cov):.0f}%' if cov is not None else f'<b>{dist}</b>'
         )
         label_sz.append(10 if len(dyn_districts) > 5 else 14)
     if label_x:
@@ -1068,7 +1100,7 @@ def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
                 textposition=txt_pos,
                 textfont=dict(size=9, color=TEXT, family=FONT),
                 hovertemplate=(
-                    f'<b>{name}</b><br>Avg coverage: {avg:.0f}%<extra></extra>'
+                    f'<b>{name}</b><br>Avg coverage: {_display_pct(avg):.0f}%<extra></extra>'
                     if avg is not None else
                     f'<b>{name}</b><br>No data<extra></extra>'
                 ),
@@ -1161,7 +1193,7 @@ def _build_district_treemap(stored: dict, view: str, year: str,
     else:
         labels, parents, values, covs, hl_set = [], [], [], [], set()
 
-    texts  = [f'{c:.0f}%' if c is not None else 'No data' for c in covs]
+    texts  = [f'{_display_pct(c):.0f}%' if c is not None else 'No data' for c in covs]
     colors = [_cov_color(c) if c is not None else '#C8C5BC' for c in covs]
     opacities = [1.0 if lbl in hl_set else 0.45 for lbl in labels]
     final_colors = []
@@ -1187,7 +1219,7 @@ def _build_district_treemap(stored: dict, view: str, year: str,
         customdata=covs,
         hovertemplate='<b>%{label}</b><br>Avg coverage: %{text}<extra></extra>',
         textposition='middle center',
-        textfont=dict(size=11, color='white', family=FONT),
+        textfont=dict(size=11, color=TEXT, family=FONT),
         texttemplate='<b>%{label}</b><br>%{text}',
         pathbar=dict(visible=False),
         tiling=dict(squarifyratio=1.5),
@@ -1230,8 +1262,8 @@ def _build_malawi_panel(stored: dict, view: str, year: str,
     treemap_fig  = _build_district_treemap(stored, view, year, district, sel_inds)
     malawi_panel = dcc.Graph(
         figure=treemap_fig,
-        config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
-        style={'marginBottom': '6px'},
+        config={'displayModeBar': True, 'responsive': True, 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
+        style={'marginBottom': '4px', 'height': '170px'},
     )
 
     # Stats from selected view data
@@ -1287,11 +1319,11 @@ def _build_malawi_panel(stored: dict, view: str, year: str,
                 html.Div(style={'height': '2px', 'background': GRID_C,
                                 'borderRadius': '1px', 'marginTop': '2px'}, children=[
                     html.Div(style={'width': f'{min(s["avg"], 100):.0f}%', 'height': '100%',
-                                    'background': col, 'borderRadius': '1px'}),
+                                    'background': col, 'borderRadius': '1px', 'width': f'{_display_pct(s["avg"]):.0f}%'}),
                 ]),
             ]),
             html.Div(style={'textAlign': 'right', 'flexShrink': '0'}, children=[
-                html.Span(f'{s["avg"]:.0f}%',
+                html.Span(f'{_display_pct(s["avg"]):.0f}%',
                           style={'fontSize': '10px', 'fontWeight': '600', 'color': col}),
                 html.Span(' OK' if s['on_target'] else '',
                           style={'fontSize': '9px', 'color': OK_C}),
@@ -1300,8 +1332,9 @@ def _build_malawi_panel(stored: dict, view: str, year: str,
 
     # Colour legend
     legend_items = [
-        (OK_C, '>=88%'), ('#C0DD97', '80-87%'),
-        (WARN_C, '65-79%'), ('#E8A830', '40-64%'), (DANGER_C, '<40%'),
+        (OK_C, '>=80% on target'),
+        (WARN_C, '65-79% watch'),
+        (DANGER_C, '<65% needs action'),
     ]
     legend = html.Div(style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '5px',
                               'marginTop': '8px', 'marginBottom': '6px'}, children=[
@@ -1337,14 +1370,14 @@ def _build_malawi_panel(stored: dict, view: str, year: str,
         html.Div(style={'display': 'flex', 'justifyContent': 'space-between',
                         'alignItems': 'baseline', 'marginBottom': '4px'}, children=[
             html.Span(view_title, style={'fontSize': '10px', 'color': MUTED}),
-            html.Span(f'{overall_avg:.0f}%' if overall_avg is not None else '-',
+            html.Span(f'{_display_pct(overall_avg):.0f}%' if overall_avg is not None else '-',
                       style={'fontSize': '18px', 'fontWeight': '700',
                              'color': _cov_color(overall_avg)}),
         ]),
         html.Div(f'{on_tgt}/{len(ind_stats)} indicators on target',
-                 style={'fontSize': '10px', 'color': MUTED, 'marginBottom': '8px'}),
+                 style={'fontSize': '10px', 'color': MUTED, 'marginBottom': '6px'}),
         html.Div('INDICATOR BREAKDOWN', className='mnid-section-lbl'),
-        html.Div(style={'overflowY': 'auto', 'maxHeight': '220px'}, children=ind_rows),
+        html.Div(style={'overflowY': 'auto', 'maxHeight': '290px'}, children=ind_rows),
     ]
 
 
@@ -1358,7 +1391,7 @@ clientside_callback(
         window._mnidScrollSpyActive = true;
 
         var sectionIds = ['mnid-summary','mnid-trends','mnid-heatmap',
-                          'mnid-coverage','mnid-comparative','mnid-readiness','mnid-analysis'];
+                          'mnid-coverage','mnid-comparative','mnid-analysis','mnid-readiness'];
 
         function setActive(id) {
             sectionIds.forEach(function(sid) {
@@ -1534,10 +1567,11 @@ def _facilities_requiring_attention(store, year='All years'):
                 'fontSize': '11px', 'fontWeight': '600', 'padding': '7px 8px', 'color': TEXT,
             }),
             html.Td(r['district'], style={'fontSize': '10px', 'color': MUTED, 'padding': '7px 8px'}),
-            html.Td(f'{r["avg"]:.0f}%', style={
+            html.Td(f'{_display_pct(r["avg"]):.0f}%', style={
                 'fontSize': '13px', 'fontWeight': '700', 'color': color, 'padding': '7px 8px',
+                'textAlign': 'center',
             }),
-            html.Td(tag, style={'padding': '7px 8px'}),
+            html.Td(tag, style={'padding': '7px 8px', 'textAlign': 'left'}),
         ])
 
     return html.Div(className='mnid-card', style={'marginBottom': '12px'}, children=[
@@ -1578,7 +1612,7 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
         years.extend(str(y) for y in sorted(mch_full['Date'].dt.year.dropna().astype(int).unique().tolist()))
 
     view_options = [
-        {'label': 'This Facility - Monthly',  'value': 'monthly'},
+        {'label': 'Facility by Month',  'value': 'monthly'},
         {'label': 'My District Facilities',   'value': 'district_facs'},
         {'label': 'All Districts',            'value': 'by_district'},
         {'label': 'All Facilities',           'value': 'by_facility'},
@@ -1655,30 +1689,30 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
         ]),
 
         # # MNID heatmap content layout
-        html.Div(style={'display': 'grid', 'gridTemplateColumns': 'minmax(0, 1.65fr) minmax(280px, 320px)',
-                        'gap': '12px', 'alignItems': 'start'}, children=[
+        html.Div(className='mnid-heatmap-grid', children=[
             dcc.Graph(
                 id='mnid-heatmap-graph',
-                config={'displayModeBar': 'hover',
+                className='mnid-heatmap-map',
+                config={'displayModeBar': True,
                         'modeBarButtonsToRemove': ['select2d', 'lasso2d'],
-                        'scrollZoom': True}
+                        'scrollZoom': True,
+                        'responsive': True,
+                        'doubleClick': 'reset'}
                 , figure=initial_fig,
                 style={'height': '560px', 'width': '100%', 'minWidth': '0'},
                 clear_on_unhover=False,
             ),
             html.Div(
                 id='mnid-heatmap-right',
-                style={'padding': '12px', 'background': '#FAFAF8',
-                       'border': f'0.5px solid {BORDER}', 'borderRadius': '10px',
-                       'maxHeight': '560px', 'overflowY': 'auto', 'minWidth': '0'},
+                className='mnid-heatmap-panel',
                 children=initial_panel,
             ),
         ]),
 
         # # MNID heatmap key
         html.P(
-            'Green >= 88% on target  -  Amber 65-79% performing  -  '
-            'Red < 65% needs review  -  Grey = no data  -  * = current facility',
+            'Green >= 80% on target or above  -  Amber 65-79% watch  -  '
+            'Red < 65% needs action  -  Grey = no data  -  * = current facility',
             style={'fontSize': '9px', 'color': MUTED, 'marginTop': '6px'},
         ),
     ])
@@ -1713,7 +1747,7 @@ def _ind_card(ind: dict, df: pd.DataFrame) -> html.Div:
     return html.Div(className=f'mnid-ind-card {cls}', children=[
         html.Div(ind['label'], className='mnid-ind-label'),
         html.Div([
-            html.Span(f'{pct:.0f}%', className=f'mnid-ind-pct {cls}'),
+            html.Span(f'{_display_pct(pct):.0f}%', className=f'mnid-ind-pct {cls}'),
             badge,
         ], className='mnid-ind-top'),
         html.Div(f'{num} / {den}  -  Target {target}%', className='mnid-ind-sub'),
@@ -1741,7 +1775,7 @@ def _phase_gauge_fig(avg_pct: float, color: str) -> go.Figure:
         height=100,
         showlegend=False,
         annotations=[dict(
-            text=f'<b>{avg_pct:.0f}%</b>',
+            text=f'<b>{_display_pct(avg_pct):.0f}%</b>',
             x=0.5, y=0.5, xref='paper', yref='paper', showarrow=False,
             font=dict(size=20, color=color, family=FONT),
         )],
@@ -1941,7 +1975,7 @@ def _coverage_charts_section(by_cat: dict, df: pd.DataFrame) -> html.Div:
             pills.append(html.Span(f'{len(awaiting)} awaiting', className='mnid-pill mnid-pill-amber'))
         if avg_pct is not None:
             pc = 'mnid-pill-green' if avg_pct >= 80 else ('mnid-pill-amber' if avg_pct >= 65 else 'mnid-pill-red')
-            pills.append(html.Span(f'Avg {avg_pct:.0f}%', className=f'mnid-pill {pc}'))
+            pills.append(html.Span(f'Avg {_display_pct(avg_pct):.0f}%', className=f'mnid-pill {pc}'))
 
         fig = _coverage_phase_fig(cat_title, inds, df)
         h   = max(len(inds) * 38 + 70, 180)
@@ -1981,7 +2015,7 @@ def _acc_section(sec_id, title, indicators, df, default_open=False):
     if avg_pct is not None:
         pc = 'mnid-pill-green' if avg_pct >= 80 else ('mnid-pill-amber' if avg_pct >= 65
                                                         else 'mnid-pill-red')
-        pills.append(html.Span(f'Avg {avg_pct:.0f}%', className=f'mnid-pill {pc}'))
+        pills.append(html.Span(f'Avg {_display_pct(avg_pct):.0f}%', className=f'mnid-pill {pc}'))
 
     return dmc.AccordionItem(value=sec_id, children=[
         dmc.AccordionControl(html.Div(style={
@@ -2028,12 +2062,12 @@ def _anc_charts(df):
     ]:
         vc = _value_counts(df, concept)
         fig = _donut(vc, title, color_map={
-            'Screened': OK_C, 'Not screened': GRID_C,
+            'Screened': OK_C, 'Not screened': DANGER_C,
         })
         if fig: charts.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'POCUS completed')
-    fig = _donut(vc, 'POCUS Completed', color_map={'Yes': OK_C, 'No': GRID_C})
+    fig = _donut(vc, 'POCUS Completed', color_map={'Yes': OK_C, 'No': DANGER_C})
     if fig: charts.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'HIV Test')
@@ -2165,7 +2199,7 @@ def _newborn_charts(df):
 
     vc = _value_counts(df, 'CPAP support')
     fig = _donut(vc, 'CPAP Support Type', color_map={
-        'Bubble CPAP': OK_C, 'Nasal oxygen': INFO_C, 'None': MUTED,
+        'Bubble CPAP': OK_C, 'Nasal oxygen': DANGER_C, 'None': MUTED,
     })
     if fig: charts.append(_chart_card('', fig))
 
@@ -2192,12 +2226,13 @@ def _newborn_charts(df):
 
 def _stat_row(label, num, den, pct, tgt=None):
     cls = _css(pct, tgt) if tgt else 'info'
-    return html.Div(className='mnid-stat-row', children=[
+    status_map = {'ok': 'On target', 'warn': 'Watch', 'danger': 'Needs action', 'info': 'Monitor'}
+    return html.Div(className=f'mnid-stat-row {cls}', children=[
         html.Span(label, className='mnid-stat-lbl'),
-        html.Div(style={'display':'flex','gap':'8px','alignItems':'center'}, children=[
-            html.Span(f'{num}/{den}', style={'fontSize':'11px','color':MUTED}),
-            html.Span(f'{pct:.0f}%', className='mnid-stat-val'),
-            html.Span('*', style={'color': _CLR[cls], 'fontSize':'10px'}),
+        html.Div(style={'display':'flex','gap':'8px','alignItems':'center', 'flexWrap': 'wrap', 'justifyContent': 'flex-end'}, children=[
+            html.Span(f'{num}/{den}', className=f'mnid-stat-meta {cls}'),
+            html.Span(f'{_display_pct(pct):.0f}%', className=f'mnid-stat-val {cls}'),
+            html.Span(status_map.get(cls, 'Monitor'), className=f'mnid-stat-tag {cls}'),
         ]),
     ])
 
@@ -2252,7 +2287,7 @@ def _compare_status_counts(df: pd.DataFrame, tracked: list) -> dict:
 def _build_compare_pie(title: str, counts: dict) -> go.Figure:
     labels = list(counts.keys())
     values = list(counts.values())
-    colors = [OK_C, WARN_C, '#D6D3CB']
+    colors = [OK_C, DANGER_C, '#D6D3CB']
 
     fig = go.Figure(go.Pie(
         labels=labels,
@@ -2278,7 +2313,7 @@ def _build_compare_pie(title: str, counts: dict) -> go.Figure:
 def _build_compare_bar(title: str, counts: dict) -> go.Figure:
     labels = list(counts.keys())
     values = list(counts.values())
-    colors = [OK_C, WARN_C, '#D6D3CB']
+    colors = [OK_C, DANGER_C, '#D6D3CB']
 
     fig = go.Figure(go.Bar(
         x=values,
@@ -2313,7 +2348,7 @@ def _build_compare_heatmap(title: str, df: 'pd.DataFrame', tracked: list) -> go.
             _, _, pct = _cov(df, ind['numerator_filters'], ind['denominator_filters'])
         target = ind.get('target', 0)
         names.append(label[:38])
-        pcts.append(pct)
+        pcts.append(_display_pct(pct))
         if pct == 0:
             colors_list.append('#E5E7EB')
         elif pct >= target:
@@ -2333,7 +2368,7 @@ def _build_compare_heatmap(title: str, df: 'pd.DataFrame', tracked: list) -> go.
         y=names,
         orientation='h',
         marker=dict(color=colors_list, line=dict(color='#fff', width=0.5)),
-        text=[f'{p:.0f}%' for p in pcts],
+        text=[f'{_display_pct(p):.0f}%' for p in pcts],
         textposition='auto',
         hovertemplate='<b>%{y}</b><br>Coverage: %{x:.1f}%<extra></extra>',
     ))
@@ -2505,7 +2540,7 @@ def _hero_donut_card(label, pct, target, color):
                 'display': 'flex', 'flexDirection': 'column',
                 'alignItems': 'center', 'justifyContent': 'center',
             }, children=[
-                html.Span(f'{p:.0f}%', style={
+                html.Span(f'{_display_pct(p):.0f}%', style={
                     'fontSize': '24px', 'fontWeight': '800',
                     'color': color, 'lineHeight': '1',
                 }),
@@ -2645,7 +2680,7 @@ def _priority_table(computed):
 
 def _district_gauge_fig(pct, district):
     """Plotly Indicator speedometer gauge for a single district."""
-    val   = pct if pct is not None else 0
+    val   = _display_pct(pct) if pct is not None else 0
     color = _cov_color(pct) if pct is not None else MUTED
     fig   = go.Figure(go.Indicator(
         mode  = 'gauge+number',
@@ -2689,7 +2724,7 @@ def _build_district_gauge_row(store, year='All years'):
         return html.Div()
 
     def _status_text(pct):
-        if pct >= 88:  return 'Strong performance'
+        if pct >= 80:  return 'Strong performance'
         if pct >= 65:  return 'Moderate coverage'
         return 'Needs attention'
 
@@ -2714,7 +2749,7 @@ def _build_district_gauge_row(store, year='All years'):
         # Horizontal bar chart - sorted ascending so worst performer is at top
         sorted_data = sorted(data, key=lambda x: x[1])
         dists  = [d for d, _ in sorted_data]
-        vals   = [v for _, v in sorted_data]
+        vals   = [_display_pct(v) for _, v in sorted_data]
         colors = [_cov_color(v) for v in vals]
         bar_h  = max(260, len(dists) * 24 + 40)
 
@@ -2858,8 +2893,8 @@ def _sidebar(facility_code: str) -> html.Div:
         ('Heatmap', '#mnid-heatmap'),
         ('Indicators', '#mnid-coverage'),
         ('Comparison', '#mnid-comparative'),
-        ('Readiness', '#mnid-readiness'),
         ('Analysis', '#mnid-analysis'),
+        ('Readiness', '#mnid-readiness'),
     ]
     return html.Div(className='mnid-nav', children=[
         html.A(href=href, className='mnid-nav-btn', children=label)
@@ -2876,7 +2911,7 @@ def _alert_banner(below, strong):
             html.P([html.Strong('On track. '),
                     'All tracked indicators are meeting target.']),
         ])
-    below_txt = ', '.join(f'{n} ({p:.0f}%)' for n, p in below)
+    below_txt = ', '.join(f'{n} ({_display_pct(p):.0f}%)' for n, p in below)
     strong_txt = ', '.join(strong[:3]) or 'None'
     return html.Div(className='mnid-alert', children=[
         html.Div(className='mnid-alert-icon',
@@ -2906,7 +2941,7 @@ def _avg_ring(pct: float, color: str) -> html.Div:
             'alignItems': 'center', 'justifyContent': 'center',
             'gap': '1px',
         }, children=[
-            html.Span(f'{p:.0f}%', style={
+            html.Span(f'{_display_pct(p):.0f}%', style={
                 'fontSize': font_size, 'fontWeight': '700',
                 'color': color, 'lineHeight': '1',
             }),
@@ -3073,12 +3108,6 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
                     desc='Cross-facility and district indicator benchmarking'),
         comparative_div,
 
-        # Operational readiness section
-        _section_anchor('mnid-readiness'),
-        _sec_header('Operational Readiness',
-                    desc='Equipment - workforce competency - data quality'),
-        _system_readiness(facility_df, supply_inds, wf_inds, dq_inds),
-
         # Clinical analysis section
         _section_anchor('mnid-analysis'),
         _sec_header('Clinical Analysis', total_analysis, desc='Care-phase deep-dives'),
@@ -3095,6 +3124,12 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
                 'panel': {'padding': '0 16px 2px'},
             },
         ),
+
+        # Operational readiness section
+        _section_anchor('mnid-readiness'),
+        _sec_header('Operational Readiness',
+                    desc='Equipment - workforce competency - data quality'),
+        _system_readiness(facility_df, supply_inds, wf_inds, dq_inds),
     ])
 
     return html.Div(className='mnid-bg', children=[

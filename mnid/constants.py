@@ -3,7 +3,7 @@
 OK_C    = '#16A34A'
 WARN_C  = '#CA8A04'
 DANGER_C = '#DC2626'
-INFO_C  = '#15803D'
+INFO_C  = '#475569'
 MUTED   = '#94A3B8'
 GRID_C  = '#F1F5F9'
 BG      = '#fff'
@@ -20,12 +20,12 @@ CAT_PALETTES = {
 }
 
 HEATMAP_CS = [
-    [0.00, '#FEF2F2'],
-    [0.40, '#DC2626'],
-    [0.65, '#CA8A04'],
-    [0.80, '#FDE68A'],
-    [0.88, '#BBF7D0'],
-    [1.00, '#16A34A'],
+    [0.00, DANGER_C],
+    [0.6499, DANGER_C],
+    [0.65, WARN_C],
+    [0.7999, WARN_C],
+    [0.80, OK_C],
+    [1.00, OK_C],
 ]
 
 FACILITY_DISTRICT = {
