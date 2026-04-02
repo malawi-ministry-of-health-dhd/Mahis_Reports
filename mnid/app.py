@@ -1452,56 +1452,133 @@ def update_heatmap_view(view, year, district, sel_inds, stored):
     return fig, panel, district_style
 
 
+_COMPARE_COLORS = [
+    OK_C, INFO_C, WARN_C, DANGER_C,
+    '#0D9488', '#7C3AED', '#0891B2', '#15803D',
+    '#BA7517', '#14B8A6',
+]
+
+
 @callback(
-    Output('mnid-compare-fac-pie-a', 'figure'),
-    Output('mnid-compare-fac-pie-b', 'figure'),
-    Output('mnid-compare-dist-pie-a', 'figure'),
-    Output('mnid-compare-dist-pie-b', 'figure'),
-    Input('mnid-compare-fac-a', 'value'),
-    Input('mnid-compare-fac-b', 'value'),
-    Input('mnid-compare-dist-a', 'value'),
-    Input('mnid-compare-dist-b', 'value'),
-    Input('mnid-compare-viz-type', 'value'),
+    Output('mnid-compare-bar-chart', 'figure'),
+    Output('mnid-compare-fac-selector', 'style'),
+    Output('mnid-compare-dist-selector', 'style'),
+    Output('mnid-compare-ind-multi', 'options'),
+    Output('mnid-compare-ind-multi', 'value'),
+    Input('mnid-compare-mode', 'value'),
+    Input('mnid-compare-fac-multi', 'value'),
+    Input('mnid-compare-dist-multi', 'value'),
+    Input('mnid-compare-ind-kind', 'value'),
+    Input('mnid-compare-ind-multi', 'value'),
     State('mnid-compare-store', 'data'),
 )
-def update_compare_charts(fac_a, fac_b, dist_a, dist_b, viz_type, stored_inds):
-    viz_type = viz_type or 'pie'
-    store_payload = stored_inds or {}
+def update_compare_charts(mode, sel_facs, sel_dists, sel_kinds, sel_ind_ids, stored):
+    mode = mode or 'facility'
+    store_payload = stored or {}
     tracked = store_payload.get('tracked', [])
     mch_full = _deserialize_store_df(store_payload.get('records'))
-    store_facs = store_payload.get('facilities', []) or mch_full.get('Facility_CODE', pd.Series(dtype=str)).dropna().astype(str).unique().tolist()
-    store_dists = store_payload.get('districts', []) or mch_full.get('District', pd.Series(dtype=str)).dropna().astype(str).unique().tolist()
 
-    _empty_counts = {'On target': 0, 'Below target': 0, 'No data': 0}
+    fac_style  = {'display': 'block'} if mode == 'facility' else {'display': 'none'}
+    dist_style = {'display': 'none'}  if mode == 'facility' else {'display': 'block'}
 
-    def _build(title, df):
-        if viz_type == 'bar':
-            counts = _compare_status_counts(df, tracked) if (len(df) and tracked) else _empty_counts
-            return _build_compare_bar(title, counts)
-        elif viz_type == 'heatmap':
-            return _build_compare_heatmap(title, df, tracked)
-        else:  # pie (default)
-            counts = _compare_status_counts(df, tracked) if (len(df) and tracked) else _empty_counts
-            return _build_compare_pie(title, counts)
+    tracked_cats = sorted({i.get('category', 'Other') for i in tracked if i.get('category')})
+    active_cats = [c for c in (sel_kinds or []) if c in tracked_cats] or tracked_cats
+    filtered_tracked = [i for i in tracked if i.get('category', 'Other') in active_cats]
 
-    fac_defaults = store_facs or _ALL_FACILITIES
-    dist_defaults = store_dists or _ALL_DISTRICTS
-    fac_a  = fac_a  or fac_defaults[0]
-    fac_b  = fac_b  or (fac_defaults[1] if len(fac_defaults) > 1 else fac_defaults[0])
-    dist_a = dist_a or dist_defaults[0]
-    dist_b = dist_b or (dist_defaults[1] if len(dist_defaults) > 1 else dist_defaults[0])
+    ind_map    = {i['id']: i for i in filtered_tracked}
+    active_inds = [ind_map[iid] for iid in (sel_ind_ids or []) if iid in ind_map]
+    ind_opts = [{'label': i['label'], 'value': i['id']} for i in filtered_tracked]
+    ind_ids = [i['id'] for i in active_inds]
 
-    fac_a_df  = mch_full[mch_full['Facility_CODE'] == fac_a]  if len(mch_full) else pd.DataFrame()
-    fac_b_df  = mch_full[mch_full['Facility_CODE'] == fac_b]  if len(mch_full) else pd.DataFrame()
-    dist_a_df = mch_full[mch_full['District'] == dist_a] if (len(mch_full) and 'District' in mch_full.columns) else pd.DataFrame()
-    dist_b_df = mch_full[mch_full['District'] == dist_b] if (len(mch_full) and 'District' in mch_full.columns) else pd.DataFrame()
-
-    return (
-        _build(f'Facility - {_FACILITY_NAMES.get(fac_a, fac_a)}',  fac_a_df),
-        _build(f'Facility - {_FACILITY_NAMES.get(fac_b, fac_b)}',  fac_b_df),
-        _build(f'District - {dist_a}', dist_a_df),
-        _build(f'District - {dist_b}', dist_b_df),
+    _empty_fig = go.Figure()
+    _empty_fig.update_layout(
+        height=420,
+        paper_bgcolor='#ffffff',
+        plot_bgcolor='#ffffff',
+        font=dict(color=TEXT, family=FONT),
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
     )
+
+    if not active_inds or mch_full.empty:
+        return _empty_fig, fac_style, dist_style, ind_opts, ind_ids
+
+    if mode == 'facility':
+        entities = sel_facs or []
+        entity_labels = [_FACILITY_NAMES.get(e, e) for e in entities]
+        def get_df(entity):
+            return mch_full[mch_full['Facility_CODE'] == entity] if 'Facility_CODE' in mch_full.columns else pd.DataFrame()
+    else:
+        entities = sel_dists or []
+        entity_labels = list(entities)
+        def get_df(entity):
+            return mch_full[mch_full['District'] == entity] if 'District' in mch_full.columns else pd.DataFrame()
+
+    if not entities:
+        return _empty_fig, fac_style, dist_style, ind_opts, ind_ids
+
+    fig = go.Figure()
+    for idx, ind in enumerate(active_inds):
+        color  = _COMPARE_COLORS[idx % len(_COMPARE_COLORS)]
+        y_vals, texts = [], []
+        for entity in entities:
+            df = get_df(entity)
+            if df.empty:
+                y_vals.append(None)
+                texts.append('No data')
+            else:
+                _, den, pct = _cov(df, ind['numerator_filters'], ind['denominator_filters'])
+                y_vals.append(_display_pct(pct) if den > 0 else None)
+                texts.append(f'{pct:.0f}%' if den > 0 else 'No data')
+
+        fig.add_trace(go.Bar(
+            name=ind['label'],
+            x=entity_labels,
+            y=y_vals,
+            text=texts,
+            textposition='outside',
+            textfont=dict(size=9, color='#E2E8F0'),
+            marker=dict(color=color, opacity=0.88,
+                        line=dict(color='rgba(255,255,255,0.25)', width=0.8)),
+            hovertemplate=(
+                f'<b>{ind["label"]}</b><br>'
+                '%{x}<br>Coverage: %{y:.1f}%<extra></extra>'
+            ),
+        ))
+
+    avg_target = sum(i.get('target', 80) for i in active_inds) / len(active_inds)
+    fig.add_hline(
+        y=avg_target,
+        line=dict(color=WARN_C, width=1.5, dash='dot'),
+        annotation=dict(text=f'Avg target {avg_target:.0f}%',
+                        font=dict(size=10, color=WARN_C),
+                        x=1, xanchor='right'),
+    )
+
+    fig.update_layout(
+        height=420,
+        barmode='group',
+        bargap=0.20,
+        bargroupgap=0.06,
+        margin=dict(l=10, r=10, t=30, b=10),
+        paper_bgcolor='#ffffff',
+        plot_bgcolor='#ffffff',
+        font=dict(color=TEXT, family=FONT),
+        xaxis=dict(showgrid=False, tickfont=dict(size=11, color=TEXT), linecolor=BORDER),
+        yaxis=dict(
+            title=dict(text='Coverage %', font=dict(size=11, color='#94A3B8')),
+            range=[0, 115],
+            showgrid=True, gridcolor=GRID_C,
+            tickfont=dict(size=10, color=DIM),
+        ),
+        legend=dict(
+            orientation='v', x=1.01, y=1,
+            xanchor='left', yanchor='top',
+            font=dict(size=10, color=DIM),
+            bgcolor='rgba(0,0,0,0)', bordercolor='rgba(0,0,0,0)',
+        ),
+    )
+    return fig, fac_style, dist_style, ind_opts, ind_ids
 
 
 # # MNID main heatmap section layout
@@ -2389,110 +2466,123 @@ def _build_compare_heatmap(title: str, df: 'pd.DataFrame', tracked: list) -> go.
 
 def _comparative_analysis_section(indicators: list, facility_code: str,
                                   mch_full: pd.DataFrame) -> html.Div:
-    """Side-by-side coverage comparison across facilities and districts."""
+    """Grouped bar chart comparison across selected facilities or districts."""
     tracked = [i for i in indicators if i.get('status') == 'tracked']
-    all_facs = sorted(mch_full['Facility_CODE'].dropna().astype(str).unique().tolist()) if len(mch_full) and 'Facility_CODE' in mch_full.columns else _ALL_FACILITIES[:]
-    all_dists = sorted(mch_full['District'].dropna().astype(str).unique().tolist()) if len(mch_full) and 'District' in mch_full.columns else _ALL_DISTRICTS[:]
+    all_facs  = sorted(mch_full['Facility_CODE'].dropna().astype(str).unique().tolist()) if len(mch_full) and 'Facility_CODE' in mch_full.columns else _ALL_FACILITIES[:]
+    all_dists = sorted(mch_full['District'].dropna().astype(str).unique().tolist())       if len(mch_full) and 'District' in mch_full.columns else _ALL_DISTRICTS[:]
     current_dist = _FACILITY_DISTRICT.get(facility_code, '')
-    fac_opts = [{'label': _FACILITY_NAMES.get(f, f), 'value': f} for f in all_facs]
-    dist_opts = [{'label': d, 'value': d} for d in all_dists]
 
-    fac_a_default = facility_code if facility_code in all_facs else (all_facs[0] if all_facs else None)
-    fac_b_default = next((f for f in all_facs if f != fac_a_default), fac_a_default)
-    dist_a_default = current_dist if current_dist in all_dists else (all_dists[0] if all_dists else None)
-    dist_b_default = next((d for d in all_dists if d != dist_a_default), dist_a_default)
-    compare_selector = html.Div(className='mnid-chart-card mnid-compare-card', children=[
-        html.Div(style={'display': 'flex', 'alignItems': 'center',
-                        'justifyContent': 'space-between', 'marginBottom': '10px',
-                        'gap': '12px', 'flexWrap': 'wrap'}, children=[
-            html.Div('SELECT COMPARISONS', className='mnid-card-title',
+    fac_opts  = [{'label': _FACILITY_NAMES.get(f, f), 'value': f} for f in all_facs]
+    dist_opts = [{'label': d, 'value': d} for d in all_dists]
+    cats = sorted({i.get('category', 'Other') for i in tracked if i.get('category')})
+    ind_opts  = [{'label': ind['label'], 'value': ind['id']} for ind in tracked]
+    cat_opts  = [{'label': c, 'value': c} for c in cats]
+
+    default_facs  = ([facility_code] if facility_code in all_facs else all_facs[:3]) or []
+    default_dists = ([current_dist]  if current_dist  in all_dists else all_dists[:3]) or []
+    default_inds  = [ind['id'] for ind in tracked[:4]]
+    default_cats  = cats[:]
+
+    _lbl_style = {
+        'fontSize': '11px', 'fontWeight': '600', 'color': '#94A3B8',
+        'textTransform': 'uppercase', 'letterSpacing': '0.05em',
+        'marginBottom': '5px', 'display': 'block',
+    }
+
+    compare_card = html.Div(className='mnid-chart-card mnid-compare-card', children=[
+        # ── Header row ───────────────────────────────────────────────────────────
+        html.Div(className='mnid-compare-header', style={'display': 'flex', 'alignItems': 'center',
+                        'justifyContent': 'space-between',
+                        'marginBottom': '16px', 'flexWrap': 'wrap', 'gap': '10px'}, children=[
+            html.Div('COMPARISON ANALYSIS', className='mnid-card-title',
                      style={'marginBottom': '0'}),
-            html.Div(style={'display': 'flex', 'alignItems': 'center', 'gap': '6px'}, children=[
-                html.Span('Chart type:', style={'fontSize': '11px', 'color': DIM,
+            html.Div(className='mnid-compare-mode', style={'display': 'flex', 'alignItems': 'center', 'gap': '6px'}, children=[
+                html.Span('Compare by:', style={'fontSize': '11px', 'color': '#94A3B8',
                                                 'fontWeight': '600', 'letterSpacing': '0.04em'}),
                 dcc.RadioItems(
-                    id='mnid-compare-viz-type',
+                    id='mnid-compare-mode',
                     options=[
-                        {'label': 'Pie',     'value': 'pie'},
-                        {'label': 'Bar',     'value': 'bar'},
-                        {'label': 'Heatmap', 'value': 'heatmap'},
+                        {'label': 'Facility', 'value': 'facility'},
+                        {'label': 'District', 'value': 'district'},
                     ],
-                    value='pie',
+                    value='facility',
                     inline=True,
-                    inputStyle={'marginRight': '4px'},
-                    labelStyle={'marginRight': '12px', 'fontSize': '12px',
-                                'color': TEXT, 'cursor': 'pointer'},
+                    inputStyle={'marginRight': '5px'},
+                    labelStyle={'marginRight': '16px', 'fontSize': '12px',
+                                'color': '#E2E8F0', 'cursor': 'pointer', 'fontWeight': '600'},
                 ),
             ]),
         ]),
-        html.Div(style={'display': 'grid', 'gridTemplateColumns': 'repeat(2, minmax(320px, 1fr))',
-                        'gap': '12px', 'alignItems': 'start'}, children=[
-            html.Div(children=[
-                html.Div('Facilities vs Facilities', className='mnid-ind-sub'),
-                html.Div(style={'display': 'grid', 'gridTemplateColumns': 'repeat(2, minmax(0, 1fr))',
-                                'gap': '8px'}, children=[
+        # ── Filters row ──────────────────────────────────────────────────────────
+        html.Div(className='mnid-compare-filters', style={'display': 'grid', 'gridTemplateColumns': '1fr 1fr 1fr',
+                        'gap': '14px', 'marginBottom': '16px', 'alignItems': 'start'}, children=[
+            # Left: entity selector (facility or district, toggled by mode)
+            html.Div(className='mnid-compare-block', children=[
+                html.Div(id='mnid-compare-fac-selector', children=[
+                    html.Label('Select Facilities', style=_lbl_style),
                     dcc.Dropdown(
-                        id='mnid-compare-fac-a',
+                        id='mnid-compare-fac-multi',
                         options=fac_opts,
-                        value=fac_a_default,
-                        clearable=False,
-                    ),
-                    dcc.Dropdown(
-                        id='mnid-compare-fac-b',
-                        options=fac_opts,
-                        value=fac_b_default,
-                        clearable=False,
+                        value=default_facs,
+                        multi=True,
+                        placeholder='Select facilities…',
                     ),
                 ]),
-                html.Div(style={'display': 'grid', 'gridTemplateColumns': 'repeat(2, minmax(0, 1fr))',
-                                'gap': '8px', 'marginTop': '6px'}, children=[
-                    dcc.Graph(id='mnid-compare-fac-pie-a',
-                              config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
-                              style={'height': '300px'}),
-                    dcc.Graph(id='mnid-compare-fac-pie-b',
-                              config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
-                              style={'height': '300px'}),
+                html.Div(id='mnid-compare-dist-selector', style={'display': 'none'}, children=[
+                    html.Label('Select Districts', style=_lbl_style),
+                    dcc.Dropdown(
+                        id='mnid-compare-dist-multi',
+                        options=dist_opts,
+                        value=default_dists,
+                        multi=True,
+                        placeholder='Select districts…',
+                    ),
                 ]),
             ]),
-            html.Div(children=[
-                html.Div('Districts vs Districts', className='mnid-ind-sub'),
-                html.Div(style={'display': 'grid', 'gridTemplateColumns': 'repeat(2, minmax(0, 1fr))',
-                                'gap': '8px'}, children=[
-                    dcc.Dropdown(
-                        id='mnid-compare-dist-a',
-                        options=dist_opts,
-                        value=dist_a_default,
-                        clearable=False,
-                    ),
-                    dcc.Dropdown(
-                        id='mnid-compare-dist-b',
-                        options=dist_opts,
-                        value=dist_b_default,
-                        clearable=False,
-                    ),
-                ]),
-                html.Div(style={'display': 'grid', 'gridTemplateColumns': 'repeat(2, minmax(0, 1fr))',
-                                'gap': '8px', 'marginTop': '6px'}, children=[
-                    dcc.Graph(id='mnid-compare-dist-pie-a',
-                              config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
-                              style={'height': '300px'}),
-                    dcc.Graph(id='mnid-compare-dist-pie-b',
-                              config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
-                              style={'height': '300px'}),
-                ]),
+            # Middle: indicator category selector
+            html.Div(className='mnid-compare-block', children=[
+                html.Label('Indicator Category', style=_lbl_style),
+                dcc.Dropdown(
+                    id='mnid-compare-ind-kind',
+                    options=cat_opts,
+                    value=default_cats,
+                    multi=True,
+                    placeholder='Select indicator categories…',
+                ),
+            ]),
+            # Right: indicator selector
+            html.Div(className='mnid-compare-block', children=[
+                html.Label('Select Indicators', style=_lbl_style),
+                dcc.Dropdown(
+                    id='mnid-compare-ind-multi',
+                    options=ind_opts,
+                    value=default_inds,
+                    multi=True,
+                    placeholder='Select indicators…',
+                ),
             ]),
         ]),
+        # ── Grouped bar chart ────────────────────────────────────────────────────
+        dcc.Graph(
+            id='mnid-compare-bar-chart',
+            config={
+                'displayModeBar': 'hover',
+                'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'],
+                'toImageButtonOptions': {'format': 'png', 'scale': 2},
+            },
+            className='mnid-compare-chart',
+            style={'height': '420px'},
+        ),
     ])
 
     return html.Div(id='mnid-comparative', children=[
         dcc.Store(id='mnid-compare-store', data={
-            'tracked': tracked,
-            'records': _serialize_store_df(mch_full),
+            'tracked':    tracked,
+            'records':    _serialize_store_df(mch_full),
             'facilities': all_facs,
-            'districts': all_dists,
+            'districts':  all_dists,
         }),
-        html.Div('COMPARATIVE ANALYSIS', className='mnid-section-lbl'),
-        html.Div(className='mnid-chart-grid', children=[compare_selector]),
+        html.Div(className='mnid-chart-grid', children=[compare_card]),
     ])
 
 

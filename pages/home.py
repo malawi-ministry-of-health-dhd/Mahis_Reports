@@ -272,12 +272,11 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
 
         # Load Data
         if is_mnid:
+            # Load full MNID scope first, then apply date range with a fallback
             SQL = f"""
                 SELECT *
                 FROM 'data/{DATA_FILE_NAME_}'
-                WHERE Date >= '{start_dt}'
-                AND Date <= '{end_dt}'
-                AND (
+                WHERE (
                     Program ILIKE '%Maternal%'
                     OR Program ILIKE '%Neonatal%'
                 )
@@ -324,14 +323,31 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
             network_data = data[network_mask].copy()
 
             facility_mask = pd.Series(True, index=network_data.index)
-            facility_mask &= (network_data[FACILITY_CODE_] == location)
+            # allow matching by code, facility name, or district (if provided in URL)
+            if location:
+                facility_mask &= (
+                    (network_data[FACILITY_CODE_] == location) |
+                    (network_data[FACILITY_] == location) |
+                    (network_data.get('District') == location)
+                )
             if hf and hf != "This Facility":
                 facility_mask &= (network_data[FACILITY_] == hf)
             filtered_data = network_data[facility_mask].copy()
+
+            # If facility filter yields no rows, fall back to network scope
+            if filtered_data.empty and len(network_data):
+                filtered_data = network_data.copy()
+
             filtered_data_date = filtered_data[
                 (filtered_data[DATE_] >= start_dt) &
                 (filtered_data[DATE_] <= end_dt)
             ]
+            # If date range yields no MNID rows, fall back to available data
+            adj_start_dt, adj_end_dt = start_dt, end_dt
+            if filtered_data_date.empty and len(filtered_data):
+                adj_start_dt = filtered_data[DATE_].min()
+                adj_end_dt = filtered_data[DATE_].max()
+                filtered_data_date = filtered_data.copy()
         else:
             # Apply Dropdown Filters
             mask = pd.Series(True, index=data.index)
@@ -349,14 +365,19 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
             ]
             network_data = filtered_data
 
-        delta_days = (end_dt - start_dt).days
+        if is_mnid:
+            delta_days = (adj_end_dt - adj_start_dt).days
+        else:
+            delta_days = (end_dt - start_dt).days
         hf_values = filtered_data[FACILITY_].dropna().sort_values().unique().tolist() if FACILITY_ in filtered_data.columns else []
         hf_options = hf_values + (["This Facility"] if "This Facility" not in hf_values else [])
         hf_value = hf_options[0] if hf_options else None
 
         return build_charts_from_json(
             filtered_data_date, network_data, delta_days, dashboard_json,
-            start_date=start_dt, end_date=end_dt, facility_code=location,
+            start_date=adj_start_dt if is_mnid else start_dt,
+            end_date=adj_end_dt if is_mnid else end_dt,
+            facility_code=location,
         ), hf_options, hf_value, clicked_name
     except Exception as e:
         import traceback
