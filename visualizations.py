@@ -662,9 +662,7 @@ def create_pivot_table(df, index_col, columns_col, values_col, title, unique_col
     
     # Apply consistent deduplication
     data = _prepare_data_for_visualization(data, unique_column)
-    
-    if data.empty:
-        return html.Div(f"No data available for {title}")
+
     
     # Determine the actual aggregation function
     if aggfunc == 'concat':
