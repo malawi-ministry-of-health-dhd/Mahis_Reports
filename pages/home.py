@@ -111,91 +111,200 @@ def get_relative_date_range(option):
         last_day_last_month = first_day_this_month - timedelta(days=1)
         start_date = last_day_last_month.replace(day=1)
         return start_date, last_day_last_month
+    # option Last 3 Months
+    elif option == 'Last 3 Months':
+        first_day_this_month = today.replace(day=1)
+        last_day_last_month = first_day_this_month - timedelta(days=1)
+        first_day_last_month = last_day_last_month.replace(day=1)
+        last_day_two_months_ago = first_day_last_month - timedelta(days=1)
+        first_day_two_months_ago = last_day_two_months_ago.replace(day=1)
+        start_date = first_day_two_months_ago
+        end_date = last_day_last_month
+        return start_date, end_date
+    # option This Year
+    elif option == 'This Year':
+        start_date = today.replace(month=1, day=1)
+        return start_date, today
+    # option Last Year
+    elif option == 'Last Year':
+        first_day_this_year = today.replace(month=1, day=1)
+        last_day_last_year = first_day_this_year - timedelta(days=1)
+        start_date = last_day_last_year.replace(month=1, day=1)
+        end_date = last_day_last_year
+        return start_date, end_date
+
     else:
         return None, None
 
-layout = html.Div(className="container", children=[
-    dcc.Location(id='url', refresh=False),
-    dcc.Store(id='active-button-store', data='home'),
-    html.Div([
+layout = html.Div(
+    className="dashboard-layout-modern",
+    children=[
+        dcc.Location(id='url', refresh=False),
+        dcc.Store(id='active-button-store', data='home'),
+        
+        # Left Sidebar
         html.Div(
-            [
-                html.Button(item, className="menu-btn")
-                for item in []
-                ],
-                className="horizontal-scroll",
-                id="scrolling-menu"
-            ),
-        html.Div(className="filter-container", children=[
-            html.Div([
-                html.Label("Relative Period"),
-                dcc.Dropdown(
-                    id='dashboard-period-type-filter',
-                    options=[
-                        {'label': item, 'value': item}
-                        for item in ['Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days','This Week','Last Week', 'This Month', 'Last Month']
-                    ],
-                    value='Today',
-                    clearable=True
-                )
-            ], className="filter-input"),
-
-            html.Div([
-                html.Label("Custom Date Range"),
-                dcc.DatePickerRange(
-                    id='dashboard-date-range-picker',
-                    min_date_allowed="2023-01-01",
-                    max_date_allowed="2050-01-01",
-                    initial_visible_month=datetime.now(),
-                    start_date=datetime.now().replace(hour=0, minute=0, second=0, microsecond=0),
-                    end_date=datetime.now().replace(hour=23, minute=59, second=59, microsecond=0),
-                    display_format='YYYY-MM-DD',
-                )
-            ], className="filter-input"),
-
-            html.Div([
-                html.Label("Health Facility"),
-                dcc.Dropdown(
-                    id='dashboard-hf-filter',
-                    options=[
-                        {'label': hf, 'value': hf}
-                        for hf in []
-                    ],
-                    value=None,
-                    clearable=True
-                )
-            ], className="filter-input"),
-
-            html.Div([
-                html.Label("Age Group"),
-                dcc.Dropdown(
-                    id='dashboard-age-filter',
-                    options=[
-                        {'label': age, 'value': age}
-                        for age in ['Over 5','Under 5']
-                    ],
-                    value=None,
-                    clearable=True
-                )
-            ], className="filter-input"),
-
-            html.Div(
+            className="dashboard-sidebar",
+            children=[
+                
+                # Filters Section
+                html.Div(
+                    className="sidebar-filters-section",
                     children=[
-                        html.Button("Apply", id="dashboard-btn-generate", n_clicks=0, className="btn btn-primary"),
-                        html.Button("Reset", id="dashboard-btn-reset", n_clicks=0, className="btn btn-secondary"),
-                    ],
-                    style={"display": "flex", "gap": "10px", "margin-bottom": "10px"}
+                        html.Div(
+                            className="filters-card",
+                            children=[
+                                html.H3("Filter Data", className="filters-title"),
+                                
+                                html.Div(
+                                    className="filters-container",
+                                    children=[
+                                        # Relative Period Filter
+                                        html.Div(
+                                            className="filter-group",
+                                            children=[
+                                                html.Label("Relative Period", className="filter-label"),
+                                                dcc.Dropdown(
+                                                    id='dashboard-period-type-filter',
+                                                    options=[
+                                                        {'label': item, 'value': item}
+                                                        for item in ['Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days',
+                                                                   'This Week', 'Last Week', 'This Month', 'Last Month',
+                                                                   'Last 3 Months', 'This Year', 'Last Year']
+                                                    ],
+                                                    value='Today',
+                                                    clearable=True,
+                                                    className="modern-dropdown"
+                                                )
+                                            ]
+                                        ),
+                                        
+                                        # Custom Date Range
+                                        html.Div(
+                                            className="filter-group",
+                                            children=[
+                                                html.Label("Custom Date Range", className="filter-label"),
+                                                dcc.DatePickerRange(
+                                                    id='dashboard-date-range-picker',
+                                                    min_date_allowed="2023-01-01",
+                                                    max_date_allowed="2050-01-01",
+                                                    initial_visible_month=datetime.now(),
+                                                    start_date=datetime.now().replace(hour=0, minute=0, second=0, microsecond=0),
+                                                    end_date=datetime.now().replace(hour=23, minute=59, second=59, microsecond=0),
+                                                    display_format='YYYY-MM-DD',
+                                                    className="modern-datepicker",
+                                                    style={
+                                                        'width': '100%',
+                                                        'border': '1px solid #ced4da',
+                                                        'borderRadius': '8px',
+                                                        'padding': '8px'
+                                                    }
+                                                )
+                                            ]
+                                        ),
+                                        
+                                        # Health Facility Filter
+                                        html.Div(
+                                            className="filter-group",
+                                            children=[
+                                                html.Label("Health Facility", className="filter-label"),
+                                                dcc.Dropdown(
+                                                    id='dashboard-hf-filter',
+                                                    options=[
+                                                        {'label': hf, 'value': hf}
+                                                        for hf in []
+                                                    ],
+                                                    value=None,
+                                                    clearable=True,
+                                                    className="modern-dropdown"
+                                                )
+                                            ]
+                                        ),
+                                        
+                                        # Age Group Filter
+                                        html.Div(
+                                            className="filter-group",
+                                            children=[
+                                                html.Label("Age Group", className="filter-label"),
+                                                dcc.Dropdown(
+                                                    id='dashboard-age-filter',
+                                                    options=[
+                                                        {'label': age, 'value': age}
+                                                        for age in ['Over 5', 'Under 5']
+                                                    ],
+                                                    value=None,
+                                                    clearable=True,
+                                                    className="modern-dropdown"
+                                                )
+                                            ]
+                                        ),
+                                    ]
+                                ),
+                                
+                                # Action Buttons
+                                html.Div(
+                                    className="filter-actions",
+                                    children=[
+                                        html.Button(
+                                            "Apply Filters", 
+                                            id="dashboard-btn-generate", 
+                                            n_clicks=0, 
+                                            className="btn-apply-modern"
+                                        ),
+                                        html.Button(
+                                            "Reset Filters", 
+                                            id="dashboard-btn-reset", 
+                                            n_clicks=0, 
+                                            className="btn-reset-modern"
+                                        ),
+                                    ]
+                                )
+                            ]
+                        )
+                    ]
                 ),
-        ]),
-
-]),
-    html.Div(id='dashboard-container'),   
-    dcc.Interval(
-        id='dashboard-interval-update-today',
-        interval=10*60*1000,  # in milliseconds
-        n_intervals=0
-    ),     
-])
+            ]
+        ),
+        
+        # Right Content Area
+        html.Div(
+            className="dashboard-main",
+            children=[
+                # Menu Section
+                html.Div(
+                    className="sidebar-menu-section",
+                    children=[
+                        html.Div(
+                            className="menu-scroll-container",
+                            children=[
+                                html.Div(
+                                    className="menu-buttons-wrapper",
+                                    id="scrolling-menu",
+                                    children=[
+                                        html.Button(item, className="menu-btn-modern")
+                                        for item in []
+                                    ]
+                                )
+                            ]
+                        )
+                    ]
+                ),
+                # Dashboard Content
+                html.Div(
+                    id='dashboard-container',
+                    className="dashboard-content-modern"
+                ),
+            ]
+        ),
+        
+        # Auto-refresh Interval
+        dcc.Interval(
+            id='dashboard-interval-update-today',
+            interval=10*60*1000,  # 10 minutes
+            n_intervals=0
+        ),
+    ]
+)
 
 @callback(
         Output('scrolling-menu', 'children'),
@@ -271,23 +380,28 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
             location = "LL040033"
         mnid_location = urlparams.get('Location', [None])[0] if urlparams.get('Location') else None
 
-        # Load Data
-        if is_mnid:
-            # Load full MNID scope first, then apply date range with a fallback
+        user_levels = ['national', 'district']
+        user_level = urlparams.get('user_level', [None])[0]
+        
+        if user_level not in user_levels:
             SQL = f"""
                 SELECT *
                 FROM 'data/{DATA_FILE_NAME_}'
-                WHERE (
-                    Program ILIKE '%Maternal%'
-                    OR Program ILIKE '%Neonatal%'
-                )
+                WHERE Date >= TIMESTAMP '{last_7_days}'
+                AND {FACILITY_CODE_} = '{location}'
+                """
+        elif not user_level:
+            SQL = f"""
+                SELECT *
+                FROM 'data/{DATA_FILE_NAME_}'
+                WHERE Date >= TIMESTAMP '{last_7_days}'
+                AND {FACILITY_CODE_} = '{location}'
                 """
         else:
             SQL = f"""
                 SELECT *
                 FROM 'data/{DATA_FILE_NAME_}'
-                WHERE Date >= '{last_7_days}'
-                AND {FACILITY_CODE_} = '{location}'
+                WHERE Date >= TIMESTAMP '{last_7_days}'
                 """
         try:
             data = DataStorage.query_duckdb(SQL)
@@ -299,7 +413,10 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
             ,style={'color':'red'}), [], '', ''  # Empty DataFrame with expected columns
 
         data[DATE_] = pd.to_datetime(data[DATE_], format='mixed')
-        data[GENDER_] = data[GENDER_].replace({"M":"Male","F":"Female"})
+        data[GENDER_] = data[GENDER_].replace({"M":"Male",
+                                               "F":"Female",
+                                               '{"label"=>"Male", "value"=>"M"}':"Male",
+                                               '{"label"=>"Female", "value"=>"F"}':"Female"})
         data["DateValue"] = pd.to_datetime(data[DATE_]).dt.date
         today = dt.today().date()
         data["months"] = data["DateValue"].apply(lambda d: (today - d).days // 30)

@@ -506,9 +506,10 @@ class DataFetcher:
         while True:
             # Build query for current batch
             date_str = current_date.strftime('%Y-%m-%d')
-            date_filter = f"AND DATE(e.encounter_datetime) = '{date_str}' AND e.encounter_id > {last_id} "
+            date_filter = f"AND DATE(e.encounter_datetime) = '{date_str}' AND e.encounter_id > {last_id} LIMIT {batch_size}"
             query = query_template.format(date_filter=date_filter)
-            batch_query = f"{query} ORDER BY encounter_id LIMIT {batch_size}"
+            batch_query = f"{query} ORDER BY encounter_id"
+            # print(batch_query)
 
             logger.debug(f"Fetching batch for {date_str} from ID {last_id}")
             try:

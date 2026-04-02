@@ -28,7 +28,7 @@ class DataStorage:
             self.query,
             filename=self.filepath,
             date_column='Date',
-            batch_size=50000,
+            batch_size=1000,
         )
         if df is not None and not df.empty:
             df.to_parquet(self.filepath, index=False)
@@ -63,7 +63,11 @@ class DataStorage:
         df = pd.read_parquet(self.filepath)
         dropdown_json = {"programs":sorted(df.Program.dropna().unique().tolist()),
                          "encounters":sorted(df.Encounter.dropna().unique().tolist()),
-                         "concepts":sorted(df.concept_name.dropna().unique().tolist())
+                         "concepts":sorted(df.concept_name.dropna().unique().tolist()),
+                         "concept_answers":sorted(df.obs_value_coded.dropna().unique().tolist()),
+                         "gender":sorted(df.Gender.dropna().unique().tolist()),
+                         "age_group":sorted(df.Age_Group.dropna().unique().tolist()),
+                         "DrugName":sorted(df.DrugName.dropna().unique().tolist())
                          }
         with open(self.dropdown_filepath, 'w') as r:
             json.dump(dropdown_json, r, indent=2)

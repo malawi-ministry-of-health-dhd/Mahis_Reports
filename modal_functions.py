@@ -34,6 +34,7 @@ with open(path_dcc_json) as r:
 drop_down_programs = dcc_json['programs']
 drop_down_encounters = dcc_json['encounters']
 drop_down_concepts = dcc_json['concepts']
+aggregations = ["nunique", "sum", "count", "mean", "min", "max"]
 
 # DATASET
 def validate_excel_file(contents):
@@ -80,7 +81,7 @@ def validate_excel_file(contents):
         variable_filters = variable_names_df.iloc[:, 1:20].values.flatten()
         variable_filters = [str(item).strip() for item in variable_filters if pd.notna(item) and str(item).strip() != '']
         filters_list = filters_df.iloc[:, 0].astype(str).str.strip().tolist()
-        missing_filters = [vf for vf in variable_filters if vf not in filters_list]
+        missing_filters = set([vf for vf in variable_filters if vf not in filters_list])
         # print(missing_filters)
         if len(missing_filters)>0:
             return False, f"The following filters from VARIABLE_NAMES are missing in FILTERS sheet: {', '.join(missing_filters)}", None, None
@@ -323,6 +324,7 @@ def update_or_create_report(report_name_df, is_update=False, existing_report=Non
     
     page_name = report_name_df['id'].iloc[0]
     report_name = report_name_df['name'].iloc[0]
+    program_name = report_name_df['programs'].iloc[0]
     
     if is_update and existing_report:
         # Update existing report
@@ -339,6 +341,7 @@ def update_or_create_report(report_name_df, is_update=False, existing_report=Non
             "report_name": report_name,
             "date_created": current_time,
             "creator": "admin",
+            "programs": [program_name],
             "date_updated": current_time,
             "updated_by": "admin",
             "page_name": page_name,
@@ -429,77 +432,179 @@ def load_preview_data():
 
 # DASHBOARDS 
 def create_chart_fields(chart_type, chart_data=None, section_index=None, chart_index=None):
-    """Create dynamic input fields based on chart type"""
     chart_data = chart_data or {}
-    filters = chart_data.get('filters', {})
-    
-    if chart_type not in CHART_TEMPLATES:
-        return html.Div("Invalid chart type")
+    filters = chart_data.get("filters", {})
 
+    # if chart_type not in CHART_TEMPLATES:
+    #     return html.Div("Invalid chart type")
+
+    template = CHART_TEMPLATES["Chart"]
+    dropdown_options = ['Date','person_id', 'encounter_id', 'Gender', 'Program', 'Encounter', 
+                        'obs_value_coded', 'concept_name', 'Value', 'ValueN', 'DrugName', 'Value_name']
     
-    # Get the template for this chart type
-    template = CHART_TEMPLATES[chart_type]
+    # Define which fields are relevant for each chart type
+    chart_type_fields = {
+        "Line": ["date_col", "y_col", "x_title", "y_title", "legend_title", "color", "unique_column"],
+        "Bar": ["label_col", "value_col", "x_title", "y_title", "top_n", "unique_column"],
+        "Pie": ["names_col", "values_col", "colormap", "unique_column"],
+        "Column": ["x_col", "y_col", "x_title", "y_title", "legend_title", "color", "unique_column"],
+        "Histogram": ["age_col", "gender_col", "bin_size", "color", "unique_column"],
+        "PivotTable": ["index_col1", "columns", "values_col", "aggfunc", "unique_column"]
+    }
     
-    # Create rows with 4 columns each
-    rows = []
-    current_row = []
+    # Common fields for all chart types
+    common_fields = ["title", "duration_default", "filter_col1", "filter_val1", "filter_col2", "filter_val2", 
+                     "filter_col3", "filter_val3", "filter_col4", "filter_val4", "filter_col5", "filter_val5"]
     
-    # Create fields for each key in the template (excluding measure, unique, duration_default)
-    excluded_fields = {'measure', 'unique', 'duration_default'}
-    elements = [key for key in template.keys() if key not in excluded_fields]
+    # Combine all fields that should be visible for this chart type
+    visible_fields = set(chart_type_fields.get(chart_type, []) + common_fields)
     
-    for i, element in enumerate(elements):
-        # Handle colormap field specially for Pie charts
-        if element == 'colormap':
-            # For colormap, we'll create a textarea for JSON input or multiple inputs
-            field_component = html.Div(className="chart-col", style={
-                'flex': '1 0 calc(25% - 10px)',
-                'minWidth': '200px'
-            }, children=[
-                html.Label("Color Map (JSON)", className="form-label"),
-                dcc.Textarea(
-                    id={"type": f"chart-{element}", "section": section_index, "index": chart_index},
-                    value=json.dumps(filters.get(element, {}), indent=2),
-                    placeholder='{"New": "#292D79", "Revisit": "#FE1AD0"}',
-                    className="form-input",
-                    style={'height': '80px', 'resize': 'vertical'}
-                ),
-            ])
-        else:
-            # For regular fields, use normal input
-            field_value = filters.get(element, template.get(element, ''))
-            # Convert non-string values to string for dcc.Input
-            if isinstance(field_value, (int, float)):
-                field_value = str(field_value)
-            elif field_value is None:
-                field_value = ''
+    # All possible fields (complete list)
+    all_fields = [
+        "date_col", "y_col", "x_col", "label_col", "value_col", "names_col", "values_col",
+        "age_col", "gender_col", "index_col1", "columns", "aggfunc",
+        "x_title", "y_title", "legend_title", "color", "top_n", "bin_size", "colormap",
+        "unique_column", "title", "duration_default",
+        "filter_col1", "filter_val1", "filter_col2", "filter_val2", "filter_col3", "filter_val3",
+        "filter_col4", "filter_val4", "filter_col5", "filter_val5"
+    ]
+    
+    FIELD_CONFIG = {
+        "date_col": {"type": "single", "options": ["Date"]},
+        "y_col": {"type": "single", "options": dropdown_options},
+        "unique_column": {"type": "single", "options": ["person_id", "encounter_id"]},
+        "label_col": {"type": "single", "options": dropdown_options},
+        "value_col": {"type": "single", "options": dropdown_options},
+        "names_col": {"type": "single", "options": dropdown_options},
+        "values_col": {"type": "single", "options": dropdown_options},
+        "x_col": {"type": "single", "options": dropdown_options},
+        "age_col": {"type": "single", "options": ["Age"]},
+        "gender_col": {"type": "single", "options": ["Gender"]},
+        "index_col1": {"type": "multi", "options": dropdown_options},
+        "columns": {"type": "multi", "options": dropdown_options},
+        "aggfunc": {"type": "multi", "options": aggregations},
+        "filter_col1": {"type": "multi", "options": dropdown_options},
+        "filter_col2": {"type": "multi", "options": dropdown_options},
+        "filter_col3": {"type": "multi", "options": dropdown_options},
+        "filter_col4": {"type": "multi", "options": dropdown_options},
+        "filter_col5": {"type": "multi", "options": dropdown_options},
+        "filter_val1": {"type": "", "options": None},
+        "filter_val2": {"type": "", "options": None},
+        "filter_val3": {"type": "", "options": None},
+        "filter_val4": {"type": "", "options": None},
+        "filter_val5": {"type": "", "options": None},
+        "duration_default": {"type": "single", "options": ["any", "7days", "30days", "90days"]},
+        "top_n": {"type": "single", "options": None},
+        "colormap": {"type": "textarea", "options": None},
+        "bin_size": {"type": "single", "options": None},
+        "color": {"type": "single", "options": None},
+        "x_title": {"type": "single", "options": None},
+        "y_title": {"type": "single", "options": None},
+        "legend_title": {"type": "single", "options": None},
+        "title": {"type": "single", "options": None},
+    }
+
+    grid_items = []
+
+    # Render ALL fields, but hide irrelevant ones with CSS
+    for element in all_fields:
+        if element not in template:
+            continue
             
-            field_component = html.Div(className="chart-col", style={
-                'flex': '1 0 calc(25% - 10px)',
-                'minWidth': '200px'
-            }, children=[
-                html.Label(element.replace('_', ' ').title(), className="form-label"),
-                dcc.Input(
-                    id={"type": f"chart-{element}", "section": section_index, "index": chart_index},
-                    value=field_value,
-                    placeholder=f"Enter {element.replace('_', ' ')}",
-                    className="form-input"
-                ),
-            ])
+        current_value = filters.get(element, template.get(element, ""))
         
-        current_row.append(field_component)
+        if current_value is None:
+            current_value = "" if FIELD_CONFIG.get(element, {}).get("type") == "single" else []
         
-        # Every 4 fields, or if it's the last field, create a new row
-        if len(current_row) == 4 or i == len(elements) - 1:
-            rows.append(html.Div(className="chart-row", style={
-                'display': 'flex',
-                'flexWrap': 'wrap',
-                'gap': '10px',
-                'marginBottom': '10px'
-            }, children=current_row))
-            current_row = []
+        # Use section and index for field IDs
+        field_id = {"type": f"chart-{element}", "section": section_index, "index": chart_index}
+        
+        # Determine if this field should be visible
+        is_visible = element in visible_fields
+        display_style = "" if is_visible else "none"
+        
+        if element in FIELD_CONFIG:
+            config = FIELD_CONFIG[element]
+            field_type = config.get("type", "single")
+            
+            if field_type == "multi":
+                options = config["options"] if config.get("options") else []
+                dropdown_opts = [{"label": opt, "value": opt} for opt in options] if options else []
+                
+                if isinstance(current_value, str) and current_value:
+                    current_value = [current_value]
+                elif not isinstance(current_value, list):
+                    current_value = []
+                
+                component = html.Div(
+                    className="chart-field",
+                    style={"display": display_style},
+                    children=[
+                        html.Label(element.replace("_", " ").title(), className="form-label"),
+                        dcc.Dropdown(
+                            id=field_id,
+                            options=dropdown_opts,
+                            value=current_value,
+                            placeholder=f"Select {element.replace('_', ' ')}",
+                            className="form-input",
+                            multi=True,
+                            clearable=True
+                        )
+                    ]
+                )
+            
+            elif field_type == "single" and config.get("options"):
+                dropdown_opts = [{"label": opt, "value": opt} for opt in config["options"]]
+                
+                component = html.Div(
+                    className="chart-field",
+                    style={"display": display_style},
+                    children=[
+                        html.Label(element.replace("_", " ").title(), className="form-label"),
+                        dcc.Dropdown(
+                            id=field_id,
+                            options=dropdown_opts,
+                            value=current_value if current_value else None,
+                            placeholder=f"Select {element.replace('_', ' ')}",
+                            className="form-input",
+                            clearable=True
+                        )
+                    ]
+                )
+            
+            elif field_type == "textarea":
+                component = html.Div(
+                    className="chart-field",
+                    style={"display": display_style},
+                    children=[
+                        html.Label(element.replace("_", " ").title(), className="form-label"),
+                        dcc.Textarea(
+                            id=field_id,
+                            value=json.dumps(current_value if isinstance(current_value, dict) else {}, indent=2),
+                            className="form-input",
+                            style={"height": "80px", "resize": "vertical"}
+                        )
+                    ]
+                )
+            
+            else:
+                component = html.Div(
+                    className="chart-field",
+                    style={"display": display_style},
+                    children=[
+                        html.Label(element.replace("_", " ").title(), className="form-label"),
+                        dcc.Input(
+                            id=field_id,
+                            value=str(current_value) if current_value else "",
+                            placeholder=f"Enter {element.replace('_', ' ')}",
+                            className="form-input",
+                            type="text"
+                        )
+                    ]
+                )
+        grid_items.append(component)
     
-    return html.Div(className="chart-fields-container", children=rows)
+    return html.Div(className="chart-grid", children=grid_items)
 
 def create_count_item(count_data=None, index=None):
     def ensure_list(value):
@@ -523,36 +628,56 @@ def create_count_item(count_data=None, index=None):
 
 
     return html.Div(className="count-item", children=[
-        html.Div(className="count-row", children=[
-            html.Div(className="count-col", children=[
-                html.Label("Count ID *", className="form-label"),
+        html.Div(style={"display": "flex","gap":"5px"}, children=[
+            html.Div(className="count-col", style={"display": "none"}, children=[
+                html.Label("ID *", className="form-label-disabled"),
                 dcc.Input(
                     id={"type": "count-id", "index": index},
                     value=count_data.get('id', f'count_{uuid.uuid4().hex[:8]}'),
                     placeholder="unique_id",
-                    className="form-input"
+                    disabled=True,
+                    className="form-input",
                 ),
             ]),
             html.Div(className="count-col", children=[
-                html.Label("Metric Name *", className="form-label"),
+                html.Label("Metric Title *", className="form-label"),
                 dcc.Input(
                     id={"type": "count-name", "index": index},
                     value=count_data.get('name', ''),
-                    placeholder="e.g. Total Registrations",
+                    placeholder="",
                     className="form-input"
                 ),
             ]),
             html.Div(className="count-col", children=[
-                html.Label("Unique Column", className="form-label"),
-                dcc.Input(
+                html.Label("Aggregation", className="form-label"),
+                dcc.Dropdown(
+                    id={"type": "count-aggregations", "index": index},
+                    value=count_data.get('filters', {}).get('measure', 'count'),
+                    options=[
+                        {'label': item, 'value': item}
+                        for item in aggregations
+                    ],
+                    className="form-input"
+                ),
+            ]),
+            html.Div(className="count-col", children=[
+                html.Label("Aggregate using", className="form-label"),
+                dcc.Dropdown(
                     id={"type": "count-unique", "index": index},
                     value=count_data.get('filters', {}).get('unique', 'person_id'),
-                    placeholder="e.g person_id",
+                    options=[
+                        {'label': item, 'value': item}
+                        for item in actual_keys_in_data
+                    ],
                     className="form-input"
                 ),
             ]),
             html.Div(className="count-col", children=[
                 html.Label("Actions", className="form-label"),
+                html.Button("Save", 
+                          id={"type": "save-count", "index": index},
+                          n_clicks=0,
+                          className="btn-save btn-small"),
                 html.Button("🗑️", 
                           id={"type": "remove-count", "index": index},
                           n_clicks=0,
@@ -561,7 +686,7 @@ def create_count_item(count_data=None, index=None):
         ]),
 
         # Level 1 Filters
-        html.Div(className="count-row", children=[
+        html.Div(style={"display": "flex","gap":"5px"}, children=[
             html.Div(className="count-col", style={"display": "none"},  children=[
                 html.Label("Filter Variable 1", className="form-label"),
                 dcc.Input(
@@ -572,7 +697,7 @@ def create_count_item(count_data=None, index=None):
                 ),
             ]),
             html.Div(className="count-col", children=[
-                html.Label("Program Filter (Var1)", className="form-label"),
+                html.Label("Program", className="form-label"),
                 dcc.Dropdown(
                     id={"type": "count-val1", "index": index},
                     value=value1,
@@ -593,7 +718,7 @@ def create_count_item(count_data=None, index=None):
                 ),
             ]),
             html.Div(className="count-col", children=[
-                html.Label("Encounter Filter (Var2)", className="form-label"),
+                html.Label("Encounter Name", className="form-label"),
                 dcc.Dropdown(
                     id={"type": "count-val2", "index": index},
                     value=value2,
@@ -602,7 +727,6 @@ def create_count_item(count_data=None, index=None):
                         {'label': item, 'value': item}
                         for item in drop_down_encounters
                     ],
-                    placeholder="",
                     className="form-input"
                 ),
             ]),
@@ -615,7 +739,7 @@ def create_count_item(count_data=None, index=None):
                 ),
             ]),
             html.Div(className="count-col", children=[
-                html.Label("Concept Name (Var3)", className="form-label"),
+                html.Label("Concept Question", className="form-label"),
                 dcc.Dropdown(
                     id={"type": "count-val3", "index": index},
                     value=value3,
@@ -637,36 +761,22 @@ def create_count_item(count_data=None, index=None):
                 ),
             ]),
             html.Div(className="count-col", children=[
-                html.Label("Obs Value Coded (Var4)", className="form-label"),
-                dcc.Input(
+                html.Label("Concept (Obs Value Coded)", className="form-label"),
+                dcc.Dropdown(
                     id={"type": "count-val4", "index": index},
                     value=count_data.get('filters', {}).get('value4', ''),
-                    placeholder="Input Obs Value Coded",
+                    multi=True,
+                    options=[
+                        {'label': item, 'value': item}
+                        for item in dcc_json['concept_answers']
+                    ],
                     className="form-input"
                 ),
             ])
         ]),
 
         # Level 2 filters
-        html.Div(className="count-row", children=[
-            html.Div(className="count-col", style={"display": "none"},  children=[
-                html.Label("Filter Variable 5", className="form-label"),
-                dcc.Input(
-                    id={"type": "count-var5", "index": index},
-                    value=count_data.get('filters', {}).get('variable5', 'ValueN'),
-                    className="form-input",
-
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Obs Value Numeric (Var5)", className="form-label"),
-                dcc.Input(
-                    id={"type": "count-val5", "index": index},
-                    value=count_data.get('filters', {}).get('value5', ''),
-                    placeholder="Input Obs Value Numeric",
-                    className="form-input"
-                ),
-            ]),
+        html.Div(style={"display": "flex","gap":"5px"}, children=[
             html.Div(className="count-col",style={"display": "none"}, children=[
                 html.Label("Filter Variable 6",  className="form-label"),
                 dcc.Input(
@@ -676,11 +786,15 @@ def create_count_item(count_data=None, index=None):
                 ),
             ]),
             html.Div(className="count-col", children=[
-                html.Label("Drugs Name (Var6)", className="form-label"),
-                dcc.Input(
+                html.Label("Drug Name", className="form-label"),
+                dcc.Dropdown(
                     id={"type": "count-val6", "index": index},
                     value=count_data.get('filters', {}).get('value6', ''),
-                    placeholder="Input Drug Name",
+                    multi=True,
+                    options=[
+                        {'label': item, 'value': item}
+                        for item in dcc_json['DrugName']
+                    ],
                     className="form-input"
                 ),
             ]),
@@ -693,29 +807,48 @@ def create_count_item(count_data=None, index=None):
                 ),
             ]),
             html.Div(className="count-col", children=[
-                html.Label("Gender (Var7)", className="form-label"),
-                dcc.Input(
+                html.Label("Gender", className="form-label"),
+                dcc.Dropdown(
                     id={"type": "count-val7", "index": index},
                     value=count_data.get('filters', {}).get('value7', ''),
-                    placeholder="Input Gender",
+                    multi=True,
+                    options=[
+                        {'label': item, 'value': item}
+                        for item in dcc_json['gender']
+                    ],
                     className="form-input"
                 ),
-            ])
-            ,
+            ]),
+            html.Div(className="count-col", style={"display": "none"},  children=[
+                html.Label("Filter Variable 5", className="form-label"),
+                dcc.Input(
+                    id={"type": "count-var5", "index": index},
+                    value=count_data.get('filters', {}).get('variable5', 'ValueN'),
+                    className="form-input",
+
+                ),
+            ]),
+            html.Div(className="count-col", children=[
+                html.Label("Obs Value Numeric", className="form-label"),
+                dcc.Input(
+                    id={"type": "count-val5", "index": index},
+                    value=count_data.get('filters', {}).get('value5', ''),
+                    className="form-input"
+                ),
+            ]),
             html.Div(className="count-col",style={"display": "none"}, children=[
                 html.Label("Filter Variable 8", className="form-label"),
                 dcc.Input(
                     id={"type": "count-var8", "index": index},
-                    value=count_data.get('filters', {}).get('variable8', 'Age_Group'),
+                    value=count_data.get('filters', {}).get('variable8', 'Age'),
                     className="form-input"
                 ),
             ]),
             html.Div(className="count-col", children=[
-                html.Label("Age Goup (Var8)", className="form-label"),
+                html.Label("Age", className="form-label"),
                 dcc.Input(
                     id={"type": "count-val8", "index": index},
                     value=count_data.get('filters', {}).get('value8', ''),
-                    placeholder="Input Age Group",
                     className="form-input"
                 ),
             ])
@@ -725,15 +858,17 @@ def create_count_item(count_data=None, index=None):
 def create_chart_item(chart_data=None, section_index=None, chart_index=None):
     chart_data = chart_data or {}
     chart_type = chart_data.get('type', 'Bar')
+    chart_id = chart_data.get('id', f'chart_{uuid.uuid4().hex[:8]}')
     
     return html.Div(className="chart-item", children=[
-        html.Div(className="chart-row", children=[
+        html.Div(style={"display": "flex","gap":"5px"}, children=[
             html.Div(className="chart-col", children=[
-                html.Label("Chart ID *", className="form-label"),
+                html.Label("Chart ID *", className="form-label-disabled"),
                 dcc.Input(
                     id={"type": "chart-id", "section": section_index, "index": chart_index},
-                    value=chart_data.get('id', f'chart_{uuid.uuid4().hex[:8]}'),
+                    value=chart_id,
                     placeholder="chart_id",
+                    disabled=True,
                     className="form-input"
                 ),
             ]),
@@ -750,21 +885,31 @@ def create_chart_item(chart_data=None, section_index=None, chart_index=None):
                 html.Label("Chart Type *", className="form-label"),
                 dcc.Dropdown(
                     id={"type": "chart-type", "section": section_index, "index": chart_index},
-                    options=[{'label': t, 'value': t} for t in CHART_TEMPLATES.keys()],
+                    options=[{'label': t, 'value': t} for t in CHART_TEMPLATES_ORIGINAL.keys()],
                     value=chart_type,
                     className="dropdown"
                 ),
             ]),
             html.Div(className="chart-col", children=[
                 html.Label("Actions", className="form-label"),
-                html.Button("🗑️", 
-                          id={"type": "remove-chart", "section": section_index, "index": chart_index},
-                          n_clicks=0,
-                          className="btn-danger btn-small")
+                html.Button(
+                    "Save", 
+                    id={"type": "save-chart", "section": section_index, "index": chart_index},
+                    n_clicks=0,
+                    className="btn-save btn-small"
+                ),
+                html.Button(
+                    "Delete", 
+                    id={"type": "remove-chart", "section": section_index, "index": chart_index},
+                    n_clicks=0,
+                    className="btn-danger btn-small"
+                )
             ]),
         ]),
-        html.Div(id={"type": "chart-fields", "section": section_index, "index": chart_index},
-                children=create_chart_fields(chart_type, chart_data, section_index, chart_index)),
+        html.Div(
+            id={"type": "chart-fields", "section": section_index, "index": chart_index},
+            children=create_chart_fields(chart_type, chart_data, section_index, chart_index)
+        ),
     ])
 
 def create_section(section_data=None, index=None):
@@ -809,6 +954,51 @@ def create_section(section_data=None, index=None):
     ])
 
 CHART_TEMPLATES = {
+    "Chart": {
+        "measure": "chart",
+        "unique": "any",
+        "duration_default": "7days",
+        "date_col": "Date",
+        "y_col": "",
+        "title": "",
+        "x_title": "Date",
+        "y_title": "Number of Patients",
+        "unique_column": "person_id",
+        "legend_title": "Legend",
+        "color": "",
+        # Bar chart fields (included but not used)
+        "label_col": "",
+        "value_col": "",
+        "top_n": 10,
+        # Pie chart fields
+        "names_col": "",
+        "values_col": "",
+        "colormap": {},
+        # Column chart fields
+        "x_col": "",
+        # Histogram fields
+        "age_col": "Age",
+        "gender_col": "Gender",
+        "bin_size": 5,
+        # PivotTable fields
+        "index_col1": "",
+        "columns": "",
+        "aggfunc": "count",
+        # Common filters
+        "filter_col1": "",
+        "filter_val1": "",
+        "filter_col2": "",
+        "filter_val2": "",
+        "filter_col3": "",
+        "filter_val3": "",
+        "filter_col4": "",
+        "filter_val4": "",
+        "filter_col5": "",
+        "filter_val5": ""
+    }
+}
+
+CHART_TEMPLATES_ORIGINAL = {
     "Line": {
         "measure": "chart",
         "unique": "any",

@@ -64,6 +64,7 @@ def render_nav(url_params):
     try:
         location = url_params.get('Location', [None])[0] if url_params else None
         uuid = url_params.get('uuid', [None])[0] if url_params else None
+        user_level = url_params.get('user_level', [None])[0] if url_params else None
         path = os.getcwd()
         timestamp_path = os.path.join(path, 'data','TimeStamp.csv')
         users_path = os.path.join(path, 'data','users_data.csv')
@@ -71,7 +72,9 @@ def render_nav(url_params):
         users = pd.read_csv(users_path)
 
         query = ""
-        if location and uuid:
+        if location and uuid and user_level:
+            query = f"?Location={location}&uuid={uuid}&user_level={user_level}"
+        elif location and uuid:
             query = f"?Location={location}&uuid={uuid}"
         elif location:
             query = f"?Location={location}"
@@ -158,7 +161,14 @@ def update_nav_links(url_params):
     try:
         location = url_params.get('Location', [None])[0] if url_params else None
         uuid = url_params.get('uuid', [None])[0] if url_params else None
-        query = f"?Location={location}&uuid={uuid}" if location and uuid else f"?Location={location}" if location else f"?uuid={uuid}" if uuid else ""
+        user_level = url_params.get('user_level', [None])[0] if url_params else None
+        # print(f"Updating nav links with Location: {location}, UUID: {uuid}, User Level: {user_level}")
+        # query = f"?Location={location}&uuid={uuid}" if location and uuid else f"?Location={location}" if location else f"?uuid={uuid}" if uuid else ""
+        query = f"?Location={location}&uuid={uuid}&user_level={user_level}" if location and uuid and user_level else \
+                f"?Location={location}&uuid={uuid}" if location and uuid else \
+                f"?Location={location}&user_level={user_level}" if location and user_level else \
+                f"?uuid={uuid}&user_level={user_level}" if uuid and user_level else \
+                f"?Location={location}" if location else f"?uuid={uuid}" if uuid else f"?user_level={user_level}" if user_level else ""
         path = os.getcwd()
         json_path = os.path.join(path, 'data','TimeStamp.csv')
         last_updated = pd.read_csv(json_path)['saving_time'].to_list()[0]
