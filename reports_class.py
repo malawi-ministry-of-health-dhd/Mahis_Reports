@@ -52,6 +52,9 @@ class ReportTableBuilder:
                 "num_field": num_field,
                 "unique_column": unique_column,
                 "pairs": pairs,
+                "literal_value": row.get("literal_value", ""),
+                "numerator_filter": str(row.get("numerator_filter", "")).strip(),
+                "denominator_filter": str(row.get("denominator_filter", "")).strip(),
             }
 
     @staticmethod
@@ -101,6 +104,26 @@ class ReportTableBuilder:
 
         spec = self.filters_map[filter_name]
         measure = spec["measure"]
+        if measure == "literal":
+            result_str = "" if spec["literal_value"] is None else str(spec["literal_value"])
+            self._value_cache[filter_name] = result_str
+            return result_str
+
+        if measure == "percentage":
+            numerator_name = spec.get("numerator_filter", "")
+            denominator_name = spec.get("denominator_filter", "")
+            num_raw = self._compute_value_from_filter(numerator_name)
+            den_raw = self._compute_value_from_filter(denominator_name)
+            try:
+                num = float(str(num_raw).replace("%", "").strip() or 0)
+                den = float(str(den_raw).replace("%", "").strip() or 0)
+                result = 0 if den == 0 else round((num / den) * 100, 1)
+                result_str = f"{result:g}%"
+            except Exception:
+                result_str = "N/A"
+            self._value_cache[filter_name] = result_str
+            return result_str
+
         args: List[Any] = [self.filtered_df]
         args_cohort: List[Any] = [self.original_df] #cohort data that is not filtered on report to display all patients from the beginning
 
