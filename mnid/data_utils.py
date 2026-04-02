@@ -3,11 +3,17 @@
 import json
 import pandas as pd
 
-from .constants import FACILITY_DISTRICT, FACILITY_NAMES
+from .constants import (
+    ALL_DISTRICTS,
+    ALL_FACILITIES,
+    FACILITY_COORDS,
+    FACILITY_DISTRICT,
+    FACILITY_NAMES,
+)
 
 
 def register_facility_metadata(df: pd.DataFrame) -> None:
-    """Update facility name and district maps from live MNID data."""
+    """Update live facility metadata caches from the current MNID dataframe."""
     if df is None or df.empty:
         return
 
@@ -18,6 +24,8 @@ def register_facility_metadata(df: pd.DataFrame) -> None:
             name = str(row.Facility).strip()
             if code and name:
                 FACILITY_NAMES[code] = name
+                if code not in ALL_FACILITIES:
+                    ALL_FACILITIES.append(code)
 
     if {'Facility_CODE', 'District'}.issubset(df.columns):
         dist_meta = df[['Facility_CODE', 'District']].dropna().drop_duplicates()
@@ -26,6 +34,17 @@ def register_facility_metadata(df: pd.DataFrame) -> None:
             district = str(row.District).strip()
             if code and district:
                 FACILITY_DISTRICT[code] = district
+                if district not in ALL_DISTRICTS:
+                    ALL_DISTRICTS.append(district)
+
+    if {'Facility_CODE', 'Facility', 'District'}.issubset(df.columns):
+        combo = df[['Facility_CODE', 'Facility', 'District']].dropna().drop_duplicates()
+        for row in combo.itertuples(index=False):
+            code = str(row.Facility_CODE).strip()
+            name = str(row.Facility).strip()
+            district = str(row.District).strip()
+            if code:
+                FACILITY_COORDS.setdefault(code, (None, None, name or code, district))
 
 
 def prepare_mnid_dataframe(df: pd.DataFrame | None) -> pd.DataFrame:
@@ -61,4 +80,3 @@ def deserialize_store_df(records: list[dict] | None) -> pd.DataFrame:
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
     register_facility_metadata(df)
     return df
-

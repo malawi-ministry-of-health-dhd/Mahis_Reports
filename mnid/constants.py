@@ -1,7 +1,7 @@
-"""Shared MNID constants and metadata."""
+"""Shared MNID constants and mutable live metadata caches."""
 
 OK_C    = '#16A34A'
-WARN_C  = '#FFFF00'
+WARN_C  = '#FFC107'
 DANGER_C = '#DC2626'
 INFO_C  = '#475569'
 MUTED   = '#94A3B8'
@@ -28,47 +28,9 @@ HEATMAP_CS = [
     [1.00, OK_C],
 ]
 
-FACILITY_DISTRICT = {
-    'LL040033': 'Lilongwe',
-    'MZ120004': 'Mzuzu',
-    'BL050022': 'Blantyre',
-    'BT020011': 'Lilongwe',
-    'KS010001': 'Kasungu',
-    'SL020001': 'Salima',
-    'ZO030001': 'Zomba',
-    'NT080001': 'Ntcheu',
-    'KR060001': 'Karonga',
-    'RP070001': 'Rumphi',
-    'LL040099': 'Lilongwe',
-    'BL050099': 'Blantyre',
-}
-
-ALL_FACILITIES = [
-    'LL040033', 'LL040099', 'BT020011',
-    'MZ120004', 'KR060001', 'RP070001',
-    'BL050022', 'BL050099', 'ZO030001',
-    'KS010001', 'SL020001', 'NT080001',
-]
-
-ALL_DISTRICTS = [
-    'Karonga', 'Rumphi', 'Mzuzu',
-    'Kasungu', 'Lilongwe', 'Salima',
-    'Ntcheu', 'Zomba', 'Blantyre',
-]
-
-FACILITY_COORDS = {
-    'LL040033': (-13.9626, 33.7741, 'Lilongwe Central Hospital', 'Lilongwe'),
-    'LL040099': (-13.9500, 33.7800, 'Kamuzu Central Hospital', 'Lilongwe'),
-    'BT020011': (-13.9780, 33.7853, 'Bwaila District Hospital', 'Lilongwe'),
-    'MZ120004': (-11.4534, 34.0192, 'Mzuzu Urban Health Centre', 'Mzuzu'),
-    'BL050022': (-15.7861, 35.0058, 'Blantyre South Health Centre', 'Blantyre'),
-    'BL050099': (-15.7800, 35.0200, 'Queen Elizabeth CH', 'Blantyre'),
-    'KS010001': (-13.0147, 33.4800, 'Kasungu District Hospital', 'Kasungu'),
-    'SL020001': (-13.7833, 34.4500, 'Salima District Hospital', 'Salima'),
-    'ZO030001': (-15.3833, 35.3167, 'Zomba Central Hospital', 'Zomba'),
-    'NT080001': (-14.9833, 34.6333, 'Ntcheu District Hospital', 'Ntcheu'),
-    'KR060001': (-9.9333, 33.9667, 'Karonga District Hospital', 'Karonga'),
-    'RP070001': (-10.7833, 34.0333, 'Rumphi District Hospital', 'Rumphi'),
-}
-
-FACILITY_NAMES = {k: v[2] for k, v in FACILITY_COORDS.items()}
+# Live metadata is filled from the MAHIS dataframe during MNID rendering.
+FACILITY_DISTRICT = {}
+ALL_FACILITIES = []
+ALL_DISTRICTS = []
+FACILITY_COORDS = {}
+FACILITY_NAMES = {}

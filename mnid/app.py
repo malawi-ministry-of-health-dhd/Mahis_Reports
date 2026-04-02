@@ -16,14 +16,18 @@ from mnid.constants import (
     OK_C, WARN_C, DANGER_C, INFO_C, MUTED, GRID_C, BG, BORDER, TEXT, DIM, FONT,
     CAT_PALETTES, HEATMAP_CS, FACILITY_DISTRICT as _FACILITY_DISTRICT,
     ALL_FACILITIES as _ALL_FACILITIES, ALL_DISTRICTS as _ALL_DISTRICTS,
-    FACILITY_COORDS as _FACILITY_COORDS, FACILITY_NAMES as _FACILITY_NAMES,
+    FACILITY_NAMES as _FACILITY_NAMES,
 )
 from mnid.data_utils import (
     prepare_mnid_dataframe as _prepare_mnid_dataframe,
     serialize_store_df as _serialize_store_df,
     deserialize_store_df as _deserialize_store_df,
 )
-from mnid.geo_utils import load_malawi_district_geojson as _load_malawi_district_geojson
+from mnid.geo_utils import (
+    load_malawi_district_geojson as _load_malawi_district_geojson,
+    build_geo_reference as _build_geo_reference,
+    derive_facility_positions as _derive_facility_positions,
+)
 
 
 _CHART_LAYOUT = dict(
@@ -419,7 +423,7 @@ def _compute_heatmap_store(mch_full: pd.DataFrame, tracked: list,
     if len(mch_full) and 'Facility_CODE' in mch_full.columns:
         all_facilities = sorted(mch_full['Facility_CODE'].dropna().astype(str).unique().tolist())
     else:
-        all_facilities = _ALL_FACILITIES[:]
+        all_facilities = sorted(_ALL_FACILITIES[:])
 
     geojson = _load_malawi_district_geojson()
     geo_districts = sorted({
@@ -435,7 +439,7 @@ def _compute_heatmap_store(mch_full: pd.DataFrame, tracked: list,
             for f in all_facilities
             if _FACILITY_DISTRICT.get(f)
         })
-    all_districts = sorted(set(data_districts) | set(geo_districts)) or _ALL_DISTRICTS[:]
+    all_districts = sorted(set(data_districts) | set(geo_districts) | set(_ALL_DISTRICTS))
 
     if facility_code and facility_code not in all_facilities:
         all_facilities.insert(0, facility_code)
@@ -470,6 +474,7 @@ def _compute_heatmap_store(mch_full: pd.DataFrame, tracked: list,
         d: [f for f in all_facilities if _FACILITY_DISTRICT.get(f) == d]
         for d in all_districts
     }
+    store['facilities_by_district'] = district_facs_map
 
     for ylbl, yval in year_options.items():
         df = mch_full[mch_full['Date'].dt.year == yval].copy() if yval else mch_full.copy()
@@ -611,7 +616,8 @@ def _build_heatmap_fig(stored: dict, view: str, year: str,
     elif view == 'by_district':
         data = stored.get('by_district', {}).get(year, {})
     elif view == 'district_facs':
-        dist = district or stored.get('current_district', stored.get('all_districts', _ALL_DISTRICTS)[0] if stored.get('all_districts') else _ALL_DISTRICTS[0])
+        default_districts = stored.get('all_districts', [])
+        dist = district or stored.get('current_district') or (default_districts[0] if default_districts else '')
         data = stored.get('by_district_facs', {}).get(dist, {}).get(year, {})
     elif view == 'yearly':
         data = stored.get('yearly') or {}
@@ -707,85 +713,6 @@ def _build_heatmap_fig(stored: dict, view: str, year: str,
 
 # # MNID geographic map data for the main heatmap
 
-_DISTRICT_POLYGONS = {
-    # # MNID northern region map shapes
-    'Karonga': [
-        (4.7, 99), (5.8, 99), (7.0, 97), (7.4, 94), (6.8, 90),
-        (5.6, 89), (4.5, 91), (4.3, 95),
-    ],
-    'Rumphi': [
-        (4.3, 91), (4.5, 91), (5.6, 89), (6.8, 90), (7.4, 94),
-        (8.2, 89), (8.6, 84), (8.1, 79), (6.9, 77), (5.6, 77),
-        (4.4, 79), (4.1, 85),
-    ],
-    'Mzuzu': [
-        (4.1, 79), (4.4, 79), (5.6, 77), (6.9, 77), (8.1, 79),
-        (8.6, 84), (9.1, 74), (9.0, 66), (8.3, 60), (7.4, 57),
-        (6.3, 56), (5.3, 56), (4.5, 57), (4.0, 63), (3.8, 72),
-    ],
-    # # MNID central region map shapes
-    'Kasungu': [
-        (3.9, 57), (4.5, 57), (5.3, 56), (6.3, 56), (7.4, 57),
-        (7.6, 53), (7.3, 47), (6.2, 43), (5.0, 43), (3.9, 45), (3.8, 51),
-    ],
-    'Salima': [
-        (7.9, 53), (9.0, 51), (10.2, 48), (10.6, 43), (11.8, 45),
-        (13.0, 43), (13.3, 38), (12.2, 33), (10.7, 32), (9.7, 34),
-        (8.7, 38), (8.3, 44),
-    ],
-    'Lilongwe': [
-        (3.9, 45), (5.0, 43), (6.2, 43), (7.3, 47), (7.6, 53),
-        (7.9, 53), (8.3, 44), (8.7, 38), (9.7, 34), (10.7, 32),
-        (10.9, 27), (10.6, 23), (9.5, 21), (8.5, 20), (7.5, 21),
-        (6.5, 22), (5.7, 24), (5.0, 28), (4.3, 34), (3.9, 40),
-    ],
-    # # MNID southern region map shapes
-    'Ntcheu': [
-        (5.0, 28), (5.7, 24), (6.5, 22), (7.5, 21), (8.5, 20),
-        (9.5, 21), (10.6, 23), (10.9, 27), (10.7, 32), (9.7, 34),
-        (8.7, 38), (8.2, 35), (7.2, 31), (6.1, 29), (5.3, 29),
-    ],
-    'Zomba': [
-        (9.7, 34), (10.7, 32), (12.2, 33), (13.3, 38), (13.5, 30),
-        (13.1, 23), (12.1, 17), (10.7, 16), (9.7, 19), (9.2, 25),
-        (9.2, 30),
-    ],
-    'Blantyre': [
-        (5.0, 28), (5.3, 29), (6.1, 29), (7.2, 31), (8.2, 35),
-        (9.2, 30), (9.2, 25), (9.7, 19), (10.7, 16), (11.5, 13),
-        (11.6, 8), (10.7, 4), (9.1, 1), (7.6, 0.5), (6.5, 1.5),
-        (5.6, 4), (5.1, 8), (4.9, 14), (4.9, 20), (5.0, 25),
-    ],
-}
-
-_DISTRICT_LABEL_POS = {
-    'Karonga':  (5.8, 94),
-    'Rumphi':   (6.2, 85),
-    'Mzuzu':    (6.5, 69),
-    'Kasungu':  (5.7, 50),
-    'Salima':   (11.0, 41),
-    'Lilongwe': (7.1, 35),
-    'Ntcheu':   (7.5, 27),
-    'Zomba':    (11.2, 26),
-    'Blantyre': (7.5, 11),
-}
-
-_FACILITY_MAP_POS = {
-    'LL040033': (7.3, 37),
-    'LL040099': (7.8, 35),
-    'BT020011': (6.5, 34),
-    'MZ120004': (6.6, 71),
-    'BL050022': (8.3, 13),
-    'BL050099': (7.1, 9),
-    'KS010001': (5.8, 51),
-    'SL020001': (11.5, 40),
-    'ZO030001': (11.4, 24),
-    'NT080001': (7.8, 28),
-    'KR060001': (5.8, 93),
-    'RP070001': (6.3, 84),
-}
-
-
 def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
                            district: str | None = None,
                            sel_inds: list | None = None) -> go.Figure:
@@ -793,22 +720,20 @@ def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
     current_fac   = stored.get('current_fac', '')
     current_dist  = stored.get('current_district', '')
     all_labels    = stored.get('y_labels', [])
-    dyn_districts = stored.get('all_districts', _ALL_DISTRICTS)
+    dyn_districts = stored.get('all_districts', [])
 
     if sel_inds:
         rows_idx = [i for i, lbl in enumerate(all_labels) if lbl in sel_inds]
     else:
         rows_idx = list(range(len(all_labels)))
 
-    # Derive facility list from store (keys in by_facility x-axis)
     by_fac_data = stored.get('by_facility', {}).get(year, {})
     store_fac_x = by_fac_data.get('x', [])
-    # strip the * marker to get raw codes
     store_facs  = [f.rstrip('*') for f in store_fac_x]
 
     def _fac_avg(fac_code):
         fac_z = by_fac_data.get('z', [])
-        key   = f'{fac_code}*' if fac_code == current_fac else fac_code
+        key = f'{fac_code}*' if fac_code == current_fac else fac_code
         if key not in store_fac_x:
             return None
         ci = store_fac_x.index(key)
@@ -817,314 +742,143 @@ def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
         return round(sum(vals) / len(vals), 1) if vals else None
 
     focus_dist  = district or current_dist
-    highlighted = {focus_dist} if view == 'district_facs' else set(dyn_districts)
-
     geojson = _load_malawi_district_geojson()
-    if geojson and view in ('by_district', 'by_facility', 'district_facs'):
-        geo_districts = sorted({
-            f.get('properties', {}).get('shapeName')
-            for f in geojson.get('features', [])
-            if f.get('properties', {}).get('shapeName')
-        })
-        display_districts = geo_districts or dyn_districts
-        geo_rows = []
-        for dist in display_districts:
-            cov = district_avgs.get(dist)
-            geo_rows.append({
-                'district': dist,
-                'coverage': cov if cov is not None else -1,
-                'coverage_label': f'{_display_pct(cov):.1f}%' if cov is not None else 'No data',
-            })
-        geo_df = pd.DataFrame(geo_rows)
-        if len(geo_df):
-            bounds_lon = []
-            bounds_lat = []
-            for feature in geojson.get('features', []):
-                geom = feature.get('geometry', {})
-                if geom.get('type') == 'Polygon':
-                    polygons = [geom.get('coordinates', [])]
-                elif geom.get('type') == 'MultiPolygon':
-                    polygons = geom.get('coordinates', [])
-                else:
-                    polygons = []
-                for polygon in polygons:
-                    if not polygon:
-                        continue
-                    ring = polygon[0]
-                    bounds_lon.extend(pt[0] for pt in ring)
-                    bounds_lat.extend(pt[1] for pt in ring)
+    geo_ref = _build_geo_reference(geojson)
+    if not geo_ref:
+        fig = go.Figure()
+        fig.add_annotation(text='District GeoJSON not available for MNID map',
+                           xref='paper', yref='paper', x=0.5, y=0.5,
+                           showarrow=False, font=dict(size=12, color=MUTED))
+        fig.update_layout(paper_bgcolor=BG, plot_bgcolor=BG, height=560)
+        return fig
 
-            min_lon, max_lon = min(bounds_lon), max(bounds_lon)
-            min_lat, max_lat = min(bounds_lat), max(bounds_lat)
-            lon_span = max(max_lon - min_lon, 1e-6)
-            lat_span = max(max_lat - min_lat, 1e-6)
-            y_scale = lat_span / lon_span
+    district_rings = geo_ref.get('district_rings', {})
+    district_centroids = geo_ref.get('district_centroids', {})
+    y_scale = geo_ref.get('y_scale', 1.0)
+    display_districts = sorted(set(dyn_districts) | set(district_rings.keys()) | set(district_avgs.keys()))
 
-            def _norm(lon, lat):
-                x = (lon - min_lon) / lon_span
-                y = (lat - min_lat) / lat_span * y_scale
-                return x, y
+    fig = go.Figure()
+    shapes = []
+    hover_x = []
+    hover_y = []
+    hover_cd = []
+    label_x = []
+    label_y = []
+    label_text = []
 
-            fig = go.Figure()
-            shapes = []
-            label_x = []
-            label_y = []
-            label_text = []
-            hover_x = []
-            hover_y = []
-            hover_cd = []
-
-            for feature in geojson.get('features', []):
-                props = feature.get('properties', {})
-                dist = props.get('shapeName')
-                if dist not in set(geo_df['district']):
-                    continue
-                row = geo_df[geo_df['district'] == dist].iloc[0]
-                cov = None if row['coverage'] == -1 else float(row['coverage'])
-                fill = _cov_color(cov) if cov is not None else '#E2E8F0'
-                line_color = '#0F172A' if (view == 'district_facs' and dist == focus_dist) else '#FFFFFF'
-                line_width = 2.8 if (view == 'district_facs' and dist == focus_dist) else 1.4
-                geom = feature.get('geometry', {})
-                if geom.get('type') == 'Polygon':
-                    polygons = [geom.get('coordinates', [])]
-                elif geom.get('type') == 'MultiPolygon':
-                    polygons = geom.get('coordinates', [])
-                else:
-                    polygons = []
-
-                label_pts = []
-                for polygon in polygons:
-                    if not polygon:
-                        continue
-                    ring = polygon[0]
-                    pts = [_norm(lon, lat) for lon, lat in ring]
-                    if not pts:
-                        continue
-                    label_pts.extend(pts)
-                    path = 'M ' + ' L '.join(f'{x:.6f},{y:.6f}' for x, y in pts) + ' Z'
-                    shapes.append(dict(
-                        type='path',
-                        path=path,
-                        xref='x', yref='y',
-                        fillcolor=fill,
-                        line=dict(color=line_color, width=line_width),
-                        layer='below',
-                    ))
-
-                if label_pts:
-                    cx = sum(p[0] for p in label_pts) / len(label_pts)
-                    cy = sum(p[1] for p in label_pts) / len(label_pts)
-                    hover_x.append(cx)
-                    hover_y.append(cy)
-                    hover_cd.append([dist, row['coverage_label']])
-                    if view != 'by_facility':
-                        label_x.append(cx)
-                        label_y.append(cy)
-                        label_text.append(f'<b>{dist}</b><br>{row["coverage_label"]}')
-
-            if shapes:
-                fig.update_layout(shapes=shapes)
-
-            if hover_x:
-                fig.add_trace(go.Scatter(
-                    x=hover_x,
-                    y=hover_y,
-                    mode='markers',
-                    marker=dict(size=10, color='rgba(0,0,0,0)'),
-                    customdata=hover_cd,
-                    hovertemplate='<b>%{customdata[0]}</b><br>Avg coverage: %{customdata[1]}<extra></extra>',
-                    showlegend=False,
-                ))
-
-            if label_x:
-                fig.add_trace(go.Scatter(
-                    x=label_x,
-                    y=label_y,
-                    mode='text',
-                    text=label_text,
-                    textfont=dict(size=10, color='#FFFFFF', family=FONT),
-                    hoverinfo='skip',
-                    showlegend=False,
-                ))
-
-            if view in ('by_facility', 'district_facs'):
-                if view == 'by_facility':
-                    fac_codes = store_facs
-                else:
-                    fac_codes = [f for f in store_facs if _FACILITY_DISTRICT.get(f) == focus_dist]
-
-                fac_x = []
-                fac_y = []
-                fac_text = []
-                fac_size = []
-                fac_color = []
-                for fac in fac_codes:
-                    coords = _FACILITY_COORDS.get(fac)
-                    if not coords:
-                        continue
-                    lat, lon, name, dist = coords
-                    x, y = _norm(lon, lat)
-                    avg = _fac_avg(fac)
-                    fac_x.append(x)
-                    fac_y.append(y)
-                    fac_text.append(f'<b>{name}</b><br>{dist}<br>Avg coverage: {f"{_display_pct(avg):.1f}%" if avg is not None else "No data"}')
-                    fac_size.append(14 if fac == current_fac else 10)
-                    fac_color.append(_cov_color(avg) if avg is not None else '#CBD5E1')
-
-                if fac_x and fac_y:
-                    fig.add_trace(go.Scatter(
-                        x=fac_x,
-                        y=fac_y,
-                        mode='markers',
-                        text=fac_text,
-                        hovertemplate='%{text}<extra></extra>',
-                        marker=dict(
-                            size=fac_size,
-                            color=fac_color,
-                            line=dict(color='#FFFFFF', width=1.2),
-                            opacity=0.95,
-                        ),
-                        showlegend=False,
-                    ))
-
-            fig.add_trace(go.Scatter(
-                x=[None], y=[None], mode='markers', showlegend=True,
-                marker=dict(
-                    size=10, color=[0], cmin=0, cmax=100, colorscale=HEATMAP_CS,
-                    colorbar=dict(
-                        thickness=14,
-                        title=dict(text='Coverage %', side='right', font=dict(size=9, color=DIM)),
-                        tickfont=dict(size=9, color=DIM),
-                        tickvals=[0, 65, 80, 100],
-                        ticktext=['0%', '65%', '80%', '100%'],
-                        len=0.8,
-                    ),
-                ),
-                hoverinfo='skip',
-            ))
-
-            fig.update_layout(
-                paper_bgcolor=BG,
-                plot_bgcolor=BG,
-                font=dict(family=FONT, color=TEXT, size=11),
-                height=560,
-                margin=dict(l=10, r=10, t=10, b=10),
-                hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
-                hovermode='closest',
-                dragmode='pan',
-                xaxis=dict(visible=False, range=[-0.02, 1.02], fixedrange=False),
-                yaxis=dict(visible=False, range=[-0.02, y_scale + 0.02], fixedrange=False, scaleanchor='x', scaleratio=1),
-            )
-            return fig
-
-
-    # # MNID district polygons
-    for dist in dyn_districts:
-        pts = _DISTRICT_POLYGONS.get(dist, [])
-        if not pts:
+    for dist in display_districts:
+        rings = district_rings.get(dist, [])
+        if not rings:
             continue
-        xs  = [p[0] for p in pts]
-        ys  = [p[1] for p in pts]
         cov = district_avgs.get(dist)
-        is_hl = dist in highlighted
+        fill = _cov_color(cov) if cov is not None else '#E2E8F0'
+        line_color = '#0F172A' if (view == 'district_facs' and dist == focus_dist) else '#FFFFFF'
+        line_width = 2.8 if (view == 'district_facs' and dist == focus_dist) else 1.4
+        for pts in rings:
+            path_str = 'M ' + ' L '.join(f'{x:.6f},{y:.6f}' for x, y in pts) + ' Z'
+            shapes.append(dict(
+                type='path', path=path_str, xref='x', yref='y',
+                fillcolor=fill, line=dict(color=line_color, width=line_width), layer='below',
+            ))
+        cx, cy = district_centroids.get(dist, (None, None))
+        if cx is not None and cy is not None:
+            hover_x.append(cx)
+            hover_y.append(cy)
+            hover_cd.append([dist, f'{_display_pct(cov):.1f}%' if cov is not None else 'No data'])
+            if view != 'by_facility':
+                label_x.append(cx)
+                label_y.append(cy)
+                label_text.append(f'<b>{dist}</b><br>{_display_pct(cov):.1f}%' if cov is not None else f'<b>{dist}</b><br>No data')
+
+    if shapes:
+        fig.update_layout(shapes=shapes)
+
+    if hover_x:
         fig.add_trace(go.Scatter(
-            x=xs, y=ys,
-            mode='lines',
-            fill='toself',
-            fillcolor=_cov_color(cov) if cov is not None else '#D6D3CB',
-            line=dict(color=INFO_C if is_hl else '#FFFFFF',
-                      width=2.5 if is_hl else 1.2),
-            opacity=1.0 if is_hl else 0.30,
-            customdata=[[dist, cov]] * len(xs),
-            hovertemplate=(
-                '<b>%{customdata[0]}</b><br>Avg coverage: %{customdata[1]:.1f}%<extra></extra>'
-                if cov is not None else
-                '<b>%{customdata[0]}</b><br>No data<extra></extra>'
-            ),
+            x=hover_x, y=hover_y, mode='markers',
+            marker=dict(size=10, color='rgba(0,0,0,0)'),
+            customdata=hover_cd,
+            hovertemplate='<b>%{customdata[0]}</b><br>Avg coverage: %{customdata[1]}<extra></extra>',
             showlegend=False,
         ))
 
-    # # MNID district labels
-    label_x, label_y, label_text, label_sz = [], [], [], []
-    for dist in dyn_districts:
-        if view == 'district_facs' and dist != focus_dist:
-            continue
-        pos = _DISTRICT_LABEL_POS.get(dist)
-        if not pos:
-            continue
-        cov = district_avgs.get(dist)
-        label_x.append(pos[0])
-        label_y.append(pos[1])
-        label_text.append(
-            f'<b>{dist}</b><br>{_display_pct(cov):.0f}%' if cov is not None else f'<b>{dist}</b>'
-        )
-        label_sz.append(10 if len(dyn_districts) > 5 else 14)
     if label_x:
         fig.add_trace(go.Scatter(
-            x=label_x, y=label_y,
-            mode='text',
-            text=label_text,
-            textfont=dict(size=label_sz[0], color='white', family=FONT),
-            hoverinfo='skip',
-            showlegend=False,
+            x=label_x, y=label_y, mode='text', text=label_text,
+            textfont=dict(size=10, color='#FFFFFF', family=FONT),
+            hoverinfo='skip', showlegend=False,
         ))
 
-    # # MNID facility dots
     if view in ('by_facility', 'district_facs'):
         if view == 'by_facility':
             fac_codes = store_facs
         else:
             fac_codes = [f for f in store_facs if _FACILITY_DISTRICT.get(f) == focus_dist]
+        facilities_by_district = stored.get('facilities_by_district', {})
+        fac_positions = _derive_facility_positions(facilities_by_district, district_centroids)
 
+        fac_x = []
+        fac_y = []
+        fac_text = []
+        fac_size = []
+        fac_color = []
+        fac_text_pos = []
         for fac in fac_codes:
-            pos = _FACILITY_MAP_POS.get(fac)
+            pos = fac_positions.get(fac)
             if not pos:
                 continue
-            avg      = _fac_avg(fac)
-            name     = _FACILITY_NAMES.get(fac, fac)
-            is_cur   = (fac == current_fac)
-            # Place label to left for east-side facilities (Salima, Zomba, Ntcheu)
-            east_facs = {'SL020001', 'ZO030001', 'NT080001'}
-            txt_pos  = 'middle left' if fac in east_facs else 'middle right'
+            x, y = pos
+            avg = _fac_avg(fac)
+            name = _FACILITY_NAMES.get(fac, fac)
+            dist = _FACILITY_DISTRICT.get(fac, '')
+            fac_x.append(x)
+            fac_y.append(y)
+            fac_text.append(f'<b>{name}</b><br>{dist}<br>Avg coverage: {f"{_display_pct(avg):.1f}%" if avg is not None else "No data"}')
+            fac_size.append(14 if fac == current_fac else 10)
+            fac_color.append(_cov_color(avg) if avg is not None else '#CBD5E1')
+            fac_text_pos.append('middle left' if x > 0.55 else 'middle right')
+
+        if fac_x:
             fig.add_trace(go.Scatter(
-                x=[pos[0]], y=[pos[1]],
-                mode='markers+text',
-                marker=dict(
-                    size=18 if is_cur else 13,
-                    color=_cov_color(avg) if avg is not None else '#CBD5E1',
-                    line=dict(color=INFO_C if is_cur else '#fff',
-                              width=3 if is_cur else 1.5),
-                    symbol='square',
-                ),
-                text=[name],
-                textposition=txt_pos,
+                x=fac_x, y=fac_y, mode='markers+text',
+                text=[_FACILITY_NAMES.get(f, f) for f in fac_codes if fac_positions.get(f)],
+                textposition=fac_text_pos,
                 textfont=dict(size=9, color=TEXT, family=FONT),
-                hovertemplate=(
-                    f'<b>{name}</b><br>Avg coverage: {_display_pct(avg):.0f}%<extra></extra>'
-                    if avg is not None else
-                    f'<b>{name}</b><br>No data<extra></extra>'
-                ),
+                hovertext=fac_text, hovertemplate='%{hovertext}<extra></extra>',
+                marker=dict(size=fac_size, color=fac_color, line=dict(color='#FFFFFF', width=1.2), opacity=0.95),
                 showlegend=False,
             ))
+
+    fig.add_trace(go.Scatter(
+        x=[None], y=[None], mode='markers', showlegend=True,
+        marker=dict(
+            size=10, color=[0], cmin=0, cmax=100, colorscale=HEATMAP_CS,
+            colorbar=dict(
+                thickness=14,
+                title=dict(text='Coverage %', side='right', font=dict(size=9, color=DIM)),
+                tickfont=dict(size=9, color=DIM),
+                tickvals=[0, 65, 80, 100],
+                ticktext=['0%', '65%', '80%', '100%'],
+                len=0.8,
+            ),
+        ),
+        hoverinfo='skip',
+    ))
 
     title = 'District Coverage Map' if view == 'by_district' else (
         'Facility Coverage Map' if view == 'by_facility' else f'{focus_dist} Facility Coverage Map'
     )
     fig.update_layout(
-        paper_bgcolor=BG,
-        plot_bgcolor=BG,
-        height=620,
-        margin=dict(l=20, r=20, t=48, b=20),
-        font=dict(family=FONT),
-        xaxis=dict(visible=False, range=[1.8, 13.6], fixedrange=True),
-        yaxis=dict(visible=False, range=[-2, 101], fixedrange=True),
+        paper_bgcolor=BG, plot_bgcolor=BG, height=560, margin=dict(l=10, r=10, t=34, b=10),
+        font=dict(family=FONT, color=TEXT, size=11), hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
+        hovermode='closest', dragmode='pan',
+        xaxis=dict(visible=False, range=[-0.02, 1.02], fixedrange=False),
+        yaxis=dict(visible=False, range=[-0.02, y_scale + 0.02], fixedrange=False, scaleanchor='x', scaleratio=1),
         annotations=[dict(
-            x=0.01, y=1.03, xref='paper', yref='paper',
-            text=title, showarrow=False, xanchor='left',
+            x=0.01, y=1.03, xref='paper', yref='paper', text=title, showarrow=False, xanchor='left',
             font=dict(size=15, color=TEXT, family=FONT),
         )],
     )
-    fig.update_yaxes(scaleanchor='x', scaleratio=0.16)
     return fig
 
 
@@ -1157,7 +911,7 @@ def _build_district_treemap(stored: dict, view: str, year: str,
                 if r < len(fac_z) and ci < len(fac_z[r]) and fac_z[r][ci] is not None]
         return round(sum(vals) / len(vals), 1) if vals else None
 
-    dyn_districts = stored.get('all_districts', _ALL_DISTRICTS)
+    dyn_districts = stored.get('all_districts', [])
     # Derive facility list from store
     by_fac_data  = stored.get('by_facility', {}).get(year, {})
     store_fac_x  = by_fac_data.get('x', [])
@@ -1680,7 +1434,7 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
     initial_fig   = _build_heatmap_fig(store, 'by_district', 'All years')
     initial_panel = _build_malawi_panel(store, 'by_district', 'All years')
 
-    dyn_districts = store.get('all_districts', _ALL_DISTRICTS)
+    dyn_districts = store.get('all_districts', [])
     cur_dist   = store.get('current_district', dyn_districts[0] if dyn_districts else '')
     has_yearly = bool(store.get('yearly', {}).get('x'))
     all_labels = store.get('y_labels', [])
@@ -2468,8 +2222,8 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                                   mch_full: pd.DataFrame) -> html.Div:
     """Grouped bar chart comparison across selected facilities or districts."""
     tracked = [i for i in indicators if i.get('status') == 'tracked']
-    all_facs  = sorted(mch_full['Facility_CODE'].dropna().astype(str).unique().tolist()) if len(mch_full) and 'Facility_CODE' in mch_full.columns else _ALL_FACILITIES[:]
-    all_dists = sorted(mch_full['District'].dropna().astype(str).unique().tolist())       if len(mch_full) and 'District' in mch_full.columns else _ALL_DISTRICTS[:]
+    all_facs  = sorted(mch_full['Facility_CODE'].dropna().astype(str).unique().tolist()) if len(mch_full) and 'Facility_CODE' in mch_full.columns else sorted(_ALL_FACILITIES[:])
+    all_dists = sorted(mch_full['District'].dropna().astype(str).unique().tolist())       if len(mch_full) and 'District' in mch_full.columns else sorted(_ALL_DISTRICTS[:])
     current_dist = _FACILITY_DISTRICT.get(facility_code, '')
 
     fac_opts  = [{'label': _FACILITY_NAMES.get(f, f), 'value': f} for f in all_facs]
@@ -2808,7 +2562,7 @@ def _district_gauge_fig(pct, district):
 def _build_district_gauge_row(store, year='All years'):
     """District performance overview: speedometers for <=5 districts, bar chart for >5."""
     avgs      = store.get('district_avgs', {}).get(year, {})
-    districts = store.get('all_districts', _ALL_DISTRICTS)
+    districts = store.get('all_districts', [])
     data      = [(d, avgs[d]) for d in districts if avgs.get(d) is not None]
     if not data:
         return html.Div()
@@ -2942,9 +2696,26 @@ def _pph_cascade(df):
 
 # MNID header, alert, KPI, and section navigation components
 
-def _topbar(facility, period, n_tracked, n_await):
-    facility_name = _FACILITY_NAMES.get(facility, facility)
-    district = _FACILITY_DISTRICT.get(facility, 'District not mapped')
+def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=None):
+    facility_name = _FACILITY_NAMES.get(facility, facility or 'Network view')
+    district = _FACILITY_DISTRICT.get(facility, 'Unknown district')
+
+    source_df = facility_df if facility_df is not None and len(facility_df) else network_df
+    if source_df is not None and len(source_df):
+        if facility and 'Facility_CODE' in source_df.columns:
+            fac_rows = source_df[source_df['Facility_CODE'].astype(str) == str(facility)]
+        else:
+            fac_rows = source_df
+        if len(fac_rows):
+            if 'Facility' in fac_rows.columns:
+                names = fac_rows['Facility'].dropna().astype(str)
+                if not names.empty:
+                    facility_name = names.mode().iloc[0]
+            if 'District' in fac_rows.columns:
+                dists = fac_rows['District'].dropna().astype(str)
+                if not dists.empty:
+                    district = dists.mode().iloc[0]
+
     return html.Div(className='mnid-topbar', children=[
         html.Div(className='mnid-topbar-copy', children=[
             html.Div('M-NID Dashboard', className='mnid-topbar-label'),

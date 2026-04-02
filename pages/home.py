@@ -269,6 +269,7 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
             location = urlparams.get('Location', [None])[0]
         else:
             location = "LL040033"
+        mnid_location = urlparams.get('Location', [None])[0] if urlparams.get('Location') else None
 
         # Load Data
         if is_mnid:
@@ -324,11 +325,11 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
 
             facility_mask = pd.Series(True, index=network_data.index)
             # allow matching by code, facility name, or district (if provided in URL)
-            if location:
+            if mnid_location:
                 facility_mask &= (
-                    (network_data[FACILITY_CODE_] == location) |
-                    (network_data[FACILITY_] == location) |
-                    (network_data.get('District') == location)
+                    (network_data[FACILITY_CODE_] == mnid_location) |
+                    (network_data[FACILITY_] == mnid_location) |
+                    (network_data.get('District') == mnid_location)
                 )
             if hf and hf != "This Facility":
                 facility_mask &= (network_data[FACILITY_] == hf)
@@ -371,13 +372,13 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
             delta_days = (end_dt - start_dt).days
         hf_values = filtered_data[FACILITY_].dropna().sort_values().unique().tolist() if FACILITY_ in filtered_data.columns else []
         hf_options = hf_values + (["This Facility"] if "This Facility" not in hf_values else [])
-        hf_value = hf_options[0] if hf_options else None
+        hf_value = "This Facility" if is_mnid and hf_options else (hf_options[0] if hf_options else None)
 
         return build_charts_from_json(
             filtered_data_date, network_data, delta_days, dashboard_json,
             start_date=adj_start_dt if is_mnid else start_dt,
             end_date=adj_end_dt if is_mnid else end_dt,
-            facility_code=location,
+            facility_code=mnid_location if is_mnid else location,
         ), hf_options, hf_value, clicked_name
     except Exception as e:
         import traceback
