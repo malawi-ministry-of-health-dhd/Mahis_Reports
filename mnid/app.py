@@ -1207,9 +1207,9 @@ def update_heatmap_view(view, year, district, sel_inds, stored):
 
 
 _COMPARE_COLORS = [
-    OK_C, INFO_C, WARN_C, DANGER_C,
-    '#0D9488', '#7C3AED', '#0891B2', '#15803D',
-    '#BA7517', '#14B8A6',
+    OK_C, WARN_C, DANGER_C, INFO_C,
+    '#0D9488', '#14B8A6', '#0891B2', '#7C3AED',
+    '#F472B6', '#F97316',
 ]
 
 

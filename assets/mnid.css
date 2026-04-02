@@ -659,7 +659,7 @@ html { scroll-behavior: smooth; }
 
 /* Compare section radio pill styling */
 #mnid-compare-mode label {
-  padding: 7px 12px;
+  padding: 7px 8px 7px 10px;
   border-radius: 999px;
   border: 1px solid #E2E8F0;
   background: #F8FAFC;
@@ -668,6 +668,11 @@ html { scroll-behavior: smooth; }
   font-size: 12px !important;
   font-weight: 600;
   margin-right: 6px !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1;
 }
 #mnid-compare-mode label:hover {
   background: #0f766e;
