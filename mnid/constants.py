@@ -1,7 +1,7 @@
 """Shared MNID constants and metadata."""
 
 OK_C    = '#16A34A'
-WARN_C  = '#CA8A04'
+WARN_C  = '#FFFF00'
 DANGER_C = '#DC2626'
 INFO_C  = '#475569'
 MUTED   = '#94A3B8'
@@ -72,4 +72,3 @@ FACILITY_COORDS = {
 }
 
 FACILITY_NAMES = {k: v[2] for k, v in FACILITY_COORDS.items()}
-
