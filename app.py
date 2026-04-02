@@ -1,5 +1,6 @@
 import dash
 from dash import html, dcc, page_container, page_registry, Output, Input, State, callback
+import dash_mantine_components as dmc
 import os
 import json
 import datetime
@@ -45,14 +46,15 @@ app = dash.Dash(
                 )
 server = app.server
 
-# Define the layout
-app.layout = html.Div([
-    dcc.Location(id='url', refresh=False),
-    dcc.Store(id='url-params-store', storage_type='session'),
-    html.Div(id="nav-container"),
-    page_container,
-    
-], style={ 'margin': '20px', 'fontFamily': 'Arial, sans-serif'})
+# MantineProvider wraps the whole app so DMC components work on any page
+app.layout = dmc.MantineProvider(
+    children=html.Div([
+        dcc.Location(id='url', refresh=False),
+        dcc.Store(id='url-params-store', storage_type='session'),
+        html.Div(id="nav-container"),
+        page_container,
+    ], style={'margin': '20px', 'fontFamily': 'Arial, sans-serif'})
+)
 
 @app.callback(
     Output("nav-container", "children"),

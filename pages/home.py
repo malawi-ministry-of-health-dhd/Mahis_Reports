@@ -9,6 +9,7 @@ from dash.exceptions import PreventUpdate
 import os
 from flask import request
 from helpers import build_charts_section, build_metrics_section
+from mnid_renderer import render_mnid_dashboard
 from datetime import datetime
 from datetime import datetime as dt
 from data_storage import DataStorage
@@ -51,20 +52,30 @@ except Exception as e:
 
 
 # BUILD CHARTS
-def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json):
-    # Load JSON configuration
+def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json,
+                           start_date=None, end_date=None, facility_code=None):
     config = dashboards_json
-    
+
+    # Route MNID dashboard configs to the dedicated MNID renderer.
+    if config.get('dashboard_type') == 'mnid':
+        return render_mnid_dashboard(
+            filtered=filtered,
+            data_opd=data_opd,
+            delta_days=delta_days,
+            config=config,
+            facility_code=facility_code or 'Unknown',
+            start_date=str(start_date)[:10] if start_date else '',
+            end_date=str(end_date)[:10] if end_date else '',
+        )
+
+    # Render all non-MNID dashboards with the generic chart builder.
     filtered = filtered.copy()
     filtered['Residence'] = filtered[HOME_DISTRICT_] + ', TA-' + filtered[TA_] + ', ' + filtered[VILLAGE_]
     delta_days = 7 if delta_days <= 0 else delta_days
-    
-    # Build metrics from counts section
+
     metrics = build_metrics_section(filtered, config["visualization_types"]["counts"])
-    
-    # Build charts from sections
-    charts = build_charts_section(filtered, data_opd, delta_days, config["visualization_types"]["charts"]["sections"])
-    
+    charts  = build_charts_section(filtered, data_opd, delta_days,
+                                    config["visualization_types"]["charts"]["sections"])
     return html.Div([
         html.Div(className="card-container-5", children=metrics),
         charts
@@ -301,7 +312,6 @@ layout = html.Div(
         Input('active-button-store', 'data')])
 
 def update_menu(interval, color):
-    
     with open(json_path, 'r') as f:
         menu_json = json.load(f)
 
@@ -339,6 +349,13 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
         ctx = callback_context
         triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else None
 
+        if not urlparams:
+            urlparams = {"Location": ["LL040033"], "uuid": ["m3his@dhd"]}
+        if not urlparams.get("Location"):
+            urlparams["Location"] = ["LL040033"]
+        if not urlparams.get("uuid"):
+            urlparams["uuid"] = ["m3his@dhd"]
+
 
         # Determine which report to show
         clicked_name = current_active
@@ -351,10 +368,17 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
         end_dt = pd.to_datetime(end_date).replace(hour=23, minute=59, second=59)
         last_7_days = start_dt - pd.Timedelta(days=7)
 
+        # Get JSON config for the report before loading data.
+        with open(json_path, 'r') as f:
+            menu_json = json.load(f)
+        dashboard_json = next((d for d in menu_json if d['report_name'] == clicked_name), menu_json[0])
+        is_mnid = dashboard_json.get('dashboard_type') == 'mnid'
+
         if urlparams.get('Location', [None])[0]:
             location = urlparams.get('Location', [None])[0]
         else:
-            return html.Div("Missing Parameters"), no_update, no_update, clicked_name
+            location = "LL040033"
+        mnid_location = urlparams.get('Location', [None])[0] if urlparams.get('Location') else None
 
         user_levels = ['national', 'district']
         user_level = urlparams.get('user_level', [None])[0]
@@ -410,34 +434,81 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
         if user_info.empty:
             return html.Div("Unauthorized User. Please contact system administrator."), no_update,no_update, clicked_name
 
-        # Apply Dropdown Filters
-        mask = pd.Series(True, index=data.index)
-        # if hf:
-        #     mask &= (data[FACILITY_] == hf)
-        if age:
-            mask &= (data[AGE_GROUP_] == age)
-            
-        filtered_data = data[mask].copy()
+        if is_mnid:
+            network_mask = pd.Series(True, index=data.index)
+            if age:
+                network_mask &= (data[AGE_GROUP_] == age)
+            network_data = data[network_mask].copy()
 
-        # Apply Date Mask
-        filtered_data_date = filtered_data[
-            (filtered_data[DATE_] >= start_dt) & 
-            (filtered_data[DATE_] <= end_dt)
-        ]
+            facility_mask = pd.Series(True, index=network_data.index)
+            # allow matching by code, facility name, or district (if provided in URL)
+            if mnid_location:
+                facility_mask &= (
+                    (network_data[FACILITY_CODE_] == mnid_location) |
+                    (network_data[FACILITY_] == mnid_location) |
+                    (network_data.get('District') == mnid_location)
+                )
+            if hf and hf != "This Facility":
+                facility_mask &= (network_data[FACILITY_] == hf)
+            filtered_data = network_data[facility_mask].copy()
 
-        # Get JSON config for the report
-        with open(json_path, 'r') as f:
-            menu_json = json.load(f)
-        dashboard_json = next((d for d in menu_json if d['report_name'] == clicked_name), menu_json[0])
+            # If facility filter yields no rows, fall back to network scope
+            if filtered_data.empty and len(network_data):
+                filtered_data = network_data.copy()
 
-        delta_days = (end_dt - start_dt).days
-        hf_options = filtered_data[FACILITY_].sort_values().unique().tolist() + ["This Facility"]
+            filtered_data_date = filtered_data[
+                (filtered_data[DATE_] >= start_dt) &
+                (filtered_data[DATE_] <= end_dt)
+            ]
+            # If date range yields no MNID rows, fall back to available data
+            adj_start_dt, adj_end_dt = start_dt, end_dt
+            if filtered_data_date.empty and len(filtered_data):
+                adj_start_dt = filtered_data[DATE_].min()
+                adj_end_dt = filtered_data[DATE_].max()
+                filtered_data_date = filtered_data.copy()
+        else:
+            # Apply Dropdown Filters
+            mask = pd.Series(True, index=data.index)
+            # if hf:
+            #     mask &= (data[FACILITY_] == hf)
+            if age:
+                mask &= (data[AGE_GROUP_] == age)
 
-        return build_charts_from_json(filtered_data_date, filtered_data, delta_days, dashboard_json), hf_options, hf_options[0],  clicked_name
+            filtered_data = data[mask].copy()
+
+            # Apply Date Mask
+            filtered_data_date = filtered_data[
+                (filtered_data[DATE_] >= start_dt) &
+                (filtered_data[DATE_] <= end_dt)
+            ]
+            network_data = filtered_data
+
+        if is_mnid:
+            delta_days = (adj_end_dt - adj_start_dt).days
+        else:
+            delta_days = (end_dt - start_dt).days
+        hf_values = filtered_data[FACILITY_].dropna().sort_values().unique().tolist() if FACILITY_ in filtered_data.columns else []
+        hf_options = hf_values + (["This Facility"] if "This Facility" not in hf_values else [])
+        hf_value = "This Facility" if is_mnid and hf_options else (hf_options[0] if hf_options else None)
+
+        return build_charts_from_json(
+            filtered_data_date, network_data, delta_days, dashboard_json,
+            start_date=adj_start_dt if is_mnid else start_dt,
+            end_date=adj_end_dt if is_mnid else end_dt,
+            facility_code=mnid_location if is_mnid else location,
+        ), hf_options, hf_value, clicked_name
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return html.Div(html.P("No data found for the facility", style={"color":"grey"})), dash.no_update, dash.no_update,dash.no_update
+        return (
+            html.Div([
+                html.P("Dashboard render failed.", style={"color": "#475569", "fontWeight": "600"}),
+                html.P(str(e), style={"color": "#94A3B8", "fontSize": "12px"}),
+            ]),
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
+        )
 
 @callback(
     [Output('dashboard-date-range-picker', 'start_date'),
