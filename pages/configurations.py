@@ -2012,7 +2012,7 @@ def toggle_preview_popup(preview_clicks, close_clicks):
         
         if df is None or df.empty:
             no_data_message = html.Div([
-                html.Div("📊 No data available", style={'color': 'orange', 'marginBottom': '10px', 'fontWeight': 'bold'}),
+                html.Div("No data available", style={'color': 'orange', 'marginBottom': '10px', 'fontWeight': 'bold'}),
                 html.Div("The data file is empty or could not be loaded.", style={'color': 'orange'})
             ])
             return {'display': 'flex'}, no_data_message, ""
