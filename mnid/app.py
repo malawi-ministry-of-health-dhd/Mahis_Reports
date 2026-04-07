@@ -1,7 +1,7 @@
 """
 MNID dashboard renderer.
 
-This module builds the Maternal and Neonatal Indicators dashboard layout,
+This module builds the Maternal and Child Health dashboard layout,
 calculates configured indicator coverage, and renders the main dashboard
 sections such as trends, comparison views, heatmaps, and readiness panels.
 """
@@ -2719,7 +2719,7 @@ def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=N
     return html.Div(className='mnid-topbar', children=[
         html.Div(className='mnid-topbar-copy', children=[
             html.Div('M-NID Dashboard', className='mnid-topbar-label'),
-            html.H1('Maternal and Neonatal Health Indicators'),
+            html.H1('Maternal and Child Health Indicators'),
             html.P('Clean view of performance, comparison, coverage, and readiness.'),
         ]),
         html.Div(className='mnid-info-pills', children=[
@@ -2999,3 +2999,4 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
         dcc.Store(id='mnid-scrollspy-out'),
         html.Div(className='mnid-shell', children=[main_content]),
     ])
+

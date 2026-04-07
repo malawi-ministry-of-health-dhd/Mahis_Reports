@@ -48,14 +48,19 @@ def register_facility_metadata(df: pd.DataFrame) -> None:
 
 
 def prepare_mnid_dataframe(df: pd.DataFrame | None) -> pd.DataFrame:
-    """Normalise the MNID dataframe used across renderer sections."""
+    """Normalise the live shared MAHIS dataframe used across MNID sections."""
     if df is None:
         return pd.DataFrame()
 
     mch_full = df.copy()
-    if 'Program' in mch_full.columns:
+    program_col = 'Reporting_Program' if 'Reporting_Program' in mch_full.columns else 'Program'
+    if program_col in mch_full.columns:
         mch_full = mch_full[
-            mch_full['Program'].fillna('').str.contains('Maternal|Neonatal', case=False, na=False)
+            mch_full[program_col].fillna('').str.contains(
+                'Maternal|Child|Neonatal|Newborn',
+                case=False,
+                na=False,
+            )
         ].copy()
     if 'Date' in mch_full.columns:
         mch_full['Date'] = pd.to_datetime(mch_full['Date'], errors='coerce')

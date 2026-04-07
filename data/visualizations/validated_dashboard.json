@@ -122,7 +122,10 @@
                   "y_col": "person_id",
                   "x_title": "Program",
                   "y_title": "Number of patients",
-                  "unique_column": ["person_id","Program"],
+                  "unique_column": [
+                    "person_id",
+                    "Program"
+                  ],
                   "legend_title": "Legend",
                   "color": "",
                   "filter_col1": "",
@@ -3240,7 +3243,7 @@
             "unique": "person_id",
             "variable1": "concept_name",
             "value1": "Number of tetanus doses",
-            "variable2": "Value",
+            "variable2": "obs_value_coded",
             "value2": [
               "two doses",
               "three doses",
@@ -3249,8 +3252,8 @@
           },
           "denominator_filters": {
             "unique": "person_id",
-            "variable1": "Encounter",
-            "value1": "ANC VISIT"
+            "variable1": "concept_name",
+            "value1": "Number of tetanus doses"
           }
         },
         {
@@ -3378,20 +3381,27 @@
           "numerator_filters": {
             "unique": "person_id",
             "variable1": "concept_name",
-            "value1": "Staff conducting delivery"
+            "value1": "Staff conducting delivery",
+            "variable2": "obs_value_coded",
+            "value2": [
+              "Nurse Midwife",
+              "Clinical Officer",
+              "Doctor"
+            ]
           },
           "denominator_filters": {
             "unique": "person_id",
             "variable1": "concept_name",
-            "value1": "Mode of delivery"
-          }
+            "value1": "Staff conducting delivery"
+          },
+          "note": "Calculated from delivery staff cadre recorded in labour encounter. Current data only captures skilled cadres."
         },
         {
           "id": "mnid_nb_001",
           "label": "Neonatal resuscitation (eligible babies)",
           "category": "Newborn",
           "target": 80,
-          "status": "tracked",
+          "status": "awaiting_baseline",
           "numerator_filters": {
             "unique": "person_id",
             "variable1": "concept_name",
@@ -3409,7 +3419,8 @@
             "value1": "Eligible for neonatal resuscitation",
             "variable2": "obs_value_coded",
             "value2": "Yes"
-          }
+          },
+          "note": "Eligibility and intervention concepts do not align reliably in current neonatal data; numerator exceeds denominator. Needs source-data linkage cleanup before tracking."
         },
         {
           "id": "mnid_nb_002",
