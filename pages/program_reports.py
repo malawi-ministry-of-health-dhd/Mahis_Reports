@@ -8,7 +8,7 @@ import numpy as np
 from dash.exceptions import PreventUpdate
 import os
 import traceback
-from helpers import build_single_chart
+from helpers.helpers import build_single_chart
 from datetime import datetime, timedelta
 from data_storage import DataStorage
 from config import (actual_keys_in_data, 

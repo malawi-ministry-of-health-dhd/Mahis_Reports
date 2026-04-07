@@ -7,7 +7,7 @@ sections such as trends, comparison views, heatmaps, and readiness panels.
 """
 from dash import html, dcc, clientside_callback, callback, Input, Output, State, ALL
 import dash_mantine_components as dmc
-from helpers import create_count_from_config
+from helpers.helpers import create_count_from_config
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime

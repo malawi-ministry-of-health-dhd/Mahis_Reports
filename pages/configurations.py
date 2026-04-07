@@ -8,7 +8,7 @@ import pandas as pd
 from datetime import datetime
 import base64
 import io
-from modal_functions import (validate_excel_file, load_reports_data, save_reports_data, 
+from helpers.modal_functions import (validate_excel_file, load_reports_data, save_reports_data, 
                         check_existing_report, get_next_report_id, update_or_create_report,load_excel_file,
                         save_excel_file, update_report_metadata, archive_report, load_preview_data,
                         create_count_item,create_chart_item, create_section,create_chart_fields,validate_dashboard_json,
@@ -193,7 +193,7 @@ def create_preview_table(df):
         sort_action="native",
         page_action="native",
         page_current=0,
-        page_size=10,
+        page_size=50,
         style_table={'overflowX': 'auto'},
         style_cell={
             'minWidth': '100px', 

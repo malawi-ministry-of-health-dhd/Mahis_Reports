@@ -401,31 +401,12 @@ def archive_report(report_id):
 # Preview Data
 def load_preview_data():
     """Load preview data from parquet file"""
-    today = datetime.now()
-    start = today.replace(hour=0, minute=0, second=0, microsecond=0)
-    end = today.replace(hour=23, minute=59, second=59, microsecond=0)
+    file_path = os.path.join("data", "concepts_data.csv")
+    if not os.path.exists(file_path):
+        return pd.DataFrame(), "Empty Reference"
     
     try:
-        # Load first 1000 records
-        SQL = f"""
-            SELECT *
-            FROM 'data/{DATA_FILE_NAME_}'
-            WHERE Date BETWEEN
-            TIMESTAMP '{end - pd.Timedelta(days=7)}'
-            AND TIMESTAMP '{end.strftime('%Y-%m-%d %H:%M:%S')}'
-            """
-    
-        df = DataStorage.query_duckdb(SQL)
-        df[DATE_] = pd.to_datetime(df[DATE_], format='mixed')
-        df[GENDER_] = df[GENDER_].replace({"M":"Male","F":"Female"})
-        df = df.drop_duplicates(subset=[CONCEPT_NAME_])
-        columns = [PERSON_ID_, ENCOUNTER_ID_, GENDER_, AGE_GROUP_, DATE_,
-                                PROGRAM_, ENCOUNTER_,
-                                OBS_VALUE_CODED_,CONCEPT_NAME_,VALUE_,VALUE_NAME_,DRUG_NAME_]
-        df = df[columns]
-        df[PERSON_ID_] = 'person_xxx'
-        df[ENCOUNTER_ID_] = 'enc_xxx'
-        df[DATE_] = '1970-01-01'
+        df = pd.read_csv(file_path)
         return df, None
     except Exception as e:
         return None, f"Error loading data: {str(e)}"

@@ -8,7 +8,7 @@ import numpy as np
 from dash.exceptions import PreventUpdate
 import os
 from flask import request
-from helpers import build_charts_section, build_metrics_section
+from helpers.helpers import build_charts_section, build_metrics_section
 from mnid_renderer import render_mnid_dashboard
 from datetime import datetime
 from datetime import datetime as dt

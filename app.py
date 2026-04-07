@@ -6,7 +6,7 @@ import json
 import datetime
 from datetime import datetime as dt
 from isoweek import Week
-from reports_class import ReportTableBuilder
+from helpers.reports_class import ReportTableBuilder
 import urllib.parse
 import plotly.express as px
 import pandas as pd

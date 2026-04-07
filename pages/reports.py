@@ -9,7 +9,7 @@ import os
 import json
 from isoweek import Week
 from dash.exceptions import PreventUpdate
-from reports_class import ReportTableBuilder
+from helpers.reports_class import ReportTableBuilder
 from reportlab.lib.pagesizes import letter, A4, portrait
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle

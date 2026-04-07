@@ -1,7 +1,7 @@
 import dash
 from dash import html, dcc
 import pandas as pd
-from visualizations import (create_column_chart, 
+from helpers.visualizations import (create_column_chart, 
                           create_count,
                           create_pie_chart,
                           create_line_chart,

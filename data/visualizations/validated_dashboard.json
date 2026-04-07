@@ -8,8 +8,9 @@
         {
           "id": "count_5f0a560b",
           "name": "All Attendance",
+          "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "countx",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [],
@@ -32,6 +33,7 @@
         {
           "id": "count_62ca9185",
           "name": "Attendance Male",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -49,6 +51,7 @@
         {
           "id": "count_6668a9a4",
           "name": "Attendance Female",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -66,6 +69,7 @@
         {
           "id": "count_eeb5378a",
           "name": "Attendance Under 5",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -83,6 +87,7 @@
         {
           "id": "count_cde8771b",
           "name": "Attendance Over 5",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -107,8 +112,9 @@
                 "id": "chart_10b29018",
                 "name": "Attendance By Program",
                 "type": "Column",
+                "level": "facility",
                 "filters": {
-                  "measure": "nunique",
+                  "measure": "count",
                   "unique": "any",
                   "duration_default": "any",
                   "title": "Attendance By Program",
@@ -116,7 +122,7 @@
                   "y_col": "person_id",
                   "x_title": "Program",
                   "y_title": "Number of patients",
-                  "unique_column": "person_id",
+                  "unique_column": ["person_id","Program"],
                   "legend_title": "Legend",
                   "color": "",
                   "filter_col1": "",
@@ -135,6 +141,7 @@
                 "id": "chart_3faf4437",
                 "name": "Daily OPD Attendance - Last 7 Days",
                 "type": "Line",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -163,6 +170,7 @@
                 "id": "chart_a8acf21a",
                 "name": "Patient Visit Type",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -188,6 +196,7 @@
                 "id": "chart_bbce8169",
                 "name": "Age Gender Disaggregation",
                 "type": "Histogram",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -215,6 +224,7 @@
                 "id": "chart_9396087d",
                 "name": "Gender Disaggregation",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -240,6 +250,7 @@
                 "id": "chart_79405336",
                 "name": "Active Users",
                 "type": "Bar",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -278,6 +289,7 @@
         {
           "id": "count_8065b921",
           "name": "All Attendance",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -297,6 +309,7 @@
         {
           "id": "count_fc025099",
           "name": "Attendance Male",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -317,6 +330,7 @@
         {
           "id": "count_3e34fe5b",
           "name": "Attendance Female",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -337,6 +351,7 @@
         {
           "id": "count_23742029",
           "name": "Attendance Under 5",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -357,6 +372,7 @@
         {
           "id": "count_aefd91dc",
           "name": "Attendance Over 5",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -377,6 +393,7 @@
         {
           "id": "count_e730ec0a",
           "name": "Malaria Cases",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -400,6 +417,7 @@
         {
           "id": "count_36b1263c",
           "name": "Malaria in Under 5",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -424,6 +442,7 @@
         {
           "id": "count_d6d78d50",
           "name": "Admissions",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -450,6 +469,7 @@
         {
           "id": "count_39f11f5e",
           "name": "Discharged Home",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -475,6 +495,7 @@
         {
           "id": "count_fa751a13",
           "name": "Died",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -507,6 +528,7 @@
                 "id": "chart_10b2901xcs",
                 "name": "Patient Encounters in OPD",
                 "type": "Column",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -538,6 +560,7 @@
                 "id": "chart_63150edf",
                 "name": "Daily OPD Attendance - Last 7 days",
                 "type": "Line",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -566,6 +589,7 @@
                 "id": "chart_d180fcaf",
                 "name": "Top Patient Complaints",
                 "type": "Bar",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -593,6 +617,7 @@
                 "id": "chart_0f4bd788",
                 "name": "Common Patient Diagnoses",
                 "type": "Bar",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -620,6 +645,7 @@
                 "id": "chart_0fd2e773",
                 "name": "Lab Orders",
                 "type": "Column",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -648,6 +674,7 @@
                 "id": "chart_028db8f4",
                 "name": "Patients with Family Medical History",
                 "type": "Bar",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -675,6 +702,7 @@
                 "id": "chart_ef45ae8f",
                 "name": "Most dispensed drugs at the Pharmacy",
                 "type": "Bar",
+                "level": "facility",
                 "filters": {
                   "measure": "sum",
                   "unique": "any",
@@ -707,6 +735,7 @@
                 "id": "chart_29ea85d8",
                 "name": "Malaria Cases Over the Last 7 days",
                 "type": "Line",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -735,6 +764,7 @@
                 "id": "chart_ef45aexg",
                 "name": "Malaria Drugs Prescribed by Clinician",
                 "type": "Bar",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -762,6 +792,7 @@
                 "id": "chart_ef45ae8f",
                 "name": "Malaria Drugs Dispensed (Quantities)",
                 "type": "Bar",
+                "level": "facility",
                 "filters": {
                   "measure": "sum",
                   "unique": "any",
@@ -800,6 +831,7 @@
         {
           "id": "count_ncd_1",
           "name": "Total Attendance",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -810,6 +842,7 @@
         {
           "id": "count_ncd_2",
           "name": "Attendance Male",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -822,6 +855,7 @@
         {
           "id": "count_ncd_3",
           "name": "Attendance Female",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -834,6 +868,7 @@
         {
           "id": "count_ncd_4",
           "name": "Attendance Under 5",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -846,6 +881,7 @@
         {
           "id": "count_ncd_5",
           "name": "Attendance Over 5",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -858,6 +894,7 @@
         {
           "id": "count_ncd_6",
           "name": "Diabetes Cases",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -872,6 +909,7 @@
         {
           "id": "count_ncd_7",
           "name": "Diabetes Type 1 Cases",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -886,6 +924,7 @@
         {
           "id": "count_ncd_8",
           "name": "Diabetes Type 2 Cases",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -900,6 +939,7 @@
         {
           "id": "count_ncd_9",
           "name": "Hypertension Cases",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -914,6 +954,7 @@
         {
           "id": "count_ncd_10",
           "name": "All cases registered in NCD Program",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -933,6 +974,7 @@
                 "id": "chart_ncd_1",
                 "name": "Daily NCD Attendance - Last 7 Days",
                 "type": "Line",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -957,6 +999,7 @@
                 "id": "chart_ncd_2",
                 "name": "Age Distribution of NCD Patients",
                 "type": "Histogram",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -986,6 +1029,7 @@
                 "id": "chart_ncd_3",
                 "name": "Alcohol Risk Factor",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -1010,6 +1054,7 @@
                 "id": "chart_ncd_4",
                 "name": "Smoking Risk Factor",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -1034,6 +1079,7 @@
                 "id": "chart_ncd_5",
                 "name": "Locations",
                 "type": "PivotTable",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -1063,6 +1109,7 @@
                 "id": "chart_ncd_6",
                 "name": "NCD Type for New Patients",
                 "type": "Column",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -1087,6 +1134,7 @@
                 "id": "chart_ncd_7",
                 "name": "NCD Type for All Patients",
                 "type": "Column",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -1111,6 +1159,7 @@
                 "id": "chart_ncd_8",
                 "name": "NCD Complications Foot",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -1135,6 +1184,7 @@
                 "id": "chart_ncd_9",
                 "name": "Aggregate NCD Drugs Dispensed",
                 "type": "PivotTable",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -1170,6 +1220,7 @@
         {
           "id": "count_imm_1",
           "name": "Total Attendance",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1180,6 +1231,7 @@
         {
           "id": "count_imm_2",
           "name": "Attendance Under 5",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1192,6 +1244,7 @@
         {
           "id": "count_imm_3",
           "name": "Attendance Under 2",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1204,6 +1257,7 @@
         {
           "id": "count_imm_4",
           "name": "Attendance Under 1",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1216,6 +1270,7 @@
         {
           "id": "count_imm_5",
           "name": "Attendance Over 5",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1228,6 +1283,7 @@
         {
           "id": "count_imm_6",
           "name": "Protected at Birth",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "encounter_id",
@@ -1244,6 +1300,7 @@
         {
           "id": "count_imm_7",
           "name": "Penta 1 doses",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1260,6 +1317,7 @@
         {
           "id": "count_imm_8",
           "name": "Penta 3 doses",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1276,6 +1334,7 @@
         {
           "id": "count_imm_9",
           "name": "MR 1 doses",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1292,6 +1351,7 @@
         {
           "id": "count_imm_10",
           "name": "MR 2 doses",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1315,6 +1375,7 @@
                 "id": "chart_imm_1",
                 "name": "Daily vaccinated clients - Last 7 days",
                 "type": "Line",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -1337,6 +1398,7 @@
                 "id": "chart_imm_2",
                 "name": "Vaccines administered",
                 "type": "Column",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -1359,6 +1421,7 @@
                 "id": "chart_imm_3",
                 "name": "Clients Disaggregation by Gender",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -1383,6 +1446,7 @@
                 "id": "chart_imm_4",
                 "name": "Doses Age and Gender Disaggregation",
                 "type": "CrossTab",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -1421,6 +1485,7 @@
         {
           "id": "count_4ad87d16",
           "name": "Total Attendance (All departments)",
+          "level": "facility",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -1445,6 +1510,7 @@
         {
           "id": "count_bcdcbca3",
           "name": "Screened for HIV",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1467,6 +1533,7 @@
         {
           "id": "count_faf63ca3",
           "name": "Screened - Status Positive",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1498,6 +1565,7 @@
         {
           "id": "count_0283a090",
           "name": "Screened - Status Negative",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1530,6 +1598,7 @@
         {
           "id": "count_0de77f74",
           "name": "Screen - Status Unknown",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1561,6 +1630,7 @@
         {
           "id": "count_5562d5cb",
           "name": "Positive Clients on ART",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1585,6 +1655,7 @@
         {
           "id": "count_0e431b2d",
           "name": "HIV Test Orders (MaHIS)",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1613,6 +1684,7 @@
         {
           "id": "count_eb37080f",
           "name": "HIV Tests Conducted",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1641,6 +1713,7 @@
         {
           "id": "count_064c9d4e",
           "name": "Test Result New Positive",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1674,6 +1747,7 @@
         {
           "id": "count_24042ce3",
           "name": "HIV Patients Screened for AHD",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -1711,6 +1785,7 @@
                 "id": "chart_561d6d95",
                 "name": "Attendance By Program",
                 "type": "Column",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -1739,6 +1814,7 @@
                 "id": "chart_a5c5623b",
                 "name": "Daily Patient Screening",
                 "type": "Line",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -1772,6 +1848,7 @@
                 "id": "chart_8fc760d6",
                 "name": "Screening by Program",
                 "type": "Column",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -1800,6 +1877,7 @@
                 "id": "chart_be90e105",
                 "name": "Patient Test Results",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -1830,6 +1908,7 @@
                 "id": "chart_bf5c1b0d",
                 "name": "New Daily HIV Tests",
                 "type": "Line",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -1861,6 +1940,7 @@
                 "id": "chart_6d35c12c",
                 "name": "New HIV Testing Outcomes",
                 "type": "Bar",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -1898,6 +1978,7 @@
                 "id": "chart_4c6f8e9c",
                 "name": "Screened HIV Patients On ART",
                 "type": "Column",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -1931,6 +2012,7 @@
                 "id": "chart_b564da26",
                 "name": "Linkage With ScanForm",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -1972,6 +2054,7 @@
         {
           "id": "count_f3d40bex",
           "name": "Enrolled Neonates",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -2001,6 +2084,7 @@
         {
           "id": "count_f3d40be9",
           "name": "Triaged Neonates",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -2029,6 +2113,7 @@
         {
           "id": "count_1c32fed6",
           "name": "Review of Systems done",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -2057,6 +2142,7 @@
         {
           "id": "count_1f41f4fb",
           "name": "Systematic Examination Done",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -2085,6 +2171,7 @@
         {
           "id": "count_1f41f4fx",
           "name": "Treated Neonates",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -2113,6 +2200,7 @@
         {
           "id": "count_b616b468",
           "name": "Admitted to Nursery",
+          "level": "facility",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -2145,6 +2233,7 @@
         {
           "id": "count_77f7fc8d",
           "name": "Outcome Referred",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -2175,6 +2264,7 @@
         {
           "id": "count_06f2a808",
           "name": "Outcome Death <24 Hours",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -2207,6 +2297,7 @@
         {
           "id": "count_1af94e5f",
           "name": "Outcome Death >24 Hours",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -2239,6 +2330,7 @@
         {
           "id": "count_d399565b",
           "name": "Outcome Neonatal Dealth",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -2273,6 +2365,7 @@
                 "id": "chart_fc8d72a1",
                 "name": "Daily Neonatal Program Enrolments - Last 7 Days",
                 "type": "Line",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2308,6 +2401,7 @@
                 "id": "chart_ac65ef42",
                 "name": "Neonatal Encounters",
                 "type": "Column",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2330,6 +2424,7 @@
                 "id": "chart_2e694262",
                 "name": "Newborn Diseases",
                 "type": "Bar",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2368,6 +2463,7 @@
                 "id": "chart_23850d26",
                 "name": "Top 10 Causes of Death",
                 "type": "Bar",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2401,6 +2497,7 @@
                 "id": "chart_0987cbef",
                 "name": "Neonatal Admission Outcomes",
                 "type": "Column",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2446,6 +2543,7 @@
         {
           "id": "count_mnh_anc_001",
           "name": "ANC Women With 2+ Tetanus Doses",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -2462,6 +2560,7 @@
         {
           "id": "count_mnh_lab_001",
           "name": "Deliveries At This Facility",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -2477,6 +2576,7 @@
         {
           "id": "count_mnh_lab_002",
           "name": "Caesarean Sections",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -2492,6 +2592,7 @@
         {
           "id": "count_mnh_lab_003",
           "name": "Skilled Delivery Staff Recorded",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -2502,6 +2603,7 @@
         {
           "id": "count_mnh_pnc_001",
           "name": "PNC Mothers Within 48 Hours",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -2514,6 +2616,7 @@
         {
           "id": "count_mnh_pnc_002",
           "name": "PNC Babies Reviewed",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -2524,6 +2627,7 @@
         {
           "id": "count_mnh_pnc_003",
           "name": "Mothers HIV Positive In PNC",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -2541,6 +2645,7 @@
         {
           "id": "count_mnh_pnc_004",
           "name": "Babies Receiving BCG",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -2566,6 +2671,7 @@
                 "id": "chart_mnh_anc_001",
                 "name": "ANC Visits Over Time",
                 "type": "Line",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2584,6 +2690,7 @@
                 "id": "chart_mnh_anc_002",
                 "name": "Pregnancy Planning Status",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2600,6 +2707,7 @@
                 "id": "chart_mnh_anc_003",
                 "name": "Blood Group Rhesus Distribution",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2616,6 +2724,7 @@
                 "id": "chart_mnh_anc_004",
                 "name": "Tetanus Dose Distribution",
                 "type": "Bar",
+                "level": "facility",
                 "filters": {
                   "measure": "count",
                   "unique": "any",
@@ -2634,6 +2743,7 @@
                 "id": "chart_mnh_anc_005",
                 "name": "ANC HIV Testing Status",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2650,6 +2760,7 @@
                 "id": "chart_mnh_anc_006",
                 "name": "ITN Given During ANC",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2671,6 +2782,7 @@
                 "id": "chart_mnh_lab_001",
                 "name": "Place of Delivery",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2687,6 +2799,7 @@
                 "id": "chart_mnh_lab_002",
                 "name": "Mode of Delivery",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2703,6 +2816,7 @@
                 "id": "chart_mnh_lab_003",
                 "name": "Obstetric Complications",
                 "type": "Bar",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2721,6 +2835,7 @@
                 "id": "chart_mnh_lab_004",
                 "name": "Newborn Complications at Birth",
                 "type": "Bar",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2739,6 +2854,7 @@
                 "id": "chart_mnh_lab_005",
                 "name": "Newborn Care Given",
                 "type": "Bar",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2757,6 +2873,7 @@
                 "id": "chart_mnh_lab_006",
                 "name": "Birth Outcome at Delivery",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2773,6 +2890,7 @@
                 "id": "chart_mnh_lab_007",
                 "name": "Vitamin K Given at Birth",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2789,6 +2907,7 @@
                 "id": "chart_mnh_lab_008",
                 "name": "Delivery Cadre Mix",
                 "type": "Bar",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2807,6 +2926,7 @@
                 "id": "chart_mnh_lab_009",
                 "name": "Referral Reasons",
                 "type": "Bar",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2830,6 +2950,7 @@
                 "id": "chart_mnh_pnc_001",
                 "name": "PNC Check Periods",
                 "type": "Bar",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2848,6 +2969,7 @@
                 "id": "chart_mnh_pnc_002",
                 "name": "Mother Final Status",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2864,6 +2986,7 @@
                 "id": "chart_mnh_pnc_003",
                 "name": "Baby Final Status",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2880,6 +3003,7 @@
                 "id": "chart_mnh_pnc_004",
                 "name": "Postnatal Complications",
                 "type": "Bar",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2898,6 +3022,7 @@
                 "id": "chart_mnh_pnc_005",
                 "name": "Baby Immunisations Recorded",
                 "type": "Bar",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2916,6 +3041,7 @@
                 "id": "chart_mnh_pnc_006",
                 "name": "Exclusive Breastfeeding Status",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2932,6 +3058,7 @@
                 "id": "chart_mnh_pnc_007",
                 "name": "Mother HIV Status in PNC",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2948,6 +3075,7 @@
                 "id": "chart_mnh_pnc_008",
                 "name": "Family Planning Counselling",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2964,6 +3092,7 @@
                 "id": "chart_mnh_pnc_009",
                 "name": "Family Planning Method Chosen",
                 "type": "Bar",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2982,6 +3111,7 @@
                 "id": "chart_mnh_pnc_010",
                 "name": "Low Birth Weight / KMC",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
@@ -2998,6 +3128,7 @@
                 "id": "chart_mnh_pnc_011",
                 "name": "Vitamin K Given in PNC",
                 "type": "Pie",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",

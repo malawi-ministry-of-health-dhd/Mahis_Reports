@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from config import QERY,USE_LOCALHOST, DATA_FILE_NAME_
+from config import QERY,USE_LOCALHOST, DATA_FILE_NAME_, CONCEPTS
 from db_services import DataFetcher
 from datetime import datetime
 import logging
@@ -99,3 +99,6 @@ if __name__ == "__main__":
     users = DataStorage(query="SELECT u.uuid as user_id, ur.role as role FROM users u JOIN user_role ur ON u.user_id = ur.user_id", 
                         filename="users_data.csv")
     users.fetch_and_save_single_table()
+
+    concepts = DataStorage(query=CONCEPTS, filename="concepts_data.csv")
+    concepts.fetch_and_save_single_table()

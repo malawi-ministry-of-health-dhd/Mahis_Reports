@@ -245,6 +245,7 @@ def create_count(df,aggregation='count', unique_column=PERSON_ID_, filter_col1=N
         return unique_visits[unique_column].agg(aggregation)
     else:
         # Default to count
+        # unique_visits.to_csv("debug_summary.csv", index=False)
         return len(unique_visits[unique_column].dropna())
 
 def create_count_sets(
@@ -421,11 +422,14 @@ def _prepare_data_for_visualization(df, unique_column, apply_deduplication=True)
     """
     data = df.copy()
     
-    if apply_deduplication and DATE_ in data.columns and unique_column in data.columns:
-        # Use same deduplication logic as create_count
-        data = data.drop_duplicates(subset=[unique_column, DATE_])
-    
-    return data
+    if isinstance(unique_column, list):
+        if apply_deduplication and DATE_ in data.columns and all(col in data.columns for col in unique_column):
+            data = data.drop_duplicates(subset=[DATE_] + unique_column)
+        return data
+    else:
+        if apply_deduplication and DATE_ in data.columns and unique_column in data.columns:
+            data = data.drop_duplicates(subset=[unique_column, DATE_])
+        return data
 
 def create_column_chart(df, x_col, y_col, title, x_title, y_title,
                         unique_column=PERSON_ID_, legend_title=None,
@@ -445,8 +449,8 @@ def create_column_chart(df, x_col, y_col, title, x_title, y_title,
     # Apply consistent deduplication
     data = _prepare_data_for_visualization(data, unique_column)
     
-    if data.empty:
-        return go.Figure().update_layout(title=f"No data available for {title}")
+    # if data.empty:
+    #     return go.Figure().update_layout(title=f"No data available for {title}")
     
     if color:
         # Group by both x_col and color column
@@ -473,7 +477,8 @@ def create_column_chart(df, x_col, y_col, title, x_title, y_title,
     else:
         # Group only by x_col
         if aggregation == 'count':
-            summary = data.groupby(x_col)[y_col].nunique().reset_index()
+            summary = data.groupby(x_col)[y_col].count().reset_index()
+            # data.to_csv("debug_summary.csv", index=False)
         elif aggregation == 'nunique':
             summary = data.groupby(x_col)[y_col].nunique().reset_index()
         else:
@@ -520,8 +525,8 @@ def create_line_chart(df, date_col, y_col, title, x_title,
     # Apply consistent deduplication
     data = _prepare_data_for_visualization(data, unique_column)
     
-    if data.empty:
-        return go.Figure().update_layout(title=f"No data available for {title}")
+    # if data.empty:
+    #     return go.Figure().update_layout(title=f"{title}")
     
     # Ensure date column is in datetime format
     if not pd.api.types.is_datetime64_any_dtype(data[date_col]):
@@ -601,8 +606,8 @@ def create_pie_chart(df, names_col, values_col, title,
     # Apply consistent deduplication
     data = _prepare_data_for_visualization(data, unique_column)
     
-    if data.empty:
-        return go.Figure().update_layout(title=f"No data available for {title}")
+    # if data.empty:
+    #     return go.Figure().update_layout(title=f"No data available for {title}")
     
     if aggregation == 'count':
         df_summary = data.groupby(names_col)[values_col].nunique().reset_index()
@@ -1086,14 +1091,14 @@ def create_age_gender_histogram(
     # Apply consistent deduplication
     data = _prepare_data_for_visualization(data, PERSON_ID_)
     
-    if data.empty:
-        return go.Figure().update_layout(title=f"No data available for {title}")
+    # if data.empty:
+    #     return go.Figure().update_layout(title=f"No data available for {title}")
     
     # Remove any rows with missing age or gender
     data = data.dropna(subset=[age_col, gender_col])
     
     if data.empty:
-        return go.Figure().update_layout(title=f"No age/gender data available for {title}")
+        return go.Figure().update_layout(title=f"{title}")
     
     min_age = int(data[age_col].min())
     max_age = int(data[age_col].max())
@@ -1156,8 +1161,8 @@ def create_horizontal_bar_chart(df, label_col, value_col, title, x_title, y_titl
     # Apply consistent deduplication
     data = _prepare_data_for_visualization(data, PERSON_ID_)
     
-    if data.empty:
-        return go.Figure().update_layout(title=f"No data available for {title}")
+    # if data.empty:
+    #     return go.Figure().update_layout(title=f"No data available for {title}")
     
     if aggregation == 'count':
         df_grouped = data.groupby(label_col)[value_col].nunique().reset_index()
