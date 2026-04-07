@@ -894,124 +894,8 @@ def _build_performance_attention_table(stored: dict, year: str,
 def _build_heatmap_fig(stored: dict, view: str, year: str,
                        district: str | None = None,
                        sel_inds: list | None = None) -> go.Figure:
-    all_labels  = stored.get('y_labels', [])
-    all_targets = stored.get('y_targets', [])
-
-    # Filter rows to selected indicators (if any selection is active)
-    if sel_inds:
-        rows_idx = [i for i, lbl in enumerate(all_labels) if lbl in sel_inds]
-    else:
-        rows_idx = list(range(len(all_labels)))
-
-    y_labels  = [all_labels[i] for i in rows_idx]
-    y_targets = [all_targets[i] for i in rows_idx]
-    display_y_labels = [
-        (lbl if len(lbl) <= 34 else f"{lbl[:31]}...") if view == 'monthly' else lbl
-        for lbl in y_labels
-    ]
-    n_inds    = len(y_labels)
-    height    = max(n_inds * (26 if view == 'monthly' else 30) + 150, 380)
-
-    if view == 'monthly':
-        data = stored.get('monthly', {}).get(year, {})
-    elif view == 'by_facility':
-        data = stored.get('by_facility', {}).get(year, {})
-    elif view == 'by_district':
-        data = stored.get('by_district', {}).get(year, {})
-    elif view == 'district_facs':
-        default_districts = stored.get('all_districts', [])
-        dist = district or stored.get('current_district') or (default_districts[0] if default_districts else '')
-        data = stored.get('by_district_facs', {}).get(dist, {}).get(year, {})
-    elif view == 'yearly':
-        data = stored.get('yearly') or {}
-    else:
-        data = {}
-
-    x_labels   = data.get('x', [])
-    z_raw      = data.get('z', [])
-    z          = [[_display_pct(v) if v is not None else None for v in z_raw[i]] for i in rows_idx if i < len(z_raw)]
-    tick_angle = data.get('tick_angle', 0)
-
-    if view in ('by_district', 'by_facility', 'district_facs'):
-        return _build_geo_heatmap_fig(stored, view, year, district, sel_inds)
-
-    if not x_labels or not z:
-        fig = go.Figure()
-        fig.add_annotation(text='No data for this selection',
-                           xref='paper', yref='paper', x=0.5, y=0.5,
-                           showarrow=False, font=dict(size=12, color=MUTED))
-        fig.update_layout(paper_bgcolor=BG, plot_bgcolor=GRID_C,
-                          height=height, margin=dict(l=220, r=80, t=16, b=60))
-        return fig
-
-    _customdata = None
-    if y_targets and all(t is not None for t in y_targets):
-        _customdata = [[tgt] * len(x_labels) for tgt, _ in zip(y_targets, z)]
-    _hover = '<b>%{y}</b><br>%{x}: <b>%{z:.0f}%</b><extra></extra>'
-    if _customdata is not None:
-        _hover = ('<b>%{y}</b><br>%{x}: <b>%{z:.0f}%</b>'
-                  '<br>Target: %{customdata[0]}%<extra></extra>')
-    fig = go.Figure(go.Heatmap(
-        z=z, x=x_labels, y=display_y_labels,
-        colorscale=HEATMAP_CS,
-        zmin=0, zmax=100,
-        zsmooth=False,
-        hoverongaps=False,
-        customdata=_customdata,
-        colorbar=dict(
-            thickness=14,
-            title=dict(text='Coverage %', side='right',
-                       font=dict(size=9, color=DIM)),
-            tickfont=dict(size=9, color=DIM),
-            tickvals=[0, 65, 80, 100],
-            ticktext=['0%', '65%', '80%', '100%'],
-            len=0.85,
-        ),
-        hovertemplate=_hover,
-        ygap=1.5, xgap=1.5,
-    ))
-
-    # Cell value annotations for compact matrix views
-    annotations = []
-    show_cell_values = (view == 'monthly') or (len(x_labels) <= 8)
-    if show_cell_values:
-        ann_size = 8 if view == 'monthly' else 9
-        for ii, row in enumerate(z):
-            for jj, val in enumerate(row):
-                if val is not None:
-                    txt_col = '#fff' if val < 65 else ('#111827' if val < 80 else '#FFFFFF')
-                    annotations.append(dict(
-                        x=x_labels[jj], y=display_y_labels[ii],
-                        text=f'{_display_pct(val):.0f}%',
-                        showarrow=False,
-                        font=dict(size=ann_size, color=txt_col, family=FONT),
-                    ))
-
-    # Target reference markers are omitted for the monthly matrix to avoid label crowding
-    y_annots = []
-    if view != 'monthly':
-        for ii, (lbl, tgt) in enumerate(zip(display_y_labels, y_targets)):
-            y_annots.append(dict(
-                x=-0.001, y=lbl,
-                xref='paper', yref='y',
-                text=f'<span style="color:{MUTED}; font-size:8px">>{tgt}%</span>',
-                showarrow=False, xanchor='right',
-                font=dict(size=7, color=MUTED, family=FONT),
-            ))
-
-    fig.update_layout(
-        paper_bgcolor=BG, plot_bgcolor=BG,
-        font=dict(family=FONT, color=TEXT, size=11),
-        height=height,
-        margin=dict(l=250 if view == 'monthly' else 230, r=90, t=16, b=70),
-        xaxis=dict(tickangle=tick_angle, tickfont=dict(size=10, color=DIM),
-                   showgrid=False, side='bottom'),
-        yaxis=dict(tickfont=dict(size=9 if view == 'monthly' else 10, color=TEXT if view == 'monthly' else DIM),
-                   showgrid=False, autorange='reversed'),
-        annotations=annotations + y_annots,
-        hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
-    )
-    return fig
+    map_view = view if view in ('by_district', 'district_facs') else 'by_district'
+    return _build_geo_heatmap_fig(stored, map_view, year, district, sel_inds)
 
 
 # # MNID geographic map data for the main heatmap
@@ -1571,15 +1455,24 @@ _COMPARE_COLORS = [
     Output('mnid-compare-dist-selector', 'style'),
     Output('mnid-compare-ind-multi', 'options'),
     Output('mnid-compare-ind-multi', 'value'),
+    Output('mnid-compare-chart-type-store', 'data'),
+    Output('mnid-compare-chart-toggle', 'className'),
+    Output('mnid-compare-chart-toggle-text', 'children'),
     Input('mnid-compare-mode', 'value'),
     Input('mnid-compare-fac-multi', 'value'),
     Input('mnid-compare-dist-multi', 'value'),
     Input('mnid-compare-ind-kind', 'value'),
     Input('mnid-compare-ind-multi', 'value'),
+    Input('mnid-compare-chart-toggle', 'n_clicks'),
     State('mnid-compare-store', 'data'),
+    State('mnid-compare-chart-type-store', 'data'),
 )
-def update_compare_charts(mode, sel_facs, sel_dists, sel_kinds, sel_ind_ids, stored):
+def update_compare_charts(mode, sel_facs, sel_dists, sel_kinds, sel_ind_ids, toggle_clicks, stored, chart_type):
     mode = mode or 'facility'
+    chart_type = chart_type or 'bar'
+    ctx = callback_context
+    if ctx and ctx.triggered and ctx.triggered[0]['prop_id'] == 'mnid-compare-chart-toggle.n_clicks':
+        chart_type = 'line' if chart_type == 'bar' else 'bar'
     store_payload = stored or {}
     tracked = store_payload.get('tracked', [])
     mch_full = _deserialize_store_df(store_payload.get('records'))
@@ -1607,7 +1500,9 @@ def update_compare_charts(mode, sel_facs, sel_dists, sel_kinds, sel_ind_ids, sto
     )
 
     if not active_inds or mch_full.empty:
-        return _empty_fig, fac_style, dist_style, ind_opts, ind_ids
+        toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
+        toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
+        return _empty_fig, fac_style, dist_style, ind_opts, ind_ids, chart_type, toggle_class, toggle_text
 
     if mode == 'facility':
         entities = sel_facs or []
@@ -1621,7 +1516,9 @@ def update_compare_charts(mode, sel_facs, sel_dists, sel_kinds, sel_ind_ids, sto
             return mch_full[mch_full['District'] == entity] if 'District' in mch_full.columns else pd.DataFrame()
 
     if not entities:
-        return _empty_fig, fac_style, dist_style, ind_opts, ind_ids
+        toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
+        toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
+        return _empty_fig, fac_style, dist_style, ind_opts, ind_ids, chart_type, toggle_class, toggle_text
 
     fig = go.Figure()
     for idx, ind in enumerate(active_inds):
@@ -1637,20 +1534,35 @@ def update_compare_charts(mode, sel_facs, sel_dists, sel_kinds, sel_ind_ids, sto
                 y_vals.append(_display_pct(pct) if den > 0 else None)
                 texts.append(f'{pct:.0f}%' if den > 0 else 'No data')
 
-        fig.add_trace(go.Bar(
-            name=ind['label'],
-            x=entity_labels,
-            y=y_vals,
-            text=texts,
-            textposition='outside',
-            textfont=dict(size=9, color='#E2E8F0'),
-            marker=dict(color=color, opacity=0.88,
-                        line=dict(color='rgba(255,255,255,0.25)', width=0.8)),
-            hovertemplate=(
-                f'<b>{ind["label"]}</b><br>'
-                '%{x}<br>Coverage: %{y:.1f}%<extra></extra>'
-            ),
-        ))
+        if chart_type == 'line':
+            fig.add_trace(go.Scatter(
+                name=ind['label'],
+                x=entity_labels,
+                y=y_vals,
+                mode='lines+markers',
+                line=dict(color=color, width=2.6, shape='spline'),
+                marker=dict(size=7, color=color, line=dict(color='#fff', width=1.2)),
+                hovertemplate=(
+                    f'<b>{ind["label"]}</b><br>'
+                    '%{x}<br>Coverage: %{y:.1f}%<extra></extra>'
+                ),
+                connectgaps=False,
+            ))
+        else:
+            fig.add_trace(go.Bar(
+                name=ind['label'],
+                x=entity_labels,
+                y=y_vals,
+                text=texts,
+                textposition='outside',
+                textfont=dict(size=9, color='#E2E8F0'),
+                marker=dict(color=color, opacity=0.88,
+                            line=dict(color='rgba(255,255,255,0.25)', width=0.8)),
+                hovertemplate=(
+                    f'<b>{ind["label"]}</b><br>'
+                    '%{x}<br>Coverage: %{y:.1f}%<extra></extra>'
+                ),
+            ))
 
     avg_target = sum(i.get('target', 80) for i in active_inds) / len(active_inds)
     fig.add_hline(
@@ -1663,7 +1575,7 @@ def update_compare_charts(mode, sel_facs, sel_dists, sel_kinds, sel_ind_ids, sto
 
     fig.update_layout(
         height=420,
-        barmode='group',
+        barmode='group' if chart_type == 'bar' else None,
         bargap=0.20,
         bargroupgap=0.06,
         margin=dict(l=10, r=10, t=30, b=10),
@@ -1684,7 +1596,9 @@ def update_compare_charts(mode, sel_facs, sel_dists, sel_kinds, sel_ind_ids, sto
             bgcolor='rgba(0,0,0,0)', bordercolor='rgba(0,0,0,0)',
         ),
     )
-    return fig, fac_style, dist_style, ind_opts, ind_ids
+    toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
+    toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
+    return fig, fac_style, dist_style, ind_opts, ind_ids, chart_type, toggle_class, toggle_text
 
 
 # # MNID main heatmap section layout
@@ -1788,20 +1702,10 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
 
     dyn_districts = store.get('all_districts', [])
     cur_dist   = store.get('current_district', dyn_districts[0] if dyn_districts else '')
-    has_yearly = bool(store.get('yearly', {}).get('x'))
     all_labels = store.get('y_labels', [])
     years = ['All years']
     if len(mch_full) and 'Date' in mch_full.columns:
         years.extend(str(y) for y in sorted(mch_full['Date'].dt.year.dropna().astype(int).unique().tolist()))
-
-    view_options = [
-        {'label': 'Facility by Month',  'value': 'monthly'},
-        {'label': 'My District Facilities',   'value': 'district_facs'},
-        {'label': 'All Districts',            'value': 'by_district'},
-        {'label': 'All Facilities',           'value': 'by_facility'},
-    ]
-    if has_yearly:
-        view_options.append({'label': 'Year-over-Year', 'value': 'yearly'})
 
     year_opts     = [{'label': y, 'value': y} for y in years]
     district_opts = [{'label': d, 'value': d} for d in dyn_districts]
@@ -1894,54 +1798,56 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
 
     heatmap_card = html.Div(id='mnid-heatmap-inner', className='mnid-card',
                     style={'marginBottom': '12px'}, children=[
-        html.Div('INDICATOR COVERAGE HEATMAP', className='mnid-section-lbl'),
+        html.Div('MAP COVERAGE VIEW', className='mnid-section-lbl'),
 
-        html.Div(style={
-            'display': 'grid',
-            'gridTemplateColumns': 'repeat(4, minmax(0, 1fr))',
-            'gap': '10px', 'alignItems': 'end',
-            'marginBottom': '12px',
-        }, children=[
-            html.Div(children=[
-                html.Div('View', style=_lbl_style),
-                dcc.Dropdown(
+        html.Div(className='mnid-map-controls', children=[
+            html.Div(className='mnid-map-scope', children=[
+                html.Div('Scope', style=_lbl_style),
+                dmc.SegmentedControl(
                     id='mnid-heatmap-view',
-                    options=view_options,
                     value='by_district',
-                    clearable=False,
-                    style=_dd_style,
+                    data=[
+                        {'label': 'Districts', 'value': 'by_district'},
+                        {'label': 'Facilities', 'value': 'district_facs'},
+                    ],
+                    size='sm',
+                    radius='xl',
+                    color='green',
+                    fullWidth=True,
                 ),
             ]),
-            html.Div(children=[
-                html.Div('Year', style=_lbl_style),
-                dcc.Dropdown(
-                    id='mnid-heatmap-year',
-                    options=year_opts,
-                    value='All years',
-                    clearable=False,
-                    style=_dd_style,
-                ),
-            ]),
-            html.Div(id='mnid-heatmap-district-wrap', style={'display': 'none'}, children=[
-                html.Div('District Focus', style=_lbl_style),
-                dcc.Dropdown(
-                    id='mnid-heatmap-district',
-                    options=district_opts,
-                    value=cur_dist,
-                    clearable=False,
-                    style=_dd_style,
-                ),
-            ]),
-            html.Div(children=[
-                html.Div('Indicators', style=_lbl_style),
-                dcc.Dropdown(
-                    id='mnid-heatmap-indicators',
-                    options=ind_opts,
-                    value=all_labels,
-                    multi=True,
-                    placeholder='Select indicators...',
-                    style=_dd_style,
-                ),
+            html.Div(className='mnid-map-filter-grid', children=[
+                html.Div(children=[
+                    html.Div('Year', style=_lbl_style),
+                    dcc.Dropdown(
+                        id='mnid-heatmap-year',
+                        options=year_opts,
+                        value='All years',
+                        clearable=False,
+                        style=_dd_style,
+                    ),
+                ]),
+                html.Div(id='mnid-heatmap-district-wrap', style={'display': 'none'}, children=[
+                    html.Div('District Focus', style=_lbl_style),
+                    dcc.Dropdown(
+                        id='mnid-heatmap-district',
+                        options=district_opts,
+                        value=cur_dist,
+                        clearable=False,
+                        style=_dd_style,
+                    ),
+                ]),
+                html.Div(children=[
+                    html.Div('Indicators', style=_lbl_style),
+                    dcc.Dropdown(
+                        id='mnid-heatmap-indicators',
+                        options=ind_opts,
+                        value=all_labels[:8] if len(all_labels) >= 8 else all_labels,
+                        multi=True,
+                        placeholder='Select indicators...',
+                        style=_dd_style,
+                    ),
+                ]),
             ]),
         ]),
 
@@ -1966,9 +1872,8 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
         ]),
 
         html.P(
-            'Green >= 80% on target or above  -  Amber 65-79% watch  -  '
-            'Red < 65% needs action  -  Grey = no data  -  * = current facility',
-            style={'fontSize': '9px', 'color': MUTED, 'marginTop': '6px'},
+            'Click the scope toggle to switch between district coverage and facility markers. Choose a district when viewing facilities to keep the map readable.',
+            style={'fontSize': '10px', 'color': MUTED, 'marginTop': '8px', 'lineHeight': '1.5'},
         ),
     ])
 
@@ -2673,7 +2578,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                         'marginBottom': '16px', 'flexWrap': 'wrap', 'gap': '10px'}, children=[
             html.Div('COMPARISON ANALYSIS', className='mnid-card-title',
                      style={'marginBottom': '0'}),
-            html.Div(className='mnid-compare-mode', style={'display': 'flex', 'alignItems': 'center', 'gap': '6px'}, children=[
+            html.Div(className='mnid-compare-mode', style={'display': 'flex', 'alignItems': 'center', 'gap': '10px', 'flexWrap': 'wrap'}, children=[
                 html.Span('Compare by:', style={'fontSize': '11px', 'color': '#94A3B8',
                                                 'fontWeight': '600', 'letterSpacing': '0.04em'}),
                 dcc.RadioItems(
@@ -2687,6 +2592,16 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                     inputStyle={'marginRight': '5px'},
                     labelStyle={'marginRight': '16px', 'fontSize': '12px',
                                 'color': '#E2E8F0', 'cursor': 'pointer', 'fontWeight': '600'},
+                ),
+                html.Button(
+                    id='mnid-compare-chart-toggle',
+                    className='mnid-trend-toggle is-bar',
+                    n_clicks=0,
+                    type='button',
+                    children=[
+                        html.Span('Bar', id='mnid-compare-chart-toggle-text', className='mnid-trend-toggle-text'),
+                        html.Span(className='mnid-trend-toggle-thumb'),
+                    ],
                 ),
             ]),
         ]),
@@ -2759,6 +2674,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
             'facilities': all_facs,
             'districts':  all_dists,
         }),
+        dcc.Store(id='mnid-compare-chart-type-store', data='bar'),
         html.Div(className='mnid-chart-grid', children=[compare_card]),
     ])
 
