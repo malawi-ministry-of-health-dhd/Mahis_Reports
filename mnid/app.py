@@ -5,7 +5,7 @@ This module builds the Maternal and Child Health dashboard layout,
 calculates configured indicator coverage, and renders the main dashboard
 sections such as trends, comparison views, heatmaps, and readiness panels.
 """
-from dash import html, dcc, clientside_callback, callback, Input, Output, State, ALL
+from dash import html, dcc, clientside_callback, callback, callback_context, Input, Output, State, ALL
 import dash_mantine_components as dmc
 from helpers.helpers import create_count_from_config
 import pandas as pd
@@ -236,7 +236,7 @@ _CAT_LABELS = {'ANC': 'ANC', 'Labour': 'Labour & Delivery', 'Newborn': 'Newborn'
 _CAT_ORDER  = ['ANC', 'Labour', 'Newborn', 'PNC']
 
 
-def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str) -> go.Figure:
+def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str, chart_type: str = 'line') -> go.Figure:
     palette = CAT_PALETTES.get(cat, [INFO_C])
     fig = go.Figure()
 
@@ -273,7 +273,23 @@ def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str) -> go.Figure:
             ys.append(round(n / d * 100, 1) if d > 0 else None)
 
         has_data = any(y is not None for y in ys)
-        if has_data:
+        if not has_data:
+            if chart_type == 'bar':
+                fig.add_trace(go.Bar(x=[], y=[], name=ind['label'], marker=dict(color=c), showlegend=True))
+            else:
+                fig.add_trace(go.Scatter(x=[], y=[], name=ind['label'], line=dict(color=c), showlegend=True))
+            continue
+
+        if chart_type == 'bar':
+            clean_xs = [x for x, y in zip(xs, ys) if y is not None]
+            clean_ys = [y for y in ys if y is not None]
+            fig.add_trace(go.Bar(
+                x=clean_xs, y=clean_ys, name=ind['label'],
+                marker=dict(color=f'rgba({r},{g},{b},0.85)', line=dict(color=c, width=1)),
+                hovertemplate=f'%{{x|%b %Y}}<br>{ind["label"]}: %{{y:.0f}}%<extra></extra>',
+                offsetgroup=str(j),
+            ))
+        else:
             fig.add_trace(go.Scatter(
                 x=xs, y=ys, name=ind['label'],
                 mode='lines+markers',
@@ -283,20 +299,19 @@ def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str) -> go.Figure:
                 connectgaps=True,
                 hovertemplate=f'%{{x|%b %Y}}<br>{ind["label"]}: %{{y:.0f}}%<extra></extra>',
             ))
-            non_none_xs = [x for x, y in zip(xs, ys) if y is not None]
-            if len(non_none_xs) >= 2:
-                fig.add_shape(type='line', x0=non_none_xs[0], x1=non_none_xs[-1],
-                              y0=ind['target'], y1=ind['target'],
-                              line=dict(color=c, width=1, dash='dot'), layer='below')
-        else:
-            fig.add_trace(go.Scatter(x=[], y=[], name=ind['label'],
-                                     line=dict(color=c), showlegend=True))
+
+        non_none_xs = [x for x, y in zip(xs, ys) if y is not None]
+        if len(non_none_xs) >= 2:
+            fig.add_shape(type='line', x0=non_none_xs[0], x1=non_none_xs[-1],
+                          y0=ind['target'], y1=ind['target'],
+                          line=dict(color=c, width=1, dash='dot'), layer='below')
     fig.update_layout(
         paper_bgcolor=BG, plot_bgcolor=BG,
         font=dict(family=FONT, color=TEXT, size=11),
         hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
         height=300,
         margin=dict(l=8, r=8, t=12, b=24),
+        barmode='group' if chart_type == 'bar' else None,
         xaxis=dict(showgrid=False, zeroline=False, showline=False,
                    tickformat='%b %y', tickfont=dict(size=10, color=MUTED)),
         yaxis=dict(showgrid=True, gridcolor=GRID_C, zeroline=False, showline=False,
@@ -304,72 +319,94 @@ def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str) -> go.Figure:
                    title=dict(text='Coverage %', font=dict(size=10, color=MUTED))),
         legend=dict(font=dict(size=10, color=DIM), bgcolor='rgba(0,0,0,0)',
                     orientation='v', x=1.01, y=1, xanchor='left', yanchor='top'),
-        hovermode='x unified',
+        hovermode='closest' if chart_type == 'bar' else 'x unified',
     )
     return fig
 
 
-# Register clientside callback once at module level
-clientside_callback(
-    """
-    function(n_clicks_list, stored_figs) {
-        if (!stored_figs) return window.dash_clientside.no_update;
-        var ctx = window.dash_clientside.callback_context;
-        if (!ctx || !ctx.triggered || !ctx.triggered.length)
-            return window.dash_clientside.no_update;
-        var prop_id = ctx.triggered[0].prop_id;
-        var id_part = prop_id.split('.')[0];
-        try { var id_obj = JSON.parse(id_part); } catch(e) {
-            return window.dash_clientside.no_update;
-        }
-        var cat = id_obj.index;
-        if (!stored_figs[cat]) return window.dash_clientside.no_update;
-
-        // Toggle active class on trend buttons (parse each element's actual Dash ID)
-        document.querySelectorAll('[id*="trend-cat-btn"]').forEach(function(el) {
-            try {
-                var parsed = JSON.parse(el.id);
-                if (parsed.index === cat) el.classList.add('active');
-                else el.classList.remove('active');
-            } catch(e) {}
-        });
-
-        return JSON.parse(stored_figs[cat]);
-    }
-    """,
+@callback(
     Output('mnid-trend-graph', 'figure'),
+    Output('mnid-trend-active-cat', 'data'),
+    Output({'type': 'trend-cat-btn', 'index': ALL}, 'className'),
+    Output('mnid-trend-chart-type-store', 'data'),
+    Output('mnid-trend-chart-toggle', 'className'),
+    Output('mnid-trend-chart-toggle-text', 'children'),
     Input({'type': 'trend-cat-btn', 'index': ALL}, 'n_clicks'),
+    Input('mnid-trend-chart-toggle', 'n_clicks'),
     State('mnid-trend-store', 'data'),
-    prevent_initial_call=True,
+    State('mnid-trend-active-cat', 'data'),
+    State('mnid-trend-chart-type-store', 'data'),
+    prevent_initial_call=False,
 )
+def update_trend_chart(n_clicks_list, toggle_clicks, stored_figs, active_cat, chart_type):
+    cat = active_cat or 'ANC'
+    mode = chart_type or 'line'
+    ctx = callback_context
+    if ctx and ctx.triggered:
+        prop_id = ctx.triggered[0]['prop_id']
+        if 'trend-cat-btn' in prop_id:
+            try:
+                cat = json.loads(prop_id.split('.')[0]).get('index', cat)
+            except Exception:
+                pass
+        elif prop_id == 'mnid-trend-chart-toggle.n_clicks':
+            mode = 'bar' if mode == 'line' else 'line'
+
+    figure_json = (((stored_figs or {}).get(mode) or {}).get(cat))
+    fig = go.Figure()
+    if figure_json:
+        fig = go.Figure(json.loads(figure_json))
+
+    classes = [
+        'mnid-filter-btn active' if c == cat else 'mnid-filter-btn'
+        for c in _CAT_ORDER
+    ]
+    toggle_class = 'mnid-trend-toggle is-bar' if mode == 'bar' else 'mnid-trend-toggle is-line'
+    toggle_text = 'Bar' if mode == 'bar' else 'Line'
+    return fig, cat, classes, mode, toggle_class, toggle_text
 
 
 def _trend_switcher(df: pd.DataFrame, indicators: list) -> html.Div:
     tracked = [i for i in indicators if i.get('status') == 'tracked']
-    stored_figs = {}
+    stored_figs = {'line': {}, 'bar': {}}
     for cat in _CAT_ORDER:
         cat_inds = [i for i in tracked if i.get('category') == cat]
-        stored_figs[cat] = _cat_trend_fig(df, cat_inds, cat).to_json()  # handles datetime
+        stored_figs['line'][cat] = _cat_trend_fig(df, cat_inds, cat, 'line').to_json()
+        stored_figs['bar'][cat] = _cat_trend_fig(df, cat_inds, cat, 'bar').to_json()
 
     default_inds = [i for i in tracked if i.get('category') == 'ANC']
-    default_fig  = _cat_trend_fig(df, default_inds, 'ANC')
+    default_fig  = _cat_trend_fig(df, default_inds, 'ANC', 'line')
 
     return html.Div(className='mnid-card', style={'marginBottom': '12px'}, children=[
         html.Div(style={'display': 'flex', 'alignItems': 'center',
-                        'justifyContent': 'space-between', 'marginBottom': '8px'}, children=[
+                        'justifyContent': 'space-between', 'marginBottom': '8px', 'gap': '12px', 'flexWrap': 'wrap'}, children=[
             html.Div('COVERAGE TREND', className='mnid-section-lbl',
                      style={'marginBottom': '0'}),
-            html.Div(className='mnid-filter-row', children=[
+            html.Div(style={'display': 'flex', 'alignItems': 'center', 'gap': '10px', 'flexWrap': 'wrap'}, children=[
                 html.Button(
-                    _CAT_LABELS.get(c, c),
-                    id={'type': 'trend-cat-btn', 'index': c},
-                    className='mnid-filter-btn' + (' active' if c == 'ANC' else ''),
+                    id='mnid-trend-chart-toggle',
+                    className='mnid-trend-toggle is-line',
                     n_clicks=0,
-                )
-                for c in _CAT_ORDER
+                    type='button',
+                    children=[
+                        html.Span('Line', id='mnid-trend-chart-toggle-text', className='mnid-trend-toggle-text'),
+                        html.Span(className='mnid-trend-toggle-thumb'),
+                    ],
+                ),
+                html.Div(className='mnid-filter-row', children=[
+                    html.Button(
+                        _CAT_LABELS.get(c, c),
+                        id={'type': 'trend-cat-btn', 'index': c},
+                        className='mnid-filter-btn' + (' active' if c == 'ANC' else ''),
+                        n_clicks=0,
+                    )
+                    for c in _CAT_ORDER
+                ]),
             ]),
         ]),
         dcc.Store(id='mnid-trend-store', data=stored_figs),
+        dcc.Store(id='mnid-trend-active-cat', data='ANC'),
+        dcc.Store(id='mnid-trend-chart-type-store', data='line'),
         dcc.Graph(id='mnid-trend-graph', figure=default_fig,
                   config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}}, style={'height': '300px'}),
     ])
