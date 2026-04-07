@@ -733,6 +733,125 @@ def _build_facility_performance_heatmap_fig(stored: dict, year: str,
     ])
 
 
+def _build_performance_attention_table(stored: dict, year: str,
+                                       district: str | None = None,
+                                       facility_type: str | None = None,
+                                       sel_inds: list | None = None) -> html.Div:
+    all_labels = stored.get('y_labels', [])
+    all_targets = stored.get('y_targets', [])
+    if sel_inds:
+        rows_idx = [i for i, lbl in enumerate(all_labels) if lbl in sel_inds]
+    else:
+        rows_idx = list(range(len(all_labels)))
+
+    focus_district = district or 'All'
+    if focus_district == 'All':
+        data = stored.get('by_facility', {}).get(year, {})
+    else:
+        data = stored.get('by_district_facs', {}).get(focus_district, {}).get(year, {})
+
+    fac_keys = data.get('x', [])
+    z_raw = data.get('z', [])
+    selected_type = facility_type or 'All'
+
+    rows = []
+    for col_idx, fac_key in enumerate(fac_keys):
+        fac_code = str(fac_key or '').rstrip('*')
+        if str(fac_code) == str(stored.get('current_fac', '')):
+            continue
+        fac_name = _FACILITY_NAMES.get(fac_code, fac_code)
+        fac_kind = _infer_facility_type(fac_code)
+        if selected_type != 'All' and fac_kind != selected_type:
+            continue
+
+        values = []
+        critical = []
+        for row_idx in rows_idx:
+            if row_idx >= len(z_raw) or col_idx >= len(z_raw[row_idx]):
+                continue
+            val = z_raw[row_idx][col_idx]
+            if val is None:
+                continue
+            pct = _display_pct(val)
+            values.append(pct)
+            tgt = all_targets[row_idx] if row_idx < len(all_targets) else 80
+            if pct < tgt:
+                critical.append((all_labels[row_idx], pct, tgt))
+
+        if not values or not critical:
+            continue
+
+        critical.sort(key=lambda item: item[1])
+        worst_pct = critical[0][1]
+        worst_gap = min(item[1] - item[2] for item in critical)
+        avg = round(sum(values) / len(values), 1)
+        rows.append({
+            'facility': fac_name,
+            'district': _FACILITY_DISTRICT.get(fac_code, ''),
+            'facility_type': fac_kind,
+            'avg': avg,
+            'critical': [(label, pct) for label, pct, _ in critical[:2]],
+            'critical_count': len(critical),
+            'worst_pct': worst_pct,
+            'worst_gap': worst_gap,
+        })
+
+    rows.sort(key=lambda row: (row['worst_pct'], row['worst_gap'], -row['critical_count'], row['avg'], row['facility']))
+    rows = rows[:5]
+
+    header = html.Tr([
+        html.Th('#', className='mnid-attention-th mnid-attention-rank'),
+        html.Th('Facility Name', className='mnid-attention-th'),
+        html.Th('District', className='mnid-attention-th'),
+        html.Th('Facility Type', className='mnid-attention-th'),
+        html.Th('Critical Indicator(s)', className='mnid-attention-th'),
+        html.Th('Average Performance', className='mnid-attention-th'),
+    ])
+
+    if not rows:
+        return html.Div(className='mnid-performance-attention-wrap mnid-performance-attention-empty', children=[
+            html.Div('FACILITIES REQUIRING ATTENTION', className='mnid-attention-title'),
+            html.Div(
+                'No facility attention data for this selection.',
+                className='mnid-attention-empty-message',
+            ),
+        ])
+
+    body = []
+    for idx, row in enumerate(rows, start=1):
+        if row['critical']:
+            critical_children = []
+            for pos, (label, pct) in enumerate(row['critical']):
+                if pos:
+                    critical_children.append(html.Br())
+                critical_children.append(f'{label} ({pct:.0f}%)')
+            critical_cell = html.Div(className='mnid-attention-critical', children=critical_children)
+        else:
+            critical_cell = html.Span('Monitoring', className='mnid-attention-monitoring')
+
+        avg_color = _cov_color(row['avg'])
+        body.append(html.Tr([
+            html.Td(str(idx), className='mnid-attention-td mnid-attention-rank'),
+            html.Td(row['facility'], className='mnid-attention-td mnid-attention-facility'),
+            html.Td(row['district'], className='mnid-attention-td'),
+            html.Td(row['facility_type'], className='mnid-attention-td'),
+            html.Td(critical_cell, className='mnid-attention-td mnid-attention-critical-cell'),
+            html.Td(
+                html.Span(f'{row["avg"]:.0f}% (Avg)', style={'color': avg_color}),
+                className='mnid-attention-td mnid-attention-avg',
+                style={'backgroundColor': '#FFF7ED' if row['avg'] < 65 else ('#FFFBEB' if row['avg'] < 80 else '#F0FDF4')},
+            ),
+        ]))
+
+    return html.Div(className='mnid-performance-attention-wrap', children=[
+        html.Div('FACILITIES REQUIRING ATTENTION', className='mnid-attention-title'),
+        html.Table(className='mnid-attention-table', children=[
+            html.Thead(header),
+            html.Tbody(body),
+        ]),
+    ])
+
+
 # MNID heatmap figure builder
 
 def _build_heatmap_fig(stored: dict, view: str, year: str,
@@ -1291,7 +1410,7 @@ clientside_callback(
         if (window._mnidScrollSpyActive) return '';
         window._mnidScrollSpyActive = true;
 
-        var sectionIds = ['mnid-summary','mnid-trends','mnid-heatmap',
+        var sectionIds = ['mnid-summary','mnid-trends','mnid-performance','mnid-heatmap',
                           'mnid-coverage','mnid-comparative','mnid-analysis','mnid-readiness'];
 
         function setActive(id) {
@@ -1344,7 +1463,7 @@ clientside_callback(
 )
 def update_heatmap_view(view, year, district, sel_inds, stored):
     if not stored:
-        return [], [], {'display': 'none'}
+        return go.Figure(), html.Div(), {'display': 'none'}
     v = view or 'by_district'
     y = year or 'All years'
     fig   = _build_heatmap_fig(stored, v, y, district, sel_inds)
@@ -1356,6 +1475,7 @@ def update_heatmap_view(view, year, district, sel_inds, stored):
 @callback(
     Output('mnid-performance-heatmap-table', 'children'),
     Output('mnid-performance-aggregate', 'children'),
+    Output('mnid-performance-attention', 'children'),
     Input('mnid-performance-district', 'value'),
     Input('mnid-performance-facility-type', 'value'),
     Input('mnid-performance-period', 'value'),
@@ -1365,7 +1485,7 @@ def update_heatmap_view(view, year, district, sel_inds, stored):
 )
 def update_performance_heatmap(district, facility_type, period, sel_inds, stored):
     if not stored:
-        return [], []
+        return html.Div(), html.Div(), html.Div()
     year = period or 'All years'
     table = _build_facility_performance_heatmap_fig(
         stored,
@@ -1375,7 +1495,14 @@ def update_performance_heatmap(district, facility_type, period, sel_inds, stored
         facility_type or 'All',
     )
     gauges = _build_district_gauge_row(stored, year)
-    return table, gauges
+    attention = _build_performance_attention_table(
+        stored,
+        year,
+        district or 'All',
+        facility_type or 'All',
+        sel_inds,
+    )
+    return table, gauges, attention
 
 
 _COMPARE_COLORS = [
@@ -1703,6 +1830,11 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
                     html.Div(className='mnid-performance-key-row', children=[html.Span('Moderate (60-80%)'), html.Div(className='mnid-performance-swatch moderate')]),
                     html.Div(className='mnid-performance-key-row', children=[html.Span('Poor (<50%)'), html.Div(className='mnid-performance-swatch poor')]),
                 ]),
+                html.Div(
+                    id='mnid-performance-attention',
+                    className='mnid-performance-attention',
+                    children=_build_performance_attention_table(store, 'All years', 'All', 'All', default_perf_inds),
+                ),
             ]),
         ]),
     ])
@@ -1787,8 +1919,7 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
         ),
     ])
 
-    attention_panel = _facilities_requiring_attention(store)
-    return html.Div(children=[performance_card, heatmap_card, attention_panel])
+    return performance_card, heatmap_card
 
 # indicator cards
 
@@ -2990,6 +3121,7 @@ def _sidebar(facility_code: str) -> html.Div:
     nav_items = [
         ('Overview', '#mnid-summary'),
         ('Trend', '#mnid-trends'),
+        ('Performance', '#mnid-performance'),
         ('Heatmap', '#mnid-heatmap'),
         ('Indicators', '#mnid-coverage'),
         ('Comparison', '#mnid-comparative'),
@@ -3160,7 +3292,7 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     ]
     analysis_acc = [a for a in analysis_acc if a]
 
-    heatmap_div      = _coverage_heatmap_section(all_inds, facility_code, network_df)
+    performance_div, heatmap_div = _coverage_heatmap_section(all_inds, facility_code, network_df)
     comparative_div  = _comparative_analysis_section(all_inds, facility_code, network_df)
 
     def _sec_header(title, count=None, desc=None):
@@ -3192,8 +3324,14 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
         _sec_header('Coverage Trends', desc='12-month rolling - dotted line = target'),
         _trend_switcher(facility_df, all_inds),
 
-        # Coverage heatmap section
+        # Facility performance section
+        _section_anchor('mnid-performance'),
+        _sec_header('Facility Performance', desc='District comparison heatmap for key performance indicators'),
+        performance_div,
+
+        # Map and heatmap section
         _section_anchor('mnid-heatmap'),
+        _sec_header('Map View', desc='Geographic coverage map and district/facility context'),
         heatmap_div,
 
         # Coverage indicators section

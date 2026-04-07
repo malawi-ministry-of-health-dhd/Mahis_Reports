@@ -642,6 +642,98 @@ html { scroll-behavior: smooth; }
   max-width: 100%;
 }
 
+.mnid-performance-attention {
+  margin-top: 16px;
+}
+
+.mnid-performance-attention-wrap {
+  border: 1px solid #DCE7EE;
+  border-radius: 12px;
+  background: #FFFFFF;
+  overflow: hidden;
+}
+
+.mnid-attention-title {
+  padding: 12px 16px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6B7E99;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.mnid-performance-attention-empty {
+  min-height: 128px;
+}
+
+.mnid-attention-empty-message {
+  padding: 24px 16px 20px;
+  color: #7A8CA6;
+  font-size: 12px;
+}
+
+.mnid-attention-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.mnid-attention-th {
+  padding: 10px 12px;
+  background: #EAF1F6;
+  border-bottom: 1px solid #D2DEE8;
+  color: #0F172A;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: left;
+}
+
+.mnid-attention-td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #E5E7EB;
+  color: #334155;
+  font-size: 11px;
+  vertical-align: top;
+  background: #FFFFFF;
+}
+
+.mnid-attention-rank {
+  width: 44px;
+  text-align: center;
+}
+
+.mnid-attention-facility {
+  font-weight: 600;
+  color: #0F172A;
+}
+
+.mnid-attention-critical {
+  color: #991B1B;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.mnid-attention-critical-cell {
+  background: linear-gradient(90deg, #FEF2F2 0%, #FFF7ED 100%);
+}
+
+.mnid-attention-monitoring {
+  display: inline-flex;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #FFFBEB;
+  color: #92400E;
+  border: 1px solid #FDE68A;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.mnid-attention-avg {
+  white-space: nowrap;
+  font-weight: 800;
+  text-align: center;
+}
+
+
 .mnid-performance-key-title {
   font-size: 11px;
   font-weight: 700;
