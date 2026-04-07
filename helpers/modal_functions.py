@@ -141,12 +141,12 @@ def validate_dashboard_json(contents):
                 for key in target_keys:
                     if key in c["filters"]:
                        if c["filters"][key] not in actual_keys_in_data:
-                           if isinstance(ch["filters"][key], list):
-                                for v in ch["filters"][key]:
+                           if isinstance(c["filters"][key], list):
+                                for v in c["filters"][key]:
                                     if v not in actual_keys_in_data:
                                         selected_values.append(v)
                                 else:
-                                    selected_values.append(ch["filters"][key])
+                                    selected_values.append(c["filters"][key])
                 if len(selected_values)>0:
                     return False, f"The following filter values in counts are invalid data columns: {', '.join(selected_values)}"
             for chart in charts['sections']:
