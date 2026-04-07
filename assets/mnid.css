@@ -1321,6 +1321,80 @@ html { scroll-behavior: smooth; }
   background: #FAFAFA;
 }
 
+.mnid-service-table-card {
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+}
+
+.mnid-service-table-head {
+  padding: 2px 0 12px;
+}
+
+.mnid-service-table-subtitle {
+  margin: 4px 0 0;
+  color: #64748B;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mnid-service-table-wrap {
+  overflow-x: auto;
+}
+
+.mnid-service-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.mnid-service-table th,
+.mnid-service-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #E2E8F0;
+  vertical-align: middle;
+}
+
+.mnid-service-table th {
+  background: #F8FAFC;
+  color: #0F172A;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: left;
+}
+
+.mnid-service-table tbody tr:hover td {
+  background: #FAFCFB;
+}
+
+.mnid-service-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.mnid-service-table-metric {
+  width: 42%;
+  color: #0F172A;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mnid-service-table-value {
+  width: 18%;
+  color: #15803D;
+  font-size: 18px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.mnid-service-table-detail {
+  width: 40%;
+  color: #64748B;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 /* MNID district gauges */
 .mnid-district-gauge-card {
   background: #fff;

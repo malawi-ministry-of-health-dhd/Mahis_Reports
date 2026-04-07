@@ -460,23 +460,17 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
                 (filtered_data[DATE_] >= start_dt) &
                 (filtered_data[DATE_] <= end_dt)
             ]
-            # If date range yields no MNID rows, fall back to available data
             adj_start_dt, adj_end_dt = start_dt, end_dt
             if filtered_data_date.empty and len(filtered_data):
                 adj_start_dt = filtered_data[DATE_].min()
                 adj_end_dt = filtered_data[DATE_].max()
                 filtered_data_date = filtered_data.copy()
         else:
-            # Apply Dropdown Filters
             mask = pd.Series(True, index=data.index)
-            # if hf:
-            #     mask &= (data[FACILITY_] == hf)
             if age:
                 mask &= (data[AGE_GROUP_] == age)
 
             filtered_data = data[mask].copy()
-
-            # Apply Date Mask
             filtered_data_date = filtered_data[
                 (filtered_data[DATE_] >= start_dt) &
                 (filtered_data[DATE_] <= end_dt)
@@ -567,4 +561,4 @@ def change_style(generate, reset):
         return style_active, style_active, style_active, style_active
     else:
         style_default = {}
-        return style_default,style_default,style_default, style_default,
+        return style_default,style_default,style_default, style_default
