@@ -1415,9 +1415,7 @@ clientside_callback(
 
         function setActive(id) {
             sectionIds.forEach(function(sid) {
-                document.querySelectorAll(
-                    '.mnid-sidebar-link[href="#' + sid + '"], .mnid-nav-btn[href="#' + sid + '"]'
-                ).forEach(function(a) {
+                document.querySelectorAll('.mnid-nav-btn[href="#' + sid + '"]').forEach(function(a) {
                     if (sid === id) a.classList.add('active');
                     else a.classList.remove('active');
                 });
@@ -1434,10 +1432,28 @@ clientside_callback(
                 }
             }
             setActive(activeId);
+
+            var nav = document.querySelector('.mnid-nav');
+            var main = document.querySelector('.mnid-main');
+            var topbar = document.querySelector('.mnid-topbar');
+            if (nav && main) {
+                var shouldFloat = window.scrollY > 220;
+                var target = topbar || main;
+                var rect = target.getBoundingClientRect();
+                nav.style.setProperty('--mnid-nav-left', rect.left + 'px');
+                nav.style.setProperty('--mnid-nav-width', rect.width + 'px');
+                nav.style.setProperty('--mnid-nav-height', nav.offsetHeight + 'px');
+                if (shouldFloat) {
+                    nav.classList.add('mnid-nav-floating');
+                    main.classList.add('mnid-main-nav-floating');
+                } else {
+                    nav.classList.remove('mnid-nav-floating');
+                    main.classList.remove('mnid-main-nav-floating');
+                }
+            }
         }
 
         window.addEventListener('scroll', updateActive, { passive: true });
-        // Also re-check after a short delay to catch initial render
         setTimeout(updateActive, 200);
         updateActive();
         return '';
@@ -3122,7 +3138,7 @@ def _sidebar(facility_code: str) -> html.Div:
         ('Overview', '#mnid-summary'),
         ('Trend', '#mnid-trends'),
         ('Performance', '#mnid-performance'),
-        ('Heatmap', '#mnid-heatmap'),
+        ('Map View', '#mnid-heatmap'),
         ('Indicators', '#mnid-coverage'),
         ('Comparison', '#mnid-comparative'),
         ('Analysis', '#mnid-analysis'),
@@ -3312,41 +3328,34 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
         _sidebar(facility_code),
         _alert_banner(below, strong),
 
-        # # MNID overview section
         _section_anchor('mnid-summary'),
         _sec_header('Overview', desc=f'{len(tracked)} tracked - {len(awaiting)} awaiting'),
         _kpi_row(computed),
         _hero_donut_row(computed),
         _priority_table(computed),
 
-        # Coverage trend section
         _section_anchor('mnid-trends'),
         _sec_header('Coverage Trends', desc='12-month rolling - dotted line = target'),
         _trend_switcher(facility_df, all_inds),
 
-        # Facility performance section
         _section_anchor('mnid-performance'),
         _sec_header('Facility Performance', desc='District comparison heatmap for key performance indicators'),
         performance_div,
 
-        # Map and heatmap section
         _section_anchor('mnid-heatmap'),
         _sec_header('Map View', desc='Geographic coverage map and district/facility context'),
         heatmap_div,
 
-        # Coverage indicators section
         _section_anchor('mnid-coverage'),
         _sec_header('Coverage Indicators', sum(len(v) for v in by_cat.values()),
                     desc='Coverage % vs target - target threshold shown per chart'),
         coverage_charts,
 
-        # Facility and district comparison section
         _section_anchor('mnid-comparative'),
         _sec_header('Facility & District Comparison',
                     desc='Cross-facility and district indicator benchmarking'),
         comparative_div,
 
-        # Clinical analysis section
         _section_anchor('mnid-analysis'),
         _sec_header('Clinical Analysis', total_analysis, desc='Care-phase deep-dives'),
         dmc.Accordion(
@@ -3363,7 +3372,6 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
             },
         ),
 
-        # Operational readiness section
         _section_anchor('mnid-readiness'),
         _sec_header('Operational Readiness',
                     desc='Equipment - workforce competency - data quality'),
