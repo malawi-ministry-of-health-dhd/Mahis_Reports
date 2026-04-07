@@ -72,6 +72,44 @@ def _display_pct(pct):
     return max(0.0, min(float(pct), 100.0))
 
 
+def _axis_wrap(label: str, width: int = 14, max_lines: int = 3) -> str:
+    words = str(label or '').split()
+    if not words:
+        return ''
+    lines = []
+    current = words[0]
+    used = 1
+    for word in words[1:]:
+        if len(current) + len(word) + 1 <= width:
+            current = f'{current} {word}'
+        else:
+            lines.append(current)
+            current = word
+        used += 1
+        if len(lines) >= max_lines - 1:
+            break
+    remaining = words[used:]
+    if remaining:
+        current = f'{current} {" ".join(remaining)}'.strip()
+    lines.append(current)
+    if len(lines[-1]) > width + 4:
+        lines[-1] = f'{lines[-1][:width + 1].rstrip()}...'
+    return '<br>'.join(lines)
+
+
+def _infer_facility_type(facility_key: str) -> str:
+    fac_code = str(facility_key or '').rstrip('*')
+    name = _FACILITY_NAMES.get(fac_code, fac_code).strip()
+    upper = name.upper()
+    if 'CENTRAL' in upper or upper.endswith(' CH'):
+        return 'Central Hospital'
+    if 'HEALTH CENT' in upper or upper.endswith(' HC'):
+        return 'Health Center'
+    if 'DISTRICT' in upper or 'HOSPITAL' in upper:
+        return 'District Hospital'
+    return 'Other'
+
+
 def _contrast_text(hex_color: str, dark: str = TEXT, light: str = '#FFFFFF') -> str:
     color = (hex_color or '').lstrip('#')
     if len(color) != 6:
@@ -584,6 +622,115 @@ def _compute_heatmap_store(mch_full: pd.DataFrame, tracked: list,
     store['counts'] = counts
 
     return store
+
+
+
+def _build_facility_performance_heatmap_fig(stored: dict, year: str,
+                                            district: str | None = None,
+                                            sel_inds: list | None = None,
+                                            facility_type: str | None = None) -> html.Div:
+    all_labels = stored.get('y_labels', [])
+    if sel_inds:
+        rows_idx = [i for i, lbl in enumerate(all_labels) if lbl in sel_inds]
+    else:
+        rows_idx = list(range(len(all_labels)))
+
+    focus_district = district or 'All'
+    if focus_district == 'All':
+        data = stored.get('by_facility', {}).get(year, {})
+    else:
+        data = stored.get('by_district_facs', {}).get(focus_district, {}).get(year, {})
+    fac_keys = data.get('x', [])
+    z_raw = data.get('z', [])
+
+    selected_type = facility_type or 'All'
+    facility_rows = []
+    for col_idx, fac_key in enumerate(fac_keys):
+        fac_code = str(fac_key or '').rstrip('*')
+        fac_name = _FACILITY_NAMES.get(fac_code, fac_code)
+        fac_kind = _infer_facility_type(fac_code)
+        if selected_type != 'All' and fac_kind != selected_type:
+            continue
+        row_vals = [
+            _display_pct(z_raw[row_idx][col_idx])
+            if row_idx < len(z_raw) and col_idx < len(z_raw[row_idx]) and z_raw[row_idx][col_idx] is not None
+            else None
+            for row_idx in rows_idx
+        ]
+        vals = [v for v in row_vals if v is not None]
+        avg = round(sum(vals) / len(vals), 1) if vals else None
+        facility_rows.append({
+            'facility': fac_name,
+            'code': fac_code,
+            'type': fac_kind,
+            'avg': avg,
+            'values': row_vals,
+            'is_current': str(fac_code) == str(stored.get('current_fac', '')),
+        })
+
+    facility_rows = [r for r in facility_rows if any(v is not None for v in r['values'])]
+    facility_rows.sort(key=lambda r: (r['avg'] is None, -(r['avg'] or 0), r['facility']))
+
+    if not facility_rows or not rows_idx:
+        return html.Div(
+            'No facility comparison data for this selection',
+            className='mnid-performance-table-empty',
+        )
+
+    def _header_cells(label: str) -> list:
+        words = str(label or '').split()
+        if not words:
+            return ['-']
+        lines = []
+        current = words[0]
+        for word in words[1:]:
+            if len(current) + len(word) + 1 <= 16 and len(lines) < 2:
+                current = f'{current} {word}'
+            else:
+                lines.append(current)
+                current = word
+                if len(lines) >= 2:
+                    break
+        remaining_words = words[len(' '.join(lines + [current]).split()):]
+        if remaining_words:
+            current = f"{current} {' '.join(remaining_words)}".strip()
+        lines.append(current)
+        if len(lines[-1]) > 16:
+            lines[-1] = f"{lines[-1][:15].rstrip()}..."
+        children = []
+        for idx, line in enumerate(lines[:3]):
+            if idx:
+                children.append(html.Br())
+            children.append(line)
+        return children
+
+    header_row = html.Tr([
+        html.Th('Facility Name', className='mnid-performance-th mnid-performance-th-facility')
+    ] + [
+        html.Th(_header_cells(all_labels[i]), className='mnid-performance-th')
+        for i in rows_idx
+    ])
+
+    body_rows = []
+    for row in facility_rows:
+        name = f"{row['facility']} *" if row['is_current'] else row['facility']
+        cells = [html.Td(name, className='mnid-performance-facility-cell')]
+        for val in row['values']:
+            bg = '#E2E8F0' if val is None else _cov_color(val)
+            fg = '#475569' if val is None else _contrast_text(bg)
+            txt = '-' if val is None else f'{val:.0f}%'
+            cells.append(html.Td(txt, className='mnid-performance-value-cell', style={
+                'backgroundColor': bg,
+                'color': fg,
+            }))
+        body_rows.append(html.Tr(cells))
+
+    return html.Div(className='mnid-performance-table-wrap', children=[
+        html.Table(className='mnid-performance-matrix', children=[
+            html.Thead(header_row),
+            html.Tbody(body_rows),
+        ])
+    ])
 
 
 # MNID heatmap figure builder
@@ -1197,13 +1344,38 @@ clientside_callback(
 )
 def update_heatmap_view(view, year, district, sel_inds, stored):
     if not stored:
-        return go.Figure(), [], {'display': 'none'}
+        return [], [], {'display': 'none'}
     v = view or 'by_district'
     y = year or 'All years'
     fig   = _build_heatmap_fig(stored, v, y, district, sel_inds)
     panel = _build_malawi_panel(stored, v, y, district, sel_inds)
     district_style = {'display': 'block'} if v == 'district_facs' else {'display': 'none'}
     return fig, panel, district_style
+
+
+@callback(
+    Output('mnid-performance-heatmap-table', 'children'),
+    Output('mnid-performance-aggregate', 'children'),
+    Input('mnid-performance-district', 'value'),
+    Input('mnid-performance-facility-type', 'value'),
+    Input('mnid-performance-period', 'value'),
+    Input('mnid-performance-indicators', 'value'),
+    State('mnid-heatmap-store', 'data'),
+    prevent_initial_call=True,
+)
+def update_performance_heatmap(district, facility_type, period, sel_inds, stored):
+    if not stored:
+        return [], []
+    year = period or 'All years'
+    table = _build_facility_performance_heatmap_fig(
+        stored,
+        year,
+        district or 'All',
+        sel_inds,
+        facility_type or 'All',
+    )
+    gauges = _build_district_gauge_row(stored, year)
+    return table, gauges
 
 
 _COMPARE_COLORS = [
@@ -1453,26 +1625,98 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
 
     year_opts     = [{'label': y, 'value': y} for y in years]
     district_opts = [{'label': d, 'value': d} for d in dyn_districts]
+    perf_district_opts = [{'label': 'All', 'value': 'All'}] + district_opts
     ind_opts      = [{'label': lbl, 'value': lbl} for lbl in all_labels]
+    default_perf_inds = all_labels[:8] if len(all_labels) >= 8 else all_labels
+    facility_type_opts = [
+        {'label': 'All', 'value': 'All'},
+        {'label': 'Central Hospital', 'value': 'Central Hospital'},
+        {'label': 'District Hospital', 'value': 'District Hospital'},
+        {'label': 'Health Center', 'value': 'Health Center'},
+    ]
 
     _dd_style = {'fontSize': '12px', 'minWidth': '0'}
     _lbl_style = {'fontSize': '10px', 'color': MUTED, 'fontWeight': '600',
                   'marginBottom': '3px'}
 
-    heatmap_card = html.Div(id='mnid-heatmap-inner', className='mnid-card',
+    performance_card = html.Div(className='mnid-card mnid-performance-block',
                     style={'marginBottom': '12px'}, children=[
         dcc.Store(id='mnid-heatmap-store', data=store),
+        html.Div('FACILITY PERFORMANCE', className='mnid-section-lbl'),
+        html.Div(style={'fontSize': '11px', 'color': DIM, 'marginBottom': '10px'},
+                 children='District comparison heatmap for key performance indicators.'),
+        html.Div(className='mnid-performance-shell', children=[
+            html.Div(id='mnid-performance-aggregate', className='mnid-performance-aggregate',
+                     children=_build_district_gauge_row(store, 'All years')),
+            html.Div(className='mnid-performance-table-card', children=[
+                html.Div(className='mnid-performance-toolbar', children=[
+                    html.Div(className='mnid-performance-filter', children=[
+                        html.Div('District', style=_lbl_style),
+                        dcc.Dropdown(
+                            id='mnid-performance-district',
+                            options=perf_district_opts,
+                            value='All',
+                            clearable=False,
+                            style=_dd_style,
+                        ),
+                    ]),
+                    html.Div(className='mnid-performance-filter', children=[
+                        html.Div('Facility Type', style=_lbl_style),
+                        dcc.Dropdown(
+                            id='mnid-performance-facility-type',
+                            options=facility_type_opts,
+                            value='All',
+                            clearable=False,
+                            style=_dd_style,
+                        ),
+                    ]),
+                    html.Div(className='mnid-performance-filter mnid-performance-period', children=[
+                        html.Div('Time Period', style=_lbl_style),
+                        dcc.Dropdown(
+                            id='mnid-performance-period',
+                            options=year_opts,
+                            value='All years',
+                            clearable=False,
+                            style=_dd_style,
+                        ),
+                    ]),
+                ]),
+                html.Div(className='mnid-performance-filter', style={'marginBottom': '10px'}, children=[
+                    html.Div('Indicators', style=_lbl_style),
+                    dcc.Dropdown(
+                        id='mnid-performance-indicators',
+                        options=ind_opts,
+                        value=default_perf_inds,
+                        multi=True,
+                        placeholder='Select indicators...',
+                        style=_dd_style,
+                    ),
+                ]),
+                html.Div(
+                    id='mnid-performance-heatmap-table',
+                    className='mnid-performance-heatmap-graph',
+                    children=_build_facility_performance_heatmap_fig(store, 'All years', 'All', default_perf_inds, 'All'),
+                ),
+                html.Div(className='mnid-performance-key', children=[
+                    html.Div('Performance Color Scale', className='mnid-performance-key-title'),
+                    html.Div(className='mnid-performance-key-row', children=[html.Span('Excellent (>90%)'), html.Div(className='mnid-performance-swatch excellent')]),
+                    html.Div(className='mnid-performance-key-row', children=[html.Span('Moderate (60-80%)'), html.Div(className='mnid-performance-swatch moderate')]),
+                    html.Div(className='mnid-performance-key-row', children=[html.Span('Poor (<50%)'), html.Div(className='mnid-performance-swatch poor')]),
+                ]),
+            ]),
+        ]),
+    ])
 
+    heatmap_card = html.Div(id='mnid-heatmap-inner', className='mnid-card',
+                    style={'marginBottom': '12px'}, children=[
         html.Div('INDICATOR COVERAGE HEATMAP', className='mnid-section-lbl'),
 
-        # # MNID heatmap filter bar
         html.Div(style={
             'display': 'grid',
             'gridTemplateColumns': 'repeat(4, minmax(0, 1fr))',
             'gap': '10px', 'alignItems': 'end',
             'marginBottom': '12px',
         }, children=[
-            # View selector
             html.Div(children=[
                 html.Div('View', style=_lbl_style),
                 dcc.Dropdown(
@@ -1483,7 +1727,6 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
                     style=_dd_style,
                 ),
             ]),
-            # Year filter
             html.Div(children=[
                 html.Div('Year', style=_lbl_style),
                 dcc.Dropdown(
@@ -1494,7 +1737,6 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
                     style=_dd_style,
                 ),
             ]),
-            # District filter
             html.Div(id='mnid-heatmap-district-wrap', style={'display': 'none'}, children=[
                 html.Div('District Focus', style=_lbl_style),
                 dcc.Dropdown(
@@ -1505,13 +1747,12 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
                     style=_dd_style,
                 ),
             ]),
-            # Indicator multi-select
             html.Div(children=[
                 html.Div('Indicators', style=_lbl_style),
                 dcc.Dropdown(
                     id='mnid-heatmap-indicators',
                     options=ind_opts,
-                    value=all_labels,   # all selected by default
+                    value=all_labels,
                     multi=True,
                     placeholder='Select indicators...',
                     style=_dd_style,
@@ -1519,7 +1760,6 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
             ]),
         ]),
 
-        # # MNID heatmap content layout
         html.Div(className='mnid-heatmap-grid', children=[
             dcc.Graph(
                 id='mnid-heatmap-graph',
@@ -1540,7 +1780,6 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
             ),
         ]),
 
-        # # MNID heatmap key
         html.P(
             'Green >= 80% on target or above  -  Amber 65-79% watch  -  '
             'Red < 65% needs action  -  Grey = no data  -  * = current facility',
@@ -1549,7 +1788,7 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
     ])
 
     attention_panel = _facilities_requiring_attention(store)
-    return html.Div(children=[district_gauges, heatmap_card, attention_panel])
+    return html.Div(children=[performance_card, heatmap_card, attention_panel])
 
 # indicator cards
 
