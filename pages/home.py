@@ -50,6 +50,14 @@ def load_dashboard_menu():
 def get_dashboard_names():
     return [d.get("report_name") for d in load_dashboard_menu() if d.get("report_name")]
 
+def normalize_report_name(name, menu_json):
+    if not name:
+        return name
+    if name == "Maternal and Child Health":
+        if any(d.get("report_name") == "Maternal Health" for d in menu_json):
+            return "Maternal Health"
+    return name
+
 # Load data once to get date range
 min_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 max_date = datetime.now().replace(hour=23, minute=59, second=59, microsecond=0)
@@ -602,6 +610,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             selected_reports = overview
         else:
             selected_reports = [clicked_name] if clicked_name else [menu_json[0]["report_name"] if menu_json else "Dashboard"]
+        selected_reports = [normalize_report_name(r, menu_json) for r in selected_reports]
 
         rendered = []
         for report_name in selected_reports:

@@ -236,6 +236,12 @@ _CAT_LABELS = {'ANC': 'ANC', 'Labour': 'Labour & Delivery', 'Newborn': 'Newborn'
 _CAT_ORDER  = ['ANC', 'Labour', 'Newborn', 'PNC']
 
 
+def _resolve_category_order(indicators: list, configured: list | None = None) -> list:
+    present = {str(i.get('category', '')).strip() for i in indicators if i.get('category')}
+    ordered = [c for c in (configured or _CAT_ORDER) if c in present]
+    return ordered or [c for c in _CAT_ORDER if c in present]
+
+
 def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str, chart_type: str = 'line') -> go.Figure:
     palette = CAT_PALETTES.get(cat, [INFO_C])
     fig = go.Figure()
@@ -336,46 +342,51 @@ def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str, chart_type: str =
     State('mnid-trend-store', 'data'),
     State('mnid-trend-active-cat', 'data'),
     State('mnid-trend-chart-type-store', 'data'),
+    State('mnid-trend-cats-store', 'data'),
     prevent_initial_call=False,
 )
-def update_trend_chart(n_clicks_list, toggle_clicks, stored_figs, active_cat, chart_type):
-    cat = active_cat or 'ANC'
+def update_trend_chart(n_clicks_list, toggle_clicks, stored_figs, active_cat, chart_type, cat_order):
+    categories = cat_order or _CAT_ORDER
+    cat = active_cat if active_cat in categories else (categories[0] if categories else 'ANC')
     mode = chart_type or 'line'
     ctx = callback_context
     if ctx and ctx.triggered:
         prop_id = ctx.triggered[0]['prop_id']
         if 'trend-cat-btn' in prop_id:
             try:
-                cat = json.loads(prop_id.split('.')[0]).get('index', cat)
+                next_cat = json.loads(prop_id.split('.')[0]).get('index', cat)
+                if next_cat in categories:
+                    cat = next_cat
             except Exception:
                 pass
         elif prop_id == 'mnid-trend-chart-toggle.n_clicks':
             mode = 'bar' if mode == 'line' else 'line'
 
     figure_json = (((stored_figs or {}).get(mode) or {}).get(cat))
-    fig = go.Figure()
-    if figure_json:
-        fig = go.Figure(json.loads(figure_json))
+    fig = go.Figure(json.loads(figure_json)) if figure_json else go.Figure()
 
     classes = [
         'mnid-filter-btn active' if c == cat else 'mnid-filter-btn'
-        for c in _CAT_ORDER
+        for c in categories
     ]
     toggle_class = 'mnid-trend-toggle is-bar' if mode == 'bar' else 'mnid-trend-toggle is-line'
     toggle_text = 'Bar' if mode == 'bar' else 'Line'
     return fig, cat, classes, mode, toggle_class, toggle_text
 
 
-def _trend_switcher(df: pd.DataFrame, indicators: list) -> html.Div:
+def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None = None, default_cat: str | None = None) -> html.Div:
     tracked = [i for i in indicators if i.get('status') == 'tracked']
+    cat_order = _resolve_category_order(tracked, categories)
+    default_cat = default_cat if default_cat in cat_order else (cat_order[0] if cat_order else 'ANC')
+
     stored_figs = {'line': {}, 'bar': {}}
-    for cat in _CAT_ORDER:
+    for cat in cat_order:
         cat_inds = [i for i in tracked if i.get('category') == cat]
         stored_figs['line'][cat] = _cat_trend_fig(df, cat_inds, cat, 'line').to_json()
         stored_figs['bar'][cat] = _cat_trend_fig(df, cat_inds, cat, 'bar').to_json()
 
-    default_inds = [i for i in tracked if i.get('category') == 'ANC']
-    default_fig  = _cat_trend_fig(df, default_inds, 'ANC', 'line')
+    default_inds = [i for i in tracked if i.get('category') == default_cat]
+    default_fig = _cat_trend_fig(df, default_inds, default_cat, 'line')
 
     return html.Div(className='mnid-card', style={'marginBottom': '12px'}, children=[
         html.Div(style={'display': 'flex', 'alignItems': 'center',
@@ -397,15 +408,16 @@ def _trend_switcher(df: pd.DataFrame, indicators: list) -> html.Div:
                     html.Button(
                         _CAT_LABELS.get(c, c),
                         id={'type': 'trend-cat-btn', 'index': c},
-                        className='mnid-filter-btn' + (' active' if c == 'ANC' else ''),
+                        className='mnid-filter-btn' + (' active' if c == default_cat else ''),
                         n_clicks=0,
                     )
-                    for c in _CAT_ORDER
+                    for c in cat_order
                 ]),
             ]),
         ]),
         dcc.Store(id='mnid-trend-store', data=stored_figs),
-        dcc.Store(id='mnid-trend-active-cat', data='ANC'),
+        dcc.Store(id='mnid-trend-active-cat', data=default_cat),
+        dcc.Store(id='mnid-trend-cats-store', data=cat_order),
         dcc.Store(id='mnid-trend-chart-type-store', data='line'),
         dcc.Graph(id='mnid-trend-graph', figure=default_fig,
                   config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}}, style={'height': '300px'}),
@@ -465,114 +477,142 @@ def _service_table_payload(df: pd.DataFrame) -> dict:
 
     payload = {
         'ANC': {
-            'title': 'Antenatal Care Service Data',
-            'subtitle': 'Core ANC volume and service-delivery counts from the current filtered dataset.',
+            'title': 'ANC Summary',
+            'subtitle': 'Visits, registration, and core ANC service fields.',
             'rows': _rows([
                 ('ANC visits recorded', _count_entities(anc_df, 'encounter_id'), 'Distinct ANC encounters'),
                 ('Unique ANC clients', _count_entities(anc_df, 'person_id'), 'Distinct clients seen in ANC'),
-                ('Anaemia screening completed', _concept_count(anc_df, 'Anemia screening', ['Screened']), 'Clients marked as screened'),
-                ('Infection screening completed', _concept_count(anc_df, 'Infection screening', ['Screened']), 'Clients screened for infection'),
-                ('High blood pressure screening', _concept_count(anc_df, 'High blood pressure screening', ['Screened']), 'Clients screened for high BP'),
-                ('POCUS completed', _concept_count(anc_df, 'POCUS completed', ['Yes']), 'Clients with completed POCUS'),
-                ('HIV tests recorded', _concept_count(anc_df, 'HIV Test', any_value=True), 'Clients with an HIV test result'),
-                ('Reactive HIV tests', _concept_count(anc_df, 'HIV Test', ['Reactive']), 'Reactive ANC HIV test results'),
-                ('Tetanus dose entries', _concept_count(anc_df, 'Number of tetanus doses', col='Value', any_value=True), 'Clients with recorded tetanus doses'),
+                ('Repeat ANC contact volume', max(_count_entities(anc_df, 'encounter_id') - _count_entities(anc_df, 'person_id'), 0), 'Repeat ANC contacts beyond first recorded visit'),
+                ('Gestational age recorded', _concept_count(anc_df, 'Gestational age recorded', any_value=True), 'Clients with gestational age documented'),
+                ('Blood group recorded', _concept_count(anc_df, 'Blood group rhesus factor', any_value=True), 'Clients with blood group / rhesus factor captured'),
+                ('Pregnancy planned responses', _concept_count(anc_df, 'Pregnancy planned', any_value=True), 'Clients with pregnancy planning status recorded'),
+                ('HIV test results recorded', _concept_count(anc_df, 'HIV Test', any_value=True), 'Clients with ANC HIV test result documented'),
+                ('Reactive HIV results', _concept_count(anc_df, 'HIV Test', ['Reactive']), 'Clients with reactive ANC HIV test result'),
+                ('ITNs given', _concept_count(anc_df, 'Insecticide treated net given', ['Yes', 'Given']), 'Clients receiving an insecticide treated net'),
+                ('2+ tetanus doses recorded', _concept_count(anc_df, 'Number of tetanus doses', ['two doses', 'three doses', 'four doses']), 'Clients documented with at least two tetanus doses'),
             ]),
         },
         'Labour': {
-            'title': 'Labour & Delivery Service Data',
-            'subtitle': 'Delivery volumes and key labour-specific events in the filtered dataset.',
+            'title': 'Labour & Delivery Summary',
+            'subtitle': 'Deliveries, outcomes, referrals, and newborn delivery records.',
             'rows': _rows([
                 ('Deliveries recorded', _count_entities(labour_df, 'encounter_id'), 'Distinct labour encounters'),
                 ('Unique mothers', _count_entities(labour_df, 'person_id'), 'Distinct women in labour data'),
-                ('Live births', _concept_count(labour_df, 'Outcome of the delivery', ['Live births']), 'Deliveries with live-birth outcome'),
-                ('Fresh stillbirths', _concept_count(labour_df, 'Outcome of the delivery', ['Fresh stillbirth']), 'Fresh stillbirth outcomes'),
-                ('Macerated stillbirths', _concept_count(labour_df, 'Outcome of the delivery', ['Macerated stillbirth']), 'Macerated stillbirth outcomes'),
-                ('Caesarean deliveries', _concept_count(labour_df, 'Mode of delivery', ['Caesarean section', 'Caesarean']), 'C-section mode of delivery'),
-                ('Obstetric complications recorded', _concept_count(labour_df, 'Obstetric complications', any_value=True), 'Clients with a documented complication'),
-                ('Digital monitoring used', _concept_count(labour_df, 'Digital intrapartum monitoring', ['Yes', 'Used', 'Completed']), 'Digital monitoring applied'),
-                ('PPH bundle completed', _concept_count(labour_df, 'PPH treatment bundle', ['Yes', 'Used', 'Completed']), 'PPH treatment bundle recorded'),
+                ('Live births', _concept_count(labour_df, 'Outcome of the delivery', ['Live birth', 'Live births']), 'Deliveries with live-birth outcome'),
+                ('Stillbirths', _concept_count(labour_df, 'Outcome of the delivery', ['Stillbirth', 'Fresh stillbirth', 'Macerated stillbirth']), 'Deliveries with stillbirth outcomes'),
+                ('Twin deliveries', _concept_count(labour_df, 'Outcome of the delivery', ['Twin delivery']), 'Deliveries recorded as twin deliveries'),
+                ('Mothers referred', _concept_count(labour_df, 'Referral completed', ['Yes']), 'Mothers with completed referral pathway'),
+                ('Referral reasons captured', _concept_count(labour_df, 'referral reasons', any_value=True), 'Encounters with documented referral reasons'),
+                ('Newborn complications recorded', _concept_count(labour_df, 'Newborn baby complications', any_value=True), 'Deliveries with newborn complication documentation'),
+                ('Newborn management recorded', _concept_count(labour_df, 'Management given to newborn', any_value=True), 'Deliveries with newborn management documented'),
+                ('Birth attendant recorded', _concept_count(labour_df, 'Staff conducting delivery', any_value=True), 'Deliveries with attending cadre documented'),
             ]),
         },
         'Newborn': {
-            'title': 'Newborn Service Data',
-            'subtitle': 'Admission volume and intervention counts for newborn care.',
+            'title': 'Newborn Summary',
+            'subtitle': 'Admissions, thermal status, respiratory support, and newborn care actions.',
             'rows': _rows([
                 ('Admissions recorded', _count_entities(newborn_df, 'encounter_id'), 'Distinct newborn encounters'),
                 ('Unique babies', _count_entities(newborn_df, 'person_id'), 'Distinct babies in newborn care'),
+                ('Repeat admission / review volume', max(_count_entities(newborn_df, 'encounter_id') - _count_entities(newborn_df, 'person_id'), 0), 'Repeat neonatal contacts beyond first recorded admission'),
+                ('Resuscitation provided', _concept_count(newborn_df, 'Neonatal resuscitation provided', ['Yes', 'Stimulation only', 'Bag and mask']), 'Babies receiving active resuscitation support'),
+                ('Resuscitation not required', _concept_count(newborn_df, 'Neonatal resuscitation provided', ['Not required']), 'Babies assessed with no resuscitation required'),
                 ('Not hypothermic on admission', _concept_count(newborn_df, 'Thermal status on admission', ['Not hypothermic']), 'Babies admitted without hypothermia'),
-                ('Neonatal resuscitation provided', _concept_count(newborn_df, 'Neonatal resuscitation provided', ['Yes', 'Stimulation only', 'Bag and mask']), 'Babies receiving resuscitation support'),
-                ('iKMC initiated', _concept_count(newborn_df, 'iKMC initiated', ['Yes']), 'Babies started on iKMC'),
+                ('Hypothermia on admission', _concept_count(newborn_df, 'Thermal status on admission', ['Mild hypothermia', 'Moderate hypothermia', 'Severe hypothermia']), 'Babies admitted with hypothermia recorded'),
                 ('Bubble CPAP support', _concept_count(newborn_df, 'CPAP support', ['Bubble CPAP']), 'Babies supported with bubble CPAP'),
+                ('Nasal oxygen support', _concept_count(newborn_df, 'CPAP support', ['Nasal oxygen']), 'Babies supported with nasal oxygen'),
                 ('Phototherapy given', _concept_count(newborn_df, 'Phototherapy given', ['Yes']), 'Babies who received phototherapy'),
                 ('Parenteral antibiotics given', _concept_count(newborn_df, 'Parenteral antibiotics given', ['Yes']), 'Babies who received antibiotics'),
-                ('Complications recorded', _concept_count(newborn_df, 'Newborn baby complications', any_value=True), 'Babies with documented complications'),
+                ('iKMC initiated', _concept_count(newborn_df, 'iKMC initiated', ['Yes']), 'Babies started on iKMC'),
             ]),
         },
         'PNC': {
-            'title': 'Postnatal Care Service Data',
-            'subtitle': 'Postnatal visit volume and maternal/newborn outcome counts.',
+            'title': 'PNC Summary',
+            'subtitle': 'Maternal and baby postnatal counts, outcomes, and service completion fields.',
             'rows': _rows([
                 ('PNC visits recorded', _count_entities(pnc_df, 'encounter_id'), 'Distinct postnatal encounters'),
                 ('Unique mothers', _count_entities(pnc_df, 'person_id'), 'Distinct clients in PNC'),
-                ('Visits within 48 hours', _concept_count(pnc_df, 'Postnatal check period', ['Within 48 hours', '0-48 hours', '<48 hours']), 'Timely postnatal checks'),
-                ('Exclusive breastfeeding', _concept_count(pnc_df, 'Breast feeding', ['Exclusive', 'exclusive breastfeeding']), 'Exclusive breastfeeding recorded'),
-                ('Mother stable', _concept_count(pnc_df, 'Status of the mother', ['Stable']), 'Mothers with stable final status'),
-                ('Maternal deaths', _concept_count(pnc_df, 'Status of the mother', ['Death', 'Died']), 'Mothers with death outcome'),
-                ('Maternal referrals', _concept_count(pnc_df, 'Status of the mother', ['Referred']), 'Mothers referred onward'),
-                ('Baby stable', _concept_count(pnc_df, 'Status of baby', ['Stable']), 'Babies with stable final status'),
-                ('Baby deaths', _concept_count(pnc_df, 'Status of baby', ['Death', 'Died']), 'Babies with death outcome'),
-                ('Postnatal complications recorded', _concept_count(pnc_df, 'Postnatal complications', any_value=True), 'Clients with documented complications'),
+                ('Babies reviewed', _concept_count(pnc_df, 'Status of baby', any_value=True), 'Babies with postnatal status recorded'),
+                ('Maternal deaths', _concept_count(pnc_df, 'Status of the mother', ['Death', 'Died']), 'Mothers with death outcome in PNC'),
+                ('Maternal referrals', _concept_count(pnc_df, 'Status of the mother', ['Referred']), 'Mothers referred onward from PNC'),
+                ('Baby deaths', _concept_count(pnc_df, 'Status of baby', ['Death', 'Died']), 'Babies with death outcome in PNC'),
+                ('Baby referrals', _concept_count(pnc_df, 'Status of baby', ['Referred']), 'Babies referred onward from PNC'),
+                ('Mother HIV status captured', _concept_count(pnc_df, 'Mother HIV Status', any_value=True), 'Mothers with HIV status recorded in PNC'),
+                ('Vitamin K given', _concept_count(pnc_df, 'Vitamin K given', ['Yes']), 'Babies with Vitamin K documented'),
+                ('Immunisation recorded', _concept_count(pnc_df, 'Immunisation given', any_value=True) + _concept_count(pnc_df, 'Type of immunization the baby received', any_value=True), 'Baby immunisation entries recorded in PNC'),
             ]),
         },
     }
     return payload
 
 
-def _service_table_view(section: dict) -> html.Div:
+def _service_table_fig(section: dict) -> go.Figure:
     rows = section.get('rows', [])
-    return html.Div(className='mnid-card mnid-service-table-card', children=[
-        html.Div(className='mnid-service-table-head', children=[
-            html.Div(section.get('title', 'Clinical Service Data'), className='mnid-card-title'),
-            html.P(section.get('subtitle', ''), className='mnid-service-table-subtitle'),
-        ]),
-        html.Div(className='mnid-service-table-wrap', children=[
-            html.Table(className='mnid-service-table', children=[
-                html.Thead(html.Tr(children=[
-                    html.Th('Metric'),
-                    html.Th('Count'),
-                    html.Th('Definition'),
-                ])),
-                html.Tbody(children=[
-                    html.Tr(children=[
-                        html.Td(row['metric'], className='mnid-service-table-metric'),
-                        html.Td(f"{int(row['value']):,}", className='mnid-service-table-value'),
-                        html.Td(row['detail'], className='mnid-service-table-detail'),
-                    ])
-                    for row in rows
-                ]),
-            ]),
-        ]),
-    ])
+    fig = go.Figure(data=[go.Table(
+        columnwidth=[0.42, 0.18, 0.40],
+        header=dict(
+            values=['Metric', 'Count', 'Definition'],
+            fill_color='#F8FAFC',
+            line_color='#E2E8F0',
+            align='left',
+            font=dict(color='#0F172A', size=11, family=FONT),
+            height=34,
+        ),
+        cells=dict(
+            values=[
+                [row['metric'] for row in rows],
+                [f"{int(row['value']):,}" for row in rows],
+                [row['detail'] for row in rows],
+            ],
+            fill_color='#FFFFFF',
+            line_color='#E2E8F0',
+            align=['left', 'right', 'left'],
+            font=dict(
+                color=[['#0F172A'] * len(rows), ['#0F172A'] * len(rows), ['#64748B'] * len(rows)],
+                size=[12, 13, 11],
+                family=FONT,
+            ),
+            height=38,
+        ),
+    )])
+    fig.update_layout(
+        title=dict(
+            text=(
+                f"<b>{section.get('title', 'Service Summary')}</b>"                 f"<br><span style='color:#94A3B8;font-size:11px;font-weight:500'>"                 f"{section.get('subtitle', '')}</span>"
+            ),
+            x=0,
+            xanchor='left',
+            font=dict(size=15, color=TEXT, family=FONT),
+        ),
+        margin=dict(l=0, r=0, t=56, b=0),
+        height=max(340, 108 + (len(rows) * 38)),
+        paper_bgcolor='#FFFFFF',
+        plot_bgcolor='#FFFFFF',
+    )
+    return fig
 
 
 @callback(
-    Output('mnid-service-table-wrap', 'children'),
+    Output('mnid-service-table-graph', 'figure'),
     Output('mnid-service-table-active-cat', 'data'),
     Output({'type': 'service-table-btn', 'index': ALL}, 'className'),
     Input({'type': 'service-table-btn', 'index': ALL}, 'n_clicks'),
     State('mnid-service-table-store', 'data'),
     State('mnid-service-table-active-cat', 'data'),
+    State('mnid-service-table-cats-store', 'data'),
     prevent_initial_call=False,
 )
-def update_service_table(n_clicks_list, stored_tables, active_cat):
-    cat = active_cat or 'ANC'
+def update_service_table(n_clicks_list, stored_tables, active_cat, cat_order):
+    categories = cat_order or _CAT_ORDER
+    cat = active_cat if active_cat in categories else (categories[0] if categories else 'ANC')
     ctx = callback_context
     if ctx and ctx.triggered:
         prop_id = ctx.triggered[0]['prop_id']
         if 'service-table-btn' in prop_id:
             try:
-                cat = json.loads(prop_id.split('.')[0]).get('index', cat)
+                next_cat = json.loads(prop_id.split('.')[0]).get('index', cat)
+                if next_cat in categories:
+                    cat = next_cat
             except Exception:
                 pass
 
@@ -580,32 +620,40 @@ def update_service_table(n_clicks_list, stored_tables, active_cat):
     section = tables.get(cat) or next(iter(tables.values()), {'rows': []})
     classes = [
         'mnid-filter-btn active' if c == cat else 'mnid-filter-btn'
-        for c in _CAT_ORDER
+        for c in categories
     ]
-    return _service_table_view(section), cat, classes
+    return _service_table_fig(section), cat, classes
 
 
-def _service_table_switcher(df: pd.DataFrame) -> html.Div:
+def _service_table_switcher(df: pd.DataFrame, categories: list | None = None, default_cat: str | None = None) -> html.Div:
     payload = _service_table_payload(df)
-    default_section = payload.get('ANC', {'rows': []})
+    cat_order = [c for c in _resolve_category_order([{'category': k} for k in payload.keys()], categories) if c in payload]
+    default_cat = default_cat if default_cat in cat_order else (cat_order[0] if cat_order else 'ANC')
+    default_section = payload.get(default_cat, {'rows': []})
     return html.Div(className='mnid-card', style={'marginBottom': '12px'}, children=[
         html.Div(style={'display': 'flex', 'alignItems': 'center',
                         'justifyContent': 'space-between', 'marginBottom': '8px', 'gap': '12px', 'flexWrap': 'wrap'}, children=[
-            html.Div('CLINICAL SERVICE TABLES', className='mnid-section-lbl',
+            html.Div('SERVICE SNAPSHOT', className='mnid-section-lbl',
                      style={'marginBottom': '0'}),
             html.Div(className='mnid-filter-row', children=[
                 html.Button(
                     _CAT_LABELS.get(c, c),
                     id={'type': 'service-table-btn', 'index': c},
-                    className='mnid-filter-btn' + (' active' if c == 'ANC' else ''),
+                    className='mnid-filter-btn' + (' active' if c == default_cat else ''),
                     n_clicks=0,
                 )
-                for c in _CAT_ORDER
+                for c in cat_order
             ]),
         ]),
         dcc.Store(id='mnid-service-table-store', data=payload),
-        dcc.Store(id='mnid-service-table-active-cat', data='ANC'),
-        html.Div(id='mnid-service-table-wrap', children=_service_table_view(default_section)),
+        dcc.Store(id='mnid-service-table-active-cat', data=default_cat),
+        dcc.Store(id='mnid-service-table-cats-store', data=cat_order),
+        dcc.Graph(
+            id='mnid-service-table-graph',
+            figure=_service_table_fig(default_section),
+            className='mnid-service-table-graph',
+            config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
+        ),
     ])
 
 
@@ -1528,7 +1576,7 @@ clientside_callback(
         if (window._mnidScrollSpyActive) return '';
         window._mnidScrollSpyActive = true;
 
-        var sectionIds = ['mnid-summary','mnid-trends','mnid-performance','mnid-heatmap',
+        var sectionIds = ['mnid-summary','mnid-data-tables','mnid-trends','mnid-performance','mnid-heatmap',
                           'mnid-coverage','mnid-comparative','mnid-analysis','mnid-readiness'];
 
         function setActive(id) {
@@ -2307,14 +2355,17 @@ def _no_data_card(message: str = 'No data available for this period.') -> html.D
     ])
 
 
-def _coverage_charts_section(by_cat: dict, df: pd.DataFrame) -> html.Div:
+def _coverage_charts_section(by_cat: dict, df: pd.DataFrame, categories: list | None = None) -> html.Div:
     """2-column grid of per-phase coverage bar charts (replaces accordion cards)."""
-    phases = [
-        ('ANC',     'Antenatal Care (ANC)'),
-        ('Labour',  'Labour & Delivery'),
-        ('Newborn', 'Newborn Care'),
-        ('PNC',     'Postnatal Care (PNC)'),
-    ]
+    phase_map = {
+        'ANC': 'Antenatal Care (ANC)',
+        'Labour': 'Labour & Delivery',
+        'Newborn': 'Newborn Care',
+        'PNC': 'Postnatal Care (PNC)',
+    }
+    phases = [(cat, phase_map.get(cat, cat)) for cat in _resolve_category_order(
+        [{'category': k} for k in by_cat.keys()], categories
+    )]
     cards = []
     for cat_key, cat_title in phases:
         inds = by_cat.get(cat_key, [])
@@ -2697,7 +2748,7 @@ def _build_compare_heatmap(title: str, df: 'pd.DataFrame', tracked: list) -> go.
     """Single-entity heatmap: one row per indicator showing coverage %."""
     names, pcts, colors_list = [], [], []
     for ind in tracked:
-        label = ind.get('label', ind.get('id', '?'))
+        label = ind.get('label', ind.get('id', '-'))
         if df.empty:
             pct = 0.0
         else:
@@ -2769,7 +2820,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
     }
 
     compare_card = html.Div(className='mnid-chart-card mnid-compare-card', children=[
-        # ── Header row ───────────────────────────────────────────────────────────
+        # -- Header row -----------------------------------------------------------
         html.Div(className='mnid-compare-header', style={'display': 'flex', 'alignItems': 'center',
                         'justifyContent': 'space-between',
                         'marginBottom': '16px', 'flexWrap': 'wrap', 'gap': '10px'}, children=[
@@ -2802,7 +2853,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                 ),
             ]),
         ]),
-        # ── Filters row ──────────────────────────────────────────────────────────
+        # -- Filters row ----------------------------------------------------------
         html.Div(className='mnid-compare-filters', style={'display': 'grid', 'gridTemplateColumns': '1fr 1fr 1fr',
                         'gap': '14px', 'marginBottom': '16px', 'alignItems': 'start'}, children=[
             # Left: entity selector (facility or district, toggled by mode)
@@ -2814,7 +2865,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                         options=fac_opts,
                         value=default_facs,
                         multi=True,
-                        placeholder='Select facilities…',
+                        placeholder='Select facilities...',
                     ),
                 ]),
                 html.Div(id='mnid-compare-dist-selector', style={'display': 'none'}, children=[
@@ -2824,7 +2875,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                         options=dist_opts,
                         value=default_dists,
                         multi=True,
-                        placeholder='Select districts…',
+                        placeholder='Select districts...',
                     ),
                 ]),
             ]),
@@ -2836,7 +2887,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                     options=cat_opts,
                     value=default_cats,
                     multi=True,
-                    placeholder='Select indicator categories…',
+                    placeholder='Select indicator categories...',
                 ),
             ]),
             # Right: indicator selector
@@ -2847,11 +2898,11 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                     options=ind_opts,
                     value=default_inds,
                     multi=True,
-                    placeholder='Select indicators…',
+                    placeholder='Select indicators...',
                 ),
             ]),
         ]),
-        # ── Grouped bar chart ────────────────────────────────────────────────────
+        # -- Grouped bar chart ----------------------------------------------------
         dcc.Graph(
             id='mnid-compare-bar-chart',
             config={
@@ -2940,12 +2991,15 @@ def _hero_donut_card(label, pct, target, color):
     ])
 
 
-def _hero_donut_row(computed):
-    """Row of large hero donut cards - ANC indicators first, up to 5 total."""
-    anc = [c for c in computed if c.get('category') == 'ANC']
-    heroes = anc[:5] if anc else computed[:5]
+def _hero_donut_row(computed, preferred_cat: str = 'ANC', section_title: str | None = None):
+    """Row of large hero donut cards favouring the requested category first."""
+    preferred = [c for c in computed if c.get('category') == preferred_cat]
+    heroes = preferred[:5] if preferred else computed[:5]
     if not heroes:
         return html.Div()
+
+    if not section_title:
+        section_title = 'KEY NEWBORN INDICATORS' if preferred_cat == 'Newborn' else 'KEY ANC INDICATORS'
 
     cards = []
     for ind in heroes:
@@ -2953,7 +3007,7 @@ def _hero_donut_row(computed):
         cards.append(_hero_donut_card(ind['label'], ind['pct'], ind['target'], color))
 
     return html.Div(style={'marginBottom': '12px'}, children=[
-        html.Div('KEY ANC INDICATORS', className='mnid-section-lbl'),
+        html.Div(section_title, className='mnid-section-lbl'),
         html.Div(className='mnid-hero-row', children=cards),
     ])
 
@@ -3232,7 +3286,8 @@ def _pph_cascade(df):
 
 # MNID header, alert, KPI, and section navigation components
 
-def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=None):
+def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=None,
+            title='Maternal and Child Health Indicators', subtitle='Clean view of performance, comparison, coverage, and readiness.'):
     facility_name = _FACILITY_NAMES.get(facility, facility or 'Network view')
     district = _FACILITY_DISTRICT.get(facility, 'Unknown district')
 
@@ -3255,8 +3310,8 @@ def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=N
     return html.Div(className='mnid-topbar', children=[
         html.Div(className='mnid-topbar-copy', children=[
             html.Div('M-NID Dashboard', className='mnid-topbar-label'),
-            html.H1('Maternal and Child Health Indicators'),
-            html.P('Clean view of performance, comparison, coverage, and readiness.'),
+            html.H1(title),
+            html.P(subtitle),
         ]),
         html.Div(className='mnid-info-pills', children=[
             html.Div(className='mnid-info-pill', children=[
@@ -3286,6 +3341,7 @@ def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=N
 def _sidebar(facility_code: str) -> html.Div:
     nav_items = [
         ('Overview', '#mnid-summary'),
+        ('Data Tables', '#mnid-data-tables'),
         ('Trend', '#mnid-trends'),
         ('Performance', '#mnid-performance'),
         ('Map View', '#mnid-heatmap'),
@@ -3425,8 +3481,27 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     dq_inds     = config.get('data_quality_indicators') or vt.get('data_quality_indicators', [])
     period      = f'{start_date} to {end_date}'
 
+    category_order = _resolve_category_order(all_inds, config.get('mnid_categories'))
+    if category_order:
+        allowed = set(category_order)
+        all_inds = [i for i in all_inds if i.get('category') in allowed]
+
     tracked  = [i for i in all_inds if i.get('status') == 'tracked']
     awaiting = [i for i in all_inds if i.get('status') == 'awaiting_baseline']
+    default_cat = category_order[0] if category_order else 'ANC'
+
+    if category_order == ['Newborn']:
+        dashboard_title = 'Newborn Indicators'
+        dashboard_subtitle = 'Focused newborn care performance, comparison, coverage, and readiness.'
+        hero_title = 'KEY NEWBORN INDICATORS'
+    elif set(category_order) == {'ANC', 'Labour', 'PNC'}:
+        dashboard_title = 'Maternal Health Indicators'
+        dashboard_subtitle = 'ANC, labour, and postnatal performance, comparison, coverage, and readiness.'
+        hero_title = 'KEY ANC INDICATORS'
+    else:
+        dashboard_title = f"{config.get('report_name', 'Maternal and Child Health')} Indicators"
+        dashboard_subtitle = 'Clean view of performance, comparison, coverage, and readiness.'
+        hero_title = 'KEY ANC INDICATORS'
 
     computed = []
     for ind in tracked:
@@ -3441,7 +3516,7 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     for ind in all_inds:
         by_cat.setdefault(ind.get('category','Other'), []).append(ind)
 
-    coverage_charts  = _coverage_charts_section(by_cat, facility_df)
+    coverage_charts  = _coverage_charts_section(by_cat, facility_df, category_order)
 
     # Pre-build analysis charts
     anc_charts    = _anc_charts(facility_df)
@@ -3451,15 +3526,15 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
 
     # All accordion sections open by default
     analysis_acc = [
-        _chart_acc_section('ch_anc',    'Antenatal Care',    anc_charts)    if anc_charts    else None,
-        _chart_acc_section('ch_labour', 'Labour & Delivery', labour_charts) if labour_charts else None,
-        _chart_acc_section('ch_pnc',    'Postnatal Care',    pnc_charts)    if pnc_charts    else None,
-        _chart_acc_section('ch_nb',     'Neonatal Care',     nb_charts)     if nb_charts     else None,
+        _chart_acc_section('ch_anc',    'Antenatal Care',    anc_charts)    if anc_charts and 'ANC' in category_order else None,
+        _chart_acc_section('ch_labour', 'Labour & Delivery', labour_charts) if labour_charts and 'Labour' in category_order else None,
+        _chart_acc_section('ch_pnc',    'Postnatal Care',    pnc_charts)    if pnc_charts and 'PNC' in category_order else None,
+        _chart_acc_section('ch_nb',     'Neonatal Care',     nb_charts)     if nb_charts and 'Newborn' in category_order else None,
     ]
     analysis_acc = [a for a in analysis_acc if a]
 
     performance_div, heatmap_div = _coverage_heatmap_section(all_inds, facility_code, network_df)
-    service_table_div = _service_table_switcher(facility_df)
+    service_table_div = _service_table_switcher(facility_df, category_order, default_cat)
     comparative_div  = _comparative_analysis_section(all_inds, facility_code, network_df)
 
     def _sec_header(title, count=None, desc=None):
@@ -3471,19 +3546,29 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
                       className='mnid-section-header-count'),
         ])
 
-    total_analysis = sum(len(c) for c in [anc_charts, labour_charts, pnc_charts, nb_charts])
+    total_analysis = sum(
+        len(charts) for cat, charts in [
+            ('ANC', anc_charts),
+            ('Labour', labour_charts),
+            ('PNC', pnc_charts),
+            ('Newborn', nb_charts),
+        ] if cat in category_order
+    )
 
     main_content = html.Div(className='mnid-main', children=[
 
-        _topbar(facility_code, period, len(tracked), len(awaiting)),
+        _topbar(facility_code, period, len(tracked), len(awaiting), facility_df=facility_df, network_df=network_df, title=dashboard_title, subtitle=dashboard_subtitle),
         _sidebar(facility_code),
         _alert_banner(below, strong),
 
         _section_anchor('mnid-summary'),
         _sec_header('Overview', desc=f'{len(tracked)} tracked - {len(awaiting)} awaiting'),
         _kpi_row(computed),
-        _hero_donut_row(computed),
+        _hero_donut_row(computed, preferred_cat=default_cat, section_title=hero_title),
         _priority_table(computed),
+
+        _section_anchor('mnid-data-tables'),
+        _sec_header('Data Tables', desc='Key service counts and outcomes'),
         service_table_div,
 
         _section_anchor('mnid-trends'),

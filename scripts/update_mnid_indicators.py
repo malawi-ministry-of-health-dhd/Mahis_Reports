@@ -206,7 +206,7 @@ mch['visualization_types']['priority_indicators'] = [
         }
     },
     {
-        "id": "mnid_nb_003", "label": "Prophylactic CPAP (1000–1499g babies)",
+        "id": "mnid_nb_003", "label": "Prophylactic CPAP (1000-1499g babies)",
         "category": "Newborn", "target": 80, "status": "tracked",
         "numerator_filters": {
             "unique": "person_id",
@@ -219,9 +219,9 @@ mch['visualization_types']['priority_indicators'] = [
         }
     },
     {
-        "id": "mnid_nb_004", "label": "CPAP for eligible babies (1500–1999g)",
+        "id": "mnid_nb_004", "label": "CPAP for eligible babies (1500-1999g)",
         "category": "Newborn", "target": 80, "status": "awaiting_baseline",
-        "note": "Requires birth weight field to separate 1500–1999g cohort from 1000–1499g. Birth weight not yet captured as a distinct filterable concept."
+        "note": "Requires birth weight field to separate 1500-1999g cohort from 1000-1499g. Birth weight not yet captured as a distinct filterable concept."
     },
     {
         "id": "mnid_nb_005", "label": "Phototherapy for jaundice",
