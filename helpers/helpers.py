@@ -219,8 +219,13 @@ def create_line_chart_from_config(data_opd, delta_days, filters):
     filter_col3    = filters.get('filter_col3') or None
     filter_val3    = parse_filter_value(filters.get('filter_val3'))
     aggregation   = filters.get('measure') or 'count'
+    custom_fields = filters.get('custom_fields') or None
 
-    return create_line_chart(filtered_data, date_col, y_col, title, x_title, y_title, unique_column, legend_title, color, filter_col1, filter_val1, filter_col2, filter_val2, filter_col3, filter_val3,aggregation)
+    return create_line_chart(filtered_data, date_col, y_col, 
+                             title, x_title, y_title, unique_column, 
+                             legend_title, color, filter_col1, 
+                             filter_val1, filter_col2, filter_val2, 
+                             filter_col3, filter_val3,aggregation, custom_fields)
 
 def create_pie_chart_from_config(filtered, filters):
     """
@@ -258,8 +263,12 @@ def create_pie_chart_from_config(filtered, filters):
     filter_val3    = parse_filter_value(filters.get('filter_val3'))
     colormap        = filters.get('colormap') or None
     aggregation   = filters.get('measure') or 'count'
+    custom_fields = filters.get('custom_fields') or None
     
-    return create_pie_chart(filtered, names_col, values_col, title, unique_column, filter_col1, filter_val1, filter_col2, filter_val2, filter_col3, filter_val3, colormap, aggregation)
+    return create_pie_chart(filtered, names_col, values_col, title, 
+                            unique_column, filter_col1, filter_val1, 
+                            filter_col2, filter_val2, filter_col3, 
+                            filter_val3, colormap, aggregation, custom_fields)
 
 def create_column_chart_from_config(filtered, filters):
     """
@@ -299,8 +308,12 @@ def create_column_chart_from_config(filtered, filters):
     filter_col3    = filters.get('filter_col3') or None
     filter_val3    = parse_filter_value(filters.get('filter_val3'))
     aggregation   = filters.get('measure') or 'count'
+    custom_fields = filters.get('custom_fields') or None
 
-    return create_column_chart(filtered, x_col, y_col, title, x_title, y_title, unique_column, legend_title, color, filter_col1, filter_val1, filter_col2, filter_val2, filter_col3, filter_val3, aggregation)
+    return create_column_chart(filtered, x_col, y_col, title, x_title, y_title, 
+                               unique_column, legend_title, color, filter_col1, 
+                               filter_val1, filter_col2, filter_val2, filter_col3, 
+                               filter_val3, aggregation, custom_fields)
 
 def create_bar_chart_from_config(filtered, filters):
     """
@@ -335,10 +348,12 @@ def create_bar_chart_from_config(filtered, filters):
     filter_col3    = filters.get('filter_col3') or None
     filter_val3    = parse_filter_value(filters.get('filter_val3'))
     aggregation   = filters.get('measure') or 'count'
+    custom_fields = filters.get('custom_fields') or None
 
     return create_horizontal_bar_chart(
         filtered, label_col, value_col, title, x_title, y_title, top_n,
-        filter_col1, filter_val1, filter_col2, filter_val2, filter_col3, filter_val3, aggregation
+        filter_col1, filter_val1, filter_col2, filter_val2, 
+        filter_col3, filter_val3, aggregation,custom_fields
     )
 
 def create_histogram_from_config(filtered, filters):
@@ -374,12 +389,14 @@ def create_histogram_from_config(filtered, filters):
     filter_col3    = filters.get('filter_col3') or None
     filter_val3    = parse_filter_value(filters.get('filter_val3'))
     aggregation   = filters.get('measure') or 'count'
+    custom_fields = filters.get('custom_fields') or None
 
     # print(f"my bin size {filtered}")
 
     return create_age_gender_histogram(
         filtered, age_col, gender_col, title, x_title, y_title, bin_size,
-        filter_col1, filter_val1, filter_col2, filter_val2, filter_col3, filter_val3,aggregation
+        filter_col1, filter_val1, filter_col2, filter_val2, filter_col3, 
+        filter_val3,aggregation, custom_fields
     )
 
 def create_pivot_table_from_config(filtered, filters):
@@ -418,10 +435,12 @@ def create_pivot_table_from_config(filtered, filters):
     aggregation   = filters.get('measure') or 'count'
     rename        = filters.get("rename") or {}
     replace       = filters.get("replace") or {}
+    custom_fields = filters.get('custom_fields') or None
 
     return create_pivot_table(
         filtered, index_col, columns, values_co, title, unique_column, aggfunc,
-        filter_col1, filter_val1, filter_col2, filter_val2, filter_col3, filter_val3, aggregation, rename, replace
+        filter_col1, filter_val1, filter_col2, filter_val2, filter_col3, 
+        filter_val3, aggregation, rename, replace, custom_fields
     )
 
 
@@ -475,6 +494,7 @@ def create_crosstab_from_config(filtered, filters):
     # Optional rename/replace
     rename        = filters.get("rename") or {}
     replace       = filters.get("replace") or {}
+    custom_fields = filters.get('custom_fields') or None
 
     return create_crosstab_table(
         df=filtered,
@@ -488,7 +508,7 @@ def create_crosstab_from_config(filtered, filters):
         filter_col1=filter_col1, filter_value1=filter_val1,
         filter_col2=filter_col2, filter_value2=filter_val2,
         filter_col3=filter_col3, filter_value3=filter_val3,
-        rename=rename, replace=replace
+        rename=rename, replace=replace, custom_fields=custom_fields
     )
 
 def create_linelist_from_config(filtered, filters,user_role=None, **kwargs):
@@ -509,6 +529,7 @@ def create_linelist_from_config(filtered, filters,user_role=None, **kwargs):
     title          = filters.get("report_name")
     authorized_user= filters.get("authorized_user") or "Any"
     message= filters.get("message") or None
+    custom_fields = filters.get('custom_fields') or None
 
     if message:
         message = message + str(authorized_user)
@@ -553,6 +574,7 @@ def create_linelist_from_config(filtered, filters,user_role=None, **kwargs):
         message = message,
         merge_methods=merge_methods,
         rename=rename,
+        custom_fields = custom_fields
         **group_kwargs
     )
 

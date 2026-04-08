@@ -9,7 +9,7 @@ import pickle
 import logging
 import time
 
-from config import DB_CONFIG, SSH_CONFIG, DB_CONFIG_LOCAL, START_DATE, LOAD_FRESH_DATA
+from config import DB_CONFIG, SSH_CONFIG, DB_CONFIG_LOCAL, START_DATE, LOAD_FRESH_DATA, DATA_FILE_NAME_
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 if LOAD_FRESH_DATA:
     # drop file latest_data_opd.parquet if exists in data folder
-    file_path = os.path.join(os.getcwd(), "data", "latest_data_opd.parquet")
+    file_path = os.path.join(os.getcwd(), "data", DATA_FILE_NAME_)
     if os.path.exists(file_path):
         os.remove(file_path)
         logger.info("Removed existing data file for fresh load.")
@@ -256,7 +256,7 @@ class DataFetcher:
                 pass
 
     # Main process flow
-    def fetch_data(self, query_template, filename='data/latest_data_opd.parquet',
+    def fetch_data(self, query_template, filename=DATA_FILE_NAME_,
                    date_column='Date', batch_size=5000, force_rebuild=False):
         """
         Robust incremental data fetcher with auto-rebuild capability

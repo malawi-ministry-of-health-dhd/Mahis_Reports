@@ -328,7 +328,7 @@ def update_menu(interval, color):
 @callback(
     [Output('dashboard-container', 'children'),
      Output('dashboard-hf-filter', 'options'),
-     Output('dashboard-hf-filter', 'value'),
+    #  Output('dashboard-hf-filter', 'value'),
      Output('active-button-store', 'data')],
     [
         Input('dashboard-btn-generate', 'n_clicks'),
@@ -410,9 +410,10 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
             traceback.print_exc()
             return html.Div('Missing Data. ' \
             'Ensure that the config file has correct database credentials'
-            ,style={'color':'red'}), [], '', ''  # Empty DataFrame with expected columns
+            ,style={'color':'red'}), [], ''  # Empty DataFrame with expected columns
 
-        data[DATE_] = pd.to_datetime(data[DATE_], format='mixed')
+        data['datetime'] = pd.to_datetime(data[DATE_])
+        data[DATE_] = pd.to_datetime(data[DATE_], format='mixed').dt.normalize()
         data[GENDER_] = data[GENDER_].replace({"M":"Male",
                                                "F":"Female",
                                                '{"label"=>"Male", "value"=>"M"}':"Male",
@@ -420,6 +421,11 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
         data["DateValue"] = pd.to_datetime(data[DATE_]).dt.date
         today = dt.today().date()
         data["months"] = data["DateValue"].apply(lambda d: (today - d).days // 30)
+
+        # facilities for dropdown options
+        hf_values = data[FACILITY_].dropna().sort_values().unique().tolist() if FACILITY_ in data.columns else []
+        hf_options = hf_values + (["This Facility"] if "This Facility" not in hf_values else [])
+        hf_value = "This Facility" if is_mnid and hf_options else (hf_options[0] if hf_options else None)
 
         # get user
         user_data_path = os.path.join(path, 'data', 'users_data.csv')
@@ -473,6 +479,8 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
             #     mask &= (data[FACILITY_] == hf)
             if age:
                 mask &= (data[AGE_GROUP_] == age)
+            if hf:
+                mask &= (data[FACILITY_] == hf)
 
             filtered_data = data[mask].copy()
 
@@ -487,16 +495,13 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
             delta_days = (adj_end_dt - adj_start_dt).days
         else:
             delta_days = (end_dt - start_dt).days
-        hf_values = filtered_data[FACILITY_].dropna().sort_values().unique().tolist() if FACILITY_ in filtered_data.columns else []
-        hf_options = hf_values + (["This Facility"] if "This Facility" not in hf_values else [])
-        hf_value = "This Facility" if is_mnid and hf_options else (hf_options[0] if hf_options else None)
-
+    
         return build_charts_from_json(
             filtered_data_date, network_data, delta_days, dashboard_json,
             start_date=adj_start_dt if is_mnid else start_dt,
             end_date=adj_end_dt if is_mnid else end_dt,
             facility_code=mnid_location if is_mnid else location,
-        ), hf_options, hf_value, clicked_name
+        ), hf_options, clicked_name
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -506,7 +511,7 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
                 html.P(str(e), style={"color": "#94A3B8", "fontSize": "12px"}),
             ]),
             dash.no_update,
-            dash.no_update,
+            # dash.no_update,
             dash.no_update,
         )
 

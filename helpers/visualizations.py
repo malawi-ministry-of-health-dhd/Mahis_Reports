@@ -16,6 +16,35 @@ from config import PERSON_ID_, ENCOUNTER_ID_, DATE_
 MAIN USE CASE OF THIS FILE IS TO PROVIDE VISUALIZATION FUNCTIONS FOR PATIENT DATA
 
 """
+def _prepare_data_for_visualization(df, unique_column, apply_deduplication=True):
+    """
+    Prepare data for visualization by applying consistent deduplication logic.
+    This mirrors the logic used in create_count functions.
+    """
+    data = df.copy()
+    
+    if isinstance(unique_column, list):
+        if apply_deduplication and DATE_ in data.columns and all(col in data.columns for col in unique_column):
+            data = data.drop_duplicates(subset=[DATE_] + unique_column)
+        return data
+    else:
+        if apply_deduplication and DATE_ in data.columns and unique_column in data.columns:
+            data = data.drop_duplicates(subset=[unique_column, DATE_])
+        return data
+
+def apply_calculated_fields(df, rules_json):
+    df = df.copy()
+    # Parse JSON if passed as string from Dash input
+    if rules_json:
+        rules = json.loads(rules_json) if isinstance(rules_json, str) else rules_json
+        for rule in rules:
+            col = rule["column"]
+            expr = rule["expr"]
+            df[col] = df.eval(expr)
+        return df
+    else:
+        return df
+
 
 def _normalize_filter_value(val):
     """Normalize filter_value into a proper list or string."""
@@ -211,11 +240,12 @@ def _apply_filter(data, filter_col, filter_value):
     return df[df[filter_col] == filter_value]
 
 
-def create_count(df,aggregation='count', unique_column=PERSON_ID_, filter_col1=None, filter_value1=None, filter_col2=None, filter_value2=None, 
-                 filter_col3=None, filter_value3=None, filter_col4=None, filter_value4=None,
-                 filter_col5=None, filter_value5=None, filter_col6=None, filter_value6=None, 
-                 filter_col7=None, filter_value7=None, filter_col8=None, filter_value8=None,
-                 filter_col9=None, filter_value9=None, filter_col10=None, filter_value10=None):
+def create_count(df, aggregation='count', unique_column=PERSON_ID_, filter_col1=None, filter_value1=None, 
+                 filter_col2=None, filter_value2=None, filter_col3=None, filter_value3=None,
+                 filter_col4=None, filter_value4=None, filter_col5=None, filter_value5=None, 
+                 filter_col6=None, filter_value6=None, filter_col7=None, filter_value7=None,
+                 filter_col8=None, filter_value8=None, filter_col9=None, filter_value9=None, 
+                 filter_col10=None, filter_value10=None):
     data = df
     
     # Apply all filters using the helper function
@@ -231,8 +261,8 @@ def create_count(df,aggregation='count', unique_column=PERSON_ID_, filter_col1=N
     data = _apply_filter(data, filter_col10, filter_value10)
     
     # Remove duplicates based on unique_column and DATE_
-    unique_visits = data.drop_duplicates(subset=[unique_column, DATE_])
-    # unique_visits = data
+    unique_visits = _prepare_data_for_visualization(data, unique_column)
+    
     # Handle different aggregation types
     if aggregation == 'count':
         return len(unique_visits[unique_column].dropna())
@@ -240,12 +270,33 @@ def create_count(df,aggregation='count', unique_column=PERSON_ID_, filter_col1=N
         return unique_visits[unique_column].nunique()
     elif aggregation == 'list':
         return unique_visits[unique_column].dropna().unique().tolist()
+    elif aggregation == 'time_diff_mins':
+        # Calculate time difference between min and max datetime for each patient
+        # Note: This assumes there's a 'DATETIME' column in your dataframe
+        if 'datetime' not in unique_visits.columns:
+            raise ValueError("datetime column is required for time_diff aggregation")
+        patient_times = data.groupby([unique_column, DATE_])['datetime'].agg(['min', 'max'])
+        patient_times['time_diff'] = (patient_times['max'] - patient_times['min']).dt.total_seconds() / (60)
+        patient_times = patient_times[patient_times['time_diff'] < 120]
+        mean_val = patient_times['time_diff'].mean()
+        if pd.isna(mean_val):
+            return 0
+        return int(mean_val)
+    elif aggregation == 'time_diff_hour':
+        if 'datetime' not in unique_visits.columns:
+            raise ValueError("datetime column is required for time_diff aggregation")
+        patient_times = data.groupby([unique_column, DATE_])['datetime'].agg(['min', 'max'])
+        patient_times['time_diff'] = (patient_times['max'] - patient_times['min']).dt.total_seconds() / (60 * 60)
+        patient_times = patient_times[patient_times['time_diff'] < 2]
+        mean_val = patient_times['time_diff'].mean()
+        if pd.isna(mean_val):
+            return 0
+        return int(mean_val)
+    
     elif aggregation in ['sum', 'mean', 'min', 'max', 'std', 'var']:
-        # For numeric aggregations
-        return unique_visits[unique_column].agg(aggregation)
+        return int(unique_visits[unique_column].agg(aggregation))
     else:
         # Default to count
-        # unique_visits.to_csv("debug_summary.csv", index=False)
         return len(unique_visits[unique_column].dropna())
 
 def create_count_sets(
@@ -288,7 +339,7 @@ def create_count_sets(
         data = _apply_filter(data, filter_col9, filter_value9)
         data = _apply_filter(data, filter_col10, filter_value10)
 
-        unique_visits = data.drop_duplicates(subset=[unique_column, DATE_])
+        unique_visits = _prepare_data_for_visualization(data, unique_column)
         return len(unique_visits)
 
     if not isinstance(filter_value2, list):
@@ -354,7 +405,7 @@ def create_count_sets(
         if not isinstance(val, list):
             remaining_df = _apply_filter(remaining_df, col, val)
 
-    unique_visits = remaining_df.drop_duplicates(subset=[unique_column, DATE_])
+    unique_visits = _prepare_data_for_visualization(remaining_df, unique_column)
 
     return len(unique_visits)
 
@@ -415,27 +466,11 @@ def create_sum_sets(df, filter_col1, filter_value1, filter_col2, filter_value2, 
 
     return filtered[num_field].sum()
 
-def _prepare_data_for_visualization(df, unique_column, apply_deduplication=True):
-    """
-    Prepare data for visualization by applying consistent deduplication logic.
-    This mirrors the logic used in create_count functions.
-    """
-    data = df.copy()
-    
-    if isinstance(unique_column, list):
-        if apply_deduplication and DATE_ in data.columns and all(col in data.columns for col in unique_column):
-            data = data.drop_duplicates(subset=[DATE_] + unique_column)
-        return data
-    else:
-        if apply_deduplication and DATE_ in data.columns and unique_column in data.columns:
-            data = data.drop_duplicates(subset=[unique_column, DATE_])
-        return data
-
 def create_column_chart(df, x_col, y_col, title, x_title, y_title,
                         unique_column=PERSON_ID_, legend_title=None,
                         color=None, filter_col1=None, filter_value1=None,
                         filter_col2=None, filter_value2=None,
-                        filter_col3=None, filter_value3=None, aggregation='count'):
+                        filter_col3=None, filter_value3=None, aggregation='count', custom_fields=None):
     """
     Create a column chart using Plotly Express with legend support.
     """
@@ -448,6 +483,7 @@ def create_column_chart(df, x_col, y_col, title, x_title, y_title,
     
     # Apply consistent deduplication
     data = _prepare_data_for_visualization(data, unique_column)
+    data = apply_calculated_fields(data, custom_fields)
     
     # if data.empty:
     #     return go.Figure().update_layout(title=f"No data available for {title}")
@@ -511,7 +547,7 @@ def create_line_chart(df, date_col, y_col, title, x_title,
                       legend_title=None, color=None, filter_col1=None, 
                       filter_value1=None, filter_col2=None, 
                       filter_value2=None, filter_col3=None, 
-                      filter_value3=None, aggregation='count'):
+                      filter_value3=None, aggregation='count',custom_fields=None):
     """
     Create a time series chart using Plotly Express.
     """
@@ -524,6 +560,7 @@ def create_line_chart(df, date_col, y_col, title, x_title,
     
     # Apply consistent deduplication
     data = _prepare_data_for_visualization(data, unique_column)
+    data = apply_calculated_fields(data, custom_fields)
     
     # if data.empty:
     #     return go.Figure().update_layout(title=f"{title}")
@@ -592,7 +629,7 @@ def create_pie_chart(df, names_col, values_col, title,
                      unique_column=PERSON_ID_, filter_col1=None, 
                      filter_value1=None, filter_col2=None, 
                      filter_value2=None, filter_col3=None, 
-                     filter_value3=None, colormap=None, aggregation='count'):
+                     filter_value3=None, colormap=None, aggregation='count',custom_fields=None):
     """
     Create a pie chart using Plotly Express.
     """
@@ -605,6 +642,7 @@ def create_pie_chart(df, names_col, values_col, title,
     
     # Apply consistent deduplication
     data = _prepare_data_for_visualization(data, unique_column)
+    data = apply_calculated_fields(data, custom_fields)
     
     # if data.empty:
     #     return go.Figure().update_layout(title=f"No data available for {title}")
@@ -654,7 +692,7 @@ def create_pivot_table(df, index_col, columns_col, values_col, title, unique_col
                      filter_col2=None, filter_value2=None,
                      filter_col3=None, filter_value3=None,
                      aggregation='count',
-                     rename={}, replace={}):
+                     rename={}, replace={}, custom_fields=None):
     """
     Create a pivot table from the DataFrame.
     """
@@ -667,6 +705,7 @@ def create_pivot_table(df, index_col, columns_col, values_col, title, unique_col
     
     # Apply consistent deduplication
     data = _prepare_data_for_visualization(data, unique_column)
+    data = apply_calculated_fields(data, custom_fields)
 
     
     # Determine the actual aggregation function
@@ -748,7 +787,7 @@ def create_crosstab_table(
     filter_col1=None, filter_value1=None,
     filter_col2=None, filter_value2=None,
     filter_col3=None, filter_value3=None,
-    rename={}, replace={}
+    rename={}, replace={},custom_fields=None
 ):
     """
     Create a crosstab table with multilayer column headers using Dash DataTable.
@@ -762,8 +801,8 @@ def create_crosstab_table(
     data = _apply_filter(data, filter_col3, filter_value3)
 
     # Deduplicate by person + date
-    if DATE_ in data.columns:
-        data = data.drop_duplicates(subset=[unique_column, DATE_])
+    data = _prepare_data_for_visualization(data, unique_column)
+    data = apply_calculated_fields(data, custom_fields)
 
     # Helper: support multi-axis for crosstab
     def _axis_arg(arg):
@@ -903,7 +942,7 @@ def create_line_list(
     rename: Optional[dict] = None,
     cols_order: Optional[List[str]] = None,
     merge_methods: Optional[List[str]] = None,
-    message = None,
+    message = None,custom_fields=None,
     **kwargs
 ) -> pd.DataFrame:
     """
@@ -920,6 +959,7 @@ def create_line_list(
         raise ValueError("unique_col must specify at least one column.")
     
     df_base = df.copy()
+    df_base = apply_calculated_fields(df_base, custom_fields)
     
     group_dfs = []
     
@@ -1076,7 +1116,7 @@ def create_age_gender_histogram(
     filter_col1=None, filter_value1=None,
     filter_col2=None, filter_value2=None,
     filter_col3=None, filter_value3=None,
-    aggregation='count'
+    aggregation='count',custom_fields=None
 ):
     """
     Create an age–gender histogram with labeled bins and data labels.
@@ -1090,6 +1130,7 @@ def create_age_gender_histogram(
     
     # Apply consistent deduplication
     data = _prepare_data_for_visualization(data, PERSON_ID_)
+    data = apply_calculated_fields(data, custom_fields)
     
     # if data.empty:
     #     return go.Figure().update_layout(title=f"No data available for {title}")
@@ -1147,7 +1188,7 @@ def create_age_gender_histogram(
 
 def create_horizontal_bar_chart(df, label_col, value_col, title, x_title, y_title, top_n=10,
                                  filter_col1=None, filter_value1=None, filter_col2=None, filter_value2=None,
-                                 filter_col3=None, filter_value3=None, aggregation='count'):
+                                 filter_col3=None, filter_value3=None, aggregation='count',custom_fields=None):
     """
     Create a horizontal bar chart showing the top N items by value.
     """
@@ -1160,6 +1201,7 @@ def create_horizontal_bar_chart(df, label_col, value_col, title, x_title, y_titl
     
     # Apply consistent deduplication
     data = _prepare_data_for_visualization(data, PERSON_ID_)
+    data = apply_calculated_fields(data, custom_fields)
     
     # if data.empty:
     #     return go.Figure().update_layout(title=f"No data available for {title}")
@@ -1379,7 +1421,7 @@ def create_scatter_plot(df, x_col, y_col, title, x_title, y_title,
     data = _apply_filter(data, filter_col2, filter_value2)
     
     # Deduplicate
-    data = data.drop_duplicates(subset=[unique_column, DATE_])
+    data = _prepare_data_for_visualization(data, unique_column)
     
     fig = px.scatter(
         data,
@@ -1458,7 +1500,7 @@ def create_treemap(df, path_cols, values_col, title,
     data = _apply_filter(data, filter_col2, filter_value2)
     
     # Deduplicate
-    data = data.drop_duplicates(subset=[unique_column, DATE_])
+    data = _prepare_data_for_visualization(data, unique_column)
     
     # Aggregate values
     summary = data.groupby(path_cols)[values_col].nunique().reset_index()
@@ -1496,7 +1538,7 @@ def create_sunburst_chart(df, path_cols, values_col, title,
     data = _apply_filter(data, filter_col2, filter_value2)
     
     # Deduplicate
-    data = data.drop_duplicates(subset=[unique_column, DATE_])
+    data = _prepare_data_for_visualization(data, unique_column)
     
     # Aggregate values
     summary = data.groupby(path_cols)[values_col].nunique().reset_index()
@@ -1705,7 +1747,7 @@ def create_3d_scatter(df, x_col, y_col, z_col, color_col, title,
     data = _apply_filter(data, filter_col2, filter_value2)
     
     # Deduplicate
-    data = data.drop_duplicates(subset=[unique_column, DATE_])
+    data = _prepare_data_for_visualization(data, unique_column)
     
     fig = px.scatter_3d(
         data,

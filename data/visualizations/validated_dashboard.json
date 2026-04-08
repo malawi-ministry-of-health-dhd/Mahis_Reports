@@ -101,12 +101,141 @@
             "variable8": "Age_Group",
             "value8": "Over 5"
           }
+        },
+        {
+          "id": "count_2cbb623e",
+          "name": "Active Health Facilities",
+          "level": "facility",
+          "filters": {
+            "measure": "nunique",
+            "unique": "Facility_CODE",
+            "variable1": "Program",
+            "value1": [],
+            "variable2": "Encounter",
+            "value2": [],
+            "variable3": "concept_name",
+            "value3": [],
+            "variable4": "obs_value_coded",
+            "value4": "",
+            "variable5": "ValueN",
+            "value5": "",
+            "variable6": "Value",
+            "value6": "",
+            "variable7": "Gender",
+            "value7": "",
+            "variable8": "Age",
+            "value8": ""
+          }
+        },
+        {
+          "id": "count_aade5941",
+          "name": "Active Programs",
+          "level": "facility",
+          "filters": {
+            "measure": "nunique",
+            "unique": "Program",
+            "variable1": "Program",
+            "value1": [],
+            "variable2": "Encounter",
+            "value2": [],
+            "variable3": "concept_name",
+            "value3": [],
+            "variable4": "obs_value_coded",
+            "value4": "",
+            "variable5": "ValueN",
+            "value5": "",
+            "variable6": "Value",
+            "value6": "",
+            "variable7": "Gender",
+            "value7": "",
+            "variable8": "Age",
+            "value8": ""
+          }
+        },
+        {
+          "id": "count_94807bef",
+          "name": "Active Users",
+          "level": "facility",
+          "filters": {
+            "measure": "nunique",
+            "unique": "User",
+            "variable1": "Program",
+            "value1": [],
+            "variable2": "Encounter",
+            "value2": [],
+            "variable3": "concept_name",
+            "value3": [],
+            "variable4": "obs_value_coded",
+            "value4": "",
+            "variable5": "ValueN",
+            "value5": "",
+            "variable6": "Value",
+            "value6": "",
+            "variable7": "Gender",
+            "value7": "",
+            "variable8": "Age",
+            "value8": ""
+          }
+        },
+        {
+          "id": "count_f9c74c60",
+          "name": "Avg Registration Time (Mins)",
+          "level": "facility",
+          "filters": {
+            "measure": "time_diff_mins",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": [],
+            "variable2": "Encounter",
+            "value2": [
+              "PATIENT REGISTRATION",
+              "REGISTRATION",
+              "VITALS"
+            ],
+            "variable3": "concept_name",
+            "value3": [],
+            "variable4": "obs_value_coded",
+            "value4": "",
+            "variable5": "ValueN",
+            "value5": "",
+            "variable6": "Value",
+            "value6": "",
+            "variable7": "Gender",
+            "value7": "",
+            "variable8": "Age",
+            "value8": ""
+          }
+        },
+        {
+          "id": "count_c02cf51a",
+          "name": "Avg Patient Duration > Exit(Mins)",
+          "level": "facility",
+          "filters": {
+            "measure": "time_diff_mins",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": [],
+            "variable2": "Encounter",
+            "value2": [],
+            "variable3": "concept_name",
+            "value3": [],
+            "variable4": "obs_value_coded",
+            "value4": "",
+            "variable5": "ValueN",
+            "value5": "",
+            "variable6": "Value",
+            "value6": "",
+            "variable7": "Gender",
+            "value7": "",
+            "variable8": "Age",
+            "value8": ""
+          }
         }
       ],
       "charts": {
         "sections": [
           {
-            "section_name": "Summary Visuals of Facility",
+            "section_name": "Facility Summary",
             "items": [
               {
                 "id": "chart_10b29018",
@@ -122,7 +251,10 @@
                   "y_col": "person_id",
                   "x_title": "Program",
                   "y_title": "Number of patients",
-                  "unique_column": ["person_id","Program"],
+                  "unique_column": [
+                    "person_id",
+                    "Program"
+                  ],
                   "legend_title": "Legend",
                   "color": "",
                   "filter_col1": "",
@@ -141,29 +273,28 @@
                 "id": "chart_3faf4437",
                 "name": "Daily OPD Attendance - Last 7 Days",
                 "type": "Line",
-                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
-                  "duration_default": "any",
+                  "duration_default": "7days",
                   "title": "Daily OPD Attendance - Last 7 Days",
+                  "unique_column": "person_id",
+                  "filter_col1": [],
+                  "filter_val1": "",
+                  "filter_col2": [],
+                  "filter_val2": "",
+                  "filter_col3": [],
+                  "filter_val3": "",
+                  "filter_col4": [],
+                  "filter_val4": "",
+                  "filter_col5": [],
+                  "filter_val5": "",
                   "date_col": "Date",
                   "y_col": "person_id",
                   "x_title": "Date",
                   "y_title": "Number of Patients",
-                  "unique_column": "person_id",
                   "legend_title": "Legend",
-                  "color": "",
-                  "filter_col1": "",
-                  "filter_val1": "",
-                  "filter_col2": "",
-                  "filter_val2": "",
-                  "filter_col3": "",
-                  "filter_val3": "",
-                  "filter_col4": "",
-                  "filter_val4": "",
-                  "filter_col5": "",
-                  "filter_val5": ""
+                  "color": ""
                 }
               },
               {
@@ -245,7 +376,12 @@
                   "filter_col5": "",
                   "filter_val5": ""
                 }
-              },
+              }
+            ]
+          },
+          {
+            "section_name": "User Analytics",
+            "items": [
               {
                 "id": "chart_79405336",
                 "name": "Active Users",
@@ -255,11 +391,11 @@
                   "measure": "nunique",
                   "unique": "any",
                   "duration_default": "any",
-                  "title": "Active Users - All patient encounters",
+                  "title": "Active Users - Top 10",
                   "label_col": "User",
                   "value_col": "person_id",
-                  "x_title": "Program",
-                  "y_title": "Number of patients",
+                  "x_title": "Number of patients created",
+                  "y_title": "User",
                   "unique_column": "person_id",
                   "top_n": "10",
                   "filter_col1": "",
@@ -272,6 +408,35 @@
                   "filter_val4": "",
                   "filter_col5": "",
                   "filter_val5": ""
+                }
+              },
+              {
+                "id": "chart_0ca3eb77",
+                "name": "Daily Active Users -Last 7 Days",
+                "type": "Line",
+                "level": "facility",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "7days",
+                  "title": "Daily Active Users -Last 7 Days",
+                  "unique_column": "person_id",
+                  "filter_col1": [],
+                  "filter_val1": "",
+                  "filter_col2": [],
+                  "filter_val2": "",
+                  "filter_col3": [],
+                  "filter_val3": "",
+                  "filter_col4": [],
+                  "filter_val4": "",
+                  "filter_col5": [],
+                  "filter_val5": "",
+                  "date_col": "Date",
+                  "y_col": "User",
+                  "x_title": "Date",
+                  "y_title": "Number of Patients",
+                  "legend_title": "Legend",
+                  "color": ""
                 }
               }
             ]
