@@ -371,7 +371,8 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
         # Get JSON config for the report before loading data.
         with open(json_path, 'r') as f:
             menu_json = json.load(f)
-        dashboard_json = next((d for d in menu_json if d['report_name'] == clicked_name), menu_json[0])
+        requested_name = 'Maternal Health' if clicked_name == 'Maternal and Child Health' else clicked_name
+        dashboard_json = next((d for d in menu_json if d['report_name'] == requested_name), menu_json[0])
         is_mnid = dashboard_json.get('dashboard_type') == 'mnid'
 
         if urlparams.get('Location', [None])[0]:

@@ -236,6 +236,12 @@ _CAT_LABELS = {'ANC': 'ANC', 'Labour': 'Labour & Delivery', 'Newborn': 'Newborn'
 _CAT_ORDER  = ['ANC', 'Labour', 'Newborn', 'PNC']
 
 
+def _resolve_category_order(indicators: list, configured: list | None = None) -> list:
+    present = {str(i.get('category', '')).strip() for i in indicators if i.get('category')}
+    ordered = [c for c in (configured or _CAT_ORDER) if c in present]
+    return ordered or [c for c in _CAT_ORDER if c in present]
+
+
 def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str, chart_type: str = 'line') -> go.Figure:
     palette = CAT_PALETTES.get(cat, [INFO_C])
     fig = go.Figure()
@@ -336,46 +342,51 @@ def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str, chart_type: str =
     State('mnid-trend-store', 'data'),
     State('mnid-trend-active-cat', 'data'),
     State('mnid-trend-chart-type-store', 'data'),
+    State('mnid-trend-cats-store', 'data'),
     prevent_initial_call=False,
 )
-def update_trend_chart(n_clicks_list, toggle_clicks, stored_figs, active_cat, chart_type):
-    cat = active_cat or 'ANC'
+def update_trend_chart(n_clicks_list, toggle_clicks, stored_figs, active_cat, chart_type, cat_order):
+    categories = cat_order or _CAT_ORDER
+    cat = active_cat if active_cat in categories else (categories[0] if categories else 'ANC')
     mode = chart_type or 'line'
     ctx = callback_context
     if ctx and ctx.triggered:
         prop_id = ctx.triggered[0]['prop_id']
         if 'trend-cat-btn' in prop_id:
             try:
-                cat = json.loads(prop_id.split('.')[0]).get('index', cat)
+                next_cat = json.loads(prop_id.split('.')[0]).get('index', cat)
+                if next_cat in categories:
+                    cat = next_cat
             except Exception:
                 pass
         elif prop_id == 'mnid-trend-chart-toggle.n_clicks':
             mode = 'bar' if mode == 'line' else 'line'
 
     figure_json = (((stored_figs or {}).get(mode) or {}).get(cat))
-    fig = go.Figure()
-    if figure_json:
-        fig = go.Figure(json.loads(figure_json))
+    fig = go.Figure(json.loads(figure_json)) if figure_json else go.Figure()
 
     classes = [
         'mnid-filter-btn active' if c == cat else 'mnid-filter-btn'
-        for c in _CAT_ORDER
+        for c in categories
     ]
     toggle_class = 'mnid-trend-toggle is-bar' if mode == 'bar' else 'mnid-trend-toggle is-line'
     toggle_text = 'Bar' if mode == 'bar' else 'Line'
     return fig, cat, classes, mode, toggle_class, toggle_text
 
 
-def _trend_switcher(df: pd.DataFrame, indicators: list) -> html.Div:
+def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None = None, default_cat: str | None = None) -> html.Div:
     tracked = [i for i in indicators if i.get('status') == 'tracked']
+    cat_order = _resolve_category_order(tracked, categories)
+    default_cat = default_cat if default_cat in cat_order else (cat_order[0] if cat_order else 'ANC')
+
     stored_figs = {'line': {}, 'bar': {}}
-    for cat in _CAT_ORDER:
+    for cat in cat_order:
         cat_inds = [i for i in tracked if i.get('category') == cat]
         stored_figs['line'][cat] = _cat_trend_fig(df, cat_inds, cat, 'line').to_json()
         stored_figs['bar'][cat] = _cat_trend_fig(df, cat_inds, cat, 'bar').to_json()
 
-    default_inds = [i for i in tracked if i.get('category') == 'ANC']
-    default_fig  = _cat_trend_fig(df, default_inds, 'ANC', 'line')
+    default_inds = [i for i in tracked if i.get('category') == default_cat]
+    default_fig = _cat_trend_fig(df, default_inds, default_cat, 'line')
 
     return html.Div(className='mnid-card', style={'marginBottom': '12px'}, children=[
         html.Div(style={'display': 'flex', 'alignItems': 'center',
@@ -397,15 +408,16 @@ def _trend_switcher(df: pd.DataFrame, indicators: list) -> html.Div:
                     html.Button(
                         _CAT_LABELS.get(c, c),
                         id={'type': 'trend-cat-btn', 'index': c},
-                        className='mnid-filter-btn' + (' active' if c == 'ANC' else ''),
+                        className='mnid-filter-btn' + (' active' if c == default_cat else ''),
                         n_clicks=0,
                     )
-                    for c in _CAT_ORDER
+                    for c in cat_order
                 ]),
             ]),
         ]),
         dcc.Store(id='mnid-trend-store', data=stored_figs),
-        dcc.Store(id='mnid-trend-active-cat', data='ANC'),
+        dcc.Store(id='mnid-trend-active-cat', data=default_cat),
+        dcc.Store(id='mnid-trend-cats-store', data=cat_order),
         dcc.Store(id='mnid-trend-chart-type-store', data='line'),
         dcc.Graph(id='mnid-trend-graph', figure=default_fig,
                   config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}}, style={'height': '300px'}),
@@ -587,16 +599,20 @@ def _service_table_fig(section: dict) -> go.Figure:
     Input({'type': 'service-table-btn', 'index': ALL}, 'n_clicks'),
     State('mnid-service-table-store', 'data'),
     State('mnid-service-table-active-cat', 'data'),
+    State('mnid-service-table-cats-store', 'data'),
     prevent_initial_call=False,
 )
-def update_service_table(n_clicks_list, stored_tables, active_cat):
-    cat = active_cat or 'ANC'
+def update_service_table(n_clicks_list, stored_tables, active_cat, cat_order):
+    categories = cat_order or _CAT_ORDER
+    cat = active_cat if active_cat in categories else (categories[0] if categories else 'ANC')
     ctx = callback_context
     if ctx and ctx.triggered:
         prop_id = ctx.triggered[0]['prop_id']
         if 'service-table-btn' in prop_id:
             try:
-                cat = json.loads(prop_id.split('.')[0]).get('index', cat)
+                next_cat = json.loads(prop_id.split('.')[0]).get('index', cat)
+                if next_cat in categories:
+                    cat = next_cat
             except Exception:
                 pass
 
@@ -604,14 +620,16 @@ def update_service_table(n_clicks_list, stored_tables, active_cat):
     section = tables.get(cat) or next(iter(tables.values()), {'rows': []})
     classes = [
         'mnid-filter-btn active' if c == cat else 'mnid-filter-btn'
-        for c in _CAT_ORDER
+        for c in categories
     ]
     return _service_table_fig(section), cat, classes
 
 
-def _service_table_switcher(df: pd.DataFrame) -> html.Div:
+def _service_table_switcher(df: pd.DataFrame, categories: list | None = None, default_cat: str | None = None) -> html.Div:
     payload = _service_table_payload(df)
-    default_section = payload.get('ANC', {'rows': []})
+    cat_order = [c for c in _resolve_category_order([{'category': k} for k in payload.keys()], categories) if c in payload]
+    default_cat = default_cat if default_cat in cat_order else (cat_order[0] if cat_order else 'ANC')
+    default_section = payload.get(default_cat, {'rows': []})
     return html.Div(className='mnid-card', style={'marginBottom': '12px'}, children=[
         html.Div(style={'display': 'flex', 'alignItems': 'center',
                         'justifyContent': 'space-between', 'marginBottom': '8px', 'gap': '12px', 'flexWrap': 'wrap'}, children=[
@@ -621,14 +639,15 @@ def _service_table_switcher(df: pd.DataFrame) -> html.Div:
                 html.Button(
                     _CAT_LABELS.get(c, c),
                     id={'type': 'service-table-btn', 'index': c},
-                    className='mnid-filter-btn' + (' active' if c == 'ANC' else ''),
+                    className='mnid-filter-btn' + (' active' if c == default_cat else ''),
                     n_clicks=0,
                 )
-                for c in _CAT_ORDER
+                for c in cat_order
             ]),
         ]),
         dcc.Store(id='mnid-service-table-store', data=payload),
-        dcc.Store(id='mnid-service-table-active-cat', data='ANC'),
+        dcc.Store(id='mnid-service-table-active-cat', data=default_cat),
+        dcc.Store(id='mnid-service-table-cats-store', data=cat_order),
         dcc.Graph(
             id='mnid-service-table-graph',
             figure=_service_table_fig(default_section),
@@ -2336,14 +2355,17 @@ def _no_data_card(message: str = 'No data available for this period.') -> html.D
     ])
 
 
-def _coverage_charts_section(by_cat: dict, df: pd.DataFrame) -> html.Div:
+def _coverage_charts_section(by_cat: dict, df: pd.DataFrame, categories: list | None = None) -> html.Div:
     """2-column grid of per-phase coverage bar charts (replaces accordion cards)."""
-    phases = [
-        ('ANC',     'Antenatal Care (ANC)'),
-        ('Labour',  'Labour & Delivery'),
-        ('Newborn', 'Newborn Care'),
-        ('PNC',     'Postnatal Care (PNC)'),
-    ]
+    phase_map = {
+        'ANC': 'Antenatal Care (ANC)',
+        'Labour': 'Labour & Delivery',
+        'Newborn': 'Newborn Care',
+        'PNC': 'Postnatal Care (PNC)',
+    }
+    phases = [(cat, phase_map.get(cat, cat)) for cat in _resolve_category_order(
+        [{'category': k} for k in by_cat.keys()], categories
+    )]
     cards = []
     for cat_key, cat_title in phases:
         inds = by_cat.get(cat_key, [])
@@ -2969,12 +2991,15 @@ def _hero_donut_card(label, pct, target, color):
     ])
 
 
-def _hero_donut_row(computed):
-    """Row of large hero donut cards - ANC indicators first, up to 5 total."""
-    anc = [c for c in computed if c.get('category') == 'ANC']
-    heroes = anc[:5] if anc else computed[:5]
+def _hero_donut_row(computed, preferred_cat: str = 'ANC', section_title: str | None = None):
+    """Row of large hero donut cards favouring the requested category first."""
+    preferred = [c for c in computed if c.get('category') == preferred_cat]
+    heroes = preferred[:5] if preferred else computed[:5]
     if not heroes:
         return html.Div()
+
+    if not section_title:
+        section_title = 'KEY NEWBORN INDICATORS' if preferred_cat == 'Newborn' else 'KEY ANC INDICATORS'
 
     cards = []
     for ind in heroes:
@@ -2982,7 +3007,7 @@ def _hero_donut_row(computed):
         cards.append(_hero_donut_card(ind['label'], ind['pct'], ind['target'], color))
 
     return html.Div(style={'marginBottom': '12px'}, children=[
-        html.Div('KEY ANC INDICATORS', className='mnid-section-lbl'),
+        html.Div(section_title, className='mnid-section-lbl'),
         html.Div(className='mnid-hero-row', children=cards),
     ])
 
@@ -3261,7 +3286,8 @@ def _pph_cascade(df):
 
 # MNID header, alert, KPI, and section navigation components
 
-def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=None):
+def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=None,
+            title='Maternal and Child Health Indicators', subtitle='Clean view of performance, comparison, coverage, and readiness.'):
     facility_name = _FACILITY_NAMES.get(facility, facility or 'Network view')
     district = _FACILITY_DISTRICT.get(facility, 'Unknown district')
 
@@ -3284,8 +3310,8 @@ def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=N
     return html.Div(className='mnid-topbar', children=[
         html.Div(className='mnid-topbar-copy', children=[
             html.Div('M-NID Dashboard', className='mnid-topbar-label'),
-            html.H1('Maternal and Child Health Indicators'),
-            html.P('Clean view of performance, comparison, coverage, and readiness.'),
+            html.H1(title),
+            html.P(subtitle),
         ]),
         html.Div(className='mnid-info-pills', children=[
             html.Div(className='mnid-info-pill', children=[
@@ -3455,8 +3481,27 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     dq_inds     = config.get('data_quality_indicators') or vt.get('data_quality_indicators', [])
     period      = f'{start_date} to {end_date}'
 
+    category_order = _resolve_category_order(all_inds, config.get('mnid_categories'))
+    if category_order:
+        allowed = set(category_order)
+        all_inds = [i for i in all_inds if i.get('category') in allowed]
+
     tracked  = [i for i in all_inds if i.get('status') == 'tracked']
     awaiting = [i for i in all_inds if i.get('status') == 'awaiting_baseline']
+    default_cat = category_order[0] if category_order else 'ANC'
+
+    if category_order == ['Newborn']:
+        dashboard_title = 'Newborn Indicators'
+        dashboard_subtitle = 'Focused newborn care performance, comparison, coverage, and readiness.'
+        hero_title = 'KEY NEWBORN INDICATORS'
+    elif set(category_order) == {'ANC', 'Labour', 'PNC'}:
+        dashboard_title = 'Maternal Health Indicators'
+        dashboard_subtitle = 'ANC, labour, and postnatal performance, comparison, coverage, and readiness.'
+        hero_title = 'KEY ANC INDICATORS'
+    else:
+        dashboard_title = f"{config.get('report_name', 'Maternal and Child Health')} Indicators"
+        dashboard_subtitle = 'Clean view of performance, comparison, coverage, and readiness.'
+        hero_title = 'KEY ANC INDICATORS'
 
     computed = []
     for ind in tracked:
@@ -3471,7 +3516,7 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     for ind in all_inds:
         by_cat.setdefault(ind.get('category','Other'), []).append(ind)
 
-    coverage_charts  = _coverage_charts_section(by_cat, facility_df)
+    coverage_charts  = _coverage_charts_section(by_cat, facility_df, category_order)
 
     # Pre-build analysis charts
     anc_charts    = _anc_charts(facility_df)
@@ -3481,15 +3526,15 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
 
     # All accordion sections open by default
     analysis_acc = [
-        _chart_acc_section('ch_anc',    'Antenatal Care',    anc_charts)    if anc_charts    else None,
-        _chart_acc_section('ch_labour', 'Labour & Delivery', labour_charts) if labour_charts else None,
-        _chart_acc_section('ch_pnc',    'Postnatal Care',    pnc_charts)    if pnc_charts    else None,
-        _chart_acc_section('ch_nb',     'Neonatal Care',     nb_charts)     if nb_charts     else None,
+        _chart_acc_section('ch_anc',    'Antenatal Care',    anc_charts)    if anc_charts and 'ANC' in category_order else None,
+        _chart_acc_section('ch_labour', 'Labour & Delivery', labour_charts) if labour_charts and 'Labour' in category_order else None,
+        _chart_acc_section('ch_pnc',    'Postnatal Care',    pnc_charts)    if pnc_charts and 'PNC' in category_order else None,
+        _chart_acc_section('ch_nb',     'Neonatal Care',     nb_charts)     if nb_charts and 'Newborn' in category_order else None,
     ]
     analysis_acc = [a for a in analysis_acc if a]
 
     performance_div, heatmap_div = _coverage_heatmap_section(all_inds, facility_code, network_df)
-    service_table_div = _service_table_switcher(facility_df)
+    service_table_div = _service_table_switcher(facility_df, category_order, default_cat)
     comparative_div  = _comparative_analysis_section(all_inds, facility_code, network_df)
 
     def _sec_header(title, count=None, desc=None):
@@ -3501,18 +3546,25 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
                       className='mnid-section-header-count'),
         ])
 
-    total_analysis = sum(len(c) for c in [anc_charts, labour_charts, pnc_charts, nb_charts])
+    total_analysis = sum(
+        len(charts) for cat, charts in [
+            ('ANC', anc_charts),
+            ('Labour', labour_charts),
+            ('PNC', pnc_charts),
+            ('Newborn', nb_charts),
+        ] if cat in category_order
+    )
 
     main_content = html.Div(className='mnid-main', children=[
 
-        _topbar(facility_code, period, len(tracked), len(awaiting)),
+        _topbar(facility_code, period, len(tracked), len(awaiting), facility_df=facility_df, network_df=network_df, title=dashboard_title, subtitle=dashboard_subtitle),
         _sidebar(facility_code),
         _alert_banner(below, strong),
 
         _section_anchor('mnid-summary'),
         _sec_header('Overview', desc=f'{len(tracked)} tracked - {len(awaiting)} awaiting'),
         _kpi_row(computed),
-        _hero_donut_row(computed),
+        _hero_donut_row(computed, preferred_cat=default_cat, section_title=hero_title),
         _priority_table(computed),
 
         _section_anchor('mnid-data-tables'),
