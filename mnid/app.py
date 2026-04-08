@@ -3289,7 +3289,7 @@ def _pph_cascade(df):
 def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=None,
             title='Maternal and Child Health Indicators', subtitle='Clean view of performance, comparison, coverage, and readiness.'):
     facility_name = _FACILITY_NAMES.get(facility, facility or 'Network view')
-    district = _FACILITY_DISTRICT.get(facility, 'Unknown district')
+    district = _FACILITY_DISTRICT.get(facility, 'All districts')
 
     source_df = facility_df if facility_df is not None and len(facility_df) else network_df
     if source_df is not None and len(source_df):
@@ -3297,6 +3297,8 @@ def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=N
             fac_rows = source_df[source_df['Facility_CODE'].astype(str) == str(facility)]
         else:
             fac_rows = source_df
+            facility_name = 'Network view' if len(source_df) else facility_name
+            district = 'All districts' if len(source_df) else district
         if len(fac_rows):
             if 'Facility' in fac_rows.columns:
                 names = fac_rows['Facility'].dropna().astype(str)

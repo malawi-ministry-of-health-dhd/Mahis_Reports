@@ -7,16 +7,16 @@
 
 /* Left Sidebar */
 .dashboard-sidebar {
-    width: 320px;
-    background: white;
-    border-right: 1px solid #e9ecef;
+    width: 286px;
+    background: #ffffff;
+    border-right: 1px solid #edf2f7;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
     position: sticky;
     top: 0;
     height: 100vh;
-    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+    box-shadow: 1px 0 8px rgba(15, 23, 42, 0.03);
 }
 
 /* Sidebar Header */
@@ -88,106 +88,186 @@
 /* Sidebar Filters Section */
 .sidebar-filters-section {
     flex: 1;
-    padding: 20px;
+    padding: 16px 12px 20px;
     overflow-y: auto;
 }
 
 .filters-card {
-    background: #f8f9fa;
+    background: #f8fafc;
+    border: 1px solid #eef2f7;
     border-radius: 16px;
-    padding: 20px;
+    padding: 18px 16px 18px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
 }
 
 .filters-title {
-    color: #2c3e50;
-    font-size: 1rem;
-    font-weight: 600;
-    margin: 0 0 20px 0;
+    color: #334155;
+    font-size: 0.98rem;
+    font-weight: 700;
+    margin: 0 0 18px 0;
     padding-bottom: 12px;
-    border-bottom: 2px solid #e9ecef;
+    border-bottom: 1px solid #e6ebf1;
 }
 
 .filters-container {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 16px;
 }
 
 .filter-group {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 7px;
 }
 
 .filter-label {
-    color: #495057;
-    font-size: 0.75rem;
-    font-weight: 600;
+    color: #4b5563;
+    font-size: 0.71rem;
+    font-weight: 700;
     margin: 0;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.08em;
 }
 
 .modern-dropdown {
     width: 100%;
+    background: #ffffff;
+    border: 1px solid #dfe6ee;
+    border-radius: 10px;
+    padding: 7px;
+    box-shadow: none;
 }
 
 .modern-dropdown .Select-control {
-    border: 1px solid #ced4da;
+    border: 1px solid #e4eaf1;
     border-radius: 8px;
-    min-height: 38px;
-    transition: all 0.2s;
-    background: white;
+    min-height: 34px;
+    background: #ffffff;
+    box-shadow: none;
 }
 
 .modern-dropdown .Select-control:hover {
-    border-color: #006401;
+    border-color: #dbe3eb;
+}
+
+.modern-dropdown.is-focused {
+    border-color: #d0dae5;
+    box-shadow: none;
 }
 
 .modern-dropdown.is-focused .Select-control {
-    border-color: #006401;
-    box-shadow: 0 0 0 2px rgba(0, 100, 1, 0.1);
+    border-color: #d9e2eb;
+    box-shadow: none;
+}
+
+.modern-dropdown .Select-placeholder,
+.modern-dropdown .Select--single > .Select-control .Select-value,
+.modern-dropdown .Select-value-label {
+    color: #475569 !important;
+    font-size: 0.92rem;
+}
+
+.modern-dropdown .Select-input > input {
+    color: #334155;
+}
+
+.modern-dropdown .Select-arrow-zone,
+.modern-dropdown .Select-clear-zone {
+    color: #9aa5b1;
+    border-left: 0 !important;
+}
+
+.modern-dropdown .Select-multi-value-wrapper,
+.modern-dropdown .Select-input,
+.modern-dropdown .Select-placeholder,
+.modern-dropdown .Select-value {
+    border: 0 !important;
+    box-shadow: none !important;
 }
 
 .modern-datepicker {
     width: 100%;
-    border: 1px solid #ced4da;
-    border-radius: 8px;
-    padding: 6px;
-    background: white;
-    transition: all 0.2s;
+    background: #ffffff;
+    border: 1px solid #dfe6ee;
+    border-radius: 10px;
+    padding: 7px;
+    box-shadow: none;
 }
 
-.modern-datepicker:hover {
-    border-color: #006401;
-}
-
-.modern-datepicker:focus {
-    border-color: #006401;
-    box-shadow: 0 0 0 2px rgba(0, 100, 1, 0.1);
+.modern-datepicker:hover,
+.modern-datepicker:focus,
+.modern-datepicker:focus-within {
+    border-color: #d0dae5;
+    box-shadow: none;
     outline: none;
+}
+
+.modern-datepicker .DateRangePicker,
+.modern-datepicker .DateInput,
+.modern-datepicker .DateInput_input {
+    width: 100%;
+}
+
+.modern-datepicker .DateRangePickerInput {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border: 1px solid #e4eaf1;
+    border-radius: 8px;
+    background: #ffffff;
+    padding: 5px 10px;
+    box-shadow: none;
+}
+
+.modern-datepicker .DateInput {
+    flex: 1 1 0;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+.modern-datepicker .DateInput_input {
+    border: 0 !important;
+    background: transparent;
+    color: #475569;
+    font-size: 0.92rem;
+    padding: 7px 4px;
+    box-shadow: none !important;
+}
+
+.modern-datepicker .DateRangePickerInput_arrow,
+.modern-datepicker .DateRangePickerInput_arrow_svg {
+    border: 0 !important;
+    fill: #94a3b8;
+}
+
+.modern-datepicker .DateInput_input__focused,
+.modern-datepicker .DateRangePickerInput__focused {
+    border-color: #e4eaf1 !important;
+    box-shadow: none !important;
 }
 
 /* Filter Actions */
 .filter-actions {
     display: flex;
-    gap: 12px;
-    margin-top: 24px;
-    padding-top: 20px;
-    border-top: 1px solid #e9ecef;
+    gap: 10px;
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid #e6ebf1;
 }
 
 .btn-apply-modern {
     flex: 1;
-    background: linear-gradient(135deg, #006401 0%, #008a02 100%);
+    background: #007a0c;
     color: white;
     border: none;
-    padding: 10px 16px;
+    padding: 11px 12px;
     border-radius: 8px;
-    font-size: 0.875rem;
+    font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.18s ease;
 }
 
 .btn-apply-modern:hover {
@@ -197,15 +277,15 @@
 
 .btn-reset-modern {
     flex: 1;
-    background: white;
-    color: #6c757d;
-    border: 1px solid #ced4da;
-    padding: 10px 16px;
+    background: #ffffff;
+    color: #94a3b8;
+    border: 1px solid #dbe4ee;
+    padding: 11px 12px;
     border-radius: 8px;
-    font-size: 0.875rem;
+    font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.18s ease;
 }
 
 .btn-reset-modern:hover {
@@ -390,4 +470,95 @@
     border-left: 3px solid #006401;
     padding-left: 12px;
     transition: all 0.2s ease;
+}
+
+.filters-card .Select-placeholder,
+.filters-card .Select--single > .Select-control .Select-value,
+.filters-card .Select-value-label {
+    color: #475569 !important;
+    font-size: 0.93rem;
+}
+
+.filters-card .Select-input > input {
+    color: #334155;
+}
+
+.filters-card .Select-arrow-zone {
+    color: #9aa5b1;
+}
+
+.filters-card .DateRangePicker,
+.filters-card .DateInput,
+.filters-card .DateInput_input {
+    width: 100%;
+}
+
+.filters-card .DateRangePickerInput {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border: 1px solid #e5ebf2;
+    border-radius: 8px;
+    background: #ffffff;
+    padding: 6px 10px;
+    box-shadow: none;
+}
+
+.filters-card .DateInput {
+    flex: 1 1 0;
+}
+
+.filters-card .DateInput_input {
+    border: 0;
+    background: transparent;
+    color: #475569;
+    font-size: 0.92rem;
+    padding: 7px 4px;
+}
+
+.filters-card .DateRangePickerInput_arrow_svg {
+    fill: #94a3b8;
+}
+
+.filters-card .DateInput_input__focused,
+.filters-card .DateRangePickerInput__focused {
+    border-color: #d1dbe6 !important;
+    box-shadow: none !important;
+}
+
+
+.filters-card .Select-input,
+.filters-card .Select-placeholder,
+.filters-card .Select-value,
+.filters-card .Select-value-label,
+.filters-card .Select-arrow-zone,
+.filters-card .Select-clear-zone,
+.filters-card .Select-menu-outer,
+.filters-card .DateInput,
+.filters-card .DateInput_input,
+.filters-card .DateRangePickerInput__withBorder {
+    box-shadow: none !important;
+}
+
+.filters-card .Select-control .Select-multi-value-wrapper,
+.filters-card .Select-control .Select-input,
+.filters-card .Select-control .Select-placeholder,
+.filters-card .Select-control .Select-value {
+    border: 0 !important;
+}
+
+.filters-card .Select-arrow-zone,
+.filters-card .Select-clear-zone {
+    border-left: 0 !important;
+}
+
+.filters-card .DateInput,
+.filters-card .DateInput_input {
+    border: 0 !important;
+    outline: 0 !important;
+}
+
+.filters-card .DateRangePickerInput_arrow {
+    border: 0 !important;
 }

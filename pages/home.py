@@ -158,7 +158,7 @@ layout = html.Div(
     className="dashboard-layout-modern",
     children=[
         dcc.Location(id='url', refresh=False),
-        dcc.Store(id='active-button-store', data='home'),
+        dcc.Store(id='active-button-store', data='General Summary'),
         
         # Left Sidebar
         html.Div(
@@ -223,7 +223,7 @@ layout = html.Div(
                                         html.Div(
                                             className="filter-group",
                                             children=[
-                                                html.Label("Facility", className="filter-label"),
+                                                html.Label("Health Facility", className="filter-label"),
                                                 dcc.Dropdown(
                                                     id='dashboard-facility-filter',
                                                     options=[],
@@ -269,22 +269,14 @@ layout = html.Div(
                                                     start_date=datetime.now().replace(hour=0, minute=0, second=0, microsecond=0),
                                                     end_date=datetime.now().replace(hour=23, minute=59, second=59, microsecond=0),
                                                     display_format='YYYY-MM-DD',
-                                                    className="modern-datepicker",
-                                                    style={
-                                                        'width': '100%',
-                                                        'border': '1px solid #ced4da',
-                                                        'borderRadius': '8px',
-                                                        'padding': '8px'
-                                                    }
+                                                    className="modern-datepicker"
                                                 )
                                             ]
                                         ),
 
-                                        # Overview Filter
                                         html.Div(
-                                            className="filter-group",
+                                            style={"display": "none"},
                                             children=[
-                                                html.Label("Overview", className="filter-label"),
                                                 dcc.Dropdown(
                                                     id='dashboard-overview-filter',
                                                     options=[
@@ -295,7 +287,6 @@ layout = html.Div(
                                                     multi=True,
                                                     clearable=True,
                                                     className="modern-dropdown",
-                                                    placeholder="Select overview report(s)"
                                                 )
                                             ]
                                         ),
@@ -473,25 +464,24 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             else:
                 level = 'Facility'
         
-        if user_level not in user_levels:
+        if level in ['National', 'District']:
             SQL = f"""
                 SELECT *
                 FROM 'data/{DATA_FILE_NAME_}'
                 WHERE Date >= TIMESTAMP '{last_7_days}'
-                AND {FACILITY_CODE_} = '{location}'
                 """
-        elif not user_level:
+        elif user_level in user_levels:
             SQL = f"""
                 SELECT *
                 FROM 'data/{DATA_FILE_NAME_}'
                 WHERE Date >= TIMESTAMP '{last_7_days}'
-                AND {FACILITY_CODE_} = '{location}'
                 """
         else:
             SQL = f"""
                 SELECT *
                 FROM 'data/{DATA_FILE_NAME_}'
                 WHERE Date >= TIMESTAMP '{last_7_days}'
+                AND {FACILITY_CODE_} = '{location}'
                 """
         try:
             data = DataStorage.query_duckdb(SQL)
@@ -550,9 +540,23 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         facilities = facilities or []
         overview = overview or []
 
+        if level == 'National':
+            districts = []
+            facilities = []
+        elif level == 'District' and facilities and district_col:
+            allowed_facilities = set(
+                base_data[base_data[district_col].isin(districts)][FACILITY_]
+                .dropna()
+                .unique()
+                .tolist()
+            ) if districts else set()
+            facilities = [f for f in facilities if f in allowed_facilities]
+
         # Facility options based on selected districts
-        if level == "District" and district_col and not districts:
-            facilities_pool = base_data.iloc[0:0]
+        if level == "National":
+            facilities_pool = base_data
+        elif level == "District" and district_col and not districts:
+            facilities_pool = base_data
         elif district_col and districts:
             facilities_pool = base_data[base_data[district_col].isin(districts)]
         else:
@@ -595,10 +599,12 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
 
         # Filter network and facility data
         network_data = base_data.copy()
-        if district_col and districts:
+        if level != 'National' and district_col and districts:
             network_data = network_data[network_data[district_col].isin(districts)]
         filtered_data = network_data.copy()
-        if facilities:
+        if level == 'Facility' and facilities:
+            filtered_data = filtered_data[filtered_data[FACILITY_].isin(facilities)]
+        elif level == 'District' and facilities:
             filtered_data = filtered_data[filtered_data[FACILITY_].isin(facilities)]
 
         if filtered_data.empty and len(network_data):
@@ -630,9 +636,18 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                 filtered_data_date = filtered_data.copy()
 
             delta_days = (adj_end_dt - adj_start_dt).days
-            facility_code_display = mnid_location if is_mnid else location
-            if facilities and is_mnid:
-                facility_code_display = ", ".join(facilities)
+            facility_code_display = location
+            if is_mnid:
+                if len(facilities) == 1 and FACILITY_ in base_data.columns and FACILITY_CODE_ in base_data.columns:
+                    fac_match = base_data[base_data[FACILITY_].astype(str) == str(facilities[0])]
+                    if len(fac_match):
+                        facility_code_display = str(fac_match[FACILITY_CODE_].dropna().astype(str).iloc[0])
+                    else:
+                        facility_code_display = ''
+                elif len(facilities) > 1 or level in ['National', 'District']:
+                    facility_code_display = ''
+                else:
+                    facility_code_display = mnid_location or location
 
             section = build_charts_from_json(
                 filtered_data_date, network_data, delta_days, dashboard_json,
