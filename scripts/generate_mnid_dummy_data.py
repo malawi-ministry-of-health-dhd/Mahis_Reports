@@ -13,6 +13,7 @@ Run from project root:
     python scripts/generate_mnid_dummy_data.py
 """
 import os, random
+import argparse
 import numpy as np
 import pandas as pd
 from datetime import date, timedelta
@@ -64,7 +65,6 @@ FACILITY_SPECS = [
     ('Chikwawa', 'Ngabu Rural Hospital',                  'Rural Hospital'),
     ('Nsanje',   'Nsanje District Hospital',              'District Hospital'),
     ('Nsanje',   'Tengani Health Centre',                 'Health Centre'),
-    # existing sample facilities (kept)
     ('Mzuzu',    'Mzuzu Urban Health Centre',             'Health Centre'),
     ('Lilongwe', 'Lilongwe Central Hospital',             'Central Hospital'),
     ('Blantyre', 'Blantyre South Health Centre',          'Health Centre'),
@@ -364,33 +364,59 @@ def readiness_rows(d, fac):
 
     return rows
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Generate MNID dummy data")
+    parser.add_argument("--max-facilities", type=int, default=None,
+                        help="Limit number of facilities included")
+    parser.add_argument("--days", type=int, default=None,
+                        help="Limit number of days from START (2024-01-01)")
+    parser.add_argument("--scale", type=float, default=1.0,
+                        help="Scale encounter volume (e.g., 0.2 for 20%%)")
+    return parser.parse_args()
+
+
+def pick_facilities(max_facilities):
+    if not max_facilities or max_facilities >= len(FACILITIES):
+        return FACILITIES
+    return random.sample(FACILITIES, k=max_facilities)
+
+
 # ── build full dataset ────────────────────────────────────────────────────────
+args = parse_args()
+
+gen_days = DAYS if not args.days else max(1, min(args.days, DAYS))
+end_date = START + timedelta(days=gen_days - 1)
+scale = max(args.scale, 0.01)
+facilities = pick_facilities(args.max_facilities)
+
 print("Generating MNID dummy data …")
+print(f"  Facilities: {len(facilities)} of {len(FACILITIES)}")
+print(f"  Date range: {START} → {end_date}")
+print(f"  Scale     : {scale}")
+
 all_rows = []
 
-for offset in range(DAYS):
+for offset in range(gen_days):
     d = START + timedelta(days=offset)
-    if d > END:
-        break
 
-    for fac in FACILITIES:
+    for fac in facilities:
         # ANC
-        n_anc = max(1, int(np.random.poisson(ANC_PER_DAY)))
+        n_anc = max(1, int(np.random.poisson(ANC_PER_DAY * scale)))
         for _ in range(n_anc):
             all_rows.extend(anc_encounter(next_pid(), d, fac))
 
         # Labour
-        n_lab = max(0, int(np.random.poisson(LABOUR_PER_DAY)))
+        n_lab = max(0, int(np.random.poisson(LABOUR_PER_DAY * scale)))
         for _ in range(n_lab):
             all_rows.extend(labour_encounter(next_pid(), d, fac))
 
         # PNC
-        n_pnc = max(1, int(np.random.poisson(PNC_PER_DAY)))
+        n_pnc = max(1, int(np.random.poisson(PNC_PER_DAY * scale)))
         for _ in range(n_pnc):
             all_rows.extend(pnc_encounter(next_pid(), d, fac))
 
         # Newborn
-        n_nb = max(0, int(np.random.poisson(NEWBORN_PER_DAY)))
+        n_nb = max(0, int(np.random.poisson(NEWBORN_PER_DAY * scale)))
         for _ in range(n_nb):
             all_rows.extend(newborn_encounter(next_pid(), d, fac))
 
