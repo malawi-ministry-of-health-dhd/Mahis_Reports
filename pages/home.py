@@ -543,7 +543,9 @@ def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams
         overview = overview or []
 
         # Facility options based on selected districts
-        if district_col and districts:
+        if level == "District" and district_col and not districts:
+            facilities_pool = base_data.iloc[0:0]
+        elif district_col and districts:
             facilities_pool = base_data[base_data[district_col].isin(districts)]
         else:
             facilities_pool = base_data
