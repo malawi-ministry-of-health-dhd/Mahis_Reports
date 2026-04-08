@@ -1,15 +1,13 @@
 {
   "programs": [
     "AETC PROGRAM",
-    "ANC PROGRAM",
     "HIV PROGRAM",
     "HTS PROGRAM",
     "IMMUNIZATION PROGRAM",
-    "LABOUR AND DELIVERY PROGRAM",
+    "MATERNAL AND CHILD HEALTH",
     "NCD PROGRAM",
     "NEONATAL PROGRAM",
-    "OPD Program",
-    "PNC PROGRAM"
+    "OPD Program"
   ],
   "encounters": [
     "ABDOMINAL EXAMINATION",

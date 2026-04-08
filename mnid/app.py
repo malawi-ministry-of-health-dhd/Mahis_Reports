@@ -465,99 +465,123 @@ def _service_table_payload(df: pd.DataFrame) -> dict:
 
     payload = {
         'ANC': {
-            'title': 'Antenatal Care Service Data',
-            'subtitle': 'Core ANC volume and service-delivery counts from the current filtered dataset.',
+            'title': 'ANC Summary',
+            'subtitle': 'Visits, registration, and core ANC service fields.',
             'rows': _rows([
                 ('ANC visits recorded', _count_entities(anc_df, 'encounter_id'), 'Distinct ANC encounters'),
                 ('Unique ANC clients', _count_entities(anc_df, 'person_id'), 'Distinct clients seen in ANC'),
-                ('Anaemia screening completed', _concept_count(anc_df, 'Anemia screening', ['Screened']), 'Clients marked as screened'),
-                ('Infection screening completed', _concept_count(anc_df, 'Infection screening', ['Screened']), 'Clients screened for infection'),
-                ('High blood pressure screening', _concept_count(anc_df, 'High blood pressure screening', ['Screened']), 'Clients screened for high BP'),
-                ('POCUS completed', _concept_count(anc_df, 'POCUS completed', ['Yes']), 'Clients with completed POCUS'),
-                ('HIV tests recorded', _concept_count(anc_df, 'HIV Test', any_value=True), 'Clients with an HIV test result'),
-                ('Reactive HIV tests', _concept_count(anc_df, 'HIV Test', ['Reactive']), 'Reactive ANC HIV test results'),
-                ('Tetanus dose entries', _concept_count(anc_df, 'Number of tetanus doses', col='Value', any_value=True), 'Clients with recorded tetanus doses'),
+                ('Repeat ANC contact volume', max(_count_entities(anc_df, 'encounter_id') - _count_entities(anc_df, 'person_id'), 0), 'Repeat ANC contacts beyond first recorded visit'),
+                ('Gestational age recorded', _concept_count(anc_df, 'Gestational age recorded', any_value=True), 'Clients with gestational age documented'),
+                ('Blood group recorded', _concept_count(anc_df, 'Blood group rhesus factor', any_value=True), 'Clients with blood group / rhesus factor captured'),
+                ('Pregnancy planned responses', _concept_count(anc_df, 'Pregnancy planned', any_value=True), 'Clients with pregnancy planning status recorded'),
+                ('HIV test results recorded', _concept_count(anc_df, 'HIV Test', any_value=True), 'Clients with ANC HIV test result documented'),
+                ('Reactive HIV results', _concept_count(anc_df, 'HIV Test', ['Reactive']), 'Clients with reactive ANC HIV test result'),
+                ('ITNs given', _concept_count(anc_df, 'Insecticide treated net given', ['Yes', 'Given']), 'Clients receiving an insecticide treated net'),
+                ('2+ tetanus doses recorded', _concept_count(anc_df, 'Number of tetanus doses', ['two doses', 'three doses', 'four doses']), 'Clients documented with at least two tetanus doses'),
             ]),
         },
         'Labour': {
-            'title': 'Labour & Delivery Service Data',
-            'subtitle': 'Delivery volumes and key labour-specific events in the filtered dataset.',
+            'title': 'Labour & Delivery Summary',
+            'subtitle': 'Deliveries, outcomes, referrals, and newborn delivery records.',
             'rows': _rows([
                 ('Deliveries recorded', _count_entities(labour_df, 'encounter_id'), 'Distinct labour encounters'),
                 ('Unique mothers', _count_entities(labour_df, 'person_id'), 'Distinct women in labour data'),
-                ('Live births', _concept_count(labour_df, 'Outcome of the delivery', ['Live births']), 'Deliveries with live-birth outcome'),
-                ('Fresh stillbirths', _concept_count(labour_df, 'Outcome of the delivery', ['Fresh stillbirth']), 'Fresh stillbirth outcomes'),
-                ('Macerated stillbirths', _concept_count(labour_df, 'Outcome of the delivery', ['Macerated stillbirth']), 'Macerated stillbirth outcomes'),
-                ('Caesarean deliveries', _concept_count(labour_df, 'Mode of delivery', ['Caesarean section', 'Caesarean']), 'C-section mode of delivery'),
-                ('Obstetric complications recorded', _concept_count(labour_df, 'Obstetric complications', any_value=True), 'Clients with a documented complication'),
-                ('Digital monitoring used', _concept_count(labour_df, 'Digital intrapartum monitoring', ['Yes', 'Used', 'Completed']), 'Digital monitoring applied'),
-                ('PPH bundle completed', _concept_count(labour_df, 'PPH treatment bundle', ['Yes', 'Used', 'Completed']), 'PPH treatment bundle recorded'),
+                ('Live births', _concept_count(labour_df, 'Outcome of the delivery', ['Live birth', 'Live births']), 'Deliveries with live-birth outcome'),
+                ('Stillbirths', _concept_count(labour_df, 'Outcome of the delivery', ['Stillbirth', 'Fresh stillbirth', 'Macerated stillbirth']), 'Deliveries with stillbirth outcomes'),
+                ('Twin deliveries', _concept_count(labour_df, 'Outcome of the delivery', ['Twin delivery']), 'Deliveries recorded as twin deliveries'),
+                ('Mothers referred', _concept_count(labour_df, 'Referral completed', ['Yes']), 'Mothers with completed referral pathway'),
+                ('Referral reasons captured', _concept_count(labour_df, 'referral reasons', any_value=True), 'Encounters with documented referral reasons'),
+                ('Newborn complications recorded', _concept_count(labour_df, 'Newborn baby complications', any_value=True), 'Deliveries with newborn complication documentation'),
+                ('Newborn management recorded', _concept_count(labour_df, 'Management given to newborn', any_value=True), 'Deliveries with newborn management documented'),
+                ('Birth attendant recorded', _concept_count(labour_df, 'Staff conducting delivery', any_value=True), 'Deliveries with attending cadre documented'),
             ]),
         },
         'Newborn': {
-            'title': 'Newborn Service Data',
-            'subtitle': 'Admission volume and intervention counts for newborn care.',
+            'title': 'Newborn Summary',
+            'subtitle': 'Admissions, thermal status, respiratory support, and newborn care actions.',
             'rows': _rows([
                 ('Admissions recorded', _count_entities(newborn_df, 'encounter_id'), 'Distinct newborn encounters'),
                 ('Unique babies', _count_entities(newborn_df, 'person_id'), 'Distinct babies in newborn care'),
+                ('Repeat admission / review volume', max(_count_entities(newborn_df, 'encounter_id') - _count_entities(newborn_df, 'person_id'), 0), 'Repeat neonatal contacts beyond first recorded admission'),
+                ('Resuscitation provided', _concept_count(newborn_df, 'Neonatal resuscitation provided', ['Yes', 'Stimulation only', 'Bag and mask']), 'Babies receiving active resuscitation support'),
+                ('Resuscitation not required', _concept_count(newborn_df, 'Neonatal resuscitation provided', ['Not required']), 'Babies assessed with no resuscitation required'),
                 ('Not hypothermic on admission', _concept_count(newborn_df, 'Thermal status on admission', ['Not hypothermic']), 'Babies admitted without hypothermia'),
-                ('Neonatal resuscitation provided', _concept_count(newborn_df, 'Neonatal resuscitation provided', ['Yes', 'Stimulation only', 'Bag and mask']), 'Babies receiving resuscitation support'),
-                ('iKMC initiated', _concept_count(newborn_df, 'iKMC initiated', ['Yes']), 'Babies started on iKMC'),
+                ('Hypothermia on admission', _concept_count(newborn_df, 'Thermal status on admission', ['Mild hypothermia', 'Moderate hypothermia', 'Severe hypothermia']), 'Babies admitted with hypothermia recorded'),
                 ('Bubble CPAP support', _concept_count(newborn_df, 'CPAP support', ['Bubble CPAP']), 'Babies supported with bubble CPAP'),
+                ('Nasal oxygen support', _concept_count(newborn_df, 'CPAP support', ['Nasal oxygen']), 'Babies supported with nasal oxygen'),
                 ('Phototherapy given', _concept_count(newborn_df, 'Phototherapy given', ['Yes']), 'Babies who received phototherapy'),
                 ('Parenteral antibiotics given', _concept_count(newborn_df, 'Parenteral antibiotics given', ['Yes']), 'Babies who received antibiotics'),
-                ('Complications recorded', _concept_count(newborn_df, 'Newborn baby complications', any_value=True), 'Babies with documented complications'),
+                ('iKMC initiated', _concept_count(newborn_df, 'iKMC initiated', ['Yes']), 'Babies started on iKMC'),
             ]),
         },
         'PNC': {
-            'title': 'Postnatal Care Service Data',
-            'subtitle': 'Postnatal visit volume and maternal/newborn outcome counts.',
+            'title': 'PNC Summary',
+            'subtitle': 'Maternal and baby postnatal counts, outcomes, and service completion fields.',
             'rows': _rows([
                 ('PNC visits recorded', _count_entities(pnc_df, 'encounter_id'), 'Distinct postnatal encounters'),
                 ('Unique mothers', _count_entities(pnc_df, 'person_id'), 'Distinct clients in PNC'),
-                ('Visits within 48 hours', _concept_count(pnc_df, 'Postnatal check period', ['Within 48 hours', '0-48 hours', '<48 hours']), 'Timely postnatal checks'),
-                ('Exclusive breastfeeding', _concept_count(pnc_df, 'Breast feeding', ['Exclusive', 'exclusive breastfeeding']), 'Exclusive breastfeeding recorded'),
-                ('Mother stable', _concept_count(pnc_df, 'Status of the mother', ['Stable']), 'Mothers with stable final status'),
-                ('Maternal deaths', _concept_count(pnc_df, 'Status of the mother', ['Death', 'Died']), 'Mothers with death outcome'),
-                ('Maternal referrals', _concept_count(pnc_df, 'Status of the mother', ['Referred']), 'Mothers referred onward'),
-                ('Baby stable', _concept_count(pnc_df, 'Status of baby', ['Stable']), 'Babies with stable final status'),
-                ('Baby deaths', _concept_count(pnc_df, 'Status of baby', ['Death', 'Died']), 'Babies with death outcome'),
-                ('Postnatal complications recorded', _concept_count(pnc_df, 'Postnatal complications', any_value=True), 'Clients with documented complications'),
+                ('Babies reviewed', _concept_count(pnc_df, 'Status of baby', any_value=True), 'Babies with postnatal status recorded'),
+                ('Maternal deaths', _concept_count(pnc_df, 'Status of the mother', ['Death', 'Died']), 'Mothers with death outcome in PNC'),
+                ('Maternal referrals', _concept_count(pnc_df, 'Status of the mother', ['Referred']), 'Mothers referred onward from PNC'),
+                ('Baby deaths', _concept_count(pnc_df, 'Status of baby', ['Death', 'Died']), 'Babies with death outcome in PNC'),
+                ('Baby referrals', _concept_count(pnc_df, 'Status of baby', ['Referred']), 'Babies referred onward from PNC'),
+                ('Mother HIV status captured', _concept_count(pnc_df, 'Mother HIV Status', any_value=True), 'Mothers with HIV status recorded in PNC'),
+                ('Vitamin K given', _concept_count(pnc_df, 'Vitamin K given', ['Yes']), 'Babies with Vitamin K documented'),
+                ('Immunisation recorded', _concept_count(pnc_df, 'Immunisation given', any_value=True) + _concept_count(pnc_df, 'Type of immunization the baby received', any_value=True), 'Baby immunisation entries recorded in PNC'),
             ]),
         },
     }
     return payload
 
 
-def _service_table_view(section: dict) -> html.Div:
+def _service_table_fig(section: dict) -> go.Figure:
     rows = section.get('rows', [])
-    return html.Div(className='mnid-card mnid-service-table-card', children=[
-        html.Div(className='mnid-service-table-head', children=[
-            html.Div(section.get('title', 'Clinical Service Data'), className='mnid-card-title'),
-            html.P(section.get('subtitle', ''), className='mnid-service-table-subtitle'),
-        ]),
-        html.Div(className='mnid-service-table-wrap', children=[
-            html.Table(className='mnid-service-table', children=[
-                html.Thead(html.Tr(children=[
-                    html.Th('Metric'),
-                    html.Th('Count'),
-                    html.Th('Definition'),
-                ])),
-                html.Tbody(children=[
-                    html.Tr(children=[
-                        html.Td(row['metric'], className='mnid-service-table-metric'),
-                        html.Td(f"{int(row['value']):,}", className='mnid-service-table-value'),
-                        html.Td(row['detail'], className='mnid-service-table-detail'),
-                    ])
-                    for row in rows
-                ]),
-            ]),
-        ]),
-    ])
+    fig = go.Figure(data=[go.Table(
+        columnwidth=[0.42, 0.18, 0.40],
+        header=dict(
+            values=['Metric', 'Count', 'Definition'],
+            fill_color='#F8FAFC',
+            line_color='#E2E8F0',
+            align='left',
+            font=dict(color='#0F172A', size=11, family=FONT),
+            height=34,
+        ),
+        cells=dict(
+            values=[
+                [row['metric'] for row in rows],
+                [f"{int(row['value']):,}" for row in rows],
+                [row['detail'] for row in rows],
+            ],
+            fill_color='#FFFFFF',
+            line_color='#E2E8F0',
+            align=['left', 'right', 'left'],
+            font=dict(
+                color=[['#0F172A'] * len(rows), ['#0F172A'] * len(rows), ['#64748B'] * len(rows)],
+                size=[12, 13, 11],
+                family=FONT,
+            ),
+            height=38,
+        ),
+    )])
+    fig.update_layout(
+        title=dict(
+            text=(
+                f"<b>{section.get('title', 'Service Summary')}</b>"                 f"<br><span style='color:#94A3B8;font-size:11px;font-weight:500'>"                 f"{section.get('subtitle', '')}</span>"
+            ),
+            x=0,
+            xanchor='left',
+            font=dict(size=15, color=TEXT, family=FONT),
+        ),
+        margin=dict(l=0, r=0, t=56, b=0),
+        height=max(340, 108 + (len(rows) * 38)),
+        paper_bgcolor='#FFFFFF',
+        plot_bgcolor='#FFFFFF',
+    )
+    return fig
 
 
 @callback(
-    Output('mnid-service-table-wrap', 'children'),
+    Output('mnid-service-table-graph', 'figure'),
     Output('mnid-service-table-active-cat', 'data'),
     Output({'type': 'service-table-btn', 'index': ALL}, 'className'),
     Input({'type': 'service-table-btn', 'index': ALL}, 'n_clicks'),
@@ -582,7 +606,7 @@ def update_service_table(n_clicks_list, stored_tables, active_cat):
         'mnid-filter-btn active' if c == cat else 'mnid-filter-btn'
         for c in _CAT_ORDER
     ]
-    return _service_table_view(section), cat, classes
+    return _service_table_fig(section), cat, classes
 
 
 def _service_table_switcher(df: pd.DataFrame) -> html.Div:
@@ -591,7 +615,7 @@ def _service_table_switcher(df: pd.DataFrame) -> html.Div:
     return html.Div(className='mnid-card', style={'marginBottom': '12px'}, children=[
         html.Div(style={'display': 'flex', 'alignItems': 'center',
                         'justifyContent': 'space-between', 'marginBottom': '8px', 'gap': '12px', 'flexWrap': 'wrap'}, children=[
-            html.Div('CLINICAL SERVICE TABLES', className='mnid-section-lbl',
+            html.Div('SERVICE SNAPSHOT', className='mnid-section-lbl',
                      style={'marginBottom': '0'}),
             html.Div(className='mnid-filter-row', children=[
                 html.Button(
@@ -605,7 +629,12 @@ def _service_table_switcher(df: pd.DataFrame) -> html.Div:
         ]),
         dcc.Store(id='mnid-service-table-store', data=payload),
         dcc.Store(id='mnid-service-table-active-cat', data='ANC'),
-        html.Div(id='mnid-service-table-wrap', children=_service_table_view(default_section)),
+        dcc.Graph(
+            id='mnid-service-table-graph',
+            figure=_service_table_fig(default_section),
+            className='mnid-service-table-graph',
+            config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
+        ),
     ])
 
 
@@ -1528,7 +1557,7 @@ clientside_callback(
         if (window._mnidScrollSpyActive) return '';
         window._mnidScrollSpyActive = true;
 
-        var sectionIds = ['mnid-summary','mnid-trends','mnid-performance','mnid-heatmap',
+        var sectionIds = ['mnid-summary','mnid-data-tables','mnid-trends','mnid-performance','mnid-heatmap',
                           'mnid-coverage','mnid-comparative','mnid-analysis','mnid-readiness'];
 
         function setActive(id) {
@@ -2697,7 +2726,7 @@ def _build_compare_heatmap(title: str, df: 'pd.DataFrame', tracked: list) -> go.
     """Single-entity heatmap: one row per indicator showing coverage %."""
     names, pcts, colors_list = [], [], []
     for ind in tracked:
-        label = ind.get('label', ind.get('id', '?'))
+        label = ind.get('label', ind.get('id', '-'))
         if df.empty:
             pct = 0.0
         else:
@@ -2769,7 +2798,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
     }
 
     compare_card = html.Div(className='mnid-chart-card mnid-compare-card', children=[
-        # ── Header row ───────────────────────────────────────────────────────────
+        # -- Header row -----------------------------------------------------------
         html.Div(className='mnid-compare-header', style={'display': 'flex', 'alignItems': 'center',
                         'justifyContent': 'space-between',
                         'marginBottom': '16px', 'flexWrap': 'wrap', 'gap': '10px'}, children=[
@@ -2802,7 +2831,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                 ),
             ]),
         ]),
-        # ── Filters row ──────────────────────────────────────────────────────────
+        # -- Filters row ----------------------------------------------------------
         html.Div(className='mnid-compare-filters', style={'display': 'grid', 'gridTemplateColumns': '1fr 1fr 1fr',
                         'gap': '14px', 'marginBottom': '16px', 'alignItems': 'start'}, children=[
             # Left: entity selector (facility or district, toggled by mode)
@@ -2814,7 +2843,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                         options=fac_opts,
                         value=default_facs,
                         multi=True,
-                        placeholder='Select facilities…',
+                        placeholder='Select facilities...',
                     ),
                 ]),
                 html.Div(id='mnid-compare-dist-selector', style={'display': 'none'}, children=[
@@ -2824,7 +2853,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                         options=dist_opts,
                         value=default_dists,
                         multi=True,
-                        placeholder='Select districts…',
+                        placeholder='Select districts...',
                     ),
                 ]),
             ]),
@@ -2836,7 +2865,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                     options=cat_opts,
                     value=default_cats,
                     multi=True,
-                    placeholder='Select indicator categories…',
+                    placeholder='Select indicator categories...',
                 ),
             ]),
             # Right: indicator selector
@@ -2847,11 +2876,11 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                     options=ind_opts,
                     value=default_inds,
                     multi=True,
-                    placeholder='Select indicators…',
+                    placeholder='Select indicators...',
                 ),
             ]),
         ]),
-        # ── Grouped bar chart ────────────────────────────────────────────────────
+        # -- Grouped bar chart ----------------------------------------------------
         dcc.Graph(
             id='mnid-compare-bar-chart',
             config={
@@ -3286,6 +3315,7 @@ def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=N
 def _sidebar(facility_code: str) -> html.Div:
     nav_items = [
         ('Overview', '#mnid-summary'),
+        ('Data Tables', '#mnid-data-tables'),
         ('Trend', '#mnid-trends'),
         ('Performance', '#mnid-performance'),
         ('Map View', '#mnid-heatmap'),
@@ -3484,6 +3514,9 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
         _kpi_row(computed),
         _hero_donut_row(computed),
         _priority_table(computed),
+
+        _section_anchor('mnid-data-tables'),
+        _sec_header('Data Tables', desc='Key service counts and outcomes'),
         service_table_div,
 
         _section_anchor('mnid-trends'),
