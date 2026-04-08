@@ -29,11 +29,54 @@ END     = date(2026, 3, 28)
 DAYS    = (END - START).days + 1
 
 # ── facility metadata ─────────────────────────────────────────────────────────
+FACILITY_SPECS = [
+    ('Mzimba',   'Mzimba District Hospital',              'District Hospital'),
+    ('Mzimba',   'Ekwendeni Mission Hospital',            'Mission Hospital'),
+    ('Mzimba',   'Embangweni Health Centre',              'Health Centre'),
+    ('Karonga',  'Karonga District Hospital',             'District Hospital'),
+    ('Karonga',  'Chilumba Rural Hospital',               'Rural Hospital'),
+    ('Rumphi',   'Rumphi District Hospital',              'District Hospital'),
+    ('Rumphi',   'Bolero Health Centre',                  'Health Centre'),
+    ('Nkhata Bay','Nkhata Bay District Hospital',          'District Hospital'),
+    ('Nkhata Bay','Mpamba Health Centre',                  'Health Centre'),
+    ('Chitipa',  'Chitipa District Hospital',             'District Hospital'),
+    ('Chitipa',  'Misuku Health Centre',                  'Health Centre'),
+    ('Lilongwe', 'Kamuzu Central Hospital',               'Central Hospital'),
+    ('Lilongwe', 'Bwaila District Hospital',              'District Hospital'),
+    ('Lilongwe', 'Area 25 Health Centre',                 'Health Centre'),
+    ('Lilongwe', 'Kawale Health Centre',                  'Health Centre'),
+    ('Dedza',    'Dedza District Hospital',               'District Hospital'),
+    ('Dedza',    'Mua Mission Hospital',                  'Mission Hospital'),
+    ('Kasungu',  'Kasungu District Hospital',             'District Hospital'),
+    ('Kasungu',  'Chulu Health Centre',                   'Health Centre'),
+    ('Ntcheu',   'Ntcheu District Hospital',              'District Hospital'),
+    ('Ntcheu',   'Bilira Health Centre',                  'Health Centre'),
+    ('Salima',   'Salima District Hospital',              'District Hospital'),
+    ('Salima',   'Lifuwu Health Centre',                  'Health Centre'),
+    ('Blantyre', 'Queen Elizabeth Central Hospital',      'Central Hospital'),
+    ('Blantyre', 'Chileka Health Centre',                 'Health Centre'),
+    ('Blantyre', 'Ndirande Health Centre',                'Health Centre'),
+    ('Zomba',    'Zomba Central Hospital',                'Central Hospital'),
+    ('Zomba',    'Domasi Rural Hospital',                 'Rural Hospital'),
+    ('Mangochi', 'Mangochi District Hospital',            'District Hospital'),
+    ('Mangochi', 'Monkey Bay Community Hospital',         'Community Hospital'),
+    ('Chikwawa', 'Chikwawa District Hospital',            'District Hospital'),
+    ('Chikwawa', 'Ngabu Rural Hospital',                  'Rural Hospital'),
+    ('Nsanje',   'Nsanje District Hospital',              'District Hospital'),
+    ('Nsanje',   'Tengani Health Centre',                 'Health Centre'),
+    # existing sample facilities (kept)
+    ('Mzuzu',    'Mzuzu Urban Health Centre',             'Health Centre'),
+    ('Lilongwe', 'Lilongwe Central Hospital',             'Central Hospital'),
+    ('Blantyre', 'Blantyre South Health Centre',          'Health Centre'),
+]
+
+def _code_for(district, idx):
+    initials = ''.join([p[0] for p in district.split()]).upper()
+    return f"{initials}{idx:03d}"
+
 FACILITIES = [
-    ('LL040033', 'Lilongwe Central Hospital',   'Lilongwe', 'Chilinde',  'Area 25'),
-    ('BT020011', 'Bwaila District Hospital',    'Lilongwe', 'Bwaila',    'Area 18'),
-    ('MZ120004', 'Mzuzu Urban Health Centre',   'Mzuzu',    'Mzuzu City','Area 3'),
-    ('BL050022', 'Blantyre South Health Centre','Blantyre',  'Chilomoni', 'Area 7'),
+    (_code_for(d, i + 1), name, d, f"{d} TA", f"{d} Village")
+    for i, (d, name, _typ) in enumerate(FACILITY_SPECS)
 ]
 
 GIVEN_NAMES  = ['Grace','Mary','Ruth','Agnes','Mercy','Beatrice','Esther','Faith',
