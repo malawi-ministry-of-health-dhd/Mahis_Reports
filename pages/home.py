@@ -411,19 +411,19 @@ def update_menu(interval, color):
         Input('dashboard-interval-update-today', 'n_intervals'),
         Input('dashboard-date-range-picker', 'start_date'), # New: Update when dates settle
         Input('dashboard-date-range-picker', 'end_date'),   # New: Update when dates settle
+        Input('dashboard-level-filter', 'value'),
+        Input('dashboard-district-filter', 'value'),
+        Input('dashboard-facility-filter', 'value'),
+        Input('dashboard-overview-filter', 'value'),
         Input({"type": "menu-button", "name": ALL}, "n_clicks"),
     ],
     [
         State('url-params-store', 'data'),
-        State('dashboard-level-filter', 'value'),
-        State('dashboard-district-filter', 'value'),
-        State('dashboard-facility-filter', 'value'),
-        State('dashboard-overview-filter', 'value'),
         State('dashboard-age-filter', 'value'),
         State('active-button-store', 'data')
     ]
 )
-def update_dashboard(gen, interval, start_date, end_date, menu_clicks, urlparams, level, districts, facilities, overview, age, current_active):
+def update_dashboard(gen, interval, start_date, end_date, level, districts, facilities, overview, menu_clicks, urlparams, age, current_active):
     try:
         ctx = callback_context
         triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else None
