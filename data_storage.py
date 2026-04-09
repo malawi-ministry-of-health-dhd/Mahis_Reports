@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from config import QERY,USE_LOCALHOST, DATA_FILE_NAME_, CONCEPTS
+import config as cfg
 from db_services import DataFetcher
 from datetime import datetime
 import logging
@@ -9,6 +9,12 @@ import duckdb
 from functools import lru_cache
 
 logging.basicConfig(level=logging.DEBUG)
+
+QERY = cfg.QERY
+USE_LOCALHOST = cfg.USE_LOCALHOST
+DATA_FILE_NAME_ = cfg.DATA_FILE_NAME_
+CONCEPTS = getattr(cfg, "CONCEPTS", None)
+
 
 class DataStorage:
     def __init__(self, query=QERY, data_dir="data", filename=DATA_FILE_NAME_):
@@ -100,5 +106,6 @@ if __name__ == "__main__":
                         filename="users_data.csv")
     users.fetch_and_save_single_table()
 
-    concepts = DataStorage(query=CONCEPTS, filename="concepts_data.csv")
-    concepts.fetch_and_save_single_table()
+    if CONCEPTS:
+        concepts = DataStorage(query=CONCEPTS, filename="concepts_data.csv")
+        concepts.fetch_and_save_single_table()

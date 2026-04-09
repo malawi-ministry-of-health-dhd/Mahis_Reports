@@ -232,7 +232,7 @@ layout = html.Div(
 def update_filters(selected_program):
     with open(path_program_reports) as x:
         program_reports_data = json.load(x)
-    filtered_reports_list = [r for r in program_reports_data["reports"] if r.get("program") == selected_program]
+    filtered_reports_list = [r for r in program_reports_data["reports"] if r.get("program") == selected_program or selected_program in (r.get("programs") or [])]
     filtered_object = {"reports":filtered_reports_list}
     program_reports = [x['report_name'] for x in filtered_object['reports']]
     return program_reports 

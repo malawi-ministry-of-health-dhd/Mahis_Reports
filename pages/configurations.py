@@ -13,6 +13,7 @@ from helpers.modal_functions import (validate_excel_file, load_reports_data, sav
                         save_excel_file, update_report_metadata, archive_report, load_preview_data,
                         create_count_item,create_chart_item, create_section,create_chart_fields,validate_dashboard_json,
                         upload_dashboard_json,validate_prog_reports_json,upload_prog_reports_json,CHART_TEMPLATES)
+from config import actual_keys_in_data
 
 dash.register_page(__name__, path="/reports_config", title="Admin Dashboard")
 
@@ -1456,21 +1457,16 @@ def handle_file_validation_and_dry_run(contents, dry_run_clicks, contents_state)
                 final_variable_names.append(str(item).strip())
 
 
-        # Check if variable names are the same as in the data
-        verification_df, nothing = load_preview_data()
-        verification_df_columns = verification_df.columns.tolist()
-
-        not_correct = []
-        correct = []
+        # Validate filter column names against the actual report dataset schema.
+        valid_filter_columns = {str(col).strip() for col in actual_keys_in_data if str(col).strip()}
+        not_correct = sorted({name for name in final_variable_names if name not in valid_filter_columns})
         dry_run_warning = []
 
-        for i in final_variable_names:
-            if i in verification_df_columns:
-                correct.append(i)
-            else:
-                not_correct.append(i)
-        if len(not_correct)>0:
-            dry_run_warning.append(html.Div(f"The following filter columns may need to be corrected: {not_correct}", style={'color': 'red', 'marginBottom': '5px'}))
+        if len(not_correct) > 0:
+            dry_run_warning.append(html.Div(
+                f"The following filter columns may need to be corrected: {not_correct}",
+                style={'color': 'red', 'marginBottom': '5px'}
+            ))
         
         dry_run_info = [
             html.Div("Dry run successful!", style={'color': 'green', 'marginBottom': '10px', 'fontWeight': 'bold'}),

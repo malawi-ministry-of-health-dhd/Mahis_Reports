@@ -1,11 +1,11 @@
 """
 MNID dashboard renderer.
 
-This module builds the Maternal and Neonatal Indicators dashboard layout,
+This module builds the Maternal and Child Health dashboard layout,
 calculates configured indicator coverage, and renders the main dashboard
 sections such as trends, comparison views, heatmaps, and readiness panels.
 """
-from dash import html, dcc, clientside_callback, callback, Input, Output, State, ALL
+from dash import html, dcc, clientside_callback, callback, callback_context, Input, Output, State, ALL
 import dash_mantine_components as dmc
 from helpers.helpers import create_count_from_config
 import pandas as pd
@@ -70,6 +70,44 @@ def _display_pct(pct):
     if pct is None:
         return None
     return max(0.0, min(float(pct), 100.0))
+
+
+def _axis_wrap(label: str, width: int = 14, max_lines: int = 3) -> str:
+    words = str(label or '').split()
+    if not words:
+        return ''
+    lines = []
+    current = words[0]
+    used = 1
+    for word in words[1:]:
+        if len(current) + len(word) + 1 <= width:
+            current = f'{current} {word}'
+        else:
+            lines.append(current)
+            current = word
+        used += 1
+        if len(lines) >= max_lines - 1:
+            break
+    remaining = words[used:]
+    if remaining:
+        current = f'{current} {" ".join(remaining)}'.strip()
+    lines.append(current)
+    if len(lines[-1]) > width + 4:
+        lines[-1] = f'{lines[-1][:width + 1].rstrip()}...'
+    return '<br>'.join(lines)
+
+
+def _infer_facility_type(facility_key: str) -> str:
+    fac_code = str(facility_key or '').rstrip('*')
+    name = _FACILITY_NAMES.get(fac_code, fac_code).strip()
+    upper = name.upper()
+    if 'CENTRAL' in upper or upper.endswith(' CH'):
+        return 'Central Hospital'
+    if 'HEALTH CENT' in upper or upper.endswith(' HC'):
+        return 'Health Center'
+    if 'DISTRICT' in upper or 'HOSPITAL' in upper:
+        return 'District Hospital'
+    return 'Other'
 
 
 def _contrast_text(hex_color: str, dark: str = TEXT, light: str = '#FFFFFF') -> str:
@@ -198,7 +236,13 @@ _CAT_LABELS = {'ANC': 'ANC', 'Labour': 'Labour & Delivery', 'Newborn': 'Newborn'
 _CAT_ORDER  = ['ANC', 'Labour', 'Newborn', 'PNC']
 
 
-def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str) -> go.Figure:
+def _resolve_category_order(indicators: list, configured: list | None = None) -> list:
+    present = {str(i.get('category', '')).strip() for i in indicators if i.get('category')}
+    ordered = [c for c in (configured or _CAT_ORDER) if c in present]
+    return ordered or [c for c in _CAT_ORDER if c in present]
+
+
+def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str, chart_type: str = 'line') -> go.Figure:
     palette = CAT_PALETTES.get(cat, [INFO_C])
     fig = go.Figure()
 
@@ -235,7 +279,23 @@ def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str) -> go.Figure:
             ys.append(round(n / d * 100, 1) if d > 0 else None)
 
         has_data = any(y is not None for y in ys)
-        if has_data:
+        if not has_data:
+            if chart_type == 'bar':
+                fig.add_trace(go.Bar(x=[], y=[], name=ind['label'], marker=dict(color=c), showlegend=True))
+            else:
+                fig.add_trace(go.Scatter(x=[], y=[], name=ind['label'], line=dict(color=c), showlegend=True))
+            continue
+
+        if chart_type == 'bar':
+            clean_xs = [x for x, y in zip(xs, ys) if y is not None]
+            clean_ys = [y for y in ys if y is not None]
+            fig.add_trace(go.Bar(
+                x=clean_xs, y=clean_ys, name=ind['label'],
+                marker=dict(color=f'rgba({r},{g},{b},0.85)', line=dict(color=c, width=1)),
+                hovertemplate=f'%{{x|%b %Y}}<br>{ind["label"]}: %{{y:.0f}}%<extra></extra>',
+                offsetgroup=str(j),
+            ))
+        else:
             fig.add_trace(go.Scatter(
                 x=xs, y=ys, name=ind['label'],
                 mode='lines+markers',
@@ -245,20 +305,19 @@ def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str) -> go.Figure:
                 connectgaps=True,
                 hovertemplate=f'%{{x|%b %Y}}<br>{ind["label"]}: %{{y:.0f}}%<extra></extra>',
             ))
-            non_none_xs = [x for x, y in zip(xs, ys) if y is not None]
-            if len(non_none_xs) >= 2:
-                fig.add_shape(type='line', x0=non_none_xs[0], x1=non_none_xs[-1],
-                              y0=ind['target'], y1=ind['target'],
-                              line=dict(color=c, width=1, dash='dot'), layer='below')
-        else:
-            fig.add_trace(go.Scatter(x=[], y=[], name=ind['label'],
-                                     line=dict(color=c), showlegend=True))
+
+        non_none_xs = [x for x, y in zip(xs, ys) if y is not None]
+        if len(non_none_xs) >= 2:
+            fig.add_shape(type='line', x0=non_none_xs[0], x1=non_none_xs[-1],
+                          y0=ind['target'], y1=ind['target'],
+                          line=dict(color=c, width=1, dash='dot'), layer='below')
     fig.update_layout(
         paper_bgcolor=BG, plot_bgcolor=BG,
         font=dict(family=FONT, color=TEXT, size=11),
         hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
         height=300,
         margin=dict(l=8, r=8, t=12, b=24),
+        barmode='group' if chart_type == 'bar' else None,
         xaxis=dict(showgrid=False, zeroline=False, showline=False,
                    tickformat='%b %y', tickfont=dict(size=10, color=MUTED)),
         yaxis=dict(showgrid=True, gridcolor=GRID_C, zeroline=False, showline=False,
@@ -266,74 +325,335 @@ def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str) -> go.Figure:
                    title=dict(text='Coverage %', font=dict(size=10, color=MUTED))),
         legend=dict(font=dict(size=10, color=DIM), bgcolor='rgba(0,0,0,0)',
                     orientation='v', x=1.01, y=1, xanchor='left', yanchor='top'),
-        hovermode='x unified',
+        hovermode='closest' if chart_type == 'bar' else 'x unified',
     )
     return fig
 
 
-# Register clientside callback once at module level
-clientside_callback(
-    """
-    function(n_clicks_list, stored_figs) {
-        if (!stored_figs) return window.dash_clientside.no_update;
-        var ctx = window.dash_clientside.callback_context;
-        if (!ctx || !ctx.triggered || !ctx.triggered.length)
-            return window.dash_clientside.no_update;
-        var prop_id = ctx.triggered[0].prop_id;
-        var id_part = prop_id.split('.')[0];
-        try { var id_obj = JSON.parse(id_part); } catch(e) {
-            return window.dash_clientside.no_update;
-        }
-        var cat = id_obj.index;
-        if (!stored_figs[cat]) return window.dash_clientside.no_update;
-
-        // Toggle active class on trend buttons (parse each element's actual Dash ID)
-        document.querySelectorAll('[id*="trend-cat-btn"]').forEach(function(el) {
-            try {
-                var parsed = JSON.parse(el.id);
-                if (parsed.index === cat) el.classList.add('active');
-                else el.classList.remove('active');
-            } catch(e) {}
-        });
-
-        return JSON.parse(stored_figs[cat]);
-    }
-    """,
+@callback(
     Output('mnid-trend-graph', 'figure'),
+    Output('mnid-trend-active-cat', 'data'),
+    Output({'type': 'trend-cat-btn', 'index': ALL}, 'className'),
+    Output('mnid-trend-chart-type-store', 'data'),
+    Output('mnid-trend-chart-toggle', 'className'),
+    Output('mnid-trend-chart-toggle-text', 'children'),
     Input({'type': 'trend-cat-btn', 'index': ALL}, 'n_clicks'),
+    Input('mnid-trend-chart-toggle', 'n_clicks'),
     State('mnid-trend-store', 'data'),
-    prevent_initial_call=True,
+    State('mnid-trend-active-cat', 'data'),
+    State('mnid-trend-chart-type-store', 'data'),
+    State('mnid-trend-cats-store', 'data'),
+    prevent_initial_call=False,
 )
+def update_trend_chart(n_clicks_list, toggle_clicks, stored_figs, active_cat, chart_type, cat_order):
+    categories = cat_order or _CAT_ORDER
+    cat = active_cat if active_cat in categories else (categories[0] if categories else 'ANC')
+    mode = chart_type or 'line'
+    ctx = callback_context
+    if ctx and ctx.triggered:
+        prop_id = ctx.triggered[0]['prop_id']
+        if 'trend-cat-btn' in prop_id:
+            try:
+                next_cat = json.loads(prop_id.split('.')[0]).get('index', cat)
+                if next_cat in categories:
+                    cat = next_cat
+            except Exception:
+                pass
+        elif prop_id == 'mnid-trend-chart-toggle.n_clicks':
+            mode = 'bar' if mode == 'line' else 'line'
+
+    figure_json = (((stored_figs or {}).get(mode) or {}).get(cat))
+    fig = go.Figure(json.loads(figure_json)) if figure_json else go.Figure()
+
+    classes = [
+        'mnid-filter-btn active' if c == cat else 'mnid-filter-btn'
+        for c in categories
+    ]
+    toggle_class = 'mnid-trend-toggle is-bar' if mode == 'bar' else 'mnid-trend-toggle is-line'
+    toggle_text = 'Bar' if mode == 'bar' else 'Line'
+    return fig, cat, classes, mode, toggle_class, toggle_text
 
 
-def _trend_switcher(df: pd.DataFrame, indicators: list) -> html.Div:
+def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None = None, default_cat: str | None = None) -> html.Div:
     tracked = [i for i in indicators if i.get('status') == 'tracked']
-    stored_figs = {}
-    for cat in _CAT_ORDER:
-        cat_inds = [i for i in tracked if i.get('category') == cat]
-        stored_figs[cat] = _cat_trend_fig(df, cat_inds, cat).to_json()  # handles datetime
+    cat_order = _resolve_category_order(tracked, categories)
+    default_cat = default_cat if default_cat in cat_order else (cat_order[0] if cat_order else 'ANC')
 
-    default_inds = [i for i in tracked if i.get('category') == 'ANC']
-    default_fig  = _cat_trend_fig(df, default_inds, 'ANC')
+    stored_figs = {'line': {}, 'bar': {}}
+    for cat in cat_order:
+        cat_inds = [i for i in tracked if i.get('category') == cat]
+        stored_figs['line'][cat] = _cat_trend_fig(df, cat_inds, cat, 'line').to_json()
+        stored_figs['bar'][cat] = _cat_trend_fig(df, cat_inds, cat, 'bar').to_json()
+
+    default_inds = [i for i in tracked if i.get('category') == default_cat]
+    default_fig = _cat_trend_fig(df, default_inds, default_cat, 'line')
 
     return html.Div(className='mnid-card', style={'marginBottom': '12px'}, children=[
         html.Div(style={'display': 'flex', 'alignItems': 'center',
-                        'justifyContent': 'space-between', 'marginBottom': '8px'}, children=[
+                        'justifyContent': 'space-between', 'marginBottom': '8px', 'gap': '12px', 'flexWrap': 'wrap'}, children=[
             html.Div('COVERAGE TREND', className='mnid-section-lbl',
+                     style={'marginBottom': '0'}),
+            html.Div(style={'display': 'flex', 'alignItems': 'center', 'gap': '10px', 'flexWrap': 'wrap'}, children=[
+                html.Button(
+                    id='mnid-trend-chart-toggle',
+                    className='mnid-trend-toggle is-line',
+                    n_clicks=0,
+                    type='button',
+                    children=[
+                        html.Span('Line', id='mnid-trend-chart-toggle-text', className='mnid-trend-toggle-text'),
+                        html.Span(className='mnid-trend-toggle-thumb'),
+                    ],
+                ),
+                html.Div(className='mnid-filter-row', children=[
+                    html.Button(
+                        _CAT_LABELS.get(c, c),
+                        id={'type': 'trend-cat-btn', 'index': c},
+                        className='mnid-filter-btn' + (' active' if c == default_cat else ''),
+                        n_clicks=0,
+                    )
+                    for c in cat_order
+                ]),
+            ]),
+        ]),
+        dcc.Store(id='mnid-trend-store', data=stored_figs),
+        dcc.Store(id='mnid-trend-active-cat', data=default_cat),
+        dcc.Store(id='mnid-trend-cats-store', data=cat_order),
+        dcc.Store(id='mnid-trend-chart-type-store', data='line'),
+        dcc.Graph(id='mnid-trend-graph', figure=default_fig,
+                  config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}}, style={'height': '300px'}),
+    ])
+
+
+def _encounter_slice(df: pd.DataFrame, regex: str) -> pd.DataFrame:
+    if df is None or df.empty or 'Encounter' not in df.columns:
+        return pd.DataFrame()
+    enc = df['Encounter'].fillna('').astype(str)
+    return df[enc.str.contains(regex, case=False, na=False)].copy()
+
+
+def _count_entities(df: pd.DataFrame, col: str) -> int:
+    if df is None or df.empty or col not in df.columns:
+        return 0
+    return int(df[col].dropna().astype(str).nunique())
+
+
+def _concept_count(df: pd.DataFrame, concept: str, values=None,
+                   col: str = 'obs_value_coded', any_value: bool = False) -> int:
+    if df is None or df.empty or 'concept_name' not in df.columns:
+        return 0
+    sub = df[df['concept_name'].fillna('').astype(str) == concept].copy()
+    if sub.empty:
+        return 0
+
+    target_col = col if col in sub.columns else None
+    if values is not None:
+        if not target_col:
+            return 0
+        wanted = {str(v).strip().lower() for v in values}
+        series = sub[target_col].fillna('').astype(str).str.strip().str.lower()
+        sub = sub[series.isin(wanted)]
+    elif any_value:
+        for candidate in [col, 'obs_value_coded', 'Value', 'Value_Name']:
+            if candidate in sub.columns:
+                series = sub[candidate].fillna('').astype(str).str.strip()
+                sub = sub[series.ne('')]
+                break
+
+    if sub.empty:
+        return 0
+    if 'person_id' in sub.columns:
+        return int(sub['person_id'].dropna().astype(str).nunique())
+    return int(len(sub))
+
+
+def _service_table_payload(df: pd.DataFrame) -> dict:
+    anc_df = _encounter_slice(df, 'ANC')
+    labour_df = _encounter_slice(df, 'LABOUR|DELIVERY|BIRTH')
+    pnc_df = _encounter_slice(df, 'PNC|POSTNATAL|POST.NATAL')
+    newborn_df = _encounter_slice(df, 'NEONATAL')
+
+    def _rows(rows):
+        return [{'metric': metric, 'value': value, 'detail': detail} for metric, value, detail in rows]
+
+    payload = {
+        'ANC': {
+            'title': 'ANC Summary',
+            'subtitle': 'Visits, registration, and core ANC service fields.',
+            'rows': _rows([
+                ('ANC visits recorded', _count_entities(anc_df, 'encounter_id'), 'Distinct ANC encounters'),
+                ('Unique ANC clients', _count_entities(anc_df, 'person_id'), 'Distinct clients seen in ANC'),
+                ('Repeat ANC contact volume', max(_count_entities(anc_df, 'encounter_id') - _count_entities(anc_df, 'person_id'), 0), 'Repeat ANC contacts beyond first recorded visit'),
+                ('Gestational age recorded', _concept_count(anc_df, 'Gestational age recorded', any_value=True), 'Clients with gestational age documented'),
+                ('Blood group recorded', _concept_count(anc_df, 'Blood group rhesus factor', any_value=True), 'Clients with blood group / rhesus factor captured'),
+                ('Pregnancy planned responses', _concept_count(anc_df, 'Pregnancy planned', any_value=True), 'Clients with pregnancy planning status recorded'),
+                ('HIV test results recorded', _concept_count(anc_df, 'HIV Test', any_value=True), 'Clients with ANC HIV test result documented'),
+                ('Reactive HIV results', _concept_count(anc_df, 'HIV Test', ['Reactive']), 'Clients with reactive ANC HIV test result'),
+                ('ITNs given', _concept_count(anc_df, 'Insecticide treated net given', ['Yes', 'Given']), 'Clients receiving an insecticide treated net'),
+                ('2+ tetanus doses recorded', _concept_count(anc_df, 'Number of tetanus doses', ['two doses', 'three doses', 'four doses']), 'Clients documented with at least two tetanus doses'),
+            ]),
+        },
+        'Labour': {
+            'title': 'Labour & Delivery Summary',
+            'subtitle': 'Deliveries, outcomes, referrals, and newborn delivery records.',
+            'rows': _rows([
+                ('Deliveries recorded', _count_entities(labour_df, 'encounter_id'), 'Distinct labour encounters'),
+                ('Unique mothers', _count_entities(labour_df, 'person_id'), 'Distinct women in labour data'),
+                ('Live births', _concept_count(labour_df, 'Outcome of the delivery', ['Live birth', 'Live births']), 'Deliveries with live-birth outcome'),
+                ('Stillbirths', _concept_count(labour_df, 'Outcome of the delivery', ['Stillbirth', 'Fresh stillbirth', 'Macerated stillbirth']), 'Deliveries with stillbirth outcomes'),
+                ('Twin deliveries', _concept_count(labour_df, 'Outcome of the delivery', ['Twin delivery']), 'Deliveries recorded as twin deliveries'),
+                ('Mothers referred', _concept_count(labour_df, 'Referral completed', ['Yes']), 'Mothers with completed referral pathway'),
+                ('Referral reasons captured', _concept_count(labour_df, 'referral reasons', any_value=True), 'Encounters with documented referral reasons'),
+                ('Newborn complications recorded', _concept_count(labour_df, 'Newborn baby complications', any_value=True), 'Deliveries with newborn complication documentation'),
+                ('Newborn management recorded', _concept_count(labour_df, 'Management given to newborn', any_value=True), 'Deliveries with newborn management documented'),
+                ('Birth attendant recorded', _concept_count(labour_df, 'Staff conducting delivery', any_value=True), 'Deliveries with attending cadre documented'),
+            ]),
+        },
+        'Newborn': {
+            'title': 'Newborn Summary',
+            'subtitle': 'Admissions, thermal status, respiratory support, and newborn care actions.',
+            'rows': _rows([
+                ('Admissions recorded', _count_entities(newborn_df, 'encounter_id'), 'Distinct newborn encounters'),
+                ('Unique babies', _count_entities(newborn_df, 'person_id'), 'Distinct babies in newborn care'),
+                ('Repeat admission / review volume', max(_count_entities(newborn_df, 'encounter_id') - _count_entities(newborn_df, 'person_id'), 0), 'Repeat neonatal contacts beyond first recorded admission'),
+                ('Resuscitation provided', _concept_count(newborn_df, 'Neonatal resuscitation provided', ['Yes', 'Stimulation only', 'Bag and mask']), 'Babies receiving active resuscitation support'),
+                ('Resuscitation not required', _concept_count(newborn_df, 'Neonatal resuscitation provided', ['Not required']), 'Babies assessed with no resuscitation required'),
+                ('Not hypothermic on admission', _concept_count(newborn_df, 'Thermal status on admission', ['Not hypothermic']), 'Babies admitted without hypothermia'),
+                ('Hypothermia on admission', _concept_count(newborn_df, 'Thermal status on admission', ['Mild hypothermia', 'Moderate hypothermia', 'Severe hypothermia']), 'Babies admitted with hypothermia recorded'),
+                ('Bubble CPAP support', _concept_count(newborn_df, 'CPAP support', ['Bubble CPAP']), 'Babies supported with bubble CPAP'),
+                ('Nasal oxygen support', _concept_count(newborn_df, 'CPAP support', ['Nasal oxygen']), 'Babies supported with nasal oxygen'),
+                ('Phototherapy given', _concept_count(newborn_df, 'Phototherapy given', ['Yes']), 'Babies who received phototherapy'),
+                ('Parenteral antibiotics given', _concept_count(newborn_df, 'Parenteral antibiotics given', ['Yes']), 'Babies who received antibiotics'),
+                ('iKMC initiated', _concept_count(newborn_df, 'iKMC initiated', ['Yes']), 'Babies started on iKMC'),
+            ]),
+        },
+        'PNC': {
+            'title': 'PNC Summary',
+            'subtitle': 'Maternal and baby postnatal counts, outcomes, and service completion fields.',
+            'rows': _rows([
+                ('PNC visits recorded', _count_entities(pnc_df, 'encounter_id'), 'Distinct postnatal encounters'),
+                ('Unique mothers', _count_entities(pnc_df, 'person_id'), 'Distinct clients in PNC'),
+                ('Babies reviewed', _concept_count(pnc_df, 'Status of baby', any_value=True), 'Babies with postnatal status recorded'),
+                ('Maternal deaths', _concept_count(pnc_df, 'Status of the mother', ['Death', 'Died']), 'Mothers with death outcome in PNC'),
+                ('Maternal referrals', _concept_count(pnc_df, 'Status of the mother', ['Referred']), 'Mothers referred onward from PNC'),
+                ('Baby deaths', _concept_count(pnc_df, 'Status of baby', ['Death', 'Died']), 'Babies with death outcome in PNC'),
+                ('Baby referrals', _concept_count(pnc_df, 'Status of baby', ['Referred']), 'Babies referred onward from PNC'),
+                ('Mother HIV status captured', _concept_count(pnc_df, 'Mother HIV Status', any_value=True), 'Mothers with HIV status recorded in PNC'),
+                ('Vitamin K given', _concept_count(pnc_df, 'Vitamin K given', ['Yes']), 'Babies with Vitamin K documented'),
+                ('Immunisation recorded', _concept_count(pnc_df, 'Immunisation given', any_value=True) + _concept_count(pnc_df, 'Type of immunization the baby received', any_value=True), 'Baby immunisation entries recorded in PNC'),
+            ]),
+        },
+    }
+    return payload
+
+
+def _service_table_fig(section: dict) -> go.Figure:
+    rows = section.get('rows', [])
+    fig = go.Figure(data=[go.Table(
+        columnwidth=[0.42, 0.18, 0.40],
+        header=dict(
+            values=['Metric', 'Count', 'Definition'],
+            fill_color='#F8FAFC',
+            line_color='#E2E8F0',
+            align='left',
+            font=dict(color='#0F172A', size=11, family=FONT),
+            height=34,
+        ),
+        cells=dict(
+            values=[
+                [row['metric'] for row in rows],
+                [f"{int(row['value']):,}" for row in rows],
+                [row['detail'] for row in rows],
+            ],
+            fill_color='#FFFFFF',
+            line_color='#E2E8F0',
+            align=['left', 'right', 'left'],
+            font=dict(
+                color=[['#0F172A'] * len(rows), ['#0F172A'] * len(rows), ['#64748B'] * len(rows)],
+                size=[12, 13, 11],
+                family=FONT,
+            ),
+            height=38,
+        ),
+    )])
+    fig.update_layout(
+        title=dict(
+            text=(
+                f"<b>{section.get('title', 'Service Summary')}</b>"                 f"<br><span style='color:#94A3B8;font-size:11px;font-weight:500'>"                 f"{section.get('subtitle', '')}</span>"
+            ),
+            x=0,
+            xanchor='left',
+            font=dict(size=15, color=TEXT, family=FONT),
+        ),
+        margin=dict(l=0, r=0, t=56, b=0),
+        height=max(340, 108 + (len(rows) * 38)),
+        paper_bgcolor='#FFFFFF',
+        plot_bgcolor='#FFFFFF',
+    )
+    return fig
+
+
+@callback(
+    Output('mnid-service-table-graph', 'figure'),
+    Output('mnid-service-table-active-cat', 'data'),
+    Output({'type': 'service-table-btn', 'index': ALL}, 'className'),
+    Input({'type': 'service-table-btn', 'index': ALL}, 'n_clicks'),
+    State('mnid-service-table-store', 'data'),
+    State('mnid-service-table-active-cat', 'data'),
+    State('mnid-service-table-cats-store', 'data'),
+    prevent_initial_call=False,
+)
+def update_service_table(n_clicks_list, stored_tables, active_cat, cat_order):
+    categories = cat_order or _CAT_ORDER
+    cat = active_cat if active_cat in categories else (categories[0] if categories else 'ANC')
+    ctx = callback_context
+    if ctx and ctx.triggered:
+        prop_id = ctx.triggered[0]['prop_id']
+        if 'service-table-btn' in prop_id:
+            try:
+                next_cat = json.loads(prop_id.split('.')[0]).get('index', cat)
+                if next_cat in categories:
+                    cat = next_cat
+            except Exception:
+                pass
+
+    tables = stored_tables or {}
+    section = tables.get(cat) or next(iter(tables.values()), {'rows': []})
+    classes = [
+        'mnid-filter-btn active' if c == cat else 'mnid-filter-btn'
+        for c in categories
+    ]
+    return _service_table_fig(section), cat, classes
+
+
+def _service_table_switcher(df: pd.DataFrame, categories: list | None = None, default_cat: str | None = None) -> html.Div:
+    payload = _service_table_payload(df)
+    cat_order = [c for c in _resolve_category_order([{'category': k} for k in payload.keys()], categories) if c in payload]
+    default_cat = default_cat if default_cat in cat_order else (cat_order[0] if cat_order else 'ANC')
+    default_section = payload.get(default_cat, {'rows': []})
+    return html.Div(className='mnid-card', style={'marginBottom': '12px'}, children=[
+        html.Div(style={'display': 'flex', 'alignItems': 'center',
+                        'justifyContent': 'space-between', 'marginBottom': '8px', 'gap': '12px', 'flexWrap': 'wrap'}, children=[
+            html.Div('SERVICE SNAPSHOT', className='mnid-section-lbl',
                      style={'marginBottom': '0'}),
             html.Div(className='mnid-filter-row', children=[
                 html.Button(
                     _CAT_LABELS.get(c, c),
-                    id={'type': 'trend-cat-btn', 'index': c},
-                    className='mnid-filter-btn' + (' active' if c == 'ANC' else ''),
+                    id={'type': 'service-table-btn', 'index': c},
+                    className='mnid-filter-btn' + (' active' if c == default_cat else ''),
                     n_clicks=0,
                 )
-                for c in _CAT_ORDER
+                for c in cat_order
             ]),
         ]),
-        dcc.Store(id='mnid-trend-store', data=stored_figs),
-        dcc.Graph(id='mnid-trend-graph', figure=default_fig,
-                  config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}}, style={'height': '300px'}),
+        dcc.Store(id='mnid-service-table-store', data=payload),
+        dcc.Store(id='mnid-service-table-active-cat', data=default_cat),
+        dcc.Store(id='mnid-service-table-cats-store', data=cat_order),
+        dcc.Graph(
+            id='mnid-service-table-graph',
+            figure=_service_table_fig(default_section),
+            className='mnid-service-table-graph',
+            config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
+        ),
     ])
 
 
@@ -586,129 +906,241 @@ def _compute_heatmap_store(mch_full: pd.DataFrame, tracked: list,
     return store
 
 
-# MNID heatmap figure builder
 
-def _build_heatmap_fig(stored: dict, view: str, year: str,
-                       district: str | None = None,
-                       sel_inds: list | None = None) -> go.Figure:
-    all_labels  = stored.get('y_labels', [])
-    all_targets = stored.get('y_targets', [])
-
-    # Filter rows to selected indicators (if any selection is active)
+def _build_facility_performance_heatmap_fig(stored: dict, year: str,
+                                            district: str | None = None,
+                                            sel_inds: list | None = None,
+                                            facility_type: str | None = None) -> html.Div:
+    all_labels = stored.get('y_labels', [])
     if sel_inds:
         rows_idx = [i for i, lbl in enumerate(all_labels) if lbl in sel_inds]
     else:
         rows_idx = list(range(len(all_labels)))
 
-    y_labels  = [all_labels[i] for i in rows_idx]
-    y_targets = [all_targets[i] for i in rows_idx]
-    display_y_labels = [
-        (lbl if len(lbl) <= 34 else f"{lbl[:31]}...") if view == 'monthly' else lbl
-        for lbl in y_labels
-    ]
-    n_inds    = len(y_labels)
-    height    = max(n_inds * (26 if view == 'monthly' else 30) + 150, 380)
-
-    if view == 'monthly':
-        data = stored.get('monthly', {}).get(year, {})
-    elif view == 'by_facility':
+    focus_district = district or 'All'
+    if focus_district == 'All':
         data = stored.get('by_facility', {}).get(year, {})
-    elif view == 'by_district':
-        data = stored.get('by_district', {}).get(year, {})
-    elif view == 'district_facs':
-        default_districts = stored.get('all_districts', [])
-        dist = district or stored.get('current_district') or (default_districts[0] if default_districts else '')
-        data = stored.get('by_district_facs', {}).get(dist, {}).get(year, {})
-    elif view == 'yearly':
-        data = stored.get('yearly') or {}
     else:
-        data = {}
+        data = stored.get('by_district_facs', {}).get(focus_district, {}).get(year, {})
+    fac_keys = data.get('x', [])
+    z_raw = data.get('z', [])
 
-    x_labels   = data.get('x', [])
-    z_raw      = data.get('z', [])
-    z          = [[_display_pct(v) if v is not None else None for v in z_raw[i]] for i in rows_idx if i < len(z_raw)]
-    tick_angle = data.get('tick_angle', 0)
+    selected_type = facility_type or 'All'
+    facility_rows = []
+    for col_idx, fac_key in enumerate(fac_keys):
+        fac_code = str(fac_key or '').rstrip('*')
+        fac_name = _FACILITY_NAMES.get(fac_code, fac_code)
+        fac_kind = _infer_facility_type(fac_code)
+        if selected_type != 'All' and fac_kind != selected_type:
+            continue
+        row_vals = [
+            _display_pct(z_raw[row_idx][col_idx])
+            if row_idx < len(z_raw) and col_idx < len(z_raw[row_idx]) and z_raw[row_idx][col_idx] is not None
+            else None
+            for row_idx in rows_idx
+        ]
+        vals = [v for v in row_vals if v is not None]
+        avg = round(sum(vals) / len(vals), 1) if vals else None
+        facility_rows.append({
+            'facility': fac_name,
+            'code': fac_code,
+            'type': fac_kind,
+            'avg': avg,
+            'values': row_vals,
+            'is_current': str(fac_code) == str(stored.get('current_fac', '')),
+        })
 
-    if view in ('by_district', 'by_facility', 'district_facs'):
-        return _build_geo_heatmap_fig(stored, view, year, district, sel_inds)
+    facility_rows = [r for r in facility_rows if any(v is not None for v in r['values'])]
+    facility_rows.sort(key=lambda r: (r['avg'] is None, -(r['avg'] or 0), r['facility']))
 
-    if not x_labels or not z:
-        fig = go.Figure()
-        fig.add_annotation(text='No data for this selection',
-                           xref='paper', yref='paper', x=0.5, y=0.5,
-                           showarrow=False, font=dict(size=12, color=MUTED))
-        fig.update_layout(paper_bgcolor=BG, plot_bgcolor=GRID_C,
-                          height=height, margin=dict(l=220, r=80, t=16, b=60))
-        return fig
+    if not facility_rows or not rows_idx:
+        return html.Div(
+            'No facility comparison data for this selection',
+            className='mnid-performance-table-empty',
+        )
 
-    _customdata = None
-    if y_targets and all(t is not None for t in y_targets):
-        _customdata = [[tgt] * len(x_labels) for tgt, _ in zip(y_targets, z)]
-    _hover = '<b>%{y}</b><br>%{x}: <b>%{z:.0f}%</b><extra></extra>'
-    if _customdata is not None:
-        _hover = ('<b>%{y}</b><br>%{x}: <b>%{z:.0f}%</b>'
-                  '<br>Target: %{customdata[0]}%<extra></extra>')
-    fig = go.Figure(go.Heatmap(
-        z=z, x=x_labels, y=display_y_labels,
-        colorscale=HEATMAP_CS,
-        zmin=0, zmax=100,
-        zsmooth=False,
-        hoverongaps=False,
-        customdata=_customdata,
-        colorbar=dict(
-            thickness=14,
-            title=dict(text='Coverage %', side='right',
-                       font=dict(size=9, color=DIM)),
-            tickfont=dict(size=9, color=DIM),
-            tickvals=[0, 65, 80, 100],
-            ticktext=['0%', '65%', '80%', '100%'],
-            len=0.85,
-        ),
-        hovertemplate=_hover,
-        ygap=1.5, xgap=1.5,
-    ))
+    def _header_cells(label: str) -> list:
+        words = str(label or '').split()
+        if not words:
+            return ['-']
+        lines = []
+        current = words[0]
+        for word in words[1:]:
+            if len(current) + len(word) + 1 <= 16 and len(lines) < 2:
+                current = f'{current} {word}'
+            else:
+                lines.append(current)
+                current = word
+                if len(lines) >= 2:
+                    break
+        remaining_words = words[len(' '.join(lines + [current]).split()):]
+        if remaining_words:
+            current = f"{current} {' '.join(remaining_words)}".strip()
+        lines.append(current)
+        if len(lines[-1]) > 16:
+            lines[-1] = f"{lines[-1][:15].rstrip()}..."
+        children = []
+        for idx, line in enumerate(lines[:3]):
+            if idx:
+                children.append(html.Br())
+            children.append(line)
+        return children
 
-    # Cell value annotations for compact matrix views
-    annotations = []
-    show_cell_values = (view == 'monthly') or (len(x_labels) <= 8)
-    if show_cell_values:
-        ann_size = 8 if view == 'monthly' else 9
-        for ii, row in enumerate(z):
-            for jj, val in enumerate(row):
-                if val is not None:
-                    txt_col = '#fff' if val < 65 else ('#111827' if val < 80 else '#FFFFFF')
-                    annotations.append(dict(
-                        x=x_labels[jj], y=display_y_labels[ii],
-                        text=f'{_display_pct(val):.0f}%',
-                        showarrow=False,
-                        font=dict(size=ann_size, color=txt_col, family=FONT),
-                    ))
+    header_row = html.Tr([
+        html.Th('Facility Name', className='mnid-performance-th mnid-performance-th-facility')
+    ] + [
+        html.Th(_header_cells(all_labels[i]), className='mnid-performance-th')
+        for i in rows_idx
+    ])
 
-    # Target reference markers are omitted for the monthly matrix to avoid label crowding
-    y_annots = []
-    if view != 'monthly':
-        for ii, (lbl, tgt) in enumerate(zip(display_y_labels, y_targets)):
-            y_annots.append(dict(
-                x=-0.001, y=lbl,
-                xref='paper', yref='y',
-                text=f'<span style="color:{MUTED}; font-size:8px">>{tgt}%</span>',
-                showarrow=False, xanchor='right',
-                font=dict(size=7, color=MUTED, family=FONT),
-            ))
+    body_rows = []
+    for row in facility_rows:
+        name = f"{row['facility']} *" if row['is_current'] else row['facility']
+        cells = [html.Td(name, className='mnid-performance-facility-cell')]
+        for val in row['values']:
+            bg = '#E2E8F0' if val is None else _cov_color(val)
+            fg = '#475569' if val is None else _contrast_text(bg)
+            txt = '-' if val is None else f'{val:.0f}%'
+            cells.append(html.Td(txt, className='mnid-performance-value-cell', style={
+                'backgroundColor': bg,
+                'color': fg,
+            }))
+        body_rows.append(html.Tr(cells))
 
-    fig.update_layout(
-        paper_bgcolor=BG, plot_bgcolor=BG,
-        font=dict(family=FONT, color=TEXT, size=11),
-        height=height,
-        margin=dict(l=250 if view == 'monthly' else 230, r=90, t=16, b=70),
-        xaxis=dict(tickangle=tick_angle, tickfont=dict(size=10, color=DIM),
-                   showgrid=False, side='bottom'),
-        yaxis=dict(tickfont=dict(size=9 if view == 'monthly' else 10, color=TEXT if view == 'monthly' else DIM),
-                   showgrid=False, autorange='reversed'),
-        annotations=annotations + y_annots,
-        hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
-    )
-    return fig
+    return html.Div(className='mnid-performance-table-wrap', children=[
+        html.Table(className='mnid-performance-matrix', children=[
+            html.Thead(header_row),
+            html.Tbody(body_rows),
+        ])
+    ])
+
+
+def _build_performance_attention_table(stored: dict, year: str,
+                                       district: str | None = None,
+                                       facility_type: str | None = None,
+                                       sel_inds: list | None = None) -> html.Div:
+    all_labels = stored.get('y_labels', [])
+    all_targets = stored.get('y_targets', [])
+    if sel_inds:
+        rows_idx = [i for i, lbl in enumerate(all_labels) if lbl in sel_inds]
+    else:
+        rows_idx = list(range(len(all_labels)))
+
+    focus_district = district or 'All'
+    if focus_district == 'All':
+        data = stored.get('by_facility', {}).get(year, {})
+    else:
+        data = stored.get('by_district_facs', {}).get(focus_district, {}).get(year, {})
+
+    fac_keys = data.get('x', [])
+    z_raw = data.get('z', [])
+    selected_type = facility_type or 'All'
+
+    rows = []
+    for col_idx, fac_key in enumerate(fac_keys):
+        fac_code = str(fac_key or '').rstrip('*')
+        if str(fac_code) == str(stored.get('current_fac', '')):
+            continue
+        fac_name = _FACILITY_NAMES.get(fac_code, fac_code)
+        fac_kind = _infer_facility_type(fac_code)
+        if selected_type != 'All' and fac_kind != selected_type:
+            continue
+
+        values = []
+        critical = []
+        for row_idx in rows_idx:
+            if row_idx >= len(z_raw) or col_idx >= len(z_raw[row_idx]):
+                continue
+            val = z_raw[row_idx][col_idx]
+            if val is None:
+                continue
+            pct = _display_pct(val)
+            values.append(pct)
+            tgt = all_targets[row_idx] if row_idx < len(all_targets) else 80
+            if pct < tgt:
+                critical.append((all_labels[row_idx], pct, tgt))
+
+        if not values or not critical:
+            continue
+
+        critical.sort(key=lambda item: item[1])
+        worst_pct = critical[0][1]
+        worst_gap = min(item[1] - item[2] for item in critical)
+        avg = round(sum(values) / len(values), 1)
+        rows.append({
+            'facility': fac_name,
+            'district': _FACILITY_DISTRICT.get(fac_code, ''),
+            'facility_type': fac_kind,
+            'avg': avg,
+            'critical': [(label, pct) for label, pct, _ in critical[:2]],
+            'critical_count': len(critical),
+            'worst_pct': worst_pct,
+            'worst_gap': worst_gap,
+        })
+
+    rows.sort(key=lambda row: (row['worst_pct'], row['worst_gap'], -row['critical_count'], row['avg'], row['facility']))
+    rows = rows[:5]
+
+    header = html.Tr([
+        html.Th('#', className='mnid-attention-th mnid-attention-rank'),
+        html.Th('Facility Name', className='mnid-attention-th'),
+        html.Th('District', className='mnid-attention-th'),
+        html.Th('Facility Type', className='mnid-attention-th'),
+        html.Th('Critical Indicator(s)', className='mnid-attention-th'),
+        html.Th('Average Performance', className='mnid-attention-th'),
+    ])
+
+    if not rows:
+        return html.Div(className='mnid-performance-attention-wrap mnid-performance-attention-empty', children=[
+            html.Div('FACILITIES REQUIRING ATTENTION', className='mnid-attention-title'),
+            html.Div(
+                'No facility attention data for this selection.',
+                className='mnid-attention-empty-message',
+            ),
+        ])
+
+    body = []
+    for idx, row in enumerate(rows, start=1):
+        if row['critical']:
+            critical_children = []
+            for pos, (label, pct) in enumerate(row['critical']):
+                if pos:
+                    critical_children.append(html.Br())
+                critical_children.append(f'{label} ({pct:.0f}%)')
+            critical_cell = html.Div(className='mnid-attention-critical', children=critical_children)
+        else:
+            critical_cell = html.Span('Monitoring', className='mnid-attention-monitoring')
+
+        avg_color = _cov_color(row['avg'])
+        body.append(html.Tr([
+            html.Td(str(idx), className='mnid-attention-td mnid-attention-rank'),
+            html.Td(row['facility'], className='mnid-attention-td mnid-attention-facility'),
+            html.Td(row['district'], className='mnid-attention-td'),
+            html.Td(row['facility_type'], className='mnid-attention-td'),
+            html.Td(critical_cell, className='mnid-attention-td mnid-attention-critical-cell'),
+            html.Td(
+                html.Span(f'{row["avg"]:.0f}% (Avg)', style={'color': avg_color}),
+                className='mnid-attention-td mnid-attention-avg',
+                style={'backgroundColor': '#FFF7ED' if row['avg'] < 65 else ('#FFFBEB' if row['avg'] < 80 else '#F0FDF4')},
+            ),
+        ]))
+
+    return html.Div(className='mnid-performance-attention-wrap', children=[
+        html.Div('FACILITIES REQUIRING ATTENTION', className='mnid-attention-title'),
+        html.Table(className='mnid-attention-table', children=[
+            html.Thead(header),
+            html.Tbody(body),
+        ]),
+    ])
+
+
+# MNID heatmap figure builder
+
+def _build_heatmap_fig(stored: dict, view: str, year: str,
+                       district: str | None = None,
+                       sel_inds: list | None = None) -> go.Figure:
+    map_view = view if view in ('by_district', 'district_facs') else 'by_district'
+    return _build_geo_heatmap_fig(stored, map_view, year, district, sel_inds)
 
 
 # # MNID geographic map data for the main heatmap
@@ -1144,14 +1576,12 @@ clientside_callback(
         if (window._mnidScrollSpyActive) return '';
         window._mnidScrollSpyActive = true;
 
-        var sectionIds = ['mnid-summary','mnid-trends','mnid-heatmap',
+        var sectionIds = ['mnid-summary','mnid-data-tables','mnid-trends','mnid-performance','mnid-heatmap',
                           'mnid-coverage','mnid-comparative','mnid-analysis','mnid-readiness'];
 
         function setActive(id) {
             sectionIds.forEach(function(sid) {
-                document.querySelectorAll(
-                    '.mnid-sidebar-link[href="#' + sid + '"], .mnid-nav-btn[href="#' + sid + '"]'
-                ).forEach(function(a) {
+                document.querySelectorAll('.mnid-nav-btn[href="#' + sid + '"]').forEach(function(a) {
                     if (sid === id) a.classList.add('active');
                     else a.classList.remove('active');
                 });
@@ -1168,10 +1598,28 @@ clientside_callback(
                 }
             }
             setActive(activeId);
+
+            var nav = document.querySelector('.mnid-nav');
+            var main = document.querySelector('.mnid-main');
+            var topbar = document.querySelector('.mnid-topbar');
+            if (nav && main) {
+                var shouldFloat = window.scrollY > 220;
+                var target = topbar || main;
+                var rect = target.getBoundingClientRect();
+                nav.style.setProperty('--mnid-nav-left', rect.left + 'px');
+                nav.style.setProperty('--mnid-nav-width', rect.width + 'px');
+                nav.style.setProperty('--mnid-nav-height', nav.offsetHeight + 'px');
+                if (shouldFloat) {
+                    nav.classList.add('mnid-nav-floating');
+                    main.classList.add('mnid-main-nav-floating');
+                } else {
+                    nav.classList.remove('mnid-nav-floating');
+                    main.classList.remove('mnid-main-nav-floating');
+                }
+            }
         }
 
         window.addEventListener('scroll', updateActive, { passive: true });
-        // Also re-check after a short delay to catch initial render
         setTimeout(updateActive, 200);
         updateActive();
         return '';
@@ -1197,13 +1645,46 @@ clientside_callback(
 )
 def update_heatmap_view(view, year, district, sel_inds, stored):
     if not stored:
-        return go.Figure(), [], {'display': 'none'}
+        return go.Figure(), html.Div(), {'display': 'none'}
     v = view or 'by_district'
     y = year or 'All years'
     fig   = _build_heatmap_fig(stored, v, y, district, sel_inds)
     panel = _build_malawi_panel(stored, v, y, district, sel_inds)
     district_style = {'display': 'block'} if v == 'district_facs' else {'display': 'none'}
     return fig, panel, district_style
+
+
+@callback(
+    Output('mnid-performance-heatmap-table', 'children'),
+    Output('mnid-performance-aggregate', 'children'),
+    Output('mnid-performance-attention', 'children'),
+    Input('mnid-performance-district', 'value'),
+    Input('mnid-performance-facility-type', 'value'),
+    Input('mnid-performance-period', 'value'),
+    Input('mnid-performance-indicators', 'value'),
+    State('mnid-heatmap-store', 'data'),
+    prevent_initial_call=True,
+)
+def update_performance_heatmap(district, facility_type, period, sel_inds, stored):
+    if not stored:
+        return html.Div(), html.Div(), html.Div()
+    year = period or 'All years'
+    table = _build_facility_performance_heatmap_fig(
+        stored,
+        year,
+        district or 'All',
+        sel_inds,
+        facility_type or 'All',
+    )
+    gauges = _build_district_gauge_row(stored, year)
+    attention = _build_performance_attention_table(
+        stored,
+        year,
+        district or 'All',
+        facility_type or 'All',
+        sel_inds,
+    )
+    return table, gauges, attention
 
 
 _COMPARE_COLORS = [
@@ -1219,15 +1700,24 @@ _COMPARE_COLORS = [
     Output('mnid-compare-dist-selector', 'style'),
     Output('mnid-compare-ind-multi', 'options'),
     Output('mnid-compare-ind-multi', 'value'),
+    Output('mnid-compare-chart-type-store', 'data'),
+    Output('mnid-compare-chart-toggle', 'className'),
+    Output('mnid-compare-chart-toggle-text', 'children'),
     Input('mnid-compare-mode', 'value'),
     Input('mnid-compare-fac-multi', 'value'),
     Input('mnid-compare-dist-multi', 'value'),
     Input('mnid-compare-ind-kind', 'value'),
     Input('mnid-compare-ind-multi', 'value'),
+    Input('mnid-compare-chart-toggle', 'n_clicks'),
     State('mnid-compare-store', 'data'),
+    State('mnid-compare-chart-type-store', 'data'),
 )
-def update_compare_charts(mode, sel_facs, sel_dists, sel_kinds, sel_ind_ids, stored):
+def update_compare_charts(mode, sel_facs, sel_dists, sel_kinds, sel_ind_ids, toggle_clicks, stored, chart_type):
     mode = mode or 'facility'
+    chart_type = chart_type or 'bar'
+    ctx = callback_context
+    if ctx and ctx.triggered and ctx.triggered[0]['prop_id'] == 'mnid-compare-chart-toggle.n_clicks':
+        chart_type = 'line' if chart_type == 'bar' else 'bar'
     store_payload = stored or {}
     tracked = store_payload.get('tracked', [])
     mch_full = _deserialize_store_df(store_payload.get('records'))
@@ -1255,7 +1745,9 @@ def update_compare_charts(mode, sel_facs, sel_dists, sel_kinds, sel_ind_ids, sto
     )
 
     if not active_inds or mch_full.empty:
-        return _empty_fig, fac_style, dist_style, ind_opts, ind_ids
+        toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
+        toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
+        return _empty_fig, fac_style, dist_style, ind_opts, ind_ids, chart_type, toggle_class, toggle_text
 
     if mode == 'facility':
         entities = sel_facs or []
@@ -1269,7 +1761,9 @@ def update_compare_charts(mode, sel_facs, sel_dists, sel_kinds, sel_ind_ids, sto
             return mch_full[mch_full['District'] == entity] if 'District' in mch_full.columns else pd.DataFrame()
 
     if not entities:
-        return _empty_fig, fac_style, dist_style, ind_opts, ind_ids
+        toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
+        toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
+        return _empty_fig, fac_style, dist_style, ind_opts, ind_ids, chart_type, toggle_class, toggle_text
 
     fig = go.Figure()
     for idx, ind in enumerate(active_inds):
@@ -1285,20 +1779,35 @@ def update_compare_charts(mode, sel_facs, sel_dists, sel_kinds, sel_ind_ids, sto
                 y_vals.append(_display_pct(pct) if den > 0 else None)
                 texts.append(f'{pct:.0f}%' if den > 0 else 'No data')
 
-        fig.add_trace(go.Bar(
-            name=ind['label'],
-            x=entity_labels,
-            y=y_vals,
-            text=texts,
-            textposition='outside',
-            textfont=dict(size=9, color='#E2E8F0'),
-            marker=dict(color=color, opacity=0.88,
-                        line=dict(color='rgba(255,255,255,0.25)', width=0.8)),
-            hovertemplate=(
-                f'<b>{ind["label"]}</b><br>'
-                '%{x}<br>Coverage: %{y:.1f}%<extra></extra>'
-            ),
-        ))
+        if chart_type == 'line':
+            fig.add_trace(go.Scatter(
+                name=ind['label'],
+                x=entity_labels,
+                y=y_vals,
+                mode='lines+markers',
+                line=dict(color=color, width=2.6, shape='spline'),
+                marker=dict(size=7, color=color, line=dict(color='#fff', width=1.2)),
+                hovertemplate=(
+                    f'<b>{ind["label"]}</b><br>'
+                    '%{x}<br>Coverage: %{y:.1f}%<extra></extra>'
+                ),
+                connectgaps=False,
+            ))
+        else:
+            fig.add_trace(go.Bar(
+                name=ind['label'],
+                x=entity_labels,
+                y=y_vals,
+                text=texts,
+                textposition='outside',
+                textfont=dict(size=9, color='#E2E8F0'),
+                marker=dict(color=color, opacity=0.88,
+                            line=dict(color='rgba(255,255,255,0.25)', width=0.8)),
+                hovertemplate=(
+                    f'<b>{ind["label"]}</b><br>'
+                    '%{x}<br>Coverage: %{y:.1f}%<extra></extra>'
+                ),
+            ))
 
     avg_target = sum(i.get('target', 80) for i in active_inds) / len(active_inds)
     fig.add_hline(
@@ -1311,7 +1820,7 @@ def update_compare_charts(mode, sel_facs, sel_dists, sel_kinds, sel_ind_ids, sto
 
     fig.update_layout(
         height=420,
-        barmode='group',
+        barmode='group' if chart_type == 'bar' else None,
         bargap=0.20,
         bargroupgap=0.06,
         margin=dict(l=10, r=10, t=30, b=10),
@@ -1332,7 +1841,9 @@ def update_compare_charts(mode, sel_facs, sel_dists, sel_kinds, sel_ind_ids, sto
             bgcolor='rgba(0,0,0,0)', bordercolor='rgba(0,0,0,0)',
         ),
     )
-    return fig, fac_style, dist_style, ind_opts, ind_ids
+    toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
+    toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
+    return fig, fac_style, dist_style, ind_opts, ind_ids, chart_type, toggle_class, toggle_text
 
 
 # # MNID main heatmap section layout
@@ -1436,90 +1947,155 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
 
     dyn_districts = store.get('all_districts', [])
     cur_dist   = store.get('current_district', dyn_districts[0] if dyn_districts else '')
-    has_yearly = bool(store.get('yearly', {}).get('x'))
     all_labels = store.get('y_labels', [])
     years = ['All years']
     if len(mch_full) and 'Date' in mch_full.columns:
         years.extend(str(y) for y in sorted(mch_full['Date'].dt.year.dropna().astype(int).unique().tolist()))
 
-    view_options = [
-        {'label': 'Facility by Month',  'value': 'monthly'},
-        {'label': 'My District Facilities',   'value': 'district_facs'},
-        {'label': 'All Districts',            'value': 'by_district'},
-        {'label': 'All Facilities',           'value': 'by_facility'},
-    ]
-    if has_yearly:
-        view_options.append({'label': 'Year-over-Year', 'value': 'yearly'})
-
     year_opts     = [{'label': y, 'value': y} for y in years]
     district_opts = [{'label': d, 'value': d} for d in dyn_districts]
+    perf_district_opts = [{'label': 'All', 'value': 'All'}] + district_opts
     ind_opts      = [{'label': lbl, 'value': lbl} for lbl in all_labels]
+    default_perf_inds = all_labels[:8] if len(all_labels) >= 8 else all_labels
+    facility_type_opts = [
+        {'label': 'All', 'value': 'All'},
+        {'label': 'Central Hospital', 'value': 'Central Hospital'},
+        {'label': 'District Hospital', 'value': 'District Hospital'},
+        {'label': 'Health Center', 'value': 'Health Center'},
+    ]
 
     _dd_style = {'fontSize': '12px', 'minWidth': '0'}
     _lbl_style = {'fontSize': '10px', 'color': MUTED, 'fontWeight': '600',
                   'marginBottom': '3px'}
 
-    heatmap_card = html.Div(id='mnid-heatmap-inner', className='mnid-card',
+    performance_card = html.Div(className='mnid-card mnid-performance-block',
                     style={'marginBottom': '12px'}, children=[
         dcc.Store(id='mnid-heatmap-store', data=store),
-
-        html.Div('INDICATOR COVERAGE HEATMAP', className='mnid-section-lbl'),
-
-        # # MNID heatmap filter bar
-        html.Div(style={
-            'display': 'grid',
-            'gridTemplateColumns': 'repeat(4, minmax(0, 1fr))',
-            'gap': '10px', 'alignItems': 'end',
-            'marginBottom': '12px',
-        }, children=[
-            # View selector
-            html.Div(children=[
-                html.Div('View', style=_lbl_style),
-                dcc.Dropdown(
-                    id='mnid-heatmap-view',
-                    options=view_options,
-                    value='by_district',
-                    clearable=False,
-                    style=_dd_style,
+        html.Div('FACILITY PERFORMANCE', className='mnid-section-lbl'),
+        html.Div(style={'fontSize': '11px', 'color': DIM, 'marginBottom': '10px'},
+                 children='District comparison heatmap for key performance indicators.'),
+        html.Div(className='mnid-performance-shell', children=[
+            html.Div(id='mnid-performance-aggregate', className='mnid-performance-aggregate',
+                     children=_build_district_gauge_row(store, 'All years')),
+            html.Div(className='mnid-performance-table-card', children=[
+                html.Div(className='mnid-performance-toolbar', children=[
+                    html.Div(className='mnid-performance-filter', children=[
+                        html.Div('District', style=_lbl_style),
+                        dcc.Dropdown(
+                            id='mnid-performance-district',
+                            options=perf_district_opts,
+                            value='All',
+                            clearable=False,
+                            style=_dd_style,
+                        ),
+                    ]),
+                    html.Div(className='mnid-performance-filter', children=[
+                        html.Div('Facility Type', style=_lbl_style),
+                        dcc.Dropdown(
+                            id='mnid-performance-facility-type',
+                            options=facility_type_opts,
+                            value='All',
+                            clearable=False,
+                            style=_dd_style,
+                        ),
+                    ]),
+                    html.Div(className='mnid-performance-filter mnid-performance-period', children=[
+                        html.Div('Time Period', style=_lbl_style),
+                        dcc.Dropdown(
+                            id='mnid-performance-period',
+                            options=year_opts,
+                            value='All years',
+                            clearable=False,
+                            style=_dd_style,
+                        ),
+                    ]),
+                ]),
+                html.Div(className='mnid-performance-filter', style={'marginBottom': '10px'}, children=[
+                    html.Div('Indicators', style=_lbl_style),
+                    dcc.Dropdown(
+                        id='mnid-performance-indicators',
+                        options=ind_opts,
+                        value=default_perf_inds,
+                        multi=True,
+                        placeholder='Select indicators...',
+                        style=_dd_style,
+                    ),
+                ]),
+                html.Div(
+                    id='mnid-performance-heatmap-table',
+                    className='mnid-performance-heatmap-graph',
+                    children=_build_facility_performance_heatmap_fig(store, 'All years', 'All', default_perf_inds, 'All'),
                 ),
-            ]),
-            # Year filter
-            html.Div(children=[
-                html.Div('Year', style=_lbl_style),
-                dcc.Dropdown(
-                    id='mnid-heatmap-year',
-                    options=year_opts,
-                    value='All years',
-                    clearable=False,
-                    style=_dd_style,
-                ),
-            ]),
-            # District filter
-            html.Div(id='mnid-heatmap-district-wrap', style={'display': 'none'}, children=[
-                html.Div('District Focus', style=_lbl_style),
-                dcc.Dropdown(
-                    id='mnid-heatmap-district',
-                    options=district_opts,
-                    value=cur_dist,
-                    clearable=False,
-                    style=_dd_style,
-                ),
-            ]),
-            # Indicator multi-select
-            html.Div(children=[
-                html.Div('Indicators', style=_lbl_style),
-                dcc.Dropdown(
-                    id='mnid-heatmap-indicators',
-                    options=ind_opts,
-                    value=all_labels,   # all selected by default
-                    multi=True,
-                    placeholder='Select indicators...',
-                    style=_dd_style,
+                html.Div(className='mnid-performance-key', children=[
+                    html.Div('Performance Color Scale', className='mnid-performance-key-title'),
+                    html.Div(className='mnid-performance-key-row', children=[html.Span('Excellent (>90%)'), html.Div(className='mnid-performance-swatch excellent')]),
+                    html.Div(className='mnid-performance-key-row', children=[html.Span('Moderate (60-80%)'), html.Div(className='mnid-performance-swatch moderate')]),
+                    html.Div(className='mnid-performance-key-row', children=[html.Span('Poor (<50%)'), html.Div(className='mnid-performance-swatch poor')]),
+                ]),
+                html.Div(
+                    id='mnid-performance-attention',
+                    className='mnid-performance-attention',
+                    children=_build_performance_attention_table(store, 'All years', 'All', 'All', default_perf_inds),
                 ),
             ]),
         ]),
+    ])
 
-        # # MNID heatmap content layout
+    heatmap_card = html.Div(id='mnid-heatmap-inner', className='mnid-card',
+                    style={'marginBottom': '12px'}, children=[
+        html.Div('MAP COVERAGE VIEW', className='mnid-section-lbl'),
+
+        html.Div(className='mnid-map-controls', children=[
+            html.Div(className='mnid-map-scope', children=[
+                html.Div('Scope', style=_lbl_style),
+                dmc.SegmentedControl(
+                    id='mnid-heatmap-view',
+                    value='by_district',
+                    data=[
+                        {'label': 'Districts', 'value': 'by_district'},
+                        {'label': 'Facilities', 'value': 'district_facs'},
+                    ],
+                    size='sm',
+                    radius='xl',
+                    color='green',
+                    fullWidth=True,
+                ),
+            ]),
+            html.Div(className='mnid-map-filter-grid', children=[
+                html.Div(children=[
+                    html.Div('Year', style=_lbl_style),
+                    dcc.Dropdown(
+                        id='mnid-heatmap-year',
+                        options=year_opts,
+                        value='All years',
+                        clearable=False,
+                        style=_dd_style,
+                    ),
+                ]),
+                html.Div(id='mnid-heatmap-district-wrap', style={'display': 'none'}, children=[
+                    html.Div('District Focus', style=_lbl_style),
+                    dcc.Dropdown(
+                        id='mnid-heatmap-district',
+                        options=district_opts,
+                        value=cur_dist,
+                        clearable=False,
+                        style=_dd_style,
+                    ),
+                ]),
+                html.Div(children=[
+                    html.Div('Indicators', style=_lbl_style),
+                    dcc.Dropdown(
+                        id='mnid-heatmap-indicators',
+                        options=ind_opts,
+                        value=all_labels[:8] if len(all_labels) >= 8 else all_labels,
+                        multi=True,
+                        placeholder='Select indicators...',
+                        style=_dd_style,
+                    ),
+                ]),
+            ]),
+        ]),
+
         html.Div(className='mnid-heatmap-grid', children=[
             dcc.Graph(
                 id='mnid-heatmap-graph',
@@ -1540,16 +2116,13 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
             ),
         ]),
 
-        # # MNID heatmap key
         html.P(
-            'Green >= 80% on target or above  -  Amber 65-79% watch  -  '
-            'Red < 65% needs action  -  Grey = no data  -  * = current facility',
-            style={'fontSize': '9px', 'color': MUTED, 'marginTop': '6px'},
+            'Click the scope toggle to switch between district coverage and facility markers. Choose a district when viewing facilities to keep the map readable.',
+            style={'fontSize': '10px', 'color': MUTED, 'marginTop': '8px', 'lineHeight': '1.5'},
         ),
     ])
 
-    attention_panel = _facilities_requiring_attention(store)
-    return html.Div(children=[district_gauges, heatmap_card, attention_panel])
+    return performance_card, heatmap_card
 
 # indicator cards
 
@@ -1782,14 +2355,17 @@ def _no_data_card(message: str = 'No data available for this period.') -> html.D
     ])
 
 
-def _coverage_charts_section(by_cat: dict, df: pd.DataFrame) -> html.Div:
+def _coverage_charts_section(by_cat: dict, df: pd.DataFrame, categories: list | None = None) -> html.Div:
     """2-column grid of per-phase coverage bar charts (replaces accordion cards)."""
-    phases = [
-        ('ANC',     'Antenatal Care (ANC)'),
-        ('Labour',  'Labour & Delivery'),
-        ('Newborn', 'Newborn Care'),
-        ('PNC',     'Postnatal Care (PNC)'),
-    ]
+    phase_map = {
+        'ANC': 'Antenatal Care (ANC)',
+        'Labour': 'Labour & Delivery',
+        'Newborn': 'Newborn Care',
+        'PNC': 'Postnatal Care (PNC)',
+    }
+    phases = [(cat, phase_map.get(cat, cat)) for cat in _resolve_category_order(
+        [{'category': k} for k in by_cat.keys()], categories
+    )]
     cards = []
     for cat_key, cat_title in phases:
         inds = by_cat.get(cat_key, [])
@@ -2172,7 +2748,7 @@ def _build_compare_heatmap(title: str, df: 'pd.DataFrame', tracked: list) -> go.
     """Single-entity heatmap: one row per indicator showing coverage %."""
     names, pcts, colors_list = [], [], []
     for ind in tracked:
-        label = ind.get('label', ind.get('id', '?'))
+        label = ind.get('label', ind.get('id', '-'))
         if df.empty:
             pct = 0.0
         else:
@@ -2244,13 +2820,13 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
     }
 
     compare_card = html.Div(className='mnid-chart-card mnid-compare-card', children=[
-        # ── Header row ───────────────────────────────────────────────────────────
+        # -- Header row -----------------------------------------------------------
         html.Div(className='mnid-compare-header', style={'display': 'flex', 'alignItems': 'center',
                         'justifyContent': 'space-between',
                         'marginBottom': '16px', 'flexWrap': 'wrap', 'gap': '10px'}, children=[
             html.Div('COMPARISON ANALYSIS', className='mnid-card-title',
                      style={'marginBottom': '0'}),
-            html.Div(className='mnid-compare-mode', style={'display': 'flex', 'alignItems': 'center', 'gap': '6px'}, children=[
+            html.Div(className='mnid-compare-mode', style={'display': 'flex', 'alignItems': 'center', 'gap': '10px', 'flexWrap': 'wrap'}, children=[
                 html.Span('Compare by:', style={'fontSize': '11px', 'color': '#94A3B8',
                                                 'fontWeight': '600', 'letterSpacing': '0.04em'}),
                 dcc.RadioItems(
@@ -2265,9 +2841,19 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                     labelStyle={'marginRight': '16px', 'fontSize': '12px',
                                 'color': '#E2E8F0', 'cursor': 'pointer', 'fontWeight': '600'},
                 ),
+                html.Button(
+                    id='mnid-compare-chart-toggle',
+                    className='mnid-trend-toggle is-bar',
+                    n_clicks=0,
+                    type='button',
+                    children=[
+                        html.Span('Bar', id='mnid-compare-chart-toggle-text', className='mnid-trend-toggle-text'),
+                        html.Span(className='mnid-trend-toggle-thumb'),
+                    ],
+                ),
             ]),
         ]),
-        # ── Filters row ──────────────────────────────────────────────────────────
+        # -- Filters row ----------------------------------------------------------
         html.Div(className='mnid-compare-filters', style={'display': 'grid', 'gridTemplateColumns': '1fr 1fr 1fr',
                         'gap': '14px', 'marginBottom': '16px', 'alignItems': 'start'}, children=[
             # Left: entity selector (facility or district, toggled by mode)
@@ -2279,7 +2865,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                         options=fac_opts,
                         value=default_facs,
                         multi=True,
-                        placeholder='Select facilities…',
+                        placeholder='Select facilities...',
                     ),
                 ]),
                 html.Div(id='mnid-compare-dist-selector', style={'display': 'none'}, children=[
@@ -2289,7 +2875,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                         options=dist_opts,
                         value=default_dists,
                         multi=True,
-                        placeholder='Select districts…',
+                        placeholder='Select districts...',
                     ),
                 ]),
             ]),
@@ -2301,7 +2887,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                     options=cat_opts,
                     value=default_cats,
                     multi=True,
-                    placeholder='Select indicator categories…',
+                    placeholder='Select indicator categories...',
                 ),
             ]),
             # Right: indicator selector
@@ -2312,11 +2898,11 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                     options=ind_opts,
                     value=default_inds,
                     multi=True,
-                    placeholder='Select indicators…',
+                    placeholder='Select indicators...',
                 ),
             ]),
         ]),
-        # ── Grouped bar chart ────────────────────────────────────────────────────
+        # -- Grouped bar chart ----------------------------------------------------
         dcc.Graph(
             id='mnid-compare-bar-chart',
             config={
@@ -2336,6 +2922,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
             'facilities': all_facs,
             'districts':  all_dists,
         }),
+        dcc.Store(id='mnid-compare-chart-type-store', data='bar'),
         html.Div(className='mnid-chart-grid', children=[compare_card]),
     ])
 
@@ -2404,12 +2991,15 @@ def _hero_donut_card(label, pct, target, color):
     ])
 
 
-def _hero_donut_row(computed):
-    """Row of large hero donut cards - ANC indicators first, up to 5 total."""
-    anc = [c for c in computed if c.get('category') == 'ANC']
-    heroes = anc[:5] if anc else computed[:5]
+def _hero_donut_row(computed, preferred_cat: str = 'ANC', section_title: str | None = None):
+    """Row of large hero donut cards favouring the requested category first."""
+    preferred = [c for c in computed if c.get('category') == preferred_cat]
+    heroes = preferred[:5] if preferred else computed[:5]
     if not heroes:
         return html.Div()
+
+    if not section_title:
+        section_title = 'KEY NEWBORN INDICATORS' if preferred_cat == 'Newborn' else 'KEY ANC INDICATORS'
 
     cards = []
     for ind in heroes:
@@ -2417,7 +3007,7 @@ def _hero_donut_row(computed):
         cards.append(_hero_donut_card(ind['label'], ind['pct'], ind['target'], color))
 
     return html.Div(style={'marginBottom': '12px'}, children=[
-        html.Div('KEY ANC INDICATORS', className='mnid-section-lbl'),
+        html.Div(section_title, className='mnid-section-lbl'),
         html.Div(className='mnid-hero-row', children=cards),
     ])
 
@@ -2696,9 +3286,10 @@ def _pph_cascade(df):
 
 # MNID header, alert, KPI, and section navigation components
 
-def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=None):
+def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=None,
+            title='Maternal and Child Health Indicators', subtitle='Clean view of performance, comparison, coverage, and readiness.'):
     facility_name = _FACILITY_NAMES.get(facility, facility or 'Network view')
-    district = _FACILITY_DISTRICT.get(facility, 'Unknown district')
+    district = _FACILITY_DISTRICT.get(facility, 'All districts')
 
     source_df = facility_df if facility_df is not None and len(facility_df) else network_df
     if source_df is not None and len(source_df):
@@ -2706,6 +3297,8 @@ def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=N
             fac_rows = source_df[source_df['Facility_CODE'].astype(str) == str(facility)]
         else:
             fac_rows = source_df
+            facility_name = 'Network view' if len(source_df) else facility_name
+            district = 'All districts' if len(source_df) else district
         if len(fac_rows):
             if 'Facility' in fac_rows.columns:
                 names = fac_rows['Facility'].dropna().astype(str)
@@ -2719,8 +3312,8 @@ def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=N
     return html.Div(className='mnid-topbar', children=[
         html.Div(className='mnid-topbar-copy', children=[
             html.Div('M-NID Dashboard', className='mnid-topbar-label'),
-            html.H1('Maternal and Neonatal Health Indicators'),
-            html.P('Clean view of performance, comparison, coverage, and readiness.'),
+            html.H1(title),
+            html.P(subtitle),
         ]),
         html.Div(className='mnid-info-pills', children=[
             html.Div(className='mnid-info-pill', children=[
@@ -2750,8 +3343,10 @@ def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=N
 def _sidebar(facility_code: str) -> html.Div:
     nav_items = [
         ('Overview', '#mnid-summary'),
+        ('Data Tables', '#mnid-data-tables'),
         ('Trend', '#mnid-trends'),
-        ('Heatmap', '#mnid-heatmap'),
+        ('Performance', '#mnid-performance'),
+        ('Map View', '#mnid-heatmap'),
         ('Indicators', '#mnid-coverage'),
         ('Comparison', '#mnid-comparative'),
         ('Analysis', '#mnid-analysis'),
@@ -2888,8 +3483,27 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     dq_inds     = config.get('data_quality_indicators') or vt.get('data_quality_indicators', [])
     period      = f'{start_date} to {end_date}'
 
+    category_order = _resolve_category_order(all_inds, config.get('mnid_categories'))
+    if category_order:
+        allowed = set(category_order)
+        all_inds = [i for i in all_inds if i.get('category') in allowed]
+
     tracked  = [i for i in all_inds if i.get('status') == 'tracked']
     awaiting = [i for i in all_inds if i.get('status') == 'awaiting_baseline']
+    default_cat = category_order[0] if category_order else 'ANC'
+
+    if category_order == ['Newborn']:
+        dashboard_title = 'Newborn Indicators'
+        dashboard_subtitle = 'Focused newborn care performance, comparison, coverage, and readiness.'
+        hero_title = 'KEY NEWBORN INDICATORS'
+    elif set(category_order) == {'ANC', 'Labour', 'PNC'}:
+        dashboard_title = 'Maternal Health Indicators'
+        dashboard_subtitle = 'ANC, labour, and postnatal performance, comparison, coverage, and readiness.'
+        hero_title = 'KEY ANC INDICATORS'
+    else:
+        dashboard_title = f"{config.get('report_name', 'Maternal and Child Health')} Indicators"
+        dashboard_subtitle = 'Clean view of performance, comparison, coverage, and readiness.'
+        hero_title = 'KEY ANC INDICATORS'
 
     computed = []
     for ind in tracked:
@@ -2904,7 +3518,7 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     for ind in all_inds:
         by_cat.setdefault(ind.get('category','Other'), []).append(ind)
 
-    coverage_charts  = _coverage_charts_section(by_cat, facility_df)
+    coverage_charts  = _coverage_charts_section(by_cat, facility_df, category_order)
 
     # Pre-build analysis charts
     anc_charts    = _anc_charts(facility_df)
@@ -2914,14 +3528,15 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
 
     # All accordion sections open by default
     analysis_acc = [
-        _chart_acc_section('ch_anc',    'Antenatal Care',    anc_charts)    if anc_charts    else None,
-        _chart_acc_section('ch_labour', 'Labour & Delivery', labour_charts) if labour_charts else None,
-        _chart_acc_section('ch_pnc',    'Postnatal Care',    pnc_charts)    if pnc_charts    else None,
-        _chart_acc_section('ch_nb',     'Neonatal Care',     nb_charts)     if nb_charts     else None,
+        _chart_acc_section('ch_anc',    'Antenatal Care',    anc_charts)    if anc_charts and 'ANC' in category_order else None,
+        _chart_acc_section('ch_labour', 'Labour & Delivery', labour_charts) if labour_charts and 'Labour' in category_order else None,
+        _chart_acc_section('ch_pnc',    'Postnatal Care',    pnc_charts)    if pnc_charts and 'PNC' in category_order else None,
+        _chart_acc_section('ch_nb',     'Neonatal Care',     nb_charts)     if nb_charts and 'Newborn' in category_order else None,
     ]
     analysis_acc = [a for a in analysis_acc if a]
 
-    heatmap_div      = _coverage_heatmap_section(all_inds, facility_code, network_df)
+    performance_div, heatmap_div = _coverage_heatmap_section(all_inds, facility_code, network_df)
+    service_table_div = _service_table_switcher(facility_df, category_order, default_cat)
     comparative_div  = _comparative_analysis_section(all_inds, facility_code, network_df)
 
     def _sec_header(title, count=None, desc=None):
@@ -2933,43 +3548,53 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
                       className='mnid-section-header-count'),
         ])
 
-    total_analysis = sum(len(c) for c in [anc_charts, labour_charts, pnc_charts, nb_charts])
+    total_analysis = sum(
+        len(charts) for cat, charts in [
+            ('ANC', anc_charts),
+            ('Labour', labour_charts),
+            ('PNC', pnc_charts),
+            ('Newborn', nb_charts),
+        ] if cat in category_order
+    )
 
     main_content = html.Div(className='mnid-main', children=[
 
-        _topbar(facility_code, period, len(tracked), len(awaiting)),
+        _topbar(facility_code, period, len(tracked), len(awaiting), facility_df=facility_df, network_df=network_df, title=dashboard_title, subtitle=dashboard_subtitle),
         _sidebar(facility_code),
         _alert_banner(below, strong),
 
-        # # MNID overview section
         _section_anchor('mnid-summary'),
         _sec_header('Overview', desc=f'{len(tracked)} tracked - {len(awaiting)} awaiting'),
         _kpi_row(computed),
-        _hero_donut_row(computed),
+        _hero_donut_row(computed, preferred_cat=default_cat, section_title=hero_title),
         _priority_table(computed),
 
-        # Coverage trend section
+        _section_anchor('mnid-data-tables'),
+        _sec_header('Data Tables', desc='Key service counts and outcomes'),
+        service_table_div,
+
         _section_anchor('mnid-trends'),
         _sec_header('Coverage Trends', desc='12-month rolling - dotted line = target'),
         _trend_switcher(facility_df, all_inds),
 
-        # Coverage heatmap section
+        _section_anchor('mnid-performance'),
+        _sec_header('Facility Performance', desc='District comparison heatmap for key performance indicators'),
+        performance_div,
+
         _section_anchor('mnid-heatmap'),
+        _sec_header('Map View', desc='Geographic coverage map and district/facility context'),
         heatmap_div,
 
-        # Coverage indicators section
         _section_anchor('mnid-coverage'),
         _sec_header('Coverage Indicators', sum(len(v) for v in by_cat.values()),
                     desc='Coverage % vs target - target threshold shown per chart'),
         coverage_charts,
 
-        # Facility and district comparison section
         _section_anchor('mnid-comparative'),
         _sec_header('Facility & District Comparison',
                     desc='Cross-facility and district indicator benchmarking'),
         comparative_div,
 
-        # Clinical analysis section
         _section_anchor('mnid-analysis'),
         _sec_header('Clinical Analysis', total_analysis, desc='Care-phase deep-dives'),
         dmc.Accordion(
@@ -2986,7 +3611,6 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
             },
         ),
 
-        # Operational readiness section
         _section_anchor('mnid-readiness'),
         _sec_header('Operational Readiness',
                     desc='Equipment - workforce competency - data quality'),
@@ -2999,3 +3623,4 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
         dcc.Store(id='mnid-scrollspy-out'),
         html.Div(className='mnid-shell', children=[main_content]),
     ])
+
