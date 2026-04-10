@@ -1704,23 +1704,15 @@ _COMPARE_COLORS = [
 
 @callback(
     Output('mnid-compare-bar-chart', 'figure'),
-    Output('mnid-compare-fac-selector', 'style'),
-    Output('mnid-compare-dist-selector', 'style'),
-    Output('mnid-compare-ind-multi', 'options'),
-    Output('mnid-compare-ind-multi', 'value'),
     Output('mnid-compare-chart-type-store', 'data'),
     Output('mnid-compare-chart-toggle', 'className'),
     Output('mnid-compare-chart-toggle-text', 'children'),
     Input('mnid-compare-mode', 'value'),
-    Input('mnid-compare-fac-multi', 'value'),
-    Input('mnid-compare-dist-multi', 'value'),
-    Input('mnid-compare-ind-kind', 'value'),
-    Input('mnid-compare-ind-multi', 'value'),
     Input('mnid-compare-chart-toggle', 'n_clicks'),
     State('mnid-compare-store', 'data'),
     State('mnid-compare-chart-type-store', 'data'),
 )
-def update_compare_charts(mode, sel_facs, sel_dists, sel_kinds, sel_ind_ids, toggle_clicks, stored, chart_type):
+def update_compare_charts(mode, toggle_clicks, stored, chart_type):
     mode = mode or 'facility'
     chart_type = chart_type or 'bar'
     ctx = callback_context
@@ -1730,17 +1722,10 @@ def update_compare_charts(mode, sel_facs, sel_dists, sel_kinds, sel_ind_ids, tog
     tracked = store_payload.get('tracked', [])
     mch_full = _deserialize_store_df(store_payload.get('records'))
 
-    fac_style  = {'display': 'block'} if mode == 'facility' else {'display': 'none'}
-    dist_style = {'display': 'none'}  if mode == 'facility' else {'display': 'block'}
-
     tracked_cats = sorted({i.get('category', 'Other') for i in tracked if i.get('category')})
-    active_cats = [c for c in (sel_kinds or []) if c in tracked_cats] or tracked_cats
+    active_cats = tracked_cats
     filtered_tracked = [i for i in tracked if i.get('category', 'Other') in active_cats]
-
-    ind_map    = {i['id']: i for i in filtered_tracked}
-    active_inds = [ind_map[iid] for iid in (sel_ind_ids or []) if iid in ind_map]
-    ind_opts = [{'label': i['label'], 'value': i['id']} for i in filtered_tracked]
-    ind_ids = [i['id'] for i in active_inds]
+    active_inds = filtered_tracked
 
     _empty_fig = go.Figure()
     _empty_fig.update_layout(
@@ -1755,15 +1740,21 @@ def update_compare_charts(mode, sel_facs, sel_dists, sel_kinds, sel_ind_ids, tog
     if not active_inds or mch_full.empty:
         toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
         toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
-        return _empty_fig, fac_style, dist_style, ind_opts, ind_ids, chart_type, toggle_class, toggle_text
+        return _empty_fig, chart_type, toggle_class, toggle_text
 
     if mode == 'facility':
-        entities = sel_facs or []
+        entities = (
+            mch_full['Facility_CODE'].dropna().astype(str).unique().tolist()
+            if 'Facility_CODE' in mch_full.columns else []
+        )
         entity_labels = [_FACILITY_NAMES.get(e, e) for e in entities]
         def get_df(entity):
             return mch_full[mch_full['Facility_CODE'] == entity] if 'Facility_CODE' in mch_full.columns else pd.DataFrame()
     else:
-        entities = sel_dists or []
+        entities = (
+            mch_full['District'].dropna().astype(str).unique().tolist()
+            if 'District' in mch_full.columns else []
+        )
         entity_labels = list(entities)
         def get_df(entity):
             return mch_full[mch_full['District'] == entity] if 'District' in mch_full.columns else pd.DataFrame()
@@ -1771,7 +1762,7 @@ def update_compare_charts(mode, sel_facs, sel_dists, sel_kinds, sel_ind_ids, tog
     if not entities:
         toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
         toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
-        return _empty_fig, fac_style, dist_style, ind_opts, ind_ids, chart_type, toggle_class, toggle_text
+        return _empty_fig, chart_type, toggle_class, toggle_text
 
     fig = go.Figure()
     for idx, ind in enumerate(active_inds):
@@ -1851,7 +1842,7 @@ def update_compare_charts(mode, sel_facs, sel_dists, sel_kinds, sel_ind_ids, tog
     )
     toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
     toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
-    return fig, fac_style, dist_style, ind_opts, ind_ids, chart_type, toggle_class, toggle_text
+    return fig, chart_type, toggle_class, toggle_text
 
 
 # # MNID main heatmap section layout
@@ -2766,26 +2757,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                                   mch_full: pd.DataFrame) -> html.Div:
     """Grouped bar chart comparison across selected facilities or districts."""
     tracked = [i for i in indicators if i.get('status') == 'tracked']
-    all_facs  = sorted(mch_full['Facility_CODE'].dropna().astype(str).unique().tolist()) if len(mch_full) and 'Facility_CODE' in mch_full.columns else sorted(_ALL_FACILITIES[:])
-    all_dists = sorted(mch_full['District'].dropna().astype(str).unique().tolist())       if len(mch_full) and 'District' in mch_full.columns else sorted(_ALL_DISTRICTS[:])
-    current_dist = _FACILITY_DISTRICT.get(facility_code, '')
-
-    fac_opts  = [{'label': _FACILITY_NAMES.get(f, f), 'value': f} for f in all_facs]
-    dist_opts = [{'label': d, 'value': d} for d in all_dists]
-    cats = sorted({i.get('category', 'Other') for i in tracked if i.get('category')})
-    ind_opts  = [{'label': ind['label'], 'value': ind['id']} for ind in tracked]
-    cat_opts  = [{'label': c, 'value': c} for c in cats]
-
-    default_facs  = ([facility_code] if facility_code in all_facs else all_facs[:3]) or []
-    default_dists = ([current_dist]  if current_dist  in all_dists else all_dists[:3]) or []
-    default_inds  = [ind['id'] for ind in tracked[:4]]
-    default_cats  = cats[:]
-
-    _lbl_style = {
-        'fontSize': '11px', 'fontWeight': '600', 'color': '#94A3B8',
-        'textTransform': 'uppercase', 'letterSpacing': '0.05em',
-        'marginBottom': '5px', 'display': 'block',
-    }
+    _ = sorted({i.get('category', 'Other') for i in tracked if i.get('category')})
 
     compare_card = html.Div(className='mnid-chart-card mnid-compare-card', children=[
         # -- Header row -----------------------------------------------------------
@@ -2821,55 +2793,6 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                 ),
             ]),
         ]),
-        # -- Filters row ----------------------------------------------------------
-        html.Div(className='mnid-compare-filters', style={'display': 'grid', 'gridTemplateColumns': '1fr 1fr 1fr',
-                        'gap': '14px', 'marginBottom': '16px', 'alignItems': 'start'}, children=[
-            # Left: entity selector (facility or district, toggled by mode)
-            html.Div(className='mnid-compare-block', children=[
-                html.Div(id='mnid-compare-fac-selector', children=[
-                    html.Label('Select Facilities', style=_lbl_style),
-                    dcc.Dropdown(
-                        id='mnid-compare-fac-multi',
-                        options=fac_opts,
-                        value=default_facs,
-                        multi=True,
-                        placeholder='Select facilities...',
-                    ),
-                ]),
-                html.Div(id='mnid-compare-dist-selector', style={'display': 'none'}, children=[
-                    html.Label('Select Districts', style=_lbl_style),
-                    dcc.Dropdown(
-                        id='mnid-compare-dist-multi',
-                        options=dist_opts,
-                        value=default_dists,
-                        multi=True,
-                        placeholder='Select districts...',
-                    ),
-                ]),
-            ]),
-            # Middle: indicator category selector
-            html.Div(className='mnid-compare-block', children=[
-                html.Label('Indicator Category', style=_lbl_style),
-                dcc.Dropdown(
-                    id='mnid-compare-ind-kind',
-                    options=cat_opts,
-                    value=default_cats,
-                    multi=True,
-                    placeholder='Select indicator categories...',
-                ),
-            ]),
-            # Right: indicator selector
-            html.Div(className='mnid-compare-block', children=[
-                html.Label('Select Indicators', style=_lbl_style),
-                dcc.Dropdown(
-                    id='mnid-compare-ind-multi',
-                    options=ind_opts,
-                    value=default_inds,
-                    multi=True,
-                    placeholder='Select indicators...',
-                ),
-            ]),
-        ]),
         # -- Grouped bar chart ----------------------------------------------------
         dcc.Graph(
             id='mnid-compare-bar-chart',
@@ -2887,8 +2810,6 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
         dcc.Store(id='mnid-compare-store', data={
             'tracked':    tracked,
             'records':    _serialize_store_df(mch_full),
-            'facilities': all_facs,
-            'districts':  all_dists,
         }),
         dcc.Store(id='mnid-compare-chart-type-store', data='bar'),
         html.Div(className='mnid-chart-grid', children=[compare_card]),
@@ -3592,4 +3513,3 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
         dcc.Store(id='mnid-scrollspy-out'),
         html.Div(className='mnid-shell', children=[main_content]),
     ])
-
