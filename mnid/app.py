@@ -466,19 +466,23 @@ def _concept_count(df: pd.DataFrame, concept: str, values=None,
     return int(len(sub))
 
 
-def _service_table_payload(df: pd.DataFrame) -> dict:
+def _service_table_payload(df: pd.DataFrame, scope_meta: dict | None = None) -> dict:
     anc_df = _encounter_slice(df, 'ANC')
     labour_df = _encounter_slice(df, 'LABOUR|DELIVERY|BIRTH')
     pnc_df = _encounter_slice(df, 'PNC|POSTNATAL|POST.NATAL')
     newborn_df = _encounter_slice(df, 'NEONATAL')
+    scope_meta = scope_meta or {'label': 'Facility', 'value': 'Current selection'}
+    scope_label = str(scope_meta.get('label') or 'Facility')
+    scope_value = str(scope_meta.get('value') or 'Current selection')
 
     def _rows(rows):
-        return [{'metric': metric, 'value': value, 'detail': detail} for metric, value, detail in rows]
+        return [{'scope': scope_value, 'metric': metric, 'value': value} for metric, value, _detail in rows]
 
     payload = {
         'ANC': {
             'title': 'ANC Summary',
             'subtitle': 'Visits, registration, and core ANC service fields.',
+            'scope_label': scope_label,
             'rows': _rows([
                 ('ANC visits recorded', _count_entities(anc_df, 'encounter_id'), 'Distinct ANC encounters'),
                 ('Unique ANC clients', _count_entities(anc_df, 'person_id'), 'Distinct clients seen in ANC'),
@@ -495,6 +499,7 @@ def _service_table_payload(df: pd.DataFrame) -> dict:
         'Labour': {
             'title': 'Labour & Delivery Summary',
             'subtitle': 'Deliveries, outcomes, referrals, and newborn delivery records.',
+            'scope_label': scope_label,
             'rows': _rows([
                 ('Deliveries recorded', _count_entities(labour_df, 'encounter_id'), 'Distinct labour encounters'),
                 ('Unique mothers', _count_entities(labour_df, 'person_id'), 'Distinct women in labour data'),
@@ -511,6 +516,7 @@ def _service_table_payload(df: pd.DataFrame) -> dict:
         'Newborn': {
             'title': 'Newborn Summary',
             'subtitle': 'Admissions, thermal status, respiratory support, and newborn care actions.',
+            'scope_label': scope_label,
             'rows': _rows([
                 ('Admissions recorded', _count_entities(newborn_df, 'encounter_id'), 'Distinct newborn encounters'),
                 ('Unique babies', _count_entities(newborn_df, 'person_id'), 'Distinct babies in newborn care'),
@@ -529,6 +535,7 @@ def _service_table_payload(df: pd.DataFrame) -> dict:
         'PNC': {
             'title': 'PNC Summary',
             'subtitle': 'Maternal and baby postnatal counts, outcomes, and service completion fields.',
+            'scope_label': scope_label,
             'rows': _rows([
                 ('PNC visits recorded', _count_entities(pnc_df, 'encounter_id'), 'Distinct postnatal encounters'),
                 ('Unique mothers', _count_entities(pnc_df, 'person_id'), 'Distinct clients in PNC'),
@@ -548,10 +555,11 @@ def _service_table_payload(df: pd.DataFrame) -> dict:
 
 def _service_table_fig(section: dict) -> go.Figure:
     rows = section.get('rows', [])
+    scope_label = section.get('scope_label', 'Facility')
     fig = go.Figure(data=[go.Table(
-        columnwidth=[0.42, 0.18, 0.40],
+        columnwidth=[0.28, 0.50, 0.22],
         header=dict(
-            values=['Metric', 'Count', 'Definition'],
+            values=[scope_label, 'Metric', 'Count'],
             fill_color='#F8FAFC',
             line_color='#E2E8F0',
             align='left',
@@ -560,16 +568,16 @@ def _service_table_fig(section: dict) -> go.Figure:
         ),
         cells=dict(
             values=[
+                [row.get('scope', '') for row in rows],
                 [row['metric'] for row in rows],
                 [f"{int(row['value']):,}" for row in rows],
-                [row['detail'] for row in rows],
             ],
             fill_color='#FFFFFF',
             line_color='#E2E8F0',
-            align=['left', 'right', 'left'],
+            align=['left', 'left', 'right'],
             font=dict(
-                color=[['#0F172A'] * len(rows), ['#0F172A'] * len(rows), ['#64748B'] * len(rows)],
-                size=[12, 13, 11],
+                color=[['#334155'] * len(rows), ['#0F172A'] * len(rows), ['#0F172A'] * len(rows)],
+                size=[11, 12, 13],
                 family=FONT,
             ),
             height=38,
@@ -625,8 +633,10 @@ def update_service_table(n_clicks_list, stored_tables, active_cat, cat_order):
     return _service_table_fig(section), cat, classes
 
 
-def _service_table_switcher(df: pd.DataFrame, categories: list | None = None, default_cat: str | None = None) -> html.Div:
-    payload = _service_table_payload(df)
+def _service_table_switcher(df: pd.DataFrame, categories: list | None = None,
+                            default_cat: str | None = None,
+                            scope_meta: dict | None = None) -> html.Div:
+    payload = _service_table_payload(df, scope_meta)
     cat_order = [c for c in _resolve_category_order([{'category': k} for k in payload.keys()], categories) if c in payload]
     default_cat = default_cat if default_cat in cat_order else (cat_order[0] if cat_order else 'ANC')
     default_section = payload.get(default_cat, {'rows': []})
@@ -1658,30 +1668,24 @@ def update_heatmap_view(view, year, district, sel_inds, stored):
     Output('mnid-performance-heatmap-table', 'children'),
     Output('mnid-performance-aggregate', 'children'),
     Output('mnid-performance-attention', 'children'),
-    Input('mnid-performance-district', 'value'),
-    Input('mnid-performance-facility-type', 'value'),
-    Input('mnid-performance-period', 'value'),
     Input('mnid-performance-indicators', 'value'),
     State('mnid-heatmap-store', 'data'),
     prevent_initial_call=True,
 )
-def update_performance_heatmap(district, facility_type, period, sel_inds, stored):
+def update_performance_heatmap(sel_inds, stored):
     if not stored:
         return html.Div(), html.Div(), html.Div()
-    year = period or 'All years'
     table = _build_facility_performance_heatmap_fig(
         stored,
-        year,
-        district or 'All',
+        'All years',
         sel_inds,
-        facility_type or 'All',
     )
-    gauges = _build_district_gauge_row(stored, year)
+    gauges = _build_district_gauge_row(stored, 'All years')
     attention = _build_performance_attention_table(
         stored,
-        year,
-        district or 'All',
-        facility_type or 'All',
+        'All years',
+        'All',
+        'All',
         sel_inds,
     )
     return table, gauges, attention
@@ -1954,15 +1958,8 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
 
     year_opts     = [{'label': y, 'value': y} for y in years]
     district_opts = [{'label': d, 'value': d} for d in dyn_districts]
-    perf_district_opts = [{'label': 'All', 'value': 'All'}] + district_opts
     ind_opts      = [{'label': lbl, 'value': lbl} for lbl in all_labels]
     default_perf_inds = all_labels[:8] if len(all_labels) >= 8 else all_labels
-    facility_type_opts = [
-        {'label': 'All', 'value': 'All'},
-        {'label': 'Central Hospital', 'value': 'Central Hospital'},
-        {'label': 'District Hospital', 'value': 'District Hospital'},
-        {'label': 'Health Center', 'value': 'Health Center'},
-    ]
 
     _dd_style = {'fontSize': '12px', 'minWidth': '0'}
     _lbl_style = {'fontSize': '10px', 'color': MUTED, 'fontWeight': '600',
@@ -1978,38 +1975,6 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
             html.Div(id='mnid-performance-aggregate', className='mnid-performance-aggregate',
                      children=_build_district_gauge_row(store, 'All years')),
             html.Div(className='mnid-performance-table-card', children=[
-                html.Div(className='mnid-performance-toolbar', children=[
-                    html.Div(className='mnid-performance-filter', children=[
-                        html.Div('District', style=_lbl_style),
-                        dcc.Dropdown(
-                            id='mnid-performance-district',
-                            options=perf_district_opts,
-                            value='All',
-                            clearable=False,
-                            style=_dd_style,
-                        ),
-                    ]),
-                    html.Div(className='mnid-performance-filter', children=[
-                        html.Div('Facility Type', style=_lbl_style),
-                        dcc.Dropdown(
-                            id='mnid-performance-facility-type',
-                            options=facility_type_opts,
-                            value='All',
-                            clearable=False,
-                            style=_dd_style,
-                        ),
-                    ]),
-                    html.Div(className='mnid-performance-filter mnid-performance-period', children=[
-                        html.Div('Time Period', style=_lbl_style),
-                        dcc.Dropdown(
-                            id='mnid-performance-period',
-                            options=year_opts,
-                            value='All years',
-                            clearable=False,
-                            style=_dd_style,
-                        ),
-                    ]),
-                ]),
                 html.Div(className='mnid-performance-filter', style={'marginBottom': '10px'}, children=[
                     html.Div('Indicators', style=_lbl_style),
                     dcc.Dropdown(
@@ -3470,7 +3435,8 @@ def _section_anchor(anchor_id):
 # MNID dashboard entry point
 
 def render_mnid_dashboard(filtered, data_opd, delta_days, config,
-                          facility_code, start_date, end_date):
+                          facility_code, start_date, end_date,
+                          scope_meta: dict | None = None):
     facility_df = _prepare_mnid_dataframe(filtered)
     network_df = _prepare_mnid_dataframe(data_opd)
     if network_df.empty:
@@ -3536,7 +3502,7 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     analysis_acc = [a for a in analysis_acc if a]
 
     performance_div, heatmap_div = _coverage_heatmap_section(all_inds, facility_code, network_df)
-    service_table_div = _service_table_switcher(facility_df, category_order, default_cat)
+    service_table_div = _service_table_switcher(facility_df, category_order, default_cat, scope_meta)
     comparative_div  = _comparative_analysis_section(all_inds, facility_code, network_df)
 
     def _sec_header(title, count=None, desc=None):

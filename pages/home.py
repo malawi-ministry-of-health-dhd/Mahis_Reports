@@ -71,7 +71,8 @@ except Exception as e:
 
 # BUILD CHARTS
 def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json,
-                           start_date=None, end_date=None, facility_code=None):
+                           start_date=None, end_date=None, facility_code=None,
+                           scope_meta=None):
     config = dashboards_json
 
     # Route MNID dashboard configs to the dedicated MNID renderer.
@@ -84,6 +85,7 @@ def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json,
             facility_code=facility_code or 'Unknown',
             start_date=str(start_date)[:10] if start_date else '',
             end_date=str(end_date)[:10] if end_date else '',
+            scope_meta=scope_meta,
         )
 
     # Render all non-MNID dashboards with the generic chart builder.
@@ -649,11 +651,25 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                 else:
                     facility_code_display = mnid_location or location
 
+            if level == 'Facility' and facilities:
+                scope_label = 'Facility' if len(facilities) == 1 else 'Facilities'
+                scope_value = facilities[0] if len(facilities) == 1 else f'{len(facilities)} selected facilities'
+            elif level == 'District' and facilities:
+                scope_label = 'Facility' if len(facilities) == 1 else 'Facilities'
+                scope_value = facilities[0] if len(facilities) == 1 else f'{len(facilities)} selected facilities'
+            elif level == 'District' and districts:
+                scope_label = 'District' if len(districts) == 1 else 'Districts'
+                scope_value = districts[0] if len(districts) == 1 else f'{len(districts)} selected districts'
+            else:
+                scope_label = 'Districts'
+                scope_value = 'All districts'
+
             section = build_charts_from_json(
                 filtered_data_date, network_data, delta_days, dashboard_json,
                 start_date=adj_start_dt,
                 end_date=adj_end_dt,
                 facility_code=facility_code_display,
+                scope_meta={'label': scope_label, 'value': scope_value},
             )
             rendered.append(html.Div([
                 html.H2(report_name, style={"marginTop": "10px"}),
