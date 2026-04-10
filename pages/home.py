@@ -547,10 +547,18 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                 clicked_name
             )
 
-        # Base filters (age)
+        # Base filters (age + MNID program category)
         base_mask = pd.Series(True, index=data.index)
         if age:
             base_mask &= (data[AGE_GROUP_] == age)
+        category = category or "All"
+        if category != "All" and "Encounter" in data.columns:
+            if category == "ANC":
+                base_mask &= data["Encounter"].fillna('').astype(str).str.contains('ANC', case=False, na=False)
+            elif category == "Labour":
+                base_mask &= data["Encounter"].fillna('').astype(str).str.contains('LABOUR|DELIVERY|BIRTH', case=False, na=False)
+            elif category == "PNC":
+                base_mask &= data["Encounter"].fillna('').astype(str).str.contains('PNC|POSTNATAL|POST.NATAL', case=False, na=False)
         base_data = data[base_mask].copy()
 
         district_col = "District" if "District" in base_data.columns else (HOME_DISTRICT_ if HOME_DISTRICT_ in base_data.columns else None)
@@ -562,8 +570,6 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         districts = districts or []
         facilities = facilities or []
         overview = overview or []
-        category = category or "All"
-
         if level == 'National':
             districts = []
             facilities = []
@@ -695,7 +701,14 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                 start_date=adj_start_dt,
                 end_date=adj_end_dt,
                 facility_code=facility_code_display,
-                scope_meta={'label': scope_label, 'value': scope_value, 'mnid_categories': mnid_categories},
+                scope_meta={
+                    'label': scope_label,
+                    'value': scope_value,
+                    'mnid_categories': mnid_categories,
+                    'level': level,
+                    'selected_facilities': facilities,
+                    'selected_districts': districts,
+                },
             )
             rendered.append(html.Div([
                 html.H2(report_name, style={"marginTop": "10px"}),

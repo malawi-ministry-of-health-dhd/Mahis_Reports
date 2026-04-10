@@ -155,6 +155,11 @@ html { scroll-behavior: smooth; }
   color: #0F172A;
   line-height: 1.2;
 }
+.mnid-info-pill-value-compact {
+  min-height: 16px;
+  display: flex;
+  align-items: center;
+}
 
 /* MNID badge pills */
 .mnid-pills {

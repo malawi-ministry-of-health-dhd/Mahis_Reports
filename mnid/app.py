@@ -338,21 +338,25 @@ def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str, chart_type: str =
     Output('mnid-trend-graph', 'figure'),
     Output('mnid-trend-active-cat', 'data'),
     Output({'type': 'trend-cat-btn', 'index': ALL}, 'className'),
+    Output('mnid-trend-indicators', 'options'),
+    Output('mnid-trend-indicators', 'value'),
     Output('mnid-trend-chart-type-store', 'data'),
     Output('mnid-trend-chart-toggle', 'className'),
     Output('mnid-trend-chart-toggle-text', 'children'),
     Input({'type': 'trend-cat-btn', 'index': ALL}, 'n_clicks'),
     Input('mnid-trend-chart-toggle', 'n_clicks'),
+    Input('mnid-trend-indicators', 'value'),
     State('mnid-trend-store', 'data'),
     State('mnid-trend-active-cat', 'data'),
     State('mnid-trend-chart-type-store', 'data'),
     State('mnid-trend-cats-store', 'data'),
     prevent_initial_call=False,
 )
-def update_trend_chart(n_clicks_list, toggle_clicks, stored_figs, active_cat, chart_type, cat_order):
+def update_trend_chart(n_clicks_list, toggle_clicks, selected_ind_ids, stored_trend, active_cat, chart_type, cat_order):
     categories = cat_order or _CAT_ORDER
     cat = active_cat if active_cat in categories else (categories[0] if categories else 'ANC')
     mode = chart_type or 'line'
+    selected_ind_ids = selected_ind_ids or []
     ctx = callback_context
     if ctx and ctx.triggered:
         prop_id = ctx.triggered[0]['prop_id']
@@ -365,9 +369,20 @@ def update_trend_chart(n_clicks_list, toggle_clicks, stored_figs, active_cat, ch
                 pass
         elif prop_id == 'mnid-trend-chart-toggle.n_clicks':
             mode = 'bar' if mode == 'line' else 'line'
+            selected_ind_ids = []
 
-    figure_json = (((stored_figs or {}).get(mode) or {}).get(cat))
-    fig = go.Figure(json.loads(figure_json)) if figure_json else go.Figure()
+    trend_payload = stored_trend or {}
+    tracked = trend_payload.get('tracked', [])
+    df = _deserialize_store_df(trend_payload.get('records'))
+    scope_meta = trend_payload.get('scope_meta') or {}
+    cat_inds = [i for i in tracked if i.get('category') == cat and i.get('status') == 'tracked']
+    ind_options = [{'label': i['label'], 'value': i['id']} for i in cat_inds]
+    valid_ids = [opt['value'] for opt in ind_options]
+    selected = [iid for iid in selected_ind_ids if iid in valid_ids][:3]
+    if not selected:
+        selected = valid_ids[:3]
+    active_inds = [i for i in cat_inds if i['id'] in selected]
+    fig = _location_trend_fig(df, active_inds, cat, mode, scope_meta)
 
     classes = [
         'mnid-filter-btn active' if c == cat else 'mnid-filter-btn'
@@ -375,27 +390,28 @@ def update_trend_chart(n_clicks_list, toggle_clicks, stored_figs, active_cat, ch
     ]
     toggle_class = 'mnid-trend-toggle is-bar' if mode == 'bar' else 'mnid-trend-toggle is-line'
     toggle_text = 'Bar' if mode == 'bar' else 'Line'
-    return fig, cat, classes, mode, toggle_class, toggle_text
+    return fig, cat, classes, ind_options, selected, mode, toggle_class, toggle_text
 
 
-def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None = None, default_cat: str | None = None) -> html.Div:
+def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None = None,
+                    default_cat: str | None = None,
+                    scope_meta: dict | None = None) -> html.Div:
     tracked = [i for i in indicators if i.get('status') == 'tracked']
     cat_order = _resolve_category_order(tracked, categories)
     default_cat = default_cat if default_cat in cat_order else (cat_order[0] if cat_order else 'ANC')
-
-    stored_figs = {'line': {}, 'bar': {}}
-    for cat in cat_order:
-        cat_inds = [i for i in tracked if i.get('category') == cat]
-        stored_figs['line'][cat] = _cat_trend_fig(df, cat_inds, cat, 'line').to_json()
-        stored_figs['bar'][cat] = _cat_trend_fig(df, cat_inds, cat, 'bar').to_json()
-
-    default_inds = [i for i in tracked if i.get('category') == default_cat]
-    default_fig = _cat_trend_fig(df, default_inds, default_cat, 'line')
+    default_inds = [i for i in tracked if i.get('category') == default_cat][:3]
+    default_ind_opts = [{'label': i['label'], 'value': i['id']} for i in tracked if i.get('category') == default_cat]
+    default_fig = _location_trend_fig(df, default_inds, default_cat, 'line', scope_meta)
+    trend_store = {
+        'tracked': tracked,
+        'records': _serialize_store_df(df),
+        'scope_meta': scope_meta or {},
+    }
 
     return html.Div(className='mnid-card', style={'marginBottom': '12px'}, children=[
         html.Div(style={'display': 'flex', 'alignItems': 'center',
                         'justifyContent': 'space-between', 'marginBottom': '8px', 'gap': '12px', 'flexWrap': 'wrap'}, children=[
-            html.Div('COVERAGE TREND', className='mnid-section-lbl',
+            html.Div('COVERAGE TREND BY LOCATION', className='mnid-section-lbl',
                      style={'marginBottom': '0'}),
             html.Div(style={'display': 'flex', 'alignItems': 'center', 'gap': '10px', 'flexWrap': 'wrap'}, children=[
                 html.Button(
@@ -419,12 +435,23 @@ def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None 
                 ]),
             ]),
         ]),
-        dcc.Store(id='mnid-trend-store', data=stored_figs),
+        html.Div(style={'marginBottom': '8px', 'maxWidth': '360px'}, children=[
+            html.Div('Indicators', style={'fontSize': '10px', 'color': MUTED, 'fontWeight': '600', 'marginBottom': '3px'}),
+            dcc.Dropdown(
+                id='mnid-trend-indicators',
+                options=default_ind_opts,
+                value=[i['id'] for i in default_inds],
+                multi=True,
+                placeholder='Select up to 3 indicators...',
+                style={'fontSize': '12px', 'minHeight': '34px'},
+            ),
+        ]),
+        dcc.Store(id='mnid-trend-store', data=trend_store),
         dcc.Store(id='mnid-trend-active-cat', data=default_cat),
         dcc.Store(id='mnid-trend-cats-store', data=cat_order),
         dcc.Store(id='mnid-trend-chart-type-store', data='line'),
         dcc.Graph(id='mnid-trend-graph', figure=default_fig,
-                  config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}}, style={'height': '300px'}),
+                  config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}}, style={'height': '340px'}),
     ])
 
 
@@ -471,99 +498,128 @@ def _concept_count(df: pd.DataFrame, concept: str, values=None,
 
 
 def _service_table_payload(df: pd.DataFrame, scope_meta: dict | None = None) -> dict:
-    anc_df = _encounter_slice(df, 'ANC')
-    labour_df = _encounter_slice(df, 'LABOUR|DELIVERY|BIRTH')
-    pnc_df = _encounter_slice(df, 'PNC|POSTNATAL|POST.NATAL')
-    newborn_df = _encounter_slice(df, 'NEONATAL')
-    scope_meta = scope_meta or {'label': 'Facility', 'value': 'Current selection'}
-    scope_label = str(scope_meta.get('label') or 'Facility')
-    scope_value = str(scope_meta.get('value') or 'Current selection')
+    scope_meta = scope_meta or {}
 
-    def _rows(rows):
-        return [{'scope': scope_value, 'metric': metric, 'value': value} for metric, value, _detail in rows]
+    def _service_entities(src: pd.DataFrame) -> list[tuple[str, pd.DataFrame]]:
+        if src is None or src.empty:
+            return []
+        if 'Facility_CODE' in src.columns:
+            entities = []
+            for fac_code, fac_df in src.groupby('Facility_CODE', dropna=True, sort=True):
+                fac_df = fac_df.copy()
+                fac_name = str(fac_code)
+                if 'Facility' in fac_df.columns:
+                    names = fac_df['Facility'].dropna().astype(str)
+                    if not names.empty:
+                        fac_name = names.mode().iloc[0]
+                else:
+                    fac_name = _FACILITY_NAMES.get(str(fac_code), str(fac_code))
+                entities.append((fac_name, fac_df))
+            return entities
+        scope_value = str(scope_meta.get('value') or 'Current selection')
+        return [(scope_value, src)]
 
-    payload = {
+    metric_specs = {
         'ANC': {
             'title': 'ANC Summary',
-            'subtitle': 'Visits, registration, and core ANC service fields.',
-            'scope_label': scope_label,
-            'rows': _rows([
-                ('ANC visits recorded', _count_entities(anc_df, 'encounter_id'), 'Distinct ANC encounters'),
-                ('Unique ANC clients', _count_entities(anc_df, 'person_id'), 'Distinct clients seen in ANC'),
-                ('Repeat ANC contact volume', max(_count_entities(anc_df, 'encounter_id') - _count_entities(anc_df, 'person_id'), 0), 'Repeat ANC contacts beyond first recorded visit'),
-                ('Gestational age recorded', _concept_count(anc_df, 'Gestational age recorded', any_value=True), 'Clients with gestational age documented'),
-                ('Blood group recorded', _concept_count(anc_df, 'Blood group rhesus factor', any_value=True), 'Clients with blood group / rhesus factor captured'),
-                ('Pregnancy planned responses', _concept_count(anc_df, 'Pregnancy planned', any_value=True), 'Clients with pregnancy planning status recorded'),
-                ('HIV test results recorded', _concept_count(anc_df, 'HIV Test', any_value=True), 'Clients with ANC HIV test result documented'),
-                ('Reactive HIV results', _concept_count(anc_df, 'HIV Test', ['Reactive']), 'Clients with reactive ANC HIV test result'),
-                ('ITNs given', _concept_count(anc_df, 'Insecticide treated net given', ['Yes', 'Given']), 'Clients receiving an insecticide treated net'),
-                ('2+ tetanus doses recorded', _concept_count(anc_df, 'Number of tetanus doses', ['two doses', 'three doses', 'four doses']), 'Clients documented with at least two tetanus doses'),
-            ]),
+            'subtitle': 'Facility rows with ANC service indicators as columns.',
+            'encounter': 'ANC',
+            'metrics': [
+                ('ANC visits recorded', lambda x: _count_entities(x, 'encounter_id')),
+                ('Unique ANC clients', lambda x: _count_entities(x, 'person_id')),
+                ('Repeat ANC contact volume', lambda x: max(_count_entities(x, 'encounter_id') - _count_entities(x, 'person_id'), 0)),
+                ('Gestational age recorded', lambda x: _concept_count(x, 'Gestational age recorded', any_value=True)),
+                ('Blood group recorded', lambda x: _concept_count(x, 'Blood group rhesus factor', any_value=True)),
+                ('Pregnancy planned responses', lambda x: _concept_count(x, 'Pregnancy planned', any_value=True)),
+                ('HIV test results recorded', lambda x: _concept_count(x, 'HIV Test', any_value=True)),
+                ('Reactive HIV results', lambda x: _concept_count(x, 'HIV Test', ['Reactive'])),
+                ('ITNs given', lambda x: _concept_count(x, 'Insecticide treated net given', ['Yes', 'Given'])),
+                ('2+ tetanus doses recorded', lambda x: _concept_count(x, 'Number of tetanus doses', ['two doses', 'three doses', 'four doses'])),
+            ],
         },
         'Labour': {
             'title': 'Labour & Delivery Summary',
-            'subtitle': 'Deliveries, outcomes, referrals, and newborn delivery records.',
-            'scope_label': scope_label,
-            'rows': _rows([
-                ('Deliveries recorded', _count_entities(labour_df, 'encounter_id'), 'Distinct labour encounters'),
-                ('Unique mothers', _count_entities(labour_df, 'person_id'), 'Distinct women in labour data'),
-                ('Live births', _concept_count(labour_df, 'Outcome of the delivery', ['Live birth', 'Live births']), 'Deliveries with live-birth outcome'),
-                ('Stillbirths', _concept_count(labour_df, 'Outcome of the delivery', ['Stillbirth', 'Fresh stillbirth', 'Macerated stillbirth']), 'Deliveries with stillbirth outcomes'),
-                ('Twin deliveries', _concept_count(labour_df, 'Outcome of the delivery', ['Twin delivery']), 'Deliveries recorded as twin deliveries'),
-                ('Mothers referred', _concept_count(labour_df, 'Referral completed', ['Yes']), 'Mothers with completed referral pathway'),
-                ('Referral reasons captured', _concept_count(labour_df, 'referral reasons', any_value=True), 'Encounters with documented referral reasons'),
-                ('Newborn complications recorded', _concept_count(labour_df, 'Newborn baby complications', any_value=True), 'Deliveries with newborn complication documentation'),
-                ('Newborn management recorded', _concept_count(labour_df, 'Management given to newborn', any_value=True), 'Deliveries with newborn management documented'),
-                ('Birth attendant recorded', _concept_count(labour_df, 'Staff conducting delivery', any_value=True), 'Deliveries with attending cadre documented'),
-            ]),
+            'subtitle': 'Facility rows with labour and delivery indicators as columns.',
+            'encounter': 'LABOUR|DELIVERY|BIRTH',
+            'metrics': [
+                ('Deliveries recorded', lambda x: _count_entities(x, 'encounter_id')),
+                ('Unique mothers', lambda x: _count_entities(x, 'person_id')),
+                ('Live births', lambda x: _concept_count(x, 'Outcome of the delivery', ['Live birth', 'Live births'])),
+                ('Stillbirths', lambda x: _concept_count(x, 'Outcome of the delivery', ['Stillbirth', 'Fresh stillbirth', 'Macerated stillbirth'])),
+                ('Twin deliveries', lambda x: _concept_count(x, 'Outcome of the delivery', ['Twin delivery'])),
+                ('Mothers referred', lambda x: _concept_count(x, 'Referral completed', ['Yes'])),
+                ('Referral reasons captured', lambda x: _concept_count(x, 'referral reasons', any_value=True)),
+                ('Newborn complications recorded', lambda x: _concept_count(x, 'Newborn baby complications', any_value=True)),
+                ('Newborn management recorded', lambda x: _concept_count(x, 'Management given to newborn', any_value=True)),
+                ('Birth attendant recorded', lambda x: _concept_count(x, 'Staff conducting delivery', any_value=True)),
+            ],
         },
         'Newborn': {
             'title': 'Newborn Summary',
-            'subtitle': 'Admissions, thermal status, respiratory support, and newborn care actions.',
-            'scope_label': scope_label,
-            'rows': _rows([
-                ('Admissions recorded', _count_entities(newborn_df, 'encounter_id'), 'Distinct newborn encounters'),
-                ('Unique babies', _count_entities(newborn_df, 'person_id'), 'Distinct babies in newborn care'),
-                ('Repeat admission / review volume', max(_count_entities(newborn_df, 'encounter_id') - _count_entities(newborn_df, 'person_id'), 0), 'Repeat neonatal contacts beyond first recorded admission'),
-                ('Resuscitation provided', _concept_count(newborn_df, 'Neonatal resuscitation provided', ['Yes', 'Stimulation only', 'Bag and mask']), 'Babies receiving active resuscitation support'),
-                ('Resuscitation not required', _concept_count(newborn_df, 'Neonatal resuscitation provided', ['Not required']), 'Babies assessed with no resuscitation required'),
-                ('Not hypothermic on admission', _concept_count(newborn_df, 'Thermal status on admission', ['Not hypothermic']), 'Babies admitted without hypothermia'),
-                ('Hypothermia on admission', _concept_count(newborn_df, 'Thermal status on admission', ['Mild hypothermia', 'Moderate hypothermia', 'Severe hypothermia']), 'Babies admitted with hypothermia recorded'),
-                ('Bubble CPAP support', _concept_count(newborn_df, 'CPAP support', ['Bubble CPAP']), 'Babies supported with bubble CPAP'),
-                ('Nasal oxygen support', _concept_count(newborn_df, 'CPAP support', ['Nasal oxygen']), 'Babies supported with nasal oxygen'),
-                ('Phototherapy given', _concept_count(newborn_df, 'Phototherapy given', ['Yes']), 'Babies who received phototherapy'),
-                ('Parenteral antibiotics given', _concept_count(newborn_df, 'Parenteral antibiotics given', ['Yes']), 'Babies who received antibiotics'),
-                ('iKMC initiated', _concept_count(newborn_df, 'iKMC initiated', ['Yes']), 'Babies started on iKMC'),
-            ]),
+            'subtitle': 'Facility rows with newborn care indicators as columns.',
+            'encounter': 'NEONATAL',
+            'metrics': [
+                ('Admissions recorded', lambda x: _count_entities(x, 'encounter_id')),
+                ('Unique babies', lambda x: _count_entities(x, 'person_id')),
+                ('Repeat admission / review volume', lambda x: max(_count_entities(x, 'encounter_id') - _count_entities(x, 'person_id'), 0)),
+                ('Resuscitation provided', lambda x: _concept_count(x, 'Neonatal resuscitation provided', ['Yes', 'Stimulation only', 'Bag and mask'])),
+                ('Resuscitation not required', lambda x: _concept_count(x, 'Neonatal resuscitation provided', ['Not required'])),
+                ('Not hypothermic on admission', lambda x: _concept_count(x, 'Thermal status on admission', ['Not hypothermic'])),
+                ('Hypothermia on admission', lambda x: _concept_count(x, 'Thermal status on admission', ['Mild hypothermia', 'Moderate hypothermia', 'Severe hypothermia'])),
+                ('Bubble CPAP support', lambda x: _concept_count(x, 'CPAP support', ['Bubble CPAP'])),
+                ('Nasal oxygen support', lambda x: _concept_count(x, 'CPAP support', ['Nasal oxygen'])),
+                ('Phototherapy given', lambda x: _concept_count(x, 'Phototherapy given', ['Yes'])),
+                ('Parenteral antibiotics given', lambda x: _concept_count(x, 'Parenteral antibiotics given', ['Yes'])),
+                ('iKMC initiated', lambda x: _concept_count(x, 'iKMC initiated', ['Yes'])),
+            ],
         },
         'PNC': {
             'title': 'PNC Summary',
-            'subtitle': 'Maternal and baby postnatal counts, outcomes, and service completion fields.',
-            'scope_label': scope_label,
-            'rows': _rows([
-                ('PNC visits recorded', _count_entities(pnc_df, 'encounter_id'), 'Distinct postnatal encounters'),
-                ('Unique mothers', _count_entities(pnc_df, 'person_id'), 'Distinct clients in PNC'),
-                ('Babies reviewed', _concept_count(pnc_df, 'Status of baby', any_value=True), 'Babies with postnatal status recorded'),
-                ('Maternal deaths', _concept_count(pnc_df, 'Status of the mother', ['Death', 'Died']), 'Mothers with death outcome in PNC'),
-                ('Maternal referrals', _concept_count(pnc_df, 'Status of the mother', ['Referred']), 'Mothers referred onward from PNC'),
-                ('Baby deaths', _concept_count(pnc_df, 'Status of baby', ['Death', 'Died']), 'Babies with death outcome in PNC'),
-                ('Baby referrals', _concept_count(pnc_df, 'Status of baby', ['Referred']), 'Babies referred onward from PNC'),
-                ('Mother HIV status captured', _concept_count(pnc_df, 'Mother HIV Status', any_value=True), 'Mothers with HIV status recorded in PNC'),
-                ('Vitamin K given', _concept_count(pnc_df, 'Vitamin K given', ['Yes']), 'Babies with Vitamin K documented'),
-                ('Immunisation recorded', _concept_count(pnc_df, 'Immunisation given', any_value=True) + _concept_count(pnc_df, 'Type of immunization the baby received', any_value=True), 'Baby immunisation entries recorded in PNC'),
-            ]),
+            'subtitle': 'Facility rows with postnatal care indicators as columns.',
+            'encounter': 'PNC|POSTNATAL|POST.NATAL',
+            'metrics': [
+                ('PNC visits recorded', lambda x: _count_entities(x, 'encounter_id')),
+                ('Unique mothers', lambda x: _count_entities(x, 'person_id')),
+                ('Babies reviewed', lambda x: _concept_count(x, 'Status of baby', any_value=True)),
+                ('Maternal deaths', lambda x: _concept_count(x, 'Status of the mother', ['Death', 'Died'])),
+                ('Maternal referrals', lambda x: _concept_count(x, 'Status of the mother', ['Referred'])),
+                ('Baby deaths', lambda x: _concept_count(x, 'Status of baby', ['Death', 'Died'])),
+                ('Baby referrals', lambda x: _concept_count(x, 'Status of baby', ['Referred'])),
+                ('Mother HIV status captured', lambda x: _concept_count(x, 'Mother HIV Status', any_value=True)),
+                ('Vitamin K given', lambda x: _concept_count(x, 'Vitamin K given', ['Yes'])),
+                ('Immunisation recorded', lambda x: _concept_count(x, 'Immunisation given', any_value=True) + _concept_count(x, 'Type of immunization the baby received', any_value=True)),
+            ],
         },
     }
+
+    payload = {}
+    entities = _service_entities(df)
+    for category, spec in metric_specs.items():
+        section_rows = []
+        for facility_name, fac_df in entities:
+            slice_df = _encounter_slice(fac_df, spec['encounter'])
+            values = [int(calc(slice_df)) for _label, calc in spec['metrics']]
+            section_rows.append({'facility': facility_name, 'values': values})
+        payload[category] = {
+            'title': spec['title'],
+            'subtitle': spec['subtitle'],
+            'columns': [label for label, _calc in spec['metrics']],
+            'rows': section_rows,
+        }
     return payload
 
 
 def _service_table_fig(section: dict) -> go.Figure:
     rows = section.get('rows', [])
-    scope_label = section.get('scope_label', 'Facility')
+    columns = section.get('columns', [])
+    header_values = ['Facility Name'] + columns
+    cell_values = [[row.get('facility', '') for row in rows]]
+    for idx, _col in enumerate(columns):
+        cell_values.append([f"{int(row.get('values', [])[idx]):,}" if idx < len(row.get('values', [])) else '0' for row in rows])
     fig = go.Figure(data=[go.Table(
-        columnwidth=[0.28, 0.50, 0.22],
+        columnwidth=[0.24] + [0.12] * len(columns),
         header=dict(
-            values=[scope_label, 'Metric', 'Count'],
+            values=header_values,
             fill_color='#F8FAFC',
             line_color='#E2E8F0',
             align='left',
@@ -571,17 +627,13 @@ def _service_table_fig(section: dict) -> go.Figure:
             height=34,
         ),
         cells=dict(
-            values=[
-                [row.get('scope', '') for row in rows],
-                [row['metric'] for row in rows],
-                [f"{int(row['value']):,}" for row in rows],
-            ],
+            values=cell_values,
             fill_color='#FFFFFF',
             line_color='#E2E8F0',
-            align=['left', 'left', 'right'],
+            align=['left'] + ['right'] * len(columns),
             font=dict(
-                color=[['#334155'] * len(rows), ['#0F172A'] * len(rows), ['#0F172A'] * len(rows)],
-                size=[11, 12, 13],
+                color=[['#334155'] * len(rows)] + [['#0F172A'] * len(rows) for _ in columns],
+                size=[11] + [12] * len(columns),
                 family=FONT,
             ),
             height=38,
@@ -600,6 +652,121 @@ def _service_table_fig(section: dict) -> go.Figure:
         height=max(340, 108 + (len(rows) * 38)),
         paper_bgcolor='#FFFFFF',
         plot_bgcolor='#FFFFFF',
+    )
+    return fig
+
+
+def _location_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str,
+                        chart_type: str = 'line',
+                        scope_meta: dict | None = None) -> go.Figure:
+    fig = go.Figure()
+    if not len(df) or not cat_inds or 'Date' not in df.columns:
+        fig.add_annotation(text='No trend data available for this selection',
+                           xref='paper', yref='paper', x=0.5, y=0.5,
+                           showarrow=False, font=dict(size=12, color=MUTED))
+        fig.update_layout(paper_bgcolor=BG, plot_bgcolor=BG,
+                          height=340, margin=dict(l=8, r=8, t=12, b=24))
+        return fig
+
+    scope_meta = scope_meta or {}
+    selected_facs = [str(v) for v in (scope_meta.get('selected_facilities') or [])]
+    selected_dists = [str(v) for v in (scope_meta.get('selected_districts') or [])]
+    level = str(scope_meta.get('level') or '')
+
+    d2 = df.copy()
+    d2['_m'] = pd.to_datetime(d2['Date']).dt.to_period('M')
+    periods = sorted(d2['_m'].dropna().unique())[-12:]
+
+    facility_name_map = {}
+    if 'Facility_CODE' in d2.columns:
+        for fac_code, fac_df in d2.groupby('Facility_CODE', dropna=True):
+            fac_name = _FACILITY_NAMES.get(str(fac_code), str(fac_code))
+            if 'Facility' in fac_df.columns:
+                names = fac_df['Facility'].dropna().astype(str)
+                if not names.empty:
+                    fac_name = names.mode().iloc[0]
+            facility_name_map[str(fac_code)] = fac_name
+
+    entity_mode = 'district'
+    entities = []
+    if selected_facs and 'Facility_CODE' in d2.columns:
+        entity_mode = 'facility'
+        entities = selected_facs[:6]
+    elif selected_dists and 'District' in d2.columns:
+        entities = selected_dists[:6]
+    elif level == 'Facility' and 'Facility_CODE' in d2.columns:
+        entity_mode = 'facility'
+        entities = d2['Facility_CODE'].dropna().astype(str).value_counts().index.tolist()[:6]
+    elif 'District' in d2.columns:
+        entities = d2['District'].dropna().astype(str).value_counts().index.tolist()[:6]
+    elif 'Facility_CODE' in d2.columns:
+        entity_mode = 'facility'
+        entities = d2['Facility_CODE'].dropna().astype(str).value_counts().index.tolist()[:6]
+
+    if not entities:
+        fig.add_annotation(text='No locations available for trend view',
+                           xref='paper', yref='paper', x=0.5, y=0.5,
+                           showarrow=False, font=dict(size=12, color=MUTED))
+        fig.update_layout(paper_bgcolor=BG, plot_bgcolor=BG,
+                          height=340, margin=dict(l=8, r=8, t=12, b=24))
+        return fig
+
+    series_idx = 0
+    for entity in entities:
+        if entity_mode == 'facility':
+            entity_df = d2[d2['Facility_CODE'].astype(str) == str(entity)].copy()
+            entity_label = facility_name_map.get(str(entity), str(entity))
+        else:
+            entity_df = d2[d2['District'].astype(str) == str(entity)].copy()
+            entity_label = str(entity)
+        for ind in cat_inds:
+            xs, ys = [], []
+            for p in periods:
+                month_df = entity_df[entity_df['_m'] == p]
+                _, den, pct = _cov(month_df, ind['numerator_filters'], ind['denominator_filters'])
+                xs.append(pd.Period(p, 'M').to_timestamp().to_pydatetime())
+                ys.append(_display_pct(pct) if den > 0 else None)
+
+            if not any(y is not None for y in ys):
+                continue
+
+            color = _TREND_SERIES_PALETTE[series_idx % len(_TREND_SERIES_PALETTE)]
+            series_idx += 1
+            r, g, b = int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16)
+            series_name = f'{entity_label} | {ind["label"]}'
+            if chart_type == 'bar':
+                clean_xs = [x for x, y in zip(xs, ys) if y is not None]
+                clean_ys = [y for y in ys if y is not None]
+                fig.add_trace(go.Bar(
+                    x=clean_xs, y=clean_ys, name=series_name,
+                    marker=dict(color=f'rgba({r},{g},{b},0.85)', line=dict(color=color, width=1)),
+                    hovertemplate=f'%{{x|%b %Y}}<br>{series_name}: %{{y:.0f}}%<extra></extra>',
+                    offsetgroup=str(series_idx),
+                ))
+            else:
+                fig.add_trace(go.Scatter(
+                    x=xs, y=ys, name=series_name,
+                    mode='lines+markers',
+                    line=dict(color=color, width=2.3, shape='spline'),
+                    marker=dict(size=5, color=color, line=dict(color='#fff', width=1.2)),
+                    connectgaps=False,
+                    hovertemplate=f'%{{x|%b %Y}}<br>{series_name}: %{{y:.0f}}%<extra></extra>',
+                ))
+    fig.update_layout(
+        paper_bgcolor=BG, plot_bgcolor=BG,
+        font=dict(family=FONT, color=TEXT, size=11),
+        hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
+        height=340,
+        margin=dict(l=8, r=8, t=12, b=24),
+        barmode='group' if chart_type == 'bar' else None,
+        xaxis=dict(showgrid=False, zeroline=False, showline=False,
+                   tickformat='%b %y', tickfont=dict(size=10, color=MUTED)),
+        yaxis=dict(showgrid=True, gridcolor=GRID_C, zeroline=False, showline=False,
+                   tickfont=dict(size=10, color=MUTED), range=[0, 105],
+                   title=dict(text='Coverage %', font=dict(size=10, color=MUTED))),
+        legend=dict(font=dict(size=10, color=DIM), bgcolor='rgba(0,0,0,0)',
+                    orientation='v', x=1.01, y=1, xanchor='left', yanchor='top'),
+        hovermode='closest' if chart_type == 'bar' else 'x unified',
     )
     return fig
 
@@ -1168,8 +1335,9 @@ def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
     all_labels    = stored.get('y_labels', [])
     dyn_districts = stored.get('all_districts', [])
 
-    if sel_inds:
-        rows_idx = [i for i, lbl in enumerate(all_labels) if lbl in sel_inds]
+    selected_labels = sel_inds if isinstance(sel_inds, list) else ([sel_inds] if sel_inds else [])
+    if selected_labels:
+        rows_idx = [i for i, lbl in enumerate(all_labels) if lbl in selected_labels]
     else:
         rows_idx = list(range(len(all_labels)))
 
@@ -1295,6 +1463,25 @@ def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
                 showlegend=False,
             ))
 
+    x_range = [-0.02, 1.02]
+    y_range = [-0.02, y_scale + 0.02]
+    if view == 'district_facs':
+        focus_points = []
+        for pts in district_rings.get(focus_dist, []):
+            focus_points.extend(pts)
+        if 'fac_positions' in locals():
+            for fac in [f for f in store_facs if _FACILITY_DISTRICT.get(f) == focus_dist]:
+                pos = fac_positions.get(fac)
+                if pos:
+                    focus_points.append(pos)
+        if focus_points:
+            xs = [p[0] for p in focus_points]
+            ys = [p[1] for p in focus_points]
+            pad_x = max((max(xs) - min(xs)) * 0.12, 0.03)
+            pad_y = max((max(ys) - min(ys)) * 0.12, 0.03)
+            x_range = [max(-0.02, min(xs) - pad_x), min(1.02, max(xs) + pad_x)]
+            y_range = [max(-0.02, min(ys) - pad_y), min(y_scale + 0.02, max(ys) + pad_y)]
+
     fig.add_trace(go.Scatter(
         x=[None], y=[None], mode='markers', showlegend=True,
         marker=dict(
@@ -1318,8 +1505,9 @@ def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
         paper_bgcolor=BG, plot_bgcolor=BG, height=560, margin=dict(l=10, r=10, t=34, b=10),
         font=dict(family=FONT, color=TEXT, size=11), hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
         hovermode='closest', dragmode='pan',
-        xaxis=dict(visible=False, range=[-0.02, 1.02], fixedrange=False),
-        yaxis=dict(visible=False, range=[-0.02, y_scale + 0.02], fixedrange=False, scaleanchor='x', scaleratio=1),
+        xaxis=dict(visible=False, range=x_range, fixedrange=False),
+        yaxis=dict(visible=False, range=y_range, fixedrange=False, scaleanchor='x', scaleratio=1),
+        transition=dict(duration=450, easing='cubic-in-out'),
         annotations=[dict(
             x=0.01, y=1.03, xref='paper', yref='paper', text=title, showarrow=False, xanchor='left',
             font=dict(size=15, color=TEXT, family=FONT),
@@ -1704,16 +1892,24 @@ _COMPARE_COLORS = [
 
 @callback(
     Output('mnid-compare-bar-chart', 'figure'),
+    Output('mnid-compare-entities', 'options'),
+    Output('mnid-compare-entities', 'value'),
+    Output('mnid-compare-indicators', 'options'),
+    Output('mnid-compare-indicators', 'value'),
     Output('mnid-compare-chart-type-store', 'data'),
     Output('mnid-compare-chart-toggle', 'className'),
     Output('mnid-compare-chart-toggle-text', 'children'),
     Input('mnid-compare-mode', 'value'),
+    Input('mnid-compare-entities', 'value'),
+    Input('mnid-compare-time-grain', 'value'),
+    Input('mnid-compare-indicators', 'value'),
     Input('mnid-compare-chart-toggle', 'n_clicks'),
     State('mnid-compare-store', 'data'),
     State('mnid-compare-chart-type-store', 'data'),
 )
-def update_compare_charts(mode, toggle_clicks, stored, chart_type):
+def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids, toggle_clicks, stored, chart_type):
     mode = mode or 'facility'
+    time_grain = time_grain or 'monthly'
     chart_type = chart_type or 'bar'
     ctx = callback_context
     if ctx and ctx.triggered and ctx.triggered[0]['prop_id'] == 'mnid-compare-chart-toggle.n_clicks':
@@ -1721,11 +1917,17 @@ def update_compare_charts(mode, toggle_clicks, stored, chart_type):
     store_payload = stored or {}
     tracked = store_payload.get('tracked', [])
     mch_full = _deserialize_store_df(store_payload.get('records'))
+    facility_options = store_payload.get('facility_options', [])
+    district_options = store_payload.get('district_options', [])
+    current_fac = store_payload.get('current_fac', '')
+    current_dist = store_payload.get('current_dist', '')
 
-    tracked_cats = sorted({i.get('category', 'Other') for i in tracked if i.get('category')})
-    active_cats = tracked_cats
-    filtered_tracked = [i for i in tracked if i.get('category', 'Other') in active_cats]
-    active_inds = filtered_tracked
+    ind_options = [{'label': i['label'], 'value': i['id']} for i in tracked]
+    valid_ind_ids = {opt['value'] for opt in ind_options}
+    selected_ind_ids = [iid for iid in (selected_ind_ids or []) if iid in valid_ind_ids][:3]
+    if not selected_ind_ids:
+        selected_ind_ids = [i['id'] for i in tracked[:3]]
+    active_inds = [i for i in tracked if i['id'] in selected_ind_ids]
 
     _empty_fig = go.Figure()
     _empty_fig.update_layout(
@@ -1740,82 +1942,90 @@ def update_compare_charts(mode, toggle_clicks, stored, chart_type):
     if not active_inds or mch_full.empty:
         toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
         toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
-        return _empty_fig, chart_type, toggle_class, toggle_text
+        entity_options = facility_options if mode == 'facility' else district_options
+        return _empty_fig, entity_options, (selected_entities or []), ind_options, selected_ind_ids, chart_type, toggle_class, toggle_text
 
     if mode == 'facility':
-        entities = (
-            mch_full['Facility_CODE'].dropna().astype(str).unique().tolist()
-            if 'Facility_CODE' in mch_full.columns else []
-        )
-        entity_labels = [_FACILITY_NAMES.get(e, e) for e in entities]
+        entity_options = facility_options
+        default_entities = ([current_fac] if current_fac else []) or [opt['value'] for opt in facility_options[:4]]
+        entities = [str(v) for v in (selected_entities or default_entities) if str(v) in {str(opt['value']) for opt in facility_options}]
+        entity_labels = {str(opt['value']): str(opt['label']) for opt in facility_options}
         def get_df(entity):
             return mch_full[mch_full['Facility_CODE'] == entity] if 'Facility_CODE' in mch_full.columns else pd.DataFrame()
     else:
-        entities = (
-            mch_full['District'].dropna().astype(str).unique().tolist()
-            if 'District' in mch_full.columns else []
-        )
-        entity_labels = list(entities)
+        entity_options = district_options
+        default_entities = ([current_dist] if current_dist else []) or [opt['value'] for opt in district_options[:4]]
+        entities = [str(v) for v in (selected_entities or default_entities) if str(v) in {str(opt['value']) for opt in district_options}]
+        entity_labels = {str(opt['value']): str(opt['label']) for opt in district_options}
         def get_df(entity):
             return mch_full[mch_full['District'] == entity] if 'District' in mch_full.columns else pd.DataFrame()
 
     if not entities:
         toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
         toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
-        return _empty_fig, chart_type, toggle_class, toggle_text
+        return _empty_fig, entity_options, [], ind_options, selected_ind_ids, chart_type, toggle_class, toggle_text
+
+    if 'Date' not in mch_full.columns:
+        toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
+        toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
+        return _empty_fig, entity_options, entities, ind_options, selected_ind_ids, chart_type, toggle_class, toggle_text
+
+    if time_grain == 'quarterly':
+        period_code = 'Q'
+        period_fmt = lambda p: f"{p.year} Q{p.quarter}"
+    elif time_grain == 'yearly':
+        period_code = 'Y'
+        period_fmt = lambda p: str(p.year)
+    else:
+        period_code = 'M'
+        period_fmt = lambda p: pd.Period(p, 'M').strftime('%b %Y')
+
+    d2 = mch_full.copy()
+    d2['_period'] = pd.to_datetime(d2['Date']).dt.to_period(period_code)
+    periods = sorted(d2['_period'].dropna().unique())[-12:]
 
     fig = go.Figure()
-    for idx, ind in enumerate(active_inds):
-        color  = _COMPARE_COLORS[idx % len(_COMPARE_COLORS)]
-        y_vals, texts = [], []
-        for entity in entities:
-            df = get_df(entity)
-            if df.empty:
-                y_vals.append(None)
-                texts.append('No data')
-            else:
-                _, den, pct = _cov(df, ind['numerator_filters'], ind['denominator_filters'])
-                y_vals.append(_display_pct(pct) if den > 0 else None)
+    series_idx = 0
+    for entity in entities:
+        entity_df = get_df(entity).copy()
+        if entity_df.empty:
+            continue
+        for ind in active_inds:
+            xs, ys, texts = [], [], []
+            for period in periods:
+                period_df = entity_df[pd.to_datetime(entity_df['Date']).dt.to_period(period_code) == period]
+                _, den, pct = _cov(period_df, ind['numerator_filters'], ind['denominator_filters'])
+                xs.append(period_fmt(period))
+                ys.append(_display_pct(pct) if den > 0 else None)
                 texts.append(f'{pct:.0f}%' if den > 0 else 'No data')
-
-        if chart_type == 'line':
-            fig.add_trace(go.Scatter(
-                name=ind['label'],
-                x=entity_labels,
-                y=y_vals,
-                mode='lines+markers',
-                line=dict(color=color, width=2.6, shape='spline'),
-                marker=dict(size=7, color=color, line=dict(color='#fff', width=1.2)),
-                hovertemplate=(
-                    f'<b>{ind["label"]}</b><br>'
-                    '%{x}<br>Coverage: %{y:.1f}%<extra></extra>'
-                ),
-                connectgaps=False,
-            ))
-        else:
-            fig.add_trace(go.Bar(
-                name=ind['label'],
-                x=entity_labels,
-                y=y_vals,
-                text=texts,
-                textposition='outside',
-                textfont=dict(size=9, color='#E2E8F0'),
-                marker=dict(color=color, opacity=0.88,
-                            line=dict(color='rgba(255,255,255,0.25)', width=0.8)),
-                hovertemplate=(
-                    f'<b>{ind["label"]}</b><br>'
-                    '%{x}<br>Coverage: %{y:.1f}%<extra></extra>'
-                ),
-            ))
-
-    avg_target = sum(i.get('target', 80) for i in active_inds) / len(active_inds)
-    fig.add_hline(
-        y=avg_target,
-        line=dict(color='#64748B', width=1.5, dash='dot'),
-        annotation=dict(text=f'Avg target {avg_target:.0f}%',
-                        font=dict(size=10, color='#64748B'),
-                        x=1, xanchor='right'),
-    )
+            if not any(y is not None for y in ys):
+                continue
+            color = _COMPARE_COLORS[series_idx % len(_COMPARE_COLORS)]
+            series_idx += 1
+            series_name = f'{entity_labels.get(entity, entity)} | {ind["label"]}'
+            if chart_type == 'line':
+                fig.add_trace(go.Scatter(
+                    name=series_name,
+                    x=xs,
+                    y=ys,
+                    mode='lines+markers',
+                    line=dict(color=color, width=2.4, shape='spline'),
+                    marker=dict(size=6, color=color, line=dict(color='#fff', width=1.0)),
+                    hovertemplate=f'<b>{series_name}</b><br>%{{x}}<br>Coverage: %{{y:.1f}}%<extra></extra>',
+                    connectgaps=False,
+                ))
+            else:
+                fig.add_trace(go.Bar(
+                    name=series_name,
+                    x=xs,
+                    y=ys,
+                    text=texts,
+                    textposition='outside',
+                    textfont=dict(size=9, color='#E2E8F0'),
+                    marker=dict(color=color, opacity=0.88,
+                                line=dict(color='rgba(255,255,255,0.25)', width=0.8)),
+                    hovertemplate=f'<b>{series_name}</b><br>%{{x}}<br>Coverage: %{{y:.1f}}%<extra></extra>',
+                ))
 
     fig.update_layout(
         height=420,
@@ -1826,7 +2036,7 @@ def update_compare_charts(mode, toggle_clicks, stored, chart_type):
         paper_bgcolor='#ffffff',
         plot_bgcolor='#ffffff',
         font=dict(color=TEXT, family=FONT),
-        xaxis=dict(showgrid=False, tickfont=dict(size=11, color=TEXT), linecolor=BORDER),
+        xaxis=dict(showgrid=False, tickfont=dict(size=11, color=TEXT), linecolor=BORDER, title=dict(text='Time', font=dict(size=11, color='#94A3B8'))),
         yaxis=dict(
             title=dict(text='Coverage %', font=dict(size=11, color='#94A3B8')),
             range=[0, 115],
@@ -1842,7 +2052,7 @@ def update_compare_charts(mode, toggle_clicks, stored, chart_type):
     )
     toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
     toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
-    return fig, chart_type, toggle_class, toggle_text
+    return fig, entity_options, entities, ind_options, selected_ind_ids, chart_type, toggle_class, toggle_text
 
 
 # # MNID main heatmap section layout
@@ -2047,9 +2257,9 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
                     dcc.Dropdown(
                         id='mnid-heatmap-indicators',
                         options=ind_opts,
-                        value=all_labels[:8] if len(all_labels) >= 8 else all_labels,
-                        multi=True,
-                        placeholder='Select indicators...',
+                        value=all_labels[0] if all_labels else None,
+                        clearable=False,
+                        placeholder='Select indicator...',
                         style=_dd_style,
                     ),
                 ]),
@@ -2060,6 +2270,7 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
             dcc.Graph(
                 id='mnid-heatmap-graph',
                 className='mnid-heatmap-map',
+                animate=True,
                 config={'displayModeBar': True,
                         'modeBarButtonsToRemove': ['select2d', 'lasso2d'],
                         'scrollZoom': True,
@@ -2755,9 +2966,22 @@ def _build_compare_heatmap(title: str, df: 'pd.DataFrame', tracked: list) -> go.
 
 def _comparative_analysis_section(indicators: list, facility_code: str,
                                   mch_full: pd.DataFrame) -> html.Div:
-    """Grouped bar chart comparison across selected facilities or districts."""
+    """Time-aware comparison across selected facilities or districts and indicators."""
     tracked = [i for i in indicators if i.get('status') == 'tracked']
-    _ = sorted({i.get('category', 'Other') for i in tracked if i.get('category')})
+    all_facs  = sorted(mch_full['Facility_CODE'].dropna().astype(str).unique().tolist()) if len(mch_full) and 'Facility_CODE' in mch_full.columns else sorted(_ALL_FACILITIES[:])
+    all_dists = sorted(mch_full['District'].dropna().astype(str).unique().tolist()) if len(mch_full) and 'District' in mch_full.columns else sorted(_ALL_DISTRICTS[:])
+    current_dist = _FACILITY_DISTRICT.get(facility_code, '')
+    fac_opts = [{'label': _FACILITY_NAMES.get(f, f), 'value': f} for f in all_facs]
+    dist_opts = [{'label': d, 'value': d} for d in all_dists]
+    ind_opts = [{'label': ind['label'], 'value': ind['id']} for ind in tracked]
+    default_facs = ([facility_code] if facility_code in all_facs else all_facs[:4]) or []
+    default_dists = ([current_dist] if current_dist in all_dists else all_dists[:4]) or []
+    default_inds = [ind['id'] for ind in tracked[:3]]
+    _lbl_style = {
+        'fontSize': '11px', 'fontWeight': '600', 'color': '#94A3B8',
+        'textTransform': 'uppercase', 'letterSpacing': '0.05em',
+        'marginBottom': '5px', 'display': 'block',
+    }
 
     compare_card = html.Div(className='mnid-chart-card mnid-compare-card', children=[
         # -- Header row -----------------------------------------------------------
@@ -2793,6 +3017,41 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                 ),
             ]),
         ]),
+        html.Div(className='mnid-compare-filters', style={'display': 'grid', 'gridTemplateColumns': '1.4fr 0.8fr 1.2fr', 'gap': '12px', 'marginBottom': '14px'}, children=[
+            html.Div(children=[
+                html.Label('Locations', style=_lbl_style),
+                dcc.Dropdown(
+                    id='mnid-compare-entities',
+                    options=fac_opts,
+                    value=default_facs,
+                    multi=True,
+                    placeholder='Select locations...',
+                ),
+            ]),
+            html.Div(children=[
+                html.Label('Time Grain', style=_lbl_style),
+                dcc.Dropdown(
+                    id='mnid-compare-time-grain',
+                    options=[
+                        {'label': 'Monthly', 'value': 'monthly'},
+                        {'label': 'Quarterly', 'value': 'quarterly'},
+                        {'label': 'Yearly', 'value': 'yearly'},
+                    ],
+                    value='monthly',
+                    clearable=False,
+                ),
+            ]),
+            html.Div(children=[
+                html.Label('Indicators', style=_lbl_style),
+                dcc.Dropdown(
+                    id='mnid-compare-indicators',
+                    options=ind_opts,
+                    value=default_inds,
+                    multi=True,
+                    placeholder='Select up to 3 indicators...',
+                ),
+            ]),
+        ]),
         # -- Grouped bar chart ----------------------------------------------------
         dcc.Graph(
             id='mnid-compare-bar-chart',
@@ -2810,6 +3069,10 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
         dcc.Store(id='mnid-compare-store', data={
             'tracked':    tracked,
             'records':    _serialize_store_df(mch_full),
+            'facility_options': fac_opts,
+            'district_options': dist_opts,
+            'current_fac': facility_code,
+            'current_dist': current_dist,
         }),
         dcc.Store(id='mnid-compare-chart-type-store', data='bar'),
         html.Div(className='mnid-chart-grid', children=[compare_card]),
@@ -2888,7 +3151,8 @@ def _hero_donut_row(computed, preferred_cat: str = 'ANC', section_title: str | N
         return html.Div()
 
     if not section_title:
-        section_title = 'KEY NEWBORN INDICATORS' if preferred_cat == 'Newborn' else 'KEY ANC INDICATORS'
+        label = _CAT_LABELS.get(preferred_cat, str(preferred_cat or 'Program'))
+        section_title = f'KEY {label.upper()} INDICATORS'
 
     cards = []
     for ind in heroes:
@@ -3198,6 +3462,12 @@ def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=N
                 if not dists.empty:
                     district = dists.mode().iloc[0]
 
+    selected_program = 'All'
+    if facility_df is not None and len(facility_df):
+        requested = getattr(facility_df, 'attrs', {}).get('mnid_program')
+        if requested:
+            selected_program = requested
+
     return html.Div(className='mnid-topbar', children=[
         html.Div(className='mnid-topbar-copy', children=[
             html.Div('M-NID Dashboard', className='mnid-topbar-label'),
@@ -3221,17 +3491,9 @@ def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=N
             ]),
             html.Div(className='mnid-info-pill', children=[
                 html.Div('Program', className='mnid-info-pill-label'),
-                dcc.Dropdown(
-                    id='mnid-category-dropdown',
-                    options=[
-                        {"label": "All", "value": "All"},
-                        {"label": "ANC", "value": "ANC"},
-                        {"label": "Labour & Delivery", "value": "Labour"},
-                        {"label": "PNC", "value": "PNC"},
-                    ],
-                    value="All",
-                    clearable=False,
-                    className="mnid-topbar-dropdown",
+                html.Div(
+                    'Labour & Delivery' if selected_program == 'Labour' else selected_program,
+                    className='mnid-info-pill-value mnid-info-pill-value-compact',
                 ),
             ]),
             html.Div(className='mnid-info-pill', children=[
@@ -3378,6 +3640,10 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
                           scope_meta: dict | None = None):
     facility_df = _prepare_mnid_dataframe(filtered)
     network_df = _prepare_mnid_dataframe(data_opd)
+    selected_program = (scope_meta or {}).get('mnid_categories')
+    selected_program = selected_program[0] if selected_program else 'All'
+    facility_df.attrs['mnid_program'] = selected_program
+    network_df.attrs['mnid_program'] = selected_program
     if network_df.empty:
         network_df = facility_df.copy()
 
@@ -3401,15 +3667,13 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     if category_order == ['Newborn']:
         dashboard_title = 'Newborn Indicators'
         dashboard_subtitle = 'Focused newborn care performance, comparison, coverage, and readiness.'
-        hero_title = 'KEY NEWBORN INDICATORS'
     elif set(category_order) == {'ANC', 'Labour', 'PNC'}:
         dashboard_title = 'Maternal Health Indicators'
         dashboard_subtitle = 'ANC, labour, and postnatal performance, comparison, coverage, and readiness.'
-        hero_title = 'KEY ANC INDICATORS'
     else:
         dashboard_title = f"{config.get('report_name', 'Maternal and Child Health')} Indicators"
         dashboard_subtitle = 'Clean view of performance, comparison, coverage, and readiness.'
-        hero_title = 'KEY ANC INDICATORS'
+    hero_title = f'KEY {_CAT_LABELS.get(default_cat, str(default_cat or "Program")).upper()} INDICATORS'
 
     computed = []
     for ind in tracked:
@@ -3481,7 +3745,7 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
 
         _section_anchor('mnid-trends'),
         _sec_header('Coverage Trends', desc='12-month rolling - dotted line = target'),
-        _trend_switcher(facility_df, all_inds),
+        _trend_switcher(facility_df, all_inds, scope_meta=scope_meta),
 
         _section_anchor('mnid-performance'),
         _sec_header('Facility Performance', desc='District comparison heatmap for key performance indicators'),
