@@ -161,6 +161,7 @@ layout = html.Div(
     children=[
         dcc.Location(id='url', refresh=False),
         dcc.Store(id='active-button-store', data='General Summary'),
+        dcc.Store(id='dashboard-category-store', data='All'),
         
         # Left Sidebar
         html.Div(
@@ -293,25 +294,6 @@ layout = html.Div(
                                             ]
                                         ),
 
-                                        # Program Category Filter (MNID)
-                                        html.Div(
-                                            className="filter-group",
-                                            children=[
-                                                html.Label("Program Category", className="filter-label"),
-                                                dcc.Dropdown(
-                                                    id='dashboard-category-filter',
-                                                    options=[
-                                                        {"label": "All", "value": "All"},
-                                                        {"label": "ANC", "value": "ANC"},
-                                                        {"label": "Labour & Delivery", "value": "Labour"},
-                                                        {"label": "PNC", "value": "PNC"},
-                                                    ],
-                                                    value="All",
-                                                    clearable=False,
-                                                    className="modern-dropdown",
-                                                )
-                                            ]
-                                        ),
                                         
                                         # Age Group Filter
                                         html.Div(
@@ -436,7 +418,7 @@ def update_menu(interval, color):
         Input('dashboard-district-filter', 'value'),
         Input('dashboard-facility-filter', 'value'),
         Input('dashboard-overview-filter', 'value'),
-        Input('dashboard-category-filter', 'value'),
+        Input('dashboard-category-store', 'data'),
         Input({"type": "menu-button", "name": ALL}, "n_clicks"),
     ],
     [
@@ -761,7 +743,7 @@ def sync_picker_with_logic(period_type, n):
      Output('dashboard-district-filter', 'value', allow_duplicate=True),
      Output('dashboard-facility-filter', 'value', allow_duplicate=True),
      Output('dashboard-overview-filter', 'value', allow_duplicate=True),
-     Output('dashboard-category-filter', 'value', allow_duplicate=True),
+     Output('dashboard-category-store', 'data', allow_duplicate=True),
      Output('dashboard-age-filter', 'value', allow_duplicate=True)],
     Input('dashboard-btn-reset', 'n_clicks'),
     prevent_initial_call=True
@@ -777,7 +759,6 @@ def reset_ui_controls(n_clicks):
      Output('dashboard-district-filter', 'style'),
      Output('dashboard-facility-filter', 'style'),
      Output('dashboard-overview-filter', 'style'),
-     Output('dashboard-category-filter', 'style'),
      Output('dashboard-age-filter', 'style')],
     [Input('dashboard-btn-reset', 'n_clicks'),
      Input('dashboard-btn-generate', 'n_clicks')],
@@ -795,7 +776,28 @@ def change_style(generate, reset):
                     "border": "3px solid green",
                     "borderRadius": "8px"
                     }
-        return style_active, style_active, style_active, style_active, style_active, style_active, style_active, style_active
+        return style_active, style_active, style_active, style_active, style_active, style_active, style_active
     else:
         style_default = {}
-        return style_default, style_default, style_default, style_default, style_default, style_default, style_default, style_default
+        return style_default, style_default, style_default, style_default, style_default, style_default, style_default
+
+
+@callback(
+    Output('dashboard-category-store', 'data'),
+    Input('mnid-category-dropdown', 'value'),
+    State('dashboard-category-store', 'data'),
+    prevent_initial_call=True
+)
+def sync_category_store(selected, current):
+    if not selected or selected == current:
+        raise PreventUpdate
+    return selected
+
+
+@callback(
+    Output('mnid-category-dropdown', 'value'),
+    Input('dashboard-category-store', 'data'),
+    prevent_initial_call=True
+)
+def sync_category_dropdown(value):
+    return value or "All"

@@ -3220,6 +3220,21 @@ def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=N
                                 'color': TEXT, 'lineHeight': '1.2'}),
             ]),
             html.Div(className='mnid-info-pill', children=[
+                html.Div('Program', className='mnid-info-pill-label'),
+                dcc.Dropdown(
+                    id='mnid-category-dropdown',
+                    options=[
+                        {"label": "All", "value": "All"},
+                        {"label": "ANC", "value": "ANC"},
+                        {"label": "Labour & Delivery", "value": "Labour"},
+                        {"label": "PNC", "value": "PNC"},
+                    ],
+                    value="All",
+                    clearable=False,
+                    className="mnid-topbar-dropdown",
+                ),
+            ]),
+            html.Div(className='mnid-info-pill', children=[
                 html.Div('Indicators', className='mnid-info-pill-label'),
                 html.Div(f'{n_tracked} tracked / {n_await} pending',
                          style={'fontSize': '11px', 'fontWeight': '700',
