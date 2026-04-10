@@ -39,6 +39,19 @@ _CHART_LAYOUT = dict(
                 orientation='v', x=1.02, y=0.5, xanchor='left'),
 )
 
+_TREND_SERIES_PALETTE = [
+    '#2563EB', '#0F766E', '#C2410C', '#7C3AED',
+    '#DB2777', '#0891B2', '#4D7C0F', '#B45309',
+    '#1D4ED8', '#BE185D', '#0F766E', '#6D28D9',
+]
+_TREND_ACCENT = {
+    'ANC': '#2563EB',
+    'Labour': '#C2410C',
+    'Newborn': '#0F766E',
+    'PNC': '#7C3AED',
+}
+_ANALYSIS_PALETTE = ['#2563EB', '#0F766E', '#7C3AED', '#C2410C', '#DB2777', '#0891B2', '#64748B']
+
 # MNID data helpers
 
 def _cov(df, n_cfg, d_cfg):
@@ -157,7 +170,7 @@ def _chart_card(title, fig):
 def _donut(counts_df, title, color_map=None):
     if not len(counts_df):
         return None
-    palette = [OK_C, INFO_C, WARN_C, DANGER_C, '#7C3AED', '#0891B2', MUTED]
+    palette = _ANALYSIS_PALETTE
     colors = [color_map.get(r, palette[i % len(palette)])
               if color_map else palette[i % len(palette)]
               for i, r in enumerate(counts_df['label'])]
@@ -181,7 +194,7 @@ def _hbar(counts_df, title, color=INFO_C, single_color=False):
     if not len(counts_df):
         return None
     counts_df = counts_df.sort_values('n')
-    palette = [OK_C, INFO_C, WARN_C, DANGER_C, '#7C3AED', '#0891B2', MUTED]
+    palette = _ANALYSIS_PALETTE
     colors = color if single_color else [palette[i % len(palette)]
                                          for i in range(len(counts_df))]
     fig = go.Figure(go.Bar(
@@ -205,15 +218,13 @@ def _hbar(counts_df, title, color=INFO_C, single_color=False):
     return fig
 
 
-def _line(monthly_df, title, color=INFO_C, y_label='Clients'):
+def _line(monthly_df, title, color='#2563EB', y_label='Clients'):
     if not len(monthly_df): return None
-    r, g, b = int(color[1:3],16), int(color[3:5],16), int(color[5:7],16)
     fig = go.Figure(go.Scatter(
         x=monthly_df['month'], y=monthly_df['n'],
         mode='lines+markers',
-        line=dict(color=color, width=2.5, shape='spline'),
-        marker=dict(size=6, color=color, line=dict(color='#fff', width=1.5)),
-        fill='tozeroy', fillcolor=f'rgba({r},{g},{b},0.07)',
+        line=dict(color=color, width=2.25, shape='spline'),
+        marker=dict(size=5, color=color, line=dict(color='#fff', width=1.25)),
         hovertemplate='%{x|%b %Y}: %{y}<extra></extra>',
     ))
     fig.update_layout(
@@ -243,7 +254,7 @@ def _resolve_category_order(indicators: list, configured: list | None = None) ->
 
 
 def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str, chart_type: str = 'line') -> go.Figure:
-    palette = CAT_PALETTES.get(cat, [INFO_C])
+    palette = _TREND_SERIES_PALETTE
     fig = go.Figure()
 
     if not len(df) or not cat_inds:
@@ -299,18 +310,11 @@ def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str, chart_type: str =
             fig.add_trace(go.Scatter(
                 x=xs, y=ys, name=ind['label'],
                 mode='lines+markers',
-                line=dict(color=c, width=2.5, shape='spline'),
-                marker=dict(size=6, color=c, line=dict(color='#fff', width=1.5)),
-                fill='tozeroy', fillcolor=f'rgba({r},{g},{b},0.05)',
+                line=dict(color=c, width=2, shape='spline'),
+                marker=dict(size=5, color=c, line=dict(color='#fff', width=1.25)),
                 connectgaps=True,
                 hovertemplate=f'%{{x|%b %Y}}<br>{ind["label"]}: %{{y:.0f}}%<extra></extra>',
             ))
-
-        non_none_xs = [x for x, y in zip(xs, ys) if y is not None]
-        if len(non_none_xs) >= 2:
-            fig.add_shape(type='line', x0=non_none_xs[0], x1=non_none_xs[-1],
-                          y0=ind['target'], y1=ind['target'],
-                          line=dict(color=c, width=1, dash='dot'), layer='below')
     fig.update_layout(
         paper_bgcolor=BG, plot_bgcolor=BG,
         font=dict(family=FONT, color=TEXT, size=11),
@@ -1692,9 +1696,9 @@ def update_performance_heatmap(sel_inds, stored):
 
 
 _COMPARE_COLORS = [
-    OK_C, WARN_C, DANGER_C, INFO_C,
-    '#0D9488', '#14B8A6', '#0891B2', '#7C3AED',
-    '#F472B6', '#F97316',
+    '#2563EB', '#0F766E', '#C2410C', '#7C3AED',
+    '#DB2777', '#0891B2', '#4D7C0F', '#B45309',
+    '#1D4ED8', '#BE185D',
 ]
 
 
@@ -1816,9 +1820,9 @@ def update_compare_charts(mode, sel_facs, sel_dists, sel_kinds, sel_ind_ids, tog
     avg_target = sum(i.get('target', 80) for i in active_inds) / len(active_inds)
     fig.add_hline(
         y=avg_target,
-        line=dict(color=WARN_C, width=1.5, dash='dot'),
+        line=dict(color='#64748B', width=1.5, dash='dot'),
         annotation=dict(text=f'Avg target {avg_target:.0f}%',
-                        font=dict(size=10, color=WARN_C),
+                        font=dict(size=10, color='#64748B'),
                         x=1, xanchor='right'),
     )
 
@@ -2424,7 +2428,7 @@ def _anc_charts(df):
     monthly = _monthly_visits(df, 'ANC VISIT')
     charts = []
 
-    fig = _line(monthly, 'ANC Visits Over Time', color=INFO_C, y_label='Unique Clients')
+    fig = _line(monthly, 'ANC Visits Over Time', color=_TREND_ACCENT['ANC'], y_label='Unique Clients')
     if fig: charts.append(_chart_card('', fig))
 
     for concept, title in [
@@ -2434,17 +2438,17 @@ def _anc_charts(df):
     ]:
         vc = _value_counts(df, concept)
         fig = _donut(vc, title, color_map={
-            'Screened': OK_C, 'Not screened': DANGER_C,
+            'Screened': '#2563EB', 'Not screened': '#94A3B8',
         })
         if fig: charts.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'POCUS completed')
-    fig = _donut(vc, 'POCUS Completed', color_map={'Yes': OK_C, 'No': DANGER_C})
+    fig = _donut(vc, 'POCUS Completed', color_map={'Yes': '#0F766E', 'No': '#94A3B8'})
     if fig: charts.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'HIV Test')
     fig = _donut(vc, 'HIV Testing Status', color_map={
-        'Non-reactive': OK_C, 'Reactive': DANGER_C,
+        'Non-reactive': '#2563EB', 'Reactive': '#DB2777',
     })
     if fig: charts.append(_chart_card('', fig))
 
@@ -2463,13 +2467,13 @@ def _labour_charts(df):
         charts.append(cascade)
 
     monthly = _monthly_visits(df, 'LABOUR AND DELIVERY')
-    fig = _line(monthly, 'Labour & Delivery Visits', color=WARN_C, y_label='Clients')
+    fig = _line(monthly, 'Labour & Delivery Visits', color=_TREND_ACCENT['Labour'], y_label='Clients')
     if fig: charts.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'Place of delivery')
     fig = _donut(vc, 'Place of Delivery', color_map={
-        'This facility': OK_C, 'this facility': OK_C,
-        'Home': DANGER_C, 'Referral facility': WARN_C, 'In transit': '#92400E',
+        'This facility': '#2563EB', 'this facility': '#2563EB',
+        'Referral facility': '#0F766E', 'Home': '#C2410C', 'In transit': '#64748B',
     })
     if fig: charts.append(_chart_card('', fig))
 
@@ -2483,9 +2487,9 @@ def _labour_charts(df):
 
     vc = _value_counts(df, 'Outcome of the delivery')
     fig = _donut(vc, 'Birth Outcome', color_map={
-        'Live births': OK_C,
-        'Fresh stillbirth': DANGER_C,
-        'Macerated stillbirth': '#92400E',
+        'Live births': '#0F766E',
+        'Fresh stillbirth': '#DB2777',
+        'Macerated stillbirth': '#7C3AED',
     })
     if fig: charts.append(_chart_card('', fig))
 
@@ -2497,9 +2501,10 @@ def _labour_charts(df):
     ]:
         vc = _value_counts(df, concept)
         fig = _donut(vc, label, color_map={
-            'Yes': OK_C, 'Used': OK_C, 'Completed': OK_C,
-            'No': DANGER_C, 'Not used': DANGER_C, 'Not required': MUTED,
-            'Partial': WARN_C, 'Not eligible': MUTED,
+            'Yes': '#2563EB', 'Used': '#2563EB', 'Completed': '#2563EB',
+            'Partial': '#C2410C',
+            'No': '#94A3B8', 'Not used': '#94A3B8',
+            'Not required': '#CBD5E1', 'Not eligible': '#CBD5E1',
         })
         if fig: charts.append(_chart_card('', fig))
 
@@ -2509,7 +2514,7 @@ def _labour_charts(df):
 def _pnc_charts(df):
     charts = []
     monthly = _monthly_visits(df, 'POSTNATAL CARE')
-    fig = _line(monthly, 'PNC Visits Over Time', color='#7C3AED', y_label='Clients')
+    fig = _line(monthly, 'PNC Visits Over Time', color=_TREND_ACCENT['PNC'], y_label='Clients')
     if fig: charts.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'Postnatal check period')
@@ -2518,20 +2523,20 @@ def _pnc_charts(df):
 
     vc = _value_counts(df, 'Breast feeding')
     fig = _donut(vc, 'Breastfeeding Mode', color_map={
-        'Exclusive': OK_C, 'exclusive breastfeeding': OK_C,
-        'Mixed': WARN_C, 'Not breastfeeding': DANGER_C,
+        'Exclusive': '#2563EB', 'exclusive breastfeeding': '#2563EB',
+        'Mixed': '#0F766E', 'Not breastfeeding': '#7C3AED',
     })
     if fig: charts.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'Status of the mother')
     fig = _donut(vc, 'Mother Final Status', color_map={
-        'Stable': OK_C, 'Death': DANGER_C, 'Referred': WARN_C,
+        'Stable': '#2563EB', 'Referred': '#C2410C', 'Death': '#DB2777',
     })
     if fig: charts.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'Status of baby')
     fig = _donut(vc, 'Baby Final Status', color_map={
-        'Stable': OK_C, 'Died': DANGER_C, 'Referred': WARN_C,
+        'Stable': '#2563EB', 'Referred': '#C2410C', 'Died': '#DB2777',
     })
     if fig: charts.append(_chart_card('', fig))
 
@@ -2545,45 +2550,46 @@ def _pnc_charts(df):
 def _newborn_charts(df):
     charts = []
     monthly = _monthly_visits(df, 'NEONATAL CARE')
-    fig = _line(monthly, 'Neonatal Care Admissions', color=OK_C, y_label='Babies')
+    fig = _line(monthly, 'Neonatal Care Admissions', color=_TREND_ACCENT['Newborn'], y_label='Babies')
     if fig: charts.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'Thermal status on admission')
     fig = _donut(vc, 'Thermal Status on Admission', color_map={
-        'Not hypothermic': OK_C,
-        'Mild hypothermia': WARN_C,
-        'Moderate hypothermia': DANGER_C,
+        'Not hypothermic': '#2563EB',
+        'Mild hypothermia': '#0F766E',
+        'Moderate hypothermia': '#C2410C',
+        'Severe hypothermia': '#DB2777',
     })
     if fig: charts.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'Neonatal resuscitation provided')
     fig = _donut(vc, 'Neonatal Resuscitation', color_map={
-        'Yes': OK_C, 'Stimulation only': INFO_C,
-        'Bag and mask': WARN_C, 'No': DANGER_C, 'Not required': MUTED,
+        'Yes': '#2563EB', 'Stimulation only': '#0F766E',
+        'Bag and mask': '#7C3AED', 'No': '#94A3B8', 'Not required': '#CBD5E1',
     })
     if fig: charts.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'iKMC initiated')
     fig = _donut(vc, 'iKMC Initiated', color_map={
-        'Yes': OK_C, 'No': DANGER_C, 'Not eligible': MUTED,
+        'Yes': '#2563EB', 'No': '#94A3B8', 'Not eligible': '#CBD5E1',
     })
     if fig: charts.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'CPAP support')
     fig = _donut(vc, 'CPAP Support Type', color_map={
-        'Bubble CPAP': OK_C, 'Nasal oxygen': DANGER_C, 'None': MUTED,
+        'Bubble CPAP': '#2563EB', 'Nasal oxygen': '#0F766E', 'None': '#94A3B8',
     })
     if fig: charts.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'Phototherapy given')
     fig = _donut(vc, 'Phototherapy Given', color_map={
-        'Yes': OK_C, 'No': DANGER_C,
+        'Yes': '#2563EB', 'No': '#94A3B8',
     })
     if fig: charts.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'Parenteral antibiotics given')
     fig = _donut(vc, 'Parenteral Antibiotics', color_map={
-        'Yes': OK_C, 'No': DANGER_C,
+        'Yes': '#2563EB', 'No': '#94A3B8',
     })
     if fig: charts.append(_chart_card('', fig))
 
@@ -2659,7 +2665,7 @@ def _compare_status_counts(df: pd.DataFrame, tracked: list) -> dict:
 def _build_compare_pie(title: str, counts: dict) -> go.Figure:
     labels = list(counts.keys())
     values = list(counts.values())
-    colors = [OK_C, DANGER_C, '#D6D3CB']
+    colors = ['#2563EB', '#0F766E', '#D6D3CB']
 
     fig = go.Figure(go.Pie(
         labels=labels,
@@ -2685,7 +2691,7 @@ def _build_compare_pie(title: str, counts: dict) -> go.Figure:
 def _build_compare_bar(title: str, counts: dict) -> go.Figure:
     labels = list(counts.keys())
     values = list(counts.values())
-    colors = [OK_C, DANGER_C, '#D6D3CB']
+    colors = ['#2563EB', '#0F766E', '#D6D3CB']
 
     fig = go.Figure(go.Bar(
         x=values,
@@ -2712,23 +2718,20 @@ def _build_compare_bar(title: str, counts: dict) -> go.Figure:
 def _build_compare_heatmap(title: str, df: 'pd.DataFrame', tracked: list) -> go.Figure:
     """Single-entity heatmap: one row per indicator showing coverage %."""
     names, pcts, colors_list = [], [], []
+    heat_palette = ['#DBEAFE', '#93C5FD', '#60A5FA', '#2563EB', '#1D4ED8']
     for ind in tracked:
         label = ind.get('label', ind.get('id', '-'))
         if df.empty:
             pct = 0.0
         else:
             _, _, pct = _cov(df, ind['numerator_filters'], ind['denominator_filters'])
-        target = ind.get('target', 0)
         names.append(label[:38])
         pcts.append(_display_pct(pct))
         if pct == 0:
             colors_list.append('#E5E7EB')
-        elif pct >= target:
-            colors_list.append(OK_C)
-        elif pct >= target * 0.75:
-            colors_list.append(WARN_C)
         else:
-            colors_list.append(DANGER_C)
+            bucket = min(int((_display_pct(pct) or 0) // 20), len(heat_palette) - 1)
+            colors_list.append(heat_palette[bucket])
 
     if not names:
         fig = go.Figure()
@@ -3219,7 +3222,7 @@ def _pph_cascade(df):
         if sum(values[1:]) == 0:
             return None
 
-        colors = [CAT_PALETTES['Labour'][0], CAT_PALETTES['Labour'][2], WARN_C, OK_C]
+        colors = ['#2563EB', '#7C3AED', '#C2410C', '#0F766E']
 
         fig = go.Figure(go.Funnel(
             y=labels, x=values,
