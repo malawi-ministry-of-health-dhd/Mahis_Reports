@@ -3373,7 +3373,8 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     dq_inds     = config.get('data_quality_indicators') or vt.get('data_quality_indicators', [])
     period      = f'{start_date} to {end_date}'
 
-    category_order = _resolve_category_order(all_inds, config.get('mnid_categories'))
+    requested_categories = (scope_meta or {}).get('mnid_categories')
+    category_order = _resolve_category_order(all_inds, requested_categories or config.get('mnid_categories'))
     if category_order:
         allowed = set(category_order)
         all_inds = [i for i in all_inds if i.get('category') in allowed]
