@@ -102,6 +102,34 @@
             "section_name": "Summary Visuals of Facility",
             "items": [
               {
+                "id": "chart_10b29015",
+                "name": "Attendance By Health Facility",
+                "type": "Column",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "Attendance By Health Facility",
+                  "x_col": "Facility",
+                  "y_col": "person_id",
+                  "x_title": "Health Facility",
+                  "y_title": "Number of patients",
+                  "unique_column": "person_id",
+                  "legend_title": "Legend",
+                  "color": "",
+                  "filter_col1": "",
+                  "filter_val1": "",
+                  "filter_col2": "",
+                  "filter_val2": "",
+                  "filter_col3": "",
+                  "filter_val3": "",
+                  "filter_col4": "",
+                  "filter_val4": "",
+                  "filter_col5": "",
+                  "filter_val5": ""
+                }
+              },
+              {
                 "id": "chart_10b29018",
                 "name": "Attendance By Program",
                 "type": "Column",

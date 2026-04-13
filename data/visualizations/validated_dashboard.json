@@ -238,6 +238,32 @@
             "section_name": "Facility Summary",
             "items": [
               {
+                "id": "chart_pivot_summary",
+                "name": "Locations",
+                "type": "PivotTable",
+                "level": "facility",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "index_col1":["District","Facility"],
+                  "columns": "",
+                  "values_col": "person_id_key",
+                  "title": "Attendance by Health Facility",
+                  "unique_column": "person_id_key",
+                  "aggfunc": "count",
+                  "filter_col1": "",
+                  "filter_val1": "",
+                  "filter_col2": "",
+                  "filter_val2": "",
+                  "filter_col3": "",
+                  "filter_val3": "",
+                  "x_title": "",
+                  "y_title": "",
+                  "rename": {"person_id": "Number of Patients"}
+                }
+              },
+              {
                 "id": "chart_10b29018",
                 "name": "Attendance By Program",
                 "type": "Column",

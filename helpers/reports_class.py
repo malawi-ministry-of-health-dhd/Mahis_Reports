@@ -1,6 +1,7 @@
 import pandas as pd
 from typing import Any, Dict, List, Tuple
 from helpers.visualizations import create_sum, create_count, create_count_sets
+from helpers.dhis_integrater import get_dhis_data
 import dash
 from datetime import datetime
 from dash import html, dash_table
@@ -10,7 +11,7 @@ class ReportTableBuilder:
         self.excel_path = excel_path
         self.filtered_df = filtered_df
         self.original_df = original_df
-
+        self.dhis_url = 'https://dhis2.health.gov.mw/api/dataValueSets.json'
         self.vars_df: pd.DataFrame | None = None
         self.filters_df: pd.DataFrame | None = None
         self.filters_map: Dict[str, Any] = {}
@@ -170,6 +171,34 @@ class ReportTableBuilder:
             return "Report"
         vals = [str(v).strip() for v in self.report_name["name"].tolist() if str(v).strip()]
         return vals[0] if vals else "Report"
+    
+    def _generate_dhis_params(self) -> Dict:
+        params = {
+            'dataSet':self.report_name['id'].iloc[0],
+            'period':'202512',
+            'orgUnit':'glIscvEdIJz'}
+        return params
+    
+    def _prepare_for_dhis_integration(self)-> List:
+        json_data = get_dhis_data(self.dhis_url, params=self._generate_dhis_params())
+        return json_data
+    
+    def _apply_dhis_mapping(self, df):
+        if "DHIS2-SCANFORM" not in df.columns:
+            return df
+        dhis_data = self._prepare_for_dhis_integration()
+        composite_key = {
+            f"{item['dataElement']}-{item['categoryOptionCombo']}": item['value']
+            for item in dhis_data
+        }
+        single_key = {
+            item['dataElement']: item['value']
+            for item in dhis_data
+        }
+        mapped = df["DHIS2-SCANFORM"].map(composite_key)
+        mapped = mapped.fillna(df["DHIS2-SCANFORM"].map(single_key))
+        df["DHIS2-SCANFORM"] = mapped
+        return df
 
     def build_section_tables(self) -> List[Tuple[str, pd.DataFrame]]:
         value_cols = self._collect_value_columns()
@@ -188,6 +217,7 @@ class ReportTableBuilder:
                 if buffer:
                     df = pd.DataFrame(buffer)
                     df = df.loc[:, (df != "").any(axis=0)]
+                    # df = self._apply_dhis_mapping(df)
                     sections.append((current_section_name, df))
                     buffer = []
                 current_section_name = name
@@ -201,17 +231,22 @@ class ReportTableBuilder:
             out = {"Data Element": name}
             for vc in value_cols:
                 filter_ref = str(row.get(vc, "")).strip()
-                out[current_headers.get(vc, vc)] = (
-                    self._compute_value_from_filter(filter_ref) if filter_ref else ""
+                if current_headers.get(vc, vc) == 'DHIS2-SCANFORM':
+                    out[current_headers.get(vc, vc)] = filter_ref
+                else:
+                    out[current_headers.get(vc, vc)] = (
+                        self._compute_value_from_filter(filter_ref) if filter_ref else ""
                 )
             buffer.append(out)
 
         if buffer:
             df = pd.DataFrame(buffer)
             df = df.loc[:, (df != "").any(axis=0)]
-            sections.append((current_section_name, df))
+            # df = self._apply_dhis_mapping(df)
+            sections.append((current_section_name, df))    
         return sections
     
+ 
     def build_section_tables_with_ids(self) -> List[Tuple[str, pd.DataFrame]]:
         value_cols = self._collect_value_columns()
         sections: List[Tuple[str, pd.DataFrame]] = []
@@ -251,10 +286,10 @@ class ReportTableBuilder:
             sections.append((current_section_name, df))
         return sections
     
+    
     def build_dash_components(self) -> List[Any]:
         title = self._title() or "Report"
         sections = self.build_section_tables()
-
         children: List[Any] = [
             html.Div(
                 children=[
@@ -262,8 +297,10 @@ class ReportTableBuilder:
                 ]
             )
         ]
-        
         for section_idx, (subtitle, subdf) in enumerate(sections):
+            subdf = self._apply_dhis_mapping(subdf)
+            if len(subdf.columns) <=1: #skip if the column has nothing in place of data. Only allow the forms that have value1x1,etc to be previewed
+                continue
             if subtitle:
                 children.append(
                     html.Div(
@@ -293,25 +330,16 @@ class ReportTableBuilder:
     
     def _create_modern_table(self, df: pd.DataFrame, section_idx: int) -> html.Div:
         """Create a modern, well-aligned table with proper column widths and no internal scrolling"""
-        
-        # Clean the dataframe - remove completely empty rows/columns
         df = df.dropna(how='all', axis=0).dropna(how='all', axis=1)
-        
         if df.empty:
             return html.Div("No data available", className="empty-table-message")
-        
-        # Prepare columns with proper styling
         value_cols = [c for c in df.columns if c != "Data Element"]
-        
-        # Calculate column widths based on content
         column_widths = {}
-        
         # Data Element column
         max_data_element_len = max(
             [len(str(x)) for x in df["Data Element"].tolist()] + [len("Data Element")]
         )
-        column_widths["Data Element"] = min(max_data_element_len * 8, 350)
-        
+        column_widths["Data Element"] = min((len(value_cols) +1) * 8, 350)
         # Value columns
         for col in value_cols:
             max_val_len = max(
@@ -395,12 +423,11 @@ class ReportTableBuilder:
                             "if": {"row_index": "odd"},
                             "backgroundColor": "#f8f9fa"
                         },
-                        # Empty cell styling for each value column
                         *[
                             {
                                 "if": {"filter_query": f"{{{col}}} = ''"},
                                 "backgroundColor": "#f1f3f4",
-                                "color": "#adb5bd"
+                                # "color": "#adb5bd"
                             }
                             for col in value_cols
                         ],

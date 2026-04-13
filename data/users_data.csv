@@ -1,1628 +1,1745 @@
 user_id,role
-59b392e6-8ac0-11e1-b88f-544249e32ba2,Clinician
+59b392e6-8ac0-11e1-b88f-544249e32ba2,Superuser
 59b392e6-8ac0-11e1-b88f-544249e32ba2,"Superuser,Superuser,"
-59b392e6-8ac0-11e1-b88f-544249e32ba2,System Developer
-3819ce3e-df0e-42d6-9996-11f1c8645416,Lab
-aaa69cb4-54aa-43ad-bb2a-e47307cad5d0,Clinician
-aaa69cb4-54aa-43ad-bb2a-e47307cad5d0,Provider
-aaa69cb4-54aa-43ad-bb2a-e47307cad5d0,Superuser
-e17e6093-40c7-4572-9ad9-0bb11d0a6f07,Lab
-8c3db5a5-4a7f-4111-b2e3-fcb9ffaae64a,Superuser
-dc940cca-d975-4358-8dfb-403aa215cf4f,Provider
-5defb066-9fdf-48e8-b26f-ff4245b73d93,Superuser
-5defb066-9fdf-48e8-b26f-ff4245b73d93,"Superuser,Superuser,"
-c1ae40f0-2fe7-4e0e-9a4c-f7295487a50e,General Registration Clerk
-8c38bbe5-24db-44df-a416-e08ac06d07f1,General Registration Clerk
-8c38bbe5-24db-44df-a416-e08ac06d07f1,Registration Clerk
-1ca9e9fd-1110-4431-8f7f-5533a7641a02,General Registration Clerk
-1ca9e9fd-1110-4431-8f7f-5533a7641a02,Registration Clerk
-7f784b82-0244-4a59-b772-da6ad614d397,General Registration Clerk
-7f784b82-0244-4a59-b772-da6ad614d397,Registration Clerk
-04fd0cb8-ea43-491a-8c52-e8e8197041e8,General Registration Clerk
-04fd0cb8-ea43-491a-8c52-e8e8197041e8,Registration Clerk
-c82041b3-27e8-4820-8efb-f68c920f0c14,Clinician
-c82041b3-27e8-4820-8efb-f68c920f0c14,"Superuser,Superuser,"
-be0255cb-0cdf-4572-8a9b-1723a9f00400,Clinician
-10c9b9e3-be32-415a-9801-e0ab144145cf,Clinician
-9cb2133f-0efb-4d23-adb2-6327ecbbd7b8,Lab
-a742f035-0fa6-4e37-850f-0f6efd8eb197,Lab
-080d65f8-9aaf-48e2-b149-beb8c89e8900,Lab
-bc82cf68-c95b-435e-9653-e486a5ace190,Nurse
-75ac8472-af31-4932-aefc-fd8db841a0ee,Nurse
-833f0fce-ad9e-42cd-aef0-e9ec9d8afa83,Nurse
-c306f8a9-f7ed-4657-83cc-895c1676d7ca,Pharmacist
-c189642e-e642-4b29-b3f0-9c0d590b648d,Pharmacist
-ab920b39-184f-46e2-abab-eb297bbc3194,Pharmacist
-27fc65a7-7342-4753-bbf5-713a26b5981a,Clinician
-27fc65a7-7342-4753-bbf5-713a26b5981a,HSA
-27fc65a7-7342-4753-bbf5-713a26b5981a,Nurse
-27fc65a7-7342-4753-bbf5-713a26b5981a,Superuser
-27fc65a7-7342-4753-bbf5-713a26b5981a,"Superuser,Superuser,"
-48114f11-b8c5-4025-bab9-656bc33b1032,Clinician
-48114f11-b8c5-4025-bab9-656bc33b1032,Superuser
-69e43ef3-560a-43ac-927f-752fab8d2800,Clinician
-69e43ef3-560a-43ac-927f-752fab8d2800,Data Assistant
-69e43ef3-560a-43ac-927f-752fab8d2800,General Registration Clerk
-69e43ef3-560a-43ac-927f-752fab8d2800,Nurse
-69e43ef3-560a-43ac-927f-752fab8d2800,SPINE clinician
-69e43ef3-560a-43ac-927f-752fab8d2800,Vitals Clerk
-1c09d042-5b55-4d88-b362-b3d93b926215,General Registration Clerk
-1c09d042-5b55-4d88-b362-b3d93b926215,Registration Clerk
-b78e1ae2-0044-41ea-af65-a945b86c760d,General Registration Clerk
-b78e1ae2-0044-41ea-af65-a945b86c760d,Registration Clerk
-e6a40a42-88d3-443a-bff0-c482f91563fc,Clinician
-e6a40a42-88d3-443a-bff0-c482f91563fc,Nurse
-f01f8049-5c24-4cd3-af25-98813c6510b2,Clinician
-f01f8049-5c24-4cd3-af25-98813c6510b2,Nurse
-9bae8972-37b2-49f8-b002-3cbb2b3424d5,Clinician
-9bae8972-37b2-49f8-b002-3cbb2b3424d5,Superuser
-ed2ddccf-bcda-44d6-978f-8a9ae4aa7bc0,Pharmacist
-aac0ef88-9d4a-4187-8274-f2e697abc661,Lab
-f5a9153f-bc5e-47e9-93e4-61da0c629842,Superuser
-f5a9153f-bc5e-47e9-93e4-61da0c629842,"Superuser,Superuser,"
-82b01953-0bbc-461f-bc37-51d6e9b9ee83,Clinician
-82b01953-0bbc-461f-bc37-51d6e9b9ee83,Superuser
-82b01953-0bbc-461f-bc37-51d6e9b9ee83,"Superuser,Superuser,"
-1864b4a0-b766-4dc8-94a4-f9477a9d9d36,Superuser
-1864b4a0-b766-4dc8-94a4-f9477a9d9d36,"Superuser,Superuser,"
-62822be2-99e6-4e27-8784-51cf9344f2ec,Superuser
-62822be2-99e6-4e27-8784-51cf9344f2ec,"Superuser,Superuser,"
-0b8151af-3123-460d-9d95-156254070004,"Superuser,Superuser,"
-40c102ef-9733-4138-9726-1bb038fb2c2b,Clinician
-5f1a3ece-d425-4e81-8311-e249c6524869,Clinician
-8e84db71-d7a1-45ba-9ad4-a029547d9cec,Clinician
-7244ccd0-8333-4020-b75a-8702a2d0ddb8,Clinician
-ccdb8245-bdbc-4f81-ac9a-adc2c279ff8c,Clinician
-f8fe5a78-def8-4b26-88be-6af5d4cc5d54,Clinician
-e4cf5508-9098-4d9d-9a20-4c3b0a3c7392,Clinician
-95f445d7-3902-4053-8ac2-2027e1df4ae3,Superuser
-497e01ab-69d0-454d-8362-26ee82b5809c,Clinician
-497e01ab-69d0-454d-8362-26ee82b5809c,Provider
-497e01ab-69d0-454d-8362-26ee82b5809c,Superuser
-497e01ab-69d0-454d-8362-26ee82b5809c,Supervisor
-680f1dbe-9220-4392-b43d-bd9a5c783588,Lab
-7aaf4f3d-d763-4b1c-bd4e-aaf806e6833b,Pharmacist
-58b1146a-8aad-42d0-96a7-a67f05a319d4,Data Assistant
-ae038600-f387-45f0-8fb5-c18326a27730,Clinician
-ae038600-f387-45f0-8fb5-c18326a27730,Provider
-ae038600-f387-45f0-8fb5-c18326a27730,Superuser
-356f657b-20b2-4425-8f37-25e35f9f1f3c,Clinician
-356f657b-20b2-4425-8f37-25e35f9f1f3c,Superuser
-7eb9ade5-4b45-4be0-8b2b-392db58a42bf,Nurse
-cdff3f5c-d53e-4b9f-80bb-b0372c5f5097,Nurse
-68d258af-4847-43a1-9e64-c84a2df25b81,HSA
-7267cdd6-f597-4c44-93ca-ff17b0882232,Clinician
-bdc7ee05-08bc-4398-8d6f-bf65148f72e9,Clinician
-c7056c9b-9e83-44ca-810e-4ef6589ca207,Clinician
-0b13aa87-055a-4a6c-bd22-adde5956c905,Clinician
-c1b56775-1f8f-4f27-8d63-c091d08b9a46,Nurse
-130f5f12-7ec7-451b-9763-3332775a804d,Nurse
-25728a91-f34b-41c8-a805-d39b1af4929e,Nurse
-ac36f743-ac80-49ef-aae0-de1284a023f4,Nurse
-0b7c17c3-9c5f-4327-8897-e54434ce95e8,General Registration Clerk
-0b7c17c3-9c5f-4327-8897-e54434ce95e8,Registration Clerk
-9c13a5cc-3d79-4cb8-b219-8d8d3063a35c,General Registration Clerk
-9c13a5cc-3d79-4cb8-b219-8d8d3063a35c,Registration Clerk
-ea5d3d1e-87b9-43f9-91b9-0244abad474b,General Registration Clerk
-ea5d3d1e-87b9-43f9-91b9-0244abad474b,Registration Clerk
-4af0a198-4332-4032-af22-e8c52695cbb9,General Registration Clerk
-4af0a198-4332-4032-af22-e8c52695cbb9,Registration Clerk
-bed810b3-e5c6-4b24-90b9-87940c4fea49,Clinician
-bed810b3-e5c6-4b24-90b9-87940c4fea49,Superuser
-bed810b3-e5c6-4b24-90b9-87940c4fea49,"Superuser,Superuser,"
-31813b6c-3d64-4173-a845-f590d586111f,Clinician
-31813b6c-3d64-4173-a845-f590d586111f,Superuser
-31813b6c-3d64-4173-a845-f590d586111f,"Superuser,Superuser,"
-91dcb299-88d0-4e0e-a7f5-3407589d7e66,Pharmacist
-045a75e8-a6bf-4b75-add8-4080ff5e545d,Clinician
-045a75e8-a6bf-4b75-add8-4080ff5e545d,Superuser
-a7075ba2-4449-44bc-a9e1-a41b80af755b,Pharmacist
-f33e8b4b-c74b-4041-b279-4dbd6d3e7125,Clinician
-f33e8b4b-c74b-4041-b279-4dbd6d3e7125,Superuser
-f33e8b4b-c74b-4041-b279-4dbd6d3e7125,"Superuser,Superuser,"
-315a555c-e20a-4f54-b23a-040059a8224c,Data Assistant
-315a555c-e20a-4f54-b23a-040059a8224c,Superuser
-13fca1f1-0e72-41c3-b6e0-fb9c964b24b2,Clinician
-13fca1f1-0e72-41c3-b6e0-fb9c964b24b2,Superuser
-57239cc4-bb2d-4f3c-9424-be41ad67d884,Nurse
-57239cc4-bb2d-4f3c-9424-be41ad67d884,Superuser
-b70351e1-6e93-4e10-b185-aea5ea80d7a7,Clinician
-6f624086-ccb6-4296-9968-b6e555d54c8a,Nurse
-6f624086-ccb6-4296-9968-b6e555d54c8a,Superuser
-124e3abc-acbd-4352-9e84-9f898a0754df,Nurse
-124e3abc-acbd-4352-9e84-9f898a0754df,Superuser
-5f8e03ea-0211-4ee4-be1e-ed7932949f93,Accompagnateur
-5f8e03ea-0211-4ee4-be1e-ed7932949f93,Accompagnateur Leader
-5f8e03ea-0211-4ee4-be1e-ed7932949f93,Adults
-5f8e03ea-0211-4ee4-be1e-ed7932949f93,Anonymous
-5f8e03ea-0211-4ee4-be1e-ed7932949f93,Authenticated
-5f8e03ea-0211-4ee4-be1e-ed7932949f93,Superuser
-06106bd6-64d5-4ae5-88e8-2bf3ed668875,Registration Clerk
-1f7d0c0f-ffea-45f3-bfcb-df0e7cdd94c0,General Registration Clerk
-1f7d0c0f-ffea-45f3-bfcb-df0e7cdd94c0,Registration Clerk
-1f7d0c0f-ffea-45f3-bfcb-df0e7cdd94c0,Superuser
-96d15cf0-088a-4120-bba7-a4b0f5a25ae6,Nurse
-2df8cbd8-3b33-4c3d-aa51-8e65c1047841,Clinician
-4b21cac7-4cd1-4b2b-bab3-0909857a554e,Superuser
-30565972-bdcc-4530-b569-875f726eb250,Data Manager
-30565972-bdcc-4530-b569-875f726eb250,Doctor
-30565972-bdcc-4530-b569-875f726eb250,Superuser
-30565972-bdcc-4530-b569-875f726eb250,Supervisor
-d43c145f-05ba-45ad-89cb-706cbf45561b,Clinician
-d43c145f-05ba-45ad-89cb-706cbf45561b,Superuser
-47877579-e5d8-4d37-a83b-bd3192e30ab7,Data Assistant
-47877579-e5d8-4d37-a83b-bd3192e30ab7,Registration Clerk
-a07f350d-1f0f-4779-a3b8-450510d605f0,Superuser
-06d8e95b-8bbb-4395-90e7-1f60d8edc2c0,Nurse
-06d8e95b-8bbb-4395-90e7-1f60d8edc2c0,Superuser
-c81751dd-e0bc-4ad5-9eae-fdb2c5554a1b,Clinician
-c81751dd-e0bc-4ad5-9eae-fdb2c5554a1b,Superuser
-c81751dd-e0bc-4ad5-9eae-fdb2c5554a1b,"Superuser,Superuser,"
-80f8b708-4938-4a73-a6b3-7f3fb4eadeb5,Clinician
-80f8b708-4938-4a73-a6b3-7f3fb4eadeb5,Data Manager
-80f8b708-4938-4a73-a6b3-7f3fb4eadeb5,Superuser
-1944c0f8-8a59-4b62-ae54-983cc0f53145,Pharmacist
-538b32de-12bf-4698-b495-8b9c6a76be52,Pharmacist
-27863fa7-36e0-4316-abf2-b47d94e2d369,Pharmacist
-0b7322c7-d099-4436-b043-7fc49442a168,Lab
-a719db68-0a12-4a82-a840-856d5386f215,Superuser
-a719db68-0a12-4a82-a840-856d5386f215,"Superuser,Superuser,"
-6ea40656-8e68-4ac5-81fa-773e60b9b55b,Nurse
-f294472c-a36d-4f4f-888f-d21646de795d,General Registration Clerk
-6600df09-007a-4d45-b019-e4f70c19c83b,Clinician
-6600df09-007a-4d45-b019-e4f70c19c83b,Nurse
-6600df09-007a-4d45-b019-e4f70c19c83b,Superuser
-6600df09-007a-4d45-b019-e4f70c19c83b,"Superuser,Superuser,"
-9274a473-77d0-4215-8a3e-36426d3f2350,Registration Clerk
-e774b475-dbfc-4058-8d92-c02da3682e4f,General Registration Clerk
-99d418ef-fab7-4ab5-b515-3f5644ac02c8,Registration Clerk
-3051ef1c-fe36-48dd-96b1-1fb5253fe791,Nurse
-d094a576-7760-4adf-bcce-31b52afcf97f,Pharmacist
-ee857088-f0c3-4f47-8268-2c06c98654ce,Nurse
-13d5848f-43fa-45cc-9591-afa8f9a71a7d,Clinician
-13d5848f-43fa-45cc-9591-afa8f9a71a7d,Superuser
-13d5848f-43fa-45cc-9591-afa8f9a71a7d,"Superuser,Superuser,"
-3a82e261-f14a-4526-86b9-3c919a65ca33,Data Assistant
-3a82e261-f14a-4526-86b9-3c919a65ca33,Data Element Contributor
-3a82e261-f14a-4526-86b9-3c919a65ca33,Data Manager
-af67688e-5f6d-453d-acd5-29114199f222,Pharmacist
-833e3bd7-033e-47a1-932b-c75c8db49f26,Nurse
-db436bb6-6b92-4461-9363-96a6cd817f7d,Clinician
-7d034b36-7419-4b05-8051-4046bf7c211f,Clinician
-671ec3f6-26b8-46fc-805f-6e19042b5459,Nurse
-4b48b6f0-9c62-4248-87ea-dac6f98e7702,Clinician
-d796945a-9b94-4792-87b0-b8cf89282051,Lab
-dcd51f25-e62b-487d-8212-9a537a18f981,Clinician
-17aaccb4-ca15-40f0-af01-c87d12dae4f2,Nurse
-feac3ef6-e844-4106-bdfc-d247d0662b41,Clinician
-42091735-5808-40df-aeb2-61701af47e34,Pharmacist
-42091735-5808-40df-aeb2-61701af47e34,Registration Clerk
-42091735-5808-40df-aeb2-61701af47e34,Vitals Clerk
-a8dc50de-5787-4f23-b4ba-213016910f1d,Pharmacist
-cda73037-d3f6-4b41-8949-a020a4b7bfd7,Clinician
-42dfcaf9-5cdd-4d72-9eb3-f17af082e766,Clinician
-0f2c3096-6450-4034-88fd-b58925dd1db6,Clinician
-4d871aac-1f3b-4129-8d22-5d7124bfb802,Registration Clerk
-4d871aac-1f3b-4129-8d22-5d7124bfb802,Vitals Clerk
-f35c5730-0008-4901-b404-ae404d4a14b9,Nurse
-81f041f0-562b-43a5-b9ef-0037c9214b8e,Clinician
-ad35cad9-7bbe-43e9-b097-1067b47ca835,Nurse
-af7c8a77-7103-4d98-beef-dfbe8413d4e5,General Registration Clerk
-af7c8a77-7103-4d98-beef-dfbe8413d4e5,Nurse
-ac37ff37-6c51-4693-b119-d41e64e25ee6,Clinician
-16358d42-2670-4bd1-b565-926a4aba52b2,Clinician
-dbbc93a1-7832-4ac6-8333-61cf213afe0c,Registration Clerk
-dbbc93a1-7832-4ac6-8333-61cf213afe0c,Vitals Clerk
-59664f6a-066c-4431-840d-a0a1d25df6ba,Clinician
-7ab6dc33-e373-41e7-b28b-56b6226b36cd,Nurse
-359f25ab-af60-47e7-a72b-a425f5dbe0ee,Lab
-359f25ab-af60-47e7-a72b-a425f5dbe0ee,Registration Clerk
-ee45b681-c568-4cce-88fd-b84303273ec2,Data Assistant
-ee45b681-c568-4cce-88fd-b84303273ec2,General Registration Clerk
-ee45b681-c568-4cce-88fd-b84303273ec2,Registration Clerk
-ee45b681-c568-4cce-88fd-b84303273ec2,Vitals Clerk
-7bc48dd4-3c29-4b03-8dcf-f14abb1c1051,Registration Clerk
-b00331bd-393d-4c59-a1ee-4b09f972f347,Pharmacist
-e30afb3f-d96c-4568-a804-5eb09b39531f,"Superuser,Superuser,"
-51ede668-4d30-4397-a148-20e4532e4e7a,Nurse
-32840d53-9aa8-4c10-8b8d-bf6942e7bfc3,Clinician
-6246708d-f007-49a1-83d4-9ef11c1ec587,General Registration Clerk
-6246708d-f007-49a1-83d4-9ef11c1ec587,Registration Clerk
-349ee7b5-70c7-4540-966d-daac605a9a7f,Lab
-a56b773f-2bbd-4507-9eac-8cb2b15ed7a6,Pharmacist
-deadad57-2eb9-447a-a065-a745abd9f4b4,Pharmacist
-beecad36-b941-4773-b74c-8935363f850b,Clinician
-19842465-45cc-49fd-8d3f-c3ba156a3e23,Nurse
-523140ec-3ba1-49ba-916d-6112a9fab0db,Nurse
-12673b8b-d5a8-4d2a-87ee-b501930063e4,Nurse
-ca8c2831-2622-4104-8427-0e579e93bc6c,Clinician
-413f34a5-349d-4806-bcd2-1ea66ab82819,Lab
-09a13609-b794-4929-94ff-aeabd53c48a3,Nurse
-6159cb02-c08d-48ae-ad82-c5333b0cb41e,Pharmacist
-70afac7f-4158-4844-8ee1-7ca1c150f988,Nurse
-b39550c7-db70-47b3-bb3a-fc72c0b4ee07,Data Assistant
-42fcaebd-2515-4201-a3c1-d6419cd6e7a5,Data Assistant
-aa55015c-2ad4-47f3-9eba-9a3a1ff7ba1e,Nurse
-2662501f-815e-451f-a62d-b7913aaa4778,Nurse
-9b7e8209-9538-40ae-a0f0-7dfa12878522,Nurse
-db81783c-fb33-4b05-9131-fcc7f58b8e81,Lab
-22f48817-3ec6-4d95-b22d-ec8402fd9677,Clinician
-0a6815ab-9ddc-4ef1-ba43-a406f46b16f1,Clinician
-d6ebb2f6-0e91-4320-9a6f-67c900998df4,Lab
-7036d6ef-e379-4565-ae6e-97e564fcaddf,Nurse
-5c3947ee-e2dd-450d-b227-156b39ad8a84,Nurse
-5212dd59-1fb9-44f3-bb22-1ec3abe4864c,Clinician
-95cb8b71-e9e1-4f63-b1c1-8a0629bc3455,Nurse
-cfa5143a-4efa-4ad4-ba0c-0357a7209501,Nurse
-dbd9b7dd-46ff-4992-9129-30aefd17d168,Nurse
-1207d830-e5e6-4649-89a8-7f5297a85345,General Registration Clerk
-57e07ac0-8405-405f-8e0d-63cac15ccf65,Nurse
-56893929-c3b0-4c13-b021-7df54fe2618f,General Registration Clerk
-56893929-c3b0-4c13-b021-7df54fe2618f,Registration Clerk
-2e5e4865-fb38-4e92-af08-91a1b142c02e,General Registration Clerk
-2e5e4865-fb38-4e92-af08-91a1b142c02e,Registration Clerk
-16e7f73f-04cf-44aa-ac7f-4f4e245c9bc9,Nurse
-387c3ec8-2e05-43d9-807e-ad0f03bc14bb,Clinician
-1f2cfa2a-fcb9-47de-bd8f-d142368a8620,Nurse
-0ec260a4-6098-4ca5-9da7-26e27f2ac8cd,Nurse
-b3c8abe1-5ece-4a71-9e73-756e77570841,Clinician
-1dac9f13-7a21-4ada-8029-0b8b3b02ef7f,Nurse
-579ffe79-def9-4124-982e-dcb344bb50df,Clinician
-10715806-a847-4813-981f-621621523db4,Nurse
-a1d3f278-3085-45b6-9b3d-c79d34dd61c4,General Registration Clerk
-3c388989-be17-4160-99d2-f8c8e8b4cdef,Clinician
-2e614936-25bd-4c17-a6b1-e5ff6b70115a,HSA
-2b18173c-e976-4e9d-ac1b-e6dbc15e7bb3,Nurse
-5385a913-d822-4c01-a7ab-2b7490e373e7,Clinician
-ff9b9df8-fb91-4292-94e7-bda1213026a5,General Registration Clerk
-ff9b9df8-fb91-4292-94e7-bda1213026a5,Provider
-a10b3998-9df5-4478-85ca-19eb19b4bd98,Registration Clerk
-22be3f0d-a236-4b67-95a6-7eec8d632e2c,Lab
-90c0eaf2-2213-48ea-acb9-21c860a37562,Clinician
-da8e8791-9c99-4135-bd74-c325c734da2a,Nurse
-93b561f2-9c41-41b2-8823-08add266a198,Clinician
-93b561f2-9c41-41b2-8823-08add266a198,Nurse
-93b561f2-9c41-41b2-8823-08add266a198,Pharmacist
-d4ffe3b9-8a22-4500-8fe6-3e683a86f346,Clinician
-68a76e0c-752c-4fe7-a0c5-c24b833f22eb,Clinician
-68a76e0c-752c-4fe7-a0c5-c24b833f22eb,Nurse
-68a76e0c-752c-4fe7-a0c5-c24b833f22eb,Pharmacist
-8edf4a77-1c74-4f1f-a836-f4332357836d,Clinician
-8edf4a77-1c74-4f1f-a836-f4332357836d,Pharmacist
-89d2cabc-7dfb-4096-8b83-a6dcaf9f6eff,Lab
-646e0389-ec84-49a2-bc3a-c445e905d5c4,Clinician
-33996575-e3eb-46c5-b30e-dcb5c300d1f6,Clinician
-33996575-e3eb-46c5-b30e-dcb5c300d1f6,Pharmacist
-90f16da2-c096-4f06-83f8-9349a3ad68ad,Pharmacist
-7ef9776c-fa9f-45e1-91a0-21d9eadcff71,Clinician
-7ef9776c-fa9f-45e1-91a0-21d9eadcff71,Pharmacist
-9e11f529-c638-4887-ac9e-4d0a8a531d9f,Clinician
-91284fc2-ed15-439e-adc2-ac55f1574432,Health Surveillance
-24213236-da9f-46b0-a3c3-90fcf12aef71,Clinician
-24213236-da9f-46b0-a3c3-90fcf12aef71,Pharmacist
-a36bd78a-59d9-41c6-830c-202dae21d1c5,Clinician
-a146f045-b100-4627-afd0-bf69ea9f9b83,Nurse
-50e08088-6a22-464d-8f94-9f539633e0ea,Nurse
-50e08088-6a22-464d-8f94-9f539633e0ea,Pharmacist
-0ebb37be-5573-4ea6-a19d-e2058fc49f83,Nurse
-d56b0ef3-d10b-4b97-b7cf-8c5765229ffc,Nurse
-83a77a0e-461d-4a58-9b2a-2307c55ce0eb,Nurse
-2183f95c-0da1-4c52-a84a-8702c80dc01c,Nurse
-0204f69b-dd71-4280-9cf6-f559b79f4ff0,Pharmacist
-8339e79f-6fe6-480d-ae79-50fbe7f8c1c9,Clinician
-8339e79f-6fe6-480d-ae79-50fbe7f8c1c9,Superuser
-8339e79f-6fe6-480d-ae79-50fbe7f8c1c9,"Superuser,Superuser,"
-7d4febc4-a35e-416a-8e80-0c00630a9d64,Clinician
-7d4febc4-a35e-416a-8e80-0c00630a9d64,Superuser
-7d4febc4-a35e-416a-8e80-0c00630a9d64,"Superuser,Superuser,"
-70e78ff3-0323-47a3-b388-a8e7b95d8144,Provider
-70e78ff3-0323-47a3-b388-a8e7b95d8144,"Superuser,Superuser,"
-ed818af7-20da-482e-b763-82d627fe4b37,Superuser
-5d248fc4-9247-4caa-a900-9eb22a69393b,Clinician
-5d248fc4-9247-4caa-a900-9eb22a69393b,Nurse
-5d248fc4-9247-4caa-a900-9eb22a69393b,Provider
-5d248fc4-9247-4caa-a900-9eb22a69393b,Superuser
-5d248fc4-9247-4caa-a900-9eb22a69393b,"Superuser,Superuser,"
-10769291-c056-4cf4-88c6-a2cdfaf328ae,Provider
-10769291-c056-4cf4-88c6-a2cdfaf328ae,Superuser
-0adf613e-0a88-44e2-9f17-884ecb70e74f,Superuser
-acce4a23-d7ba-4635-8ba2-ea6245cb0c3b,Anonymous
-acce4a23-d7ba-4635-8ba2-ea6245cb0c3b,Authenticated
-acce4a23-d7ba-4635-8ba2-ea6245cb0c3b,Program Manager
-acce4a23-d7ba-4635-8ba2-ea6245cb0c3b,Superuser
-acce4a23-d7ba-4635-8ba2-ea6245cb0c3b,System Developer
-65db959a-5966-47e5-aa84-41467a3ef084,Provider
-65db959a-5966-47e5-aa84-41467a3ef084,Superuser
-65db959a-5966-47e5-aa84-41467a3ef084,"Superuser,Superuser,"
-a58ad45f-b3b4-429c-99b9-b0531bdc4052,HSA
-a58ad45f-b3b4-429c-99b9-b0531bdc4052,Informatics Manager
-a58ad45f-b3b4-429c-99b9-b0531bdc4052,Superuser
-a58ad45f-b3b4-429c-99b9-b0531bdc4052,"Superuser,Superuser,"
-a58ad45f-b3b4-429c-99b9-b0531bdc4052,System Developer
-2f08bae6-13ba-4574-b2df-afa63dfadd9e,"Superuser,Superuser,"
-2f08bae6-13ba-4574-b2df-afa63dfadd9e,Supervisor
-30e0e464-a7ca-46f8-8d07-a10954967167,Nurse
-8a4db3a8-532d-4e75-9c08-d4c2863c9d71,Superuser
-be49c32e-5c80-465e-bf7f-e821f36698ef,Clinician
-be49c32e-5c80-465e-bf7f-e821f36698ef,Superuser
-be49c32e-5c80-465e-bf7f-e821f36698ef,"Superuser,Superuser,"
-6bd6df6a-339b-4c3c-afc4-3e690f7830f2,Nurse
-bac710d4-da94-4fca-9b7a-7c93f236ed4c,Superuser
-f8e4f6cf-04a8-4778-a40c-8f3cffb3b0e6,Clinician
-f8e4f6cf-04a8-4778-a40c-8f3cffb3b0e6,Nurse
-f8e4f6cf-04a8-4778-a40c-8f3cffb3b0e6,Provider
-f8e4f6cf-04a8-4778-a40c-8f3cffb3b0e6,Superuser
-72e37e2b-4838-4591-8664-cdb8fec874df,Clinician
-72e37e2b-4838-4591-8664-cdb8fec874df,Nurse
-72e37e2b-4838-4591-8664-cdb8fec874df,Superuser
-72e37e2b-4838-4591-8664-cdb8fec874df,Vitals Clerk
-a3011707-aad0-49e9-bedc-e905bc63f2ef,Clinician
-a3011707-aad0-49e9-bedc-e905bc63f2ef,District Superuser
-a3011707-aad0-49e9-bedc-e905bc63f2ef,Lab
-a3011707-aad0-49e9-bedc-e905bc63f2ef,Nurse
-a3011707-aad0-49e9-bedc-e905bc63f2ef,Registration Clerk
-a3011707-aad0-49e9-bedc-e905bc63f2ef,Superuser
-ebb5a0ec-388a-4f4a-81e3-a8a842682a32,Adults
-ebb5a0ec-388a-4f4a-81e3-a8a842682a32,Clinician
-ebb5a0ec-388a-4f4a-81e3-a8a842682a32,General Registration Clerk
-ebb5a0ec-388a-4f4a-81e3-a8a842682a32,Lab
-ebb5a0ec-388a-4f4a-81e3-a8a842682a32,Pharmacist
-ebb5a0ec-388a-4f4a-81e3-a8a842682a32,Superuser
-44609ab1-fd17-4730-8af9-1ab51aed9430,Clinician
-202d4117-4100-403e-8cd6-929e1bcc3284,Clinician
-f5be8bb1-06e3-43c0-a678-defa66585283,Clinician
-f5be8bb1-06e3-43c0-a678-defa66585283,Lab
-f2e87002-7c13-405c-b91e-fbb747a315b7,Clinician
-f2e87002-7c13-405c-b91e-fbb747a315b7,Superuser
-ae3255f8-1971-42ad-b23e-7c12ba7144ba,Clinician
-ae3255f8-1971-42ad-b23e-7c12ba7144ba,Superuser
-4026cbdc-844e-474d-9aef-951bddc4f0e3,Clinician
-4026cbdc-844e-474d-9aef-951bddc4f0e3,General Registration Clerk
-4026cbdc-844e-474d-9aef-951bddc4f0e3,Lab
-4026cbdc-844e-474d-9aef-951bddc4f0e3,Nurse
-4026cbdc-844e-474d-9aef-951bddc4f0e3,Pharmacist
-4026cbdc-844e-474d-9aef-951bddc4f0e3,Superuser
-4026cbdc-844e-474d-9aef-951bddc4f0e3,Supervisor
-0bcdd618-6302-4d84-90e3-46584b8ce328,Clinician
-0bcdd618-6302-4d84-90e3-46584b8ce328,Superuser
-37f2c582-714d-4ffc-86e1-3a708a16b61d,Clinician
-37f2c582-714d-4ffc-86e1-3a708a16b61d,Superuser
-d1abb5e2-80f4-4ecb-98d5-efead0e84d37,Clinician
-b8a57aa9-58dc-485f-a42e-88cf58b6c716,Clinician
-b8a57aa9-58dc-485f-a42e-88cf58b6c716,Superuser
-d699879a-57d0-4ba6-b4c9-18dd810ecb44,Clinician
-65cd44d9-77a5-40bd-8f63-b9e1b1b52f9a,Clinician
-346f6135-0c48-4f0f-8717-9af401082fd5,Clinician
-9367e323-624b-427b-bc96-7aae1247503f,Clinician
-9367e323-624b-427b-bc96-7aae1247503f,Lab
-9367e323-624b-427b-bc96-7aae1247503f,Nurse
-9367e323-624b-427b-bc96-7aae1247503f,Superuser
-63afc7fe-8507-405a-a2a5-16ea04cd213f,Clinician
-63afc7fe-8507-405a-a2a5-16ea04cd213f,Superuser
-06269ad0-1df0-417f-8b36-f93e45cc71ad,Clinician
-2f50d41c-95d0-4296-9894-e667710979c0,Clinician
-4aec0ef9-9039-4f96-b88b-af173488bc7e,Clinician
-8f1d8fc5-d9fa-435d-bc19-31bcd9076d0c,Clinician
-8f1d8fc5-d9fa-435d-bc19-31bcd9076d0c,Superuser
-179ad756-1a56-4593-b617-bc011c4025b9,Clinician
-f88c431b-8662-4ad5-9acd-b6ae8eb1802d,Clinician
-f88c431b-8662-4ad5-9acd-b6ae8eb1802d,Superuser
-b43e504f-292e-4320-8f4e-b3faa0d14070,Clinician
-b43e504f-292e-4320-8f4e-b3faa0d14070,Superuser
-86b1bcf3-3eb1-45cf-befd-263145861a9d,Nurse
-86b1bcf3-3eb1-45cf-befd-263145861a9d,Superuser
-3c8e4307-a793-4961-a936-3ad8198443d9,Clinician
-3c8e4307-a793-4961-a936-3ad8198443d9,Superuser
-f6c7de50-3e08-40ad-acde-a69adb35feb1,Clinician
-f6c7de50-3e08-40ad-acde-a69adb35feb1,Superuser
-c273f89d-bac1-4ce2-a0b1-186a91363f81,Clinician
-e13b0e23-65f3-4faa-ad11-28cbe683fa09,Clinician
-e13b0e23-65f3-4faa-ad11-28cbe683fa09,Superuser
-fe0cc61e-6e62-4832-be5d-5b6fc18a3ac7,Clinician
-fe0cc61e-6e62-4832-be5d-5b6fc18a3ac7,Lab
-fe0cc61e-6e62-4832-be5d-5b6fc18a3ac7,Nurse
-833b0cfa-9cc7-4d6d-8d6f-4a7dcddf6ab8,Registration Clerk
-7f7ca6bb-b6bb-47b7-9234-a8b06d6ca648,Registration Clerk
-6ed27c8e-2b09-4cd0-8039-685b64060de4,Registration Clerk
-343a9425-7b8e-4e4d-a3bf-5ca01d95d31b,Registration Clerk
-09815f8c-4b7c-4f2d-bf00-3d5486a1949b,Registration Clerk
-11761885-a31f-4d61-a2f0-d41fd6678c2d,Registration Clerk
-d715c9d8-1835-47d4-960d-2acf5541fc62,Registration Clerk
-97a6a9f8-f0f1-4b7e-a23b-b0c2aaba0f08,Nurse
-f888be7d-4f5c-40b7-8e16-b910d6207fc0,Nurse
-92aa7fa9-68f7-4065-a811-35479afb2f31,Clinician
-baee8087-5a77-431c-8bf1-5d62eb061969,Clinician
-46519cc8-2abe-4144-9dc3-5f424c3dd560,Clinician
-53e0dd13-2ac0-4a92-a904-450bc7ea2c98,Lab
-80d8f7e9-b86c-463a-8b08-73122e9bd807,Pharmacist
-483a6fc4-354b-4ef1-8e79-00b1d476f603,Lab
-bf51ec23-7410-4cca-a3f7-348cdc52d3fa,Pharmacist
-f3220279-f610-4f70-be05-4ab6de64352d,Pharmacist
-2e998cd9-2a48-46df-b344-45096bfd91cb,Pharmacist
-9286873a-3cc7-4de4-8b3d-d6493ff7b876,Pharmacist
-e40982bd-ca8f-48b9-a458-01fff922aff1,Pharmacist
-06e6324c-0979-4fe6-9efa-f27ff0044ef5,Lab
-f1d006d4-ff85-4de4-9755-751f6c665d12,Lab
-67c07728-d2e4-465d-8d6b-5d58be1e7a87,Lab
-58cdaaf2-50f4-4a9e-b0ea-603b2476b86c,Lab
-57d0fda2-b646-41a6-8079-2e25b1cb3c2f,Lab
-a467faed-ff62-4ec8-be22-b15742acb353,Superuser
-f8b5bbe5-755d-46cc-adda-0aa31090007f,Clinician
-f8b5bbe5-755d-46cc-adda-0aa31090007f,Lab
-34937af2-164b-4d21-bbc9-de1384aefd7d,Clinician
-34937af2-164b-4d21-bbc9-de1384aefd7d,Lab
-34937af2-164b-4d21-bbc9-de1384aefd7d,Nurse
-f1c0059f-fd11-4a77-8a90-4acde63cc1d0,Clinician
-bf30111e-cdd7-42f2-86a4-a703ba27d664,Clinician
-bf30111e-cdd7-42f2-86a4-a703ba27d664,Lab
-fc5ae918-417c-4fb0-8a2e-c9ba76bddf65,Clinician
-fc5ae918-417c-4fb0-8a2e-c9ba76bddf65,Lab
-fc5ae918-417c-4fb0-8a2e-c9ba76bddf65,Nurse
-e9c2b9ba-81d1-46a4-8d9e-0c2ec8022228,Clinician
-346b7f9d-5a55-406f-ab45-6b52aaba5877,Clinician
-cd35460b-2768-4d97-b4f1-4e1b51790940,Clinician
-09c22edd-af2a-41bb-bad0-e96d8e2f83f8,Clinician
-d7fc013d-1dd4-41f5-b110-031e79c72168,Clinician
-3f93579c-f5f2-4464-9731-84792deda9d3,Clinician
-3f93579c-f5f2-4464-9731-84792deda9d3,Lab
-09a8f6a3-0a08-40b6-b8e1-e87fab35a409,Clinician
-76ed27e3-e89e-457e-a8f8-797dcb13779b,Clinician
-76ed27e3-e89e-457e-a8f8-797dcb13779b,Lab
-55b3f0ec-1fa5-4fa7-b854-e1902ce6fd75,Clinician
-06d49461-3153-47df-b471-fa85fbf3bb40,Clinician
-d100c853-8e8d-4c74-b9b6-4d14170c9d69,Clinician
-7acd5afd-f3c1-4975-a32e-541776fc4b47,Clinician
-b3743c3b-9a10-451b-86c2-aa4f05219fa5,Clinician
-cadd3e14-e4de-4da2-ab09-d8ee4ceb5da7,Clinician
-a2f26162-521a-4a39-a506-e38cd068116c,Registration Clerk
-47b16c0e-b805-4d48-9250-319d70649ea6,Nurse
-c7df65ea-a30f-4d57-be17-963714bc4e92,Pharmacist
-13faa4bd-4705-43a7-b8c3-75b0a5ba5161,Nurse
-f20ab4ae-976c-49db-942c-e48031f240e6,Nurse
-c1488535-1f46-4a7a-944e-4e5d8915c6c2,Clinician
-c0e3c53e-8b1f-4b12-8b1d-be728fbf03a5,Registration Clerk
-0f2ca3f5-de00-4eb3-8c62-972133233f58,Clinician
-4d77a4b6-f335-46e2-a698-677b3775930b,Lab
-f056b11e-ac77-4f9f-a672-57983adf619f,Clinician
-7d2a39a6-5079-40cb-83cb-2516dd86d24e,Registration Clerk
-d40cc98c-a815-4831-8529-137814982a9f,Registration Clerk
-64df5e3d-38da-479a-a70f-eb7c273a85b8,Lab
-0fd74006-9b18-4205-a36a-7b5ebc68ae8f,Clinician
-744b4eb9-77da-4f51-9716-f101945db1ba,Registration Clerk
-afbbb707-6d74-4ed8-b7ac-8c352dbfda5c,Clinician
-25c678b2-d208-40ad-9d42-8f236783367e,Clinician
-ca2835b3-e2d6-4fc0-ae7f-3d8402355e52,Nurse
-cfc18b2d-38ef-4e80-85a3-8c3408293580,Registration Clerk
-dfbd828a-97fd-4b05-b677-b94cb7d932be,Clinician
-74d17056-feee-4bec-9931-8ffd00187c99,Clinician
-770472e0-43ff-4188-a036-d3cb8c19e7c0,General Registration Clerk
-770472e0-43ff-4188-a036-d3cb8c19e7c0,Registration Clerk
-2a5238fd-fc0b-4b0e-b9ca-e738939dfc9e,Nurse
-b960be3e-7e07-4306-a80b-57afcce6d421,Clinician
-9d77b6c3-57b0-4c63-b470-767c04e0bad4,Nurse
-c5036ad0-24d9-4a85-bd7f-4abb005a645e,Lab
-552d40c9-0bcc-426a-a25d-72aea86cdec5,Nurse
-9b48e568-3805-462a-a7eb-22541585253d,Clinician
-b2b6d993-fd79-4be7-bfe9-505ea75d9721,General Registration Clerk
-b2b6d993-fd79-4be7-bfe9-505ea75d9721,Registration Clerk
-c8e0b775-ebf1-4e9a-9014-70efb325dee3,Nurse
-95446454-9975-4990-aeb6-0a656b8abde0,Pharmacist
-460f8388-e464-411e-a01d-94d46d111e14,Nurse
-106e8e32-8ba5-46ae-88db-f1f5612254d3,Nurse
-98bb55fe-1eef-442b-b70c-20caf90b8635,Lab
-f3665c51-c98a-4c59-b5e9-e40ed529d890,Nurse
-9537efbb-5cf2-4f82-97c4-e2fd938424c3,General Registration Clerk
-9537efbb-5cf2-4f82-97c4-e2fd938424c3,Registration Clerk
-05360fd9-aead-483b-9625-378493329886,General Registration Clerk
-32d1c552-0f6c-45f7-a54a-89be4cd6d75e,Clinician
-05045665-47e3-4f0a-af73-6c59da8a190f,Pharmacist
-101d3b2f-a7ad-48c6-abe8-ec710eabd1b6,Clinician
-1c273abe-7628-41dc-b5c0-03fcfd4c7c34,Clinician
-882efb63-f12f-42fa-9289-c2c882ba13e9,Lab
-36c4437c-80de-4093-9884-215abbb20ce7,Lab
-b8cbd0e2-edfa-4957-9475-7949b8bfa4e5,General Registration Clerk
-5a85c997-b664-4b25-9d5d-685196ed7187,General Registration Clerk
-61bec057-bbba-4e3d-9f28-c48fb67ae80f,Data Manager
-61bec057-bbba-4e3d-9f28-c48fb67ae80f,Registration Clerk
-03749c79-657f-40a3-8f86-126dc5348bb0,Nurse
-5007e35e-41fc-48ea-a6e3-23607d4278a4,Nurse
-e6b80e62-d815-479e-b6d8-3acafda19cb5,Clinician
-bcb9a553-8c08-4378-b7c3-d491d82f8647,Clinician
-ee14a4d6-dac2-4312-870c-0c35e333ea36,Clinician
-8501b173-a6f7-49a1-a87a-4f983aa0ce82,Clinician
-9c058571-a16c-45f5-910a-915ed7e759ac,Nurse
-706b068e-a506-43c1-82fd-cf4d7f5d0a3a,Nurse
-310d64fb-8a1f-4f93-90e4-63d86aacf18d,Pharmacist
-fe542d54-964c-48be-9883-c92a982108fc,Nurse
-336661d9-5c67-46e4-b950-fe04852aedbd,Clinician
-267dd9ce-b63e-49d3-96cc-55c9397eecc7,HMIS lab order
-267dd9ce-b63e-49d3-96cc-55c9397eecc7,Lab
-b7a641db-1ec8-4431-bdaf-4c770c0aeaef,Nurse
-8d6a7c0c-0c98-4569-8c38-f709c4d949fc,Clinician
-0dfe9439-26b2-40c8-905c-a5e5da5d02a8,Clinician
-0dfe9439-26b2-40c8-905c-a5e5da5d02a8,Doctor
-bc1d5ec7-c6f6-44b4-a0f3-2ff5d7707809,Nurse
-f6bbf91e-e336-4086-bbe7-b11e843cd507,General Registration Clerk
-caad6992-35d0-4680-b222-b30490ba8603,General Registration Clerk
-caad6992-35d0-4680-b222-b30490ba8603,Registration Clerk
-a216c778-b39d-405c-b3d4-58c8236aeb74,Nurse
-103504ba-4a06-4d49-a4ed-607c88398d38,General Registration Clerk
-3432bd66-0842-44d8-867a-622f1a6016c7,Nurse
-bb244444-91a1-49a8-ac89-c1ea614f63d0,Pharmacist
-650f85cc-4a37-482c-a6ed-ce7cdb7c2f31,Lab
-cde22ed4-1cf7-4a5d-80bc-cb8bc343ba23,Clinician
-7607fee5-4231-473d-b468-e9b9d1e84bfe,General Registration Clerk
-7607fee5-4231-473d-b468-e9b9d1e84bfe,Registration Clerk
-62436952-31cf-47d1-80d2-be402c770545,Registration Clerk
-a8198894-64ea-4233-9dd4-6510f3fe592f,Lab
-6e2e7255-d0d5-4ad2-a37e-0d8752e11eb1,Pharmacist
-5da5866c-7e3e-4d20-8b00-017911071044,Lab
-bd13186e-e1da-4a7d-9c28-81f6b8d4e2d2,Clinician
-e3f0eebd-e54d-43ae-99e9-b4c2d52cbc4b,Clinician
-9d5ceb6d-e64d-4fee-8844-f1ab5cc19fde,Nurse
-5cea8b18-d147-4082-85aa-c3a233dd2563,Lab
-bdf34885-fdf2-4e0e-a18f-c6b872ba33e1,Pharmacist
-78e30fc4-eb61-411d-97d7-040fed95cd08,Lab
-71c3894d-f867-47d3-838a-abc01e2f69f1,General Registration Clerk
-8e9395e1-674c-4ce7-8c43-7ef286655365,Lab
-a6ee75c6-30e7-46ea-87f5-291ec68637b1,Nurse
-1ff6668c-92fc-4224-af65-49334fef6fee,Clinician
-1ff6668c-92fc-4224-af65-49334fef6fee,Data Manager
-1ff6668c-92fc-4224-af65-49334fef6fee,General Registration Clerk
-1ff6668c-92fc-4224-af65-49334fef6fee,Registration Clerk
-d1517b46-aae0-4c70-941f-30338b09b2ec,Data Manager
-e7852fbe-1a32-4515-a733-ea8f619acbc7,Nurse
-21512f6d-a5ca-45eb-85a7-0ea8c01ac656,General Registration Clerk
-b2c1c004-252f-46b9-b195-4b0ec526927c,Pharmacist
-7932fe35-a5a9-4d53-a301-221be68b6f8e,Clinician
-7932fe35-a5a9-4d53-a301-221be68b6f8e,General Registration Clerk
-7932fe35-a5a9-4d53-a301-221be68b6f8e,Lab
-7932fe35-a5a9-4d53-a301-221be68b6f8e,Pharmacist
-7932fe35-a5a9-4d53-a301-221be68b6f8e,Superuser
-6b83d563-260c-4212-9140-25ddc674a299,Pharmacist
-9c2640ab-7bb8-4d8c-95eb-be119716eff4,Pharmacist
-d3d83189-6c59-46d0-8c10-bb557278e54f,Lab
-59d8dd33-8948-4ae0-bfb2-68cff6f5dda8,Nurse
-22cdcfac-31cd-444d-8d54-bd0dc2bf73ef,General Registration Clerk
-56a68e9b-ab43-4313-b7f2-40ce6882148c,General Registration Clerk
-141e23a1-abaf-4aae-b2fe-0c843e0835d1,Lab
-69addb31-0091-4517-acf0-dae1d43cd9d1,Clinician
-23562f44-aa35-4ba8-8bd0-66dd11d42da6,Nurse
-9c150e09-faec-4ba0-a6f2-c5b790c5842d,Clinician
-6af80a8f-2786-4051-a5b2-a0b492e3772c,Lab
-fdc6a19b-ee91-4390-9713-963aefdec7c6,Registration Clerk
-804d42b5-2137-4414-9f4a-701fec27b1e3,Pharmacist
-304e9b08-9e3d-42c0-803f-f7f33610b3dc,Clinician
-d605768f-2515-4626-b746-550f4148b773,Clinician
-d605768f-2515-4626-b746-550f4148b773,Lab
-5b9764bd-cd55-4d69-9efe-ea41628140f5,Clinician
-5b9764bd-cd55-4d69-9efe-ea41628140f5,Lab
-b2ccbe38-378b-41af-a5be-67caa589d3a5,Clinician
-b2ccbe38-378b-41af-a5be-67caa589d3a5,Lab
-91cad5bb-8d65-457b-9680-68079a190ed8,Registration Clerk
-364de3c0-e0c9-4d74-ad93-293f72a3fe27,Clinician
-5e541243-7bd1-4110-b86f-5bc75f0328d6,Clinician
-89d63623-f444-4fc0-a305-9c1159807843,Clinician
-81e136c7-ff0d-4655-b4c3-a5d074989ae3,Clinician
-81e136c7-ff0d-4655-b4c3-a5d074989ae3,Lab
-81e136c7-ff0d-4655-b4c3-a5d074989ae3,Pharmacist
-a6ba9abc-ba08-4d98-a438-0c5aa6000349,Clinician
-a6ba9abc-ba08-4d98-a438-0c5aa6000349,Lab
-5250bcce-96ee-44e6-a213-34ff2fea3999,Nurse
-742f93c0-6b82-4dd8-a727-71a28c5cf028,Clinician
-742f93c0-6b82-4dd8-a727-71a28c5cf028,Lab
-c470aa30-b400-4d6f-a571-9bc106193765,Clinician
-c470aa30-b400-4d6f-a571-9bc106193765,Pharmacist
-2ffc0b08-8707-430d-99bd-e1ae9d0e0660,General Registration Clerk
-ec6161dd-d74e-4194-b5d6-37fc6b62ac1c,Clinician
-6bcf917b-81ac-4d0a-a674-5750a7ab49ca,Registration Clerk
-d687243a-682f-48a5-9dc7-ce099b91b968,Registration Clerk
-d1bfa549-d376-4676-8902-5c39b085e676,Clinician
-d1bfa549-d376-4676-8902-5c39b085e676,Lab
-c485d024-1e83-4779-9a59-100e1c5b417a,Clinician
-c485d024-1e83-4779-9a59-100e1c5b417a,Lab
-078e3cf2-c365-4373-b625-587384658ae9,Clinician
-078e3cf2-c365-4373-b625-587384658ae9,Lab
-43047e6d-47eb-4ff5-aeb6-3e86635caafb,Clinician
-43047e6d-47eb-4ff5-aeb6-3e86635caafb,Lab
-4796bf89-a9ee-44eb-b654-aa7de4a7b203,Clinician
-4796bf89-a9ee-44eb-b654-aa7de4a7b203,Lab
-c9e9da88-b3e8-4e56-9780-d24ef3dc7f69,Clinician
-c9e9da88-b3e8-4e56-9780-d24ef3dc7f69,Lab
-808458ff-3849-435d-9db9-0e49f684bf66,Clinician
-808458ff-3849-435d-9db9-0e49f684bf66,Lab
-8cc2e233-29c8-4314-aae0-559180fbc5c0,Clinician
-8cc2e233-29c8-4314-aae0-559180fbc5c0,Lab
-cd3aaa9a-df68-4005-97fd-8fc0a4fde075,Clinician
-cd3aaa9a-df68-4005-97fd-8fc0a4fde075,Lab
-b550809f-36dc-47f3-b476-c70932634e78,Clinician
-683dc036-6d82-433f-b720-a73cfd9ee1f6,General Registration Clerk
-1503d36f-bc7c-4fb0-9d60-148a293b8c7e,Nurse
-ecb1a496-d8ee-4982-8979-2a4615c184f2,Nurse
-fcd5d37f-806a-4226-9d89-0cb99d1bfc29,Nurse
-1e75f265-693e-49ed-9347-d0b74eea7ded,Nurse
-a28c25e6-1f8d-40e4-9117-45eed36d5248,Nurse
-4d490500-d085-4ee6-b9c4-ae96f60fa707,Clinician
-371d79c1-1800-4628-a43f-98b5d94903a0,Registration Clerk
-487be3f5-18d4-4cf3-a6d3-ede5120e8a71,Registration Clerk
-5dd10c5d-7f73-45fe-8670-ea654b122144,Lab
-4c73f77d-1f1d-4da0-8737-95d36d8b10a7,Lab
-8b421bee-fa7f-49ea-ab95-bac5510ffbe1,Pharmacist
-81581029-a943-4c4b-8934-54562e89dc9f,Clinician
-c6c3a58d-9645-4e8d-a4ff-69ac0a115422,Registration Clerk
-a2103860-8f2f-4adc-9c3d-5ced95fddc4f,Nurse
-f151aef7-46d9-4743-a31f-16aa63915433,Clinician
-dd7d36ee-2a95-48ee-854f-054c95c94e31,Nurse
-01829866-745d-4c36-8a1e-352e45dae2a6,Clinician
-9666cf9b-b2b3-4353-94cc-4766f8c26194,Lab
-9f65f29a-bb18-444b-bca8-24262df989b4,Lab
-1d8e74f2-5cf7-43b9-bdf0-dbddb757ce0c,Clinician
-36407043-0158-4a23-8fb1-6256f9c9c1ed,Nurse
-46d609a0-a9af-4e0e-acc1-3ce1846af60d,Registration Clerk
-ca1be490-451f-45b8-a6c8-69b21ab2a174,Registration Clerk
-de27942c-6862-4b58-96fc-c6d511e93a45,Lab
-817b2263-dc94-4b1b-9dde-7b13124446a7,Nurse
-cb6b620f-e60d-4c9a-8f02-aea98284ec3f,Clinician
-9eafed9e-a690-407e-be6e-b4159e550136,Clinician
-49423f32-7616-45bb-a5fa-2d9e341f2e02,Clinician
-3734b2e3-81a1-4112-b565-3836cf5a277e,Lab
-0e0261cb-f082-4112-a052-6a1830a91b7b,Clinician
-efd9951a-6865-4fc2-b57d-27e3a60903ef,Clinician
-7c8f2dbb-45c4-41e8-822e-bf5e03ea4b92,Lab
-f226e1c6-472a-44bc-a583-2bae93a13afb,Clinician
-ef161d86-3f87-41e6-97bd-065075d7234a,Lab
-301a221e-803f-4670-8063-85642131e6d7,Lab
-2b508772-114c-4b56-8c5e-9fab67e30898,Lab
-528387de-6534-4754-af3e-69314d79caa1,Clinician
-0067243a-d0f9-45ce-8b63-009fa564c8ba,Pharmacist
-d94582f4-451e-4bc0-992e-44ecbbd22f71,Pharmacist
-792c9a22-25ef-4da8-a371-1f7f7710a38e,Clinician
-d822ed01-01f5-4eb3-94e3-27a109d72c5b,Pharmacist
-1feeebe0-6df3-49ba-8e8d-9f69564b1140,Clinician
-39d71ffe-e211-4fd5-a097-ca17aff8c29e,Clinician
-c1b467d2-c543-44c0-b1a2-fec69ca669a7,Pharmacist
-73f243a8-6d4a-4753-87b5-ef5e42c8c3f1,Clinician
-f5ced044-6048-4fbe-821e-225ca590fbe8,Pharmacist
-1ef8dde9-8e03-4528-9bf6-658cd823108f,Lab
-95d41313-9132-4097-9cd3-1e6f5f940f13,Lab
-42b3aec2-2112-4914-8ae0-d70e1b395b1b,Clinician
-d2956908-97d5-40c5-be32-3105c53a351a,Clinician
-c808d61f-c4ca-408d-928f-c8802671bdef,Nurse
-6f636d7f-67d8-4d2b-b982-e091e2ff48bf,Clinician
-ab45bf5f-3b06-4146-89dd-ff909b15e602,Clinician
-a05acea4-be1a-4a07-b30e-a49a047553e7,Clinician
-1708bacd-2b87-48b1-8a99-3cabb1ffb513,General Registration Clerk
-81ed0746-34cb-4a14-99dc-a02360e90024,General Registration Clerk
-1b7cc952-90de-461b-9a23-a2a21f0b4add,General Registration Clerk
-1b7cc952-90de-461b-9a23-a2a21f0b4add,Registration Clerk
-f7f3261a-8f8f-4405-a1f6-fe04c3ac1cf6,General Registration Clerk
-f7f3261a-8f8f-4405-a1f6-fe04c3ac1cf6,Registration Clerk
-e09ec1f3-fab2-4a0a-8115-8cba572c335b,Clinician
-7cefdf60-0b33-464e-b08d-33d2a0afd352,Pharmacist
-af694402-8e7d-4118-b8f0-ca6e83acae4b,Nurse
-685b6da0-3ab9-49b3-8e3a-8ac46bbe6c57,Clinician
-685b6da0-3ab9-49b3-8e3a-8ac46bbe6c57,Nurse
-c563f942-cb3c-48db-bbdf-5f3c5e11a78e,Clinician
-c563f942-cb3c-48db-bbdf-5f3c5e11a78e,Nurse
-4e1928e5-5c4b-4ddb-aef1-926413ff7da8,Nurse
-26452ea0-1d34-4602-9b2e-c509e1f83d64,Clinician
-26452ea0-1d34-4602-9b2e-c509e1f83d64,Nurse
-69370836-78dc-4f37-a30b-17a57e5c59c8,General Registration Clerk
-69370836-78dc-4f37-a30b-17a57e5c59c8,Registration Clerk
-53289185-a224-4566-80f7-24bea1f54e4b,HMIS lab order
-53289185-a224-4566-80f7-24bea1f54e4b,Lab
-95965570-7181-4540-a0fc-5cb70ca4e835,HMIS lab order
-95965570-7181-4540-a0fc-5cb70ca4e835,Lab
-68cfb809-1676-4709-8daa-5845cbca6a15,General Registration Clerk
-68cfb809-1676-4709-8daa-5845cbca6a15,Registration Clerk
-597d835a-08d9-4d9f-b7e5-80d92b4b58e1,Clinician
-6d57aadb-fdda-4005-9a50-5724bc8c6dcc,Clinician
-fc74cf0c-08a8-415d-b28a-33f470e18015,Clinician
-1011fd93-9e63-4dbe-9bc6-18d67844dc5f,Lab
-8e4755ce-4dc3-4be2-9bc7-be043bd54bf7,General Registration Clerk
-8e4755ce-4dc3-4be2-9bc7-be043bd54bf7,Registration Clerk
-6d368e6b-cf83-46d2-95c2-a245c81c9234,General Registration Clerk
-6d368e6b-cf83-46d2-95c2-a245c81c9234,Registration Clerk
-d681aa74-c68e-484f-b233-a5ecc9f1cce2,Clinician
-fdbe56a8-2ca7-499b-99d9-d0a9ab1083e0,Clinician
-2296ce72-5d36-4f10-baf1-7f323d8ca112,Nurse
-a22e47fa-57c5-480b-9717-095f36622ebd,Nurse
-41cb4dfa-bd12-4253-a423-8e2fcbba87d4,Clinician
-a3379110-6ea7-489c-9456-c8a9fef8a6c9,Clinician
-a3379110-6ea7-489c-9456-c8a9fef8a6c9,Doctor
-d2afe07a-6672-45ad-8636-0a072f4880bc,Lab
-70ab99d0-3eab-4733-aa0c-11be8062adb7,Clinician
-d0574032-fa22-4681-9020-402f2e1b1f34,Clinician
-d0574032-fa22-4681-9020-402f2e1b1f34,Doctor
-52e0d985-1073-4b2d-bb4a-d5100f30c5c2,Pharmacist
-132d682f-463e-4e51-b7f4-834172f46f90,Clinician
-0f4231ee-7e16-403d-aa37-ecc1712a36dc,Nurse
-54e78cae-e974-484a-aa84-cecea3095888,Registration Clerk
-ad2cf4a0-0212-41eb-bec9-cd95e87ab8a8,Clinician
-a0d28516-0ab7-4be4-9a18-f14229c858d4,Nurse
-91640f0c-4c49-479f-81a4-0517021a53fc,General Registration Clerk
-91640f0c-4c49-479f-81a4-0517021a53fc,Registration Clerk
-e50bf39e-8539-4e8b-83fc-ac5dfa339853,Clinician
-edff312a-f098-4262-8010-1962d93807e2,General Registration Clerk
-2609da06-f96d-4680-a080-d5ddefca4f8e,Pharmacist
-7ef9a3d1-66e2-452a-a292-d4f5a7ae5223,Lab
-ba6d56aa-2c01-459d-b183-fa0171f769f6,Clinician
-099a009c-e370-446d-9471-944fe61cedfe,Nurse
-f01f04ba-8447-43db-945e-626ff22e3e0c,Nurse
-28ebd1ef-0c8e-4c4e-bf13-ccd752bf7a54,Nurse
-ed631a20-99ac-4bb6-b404-a2cf89507ec7,Lab
-805fbdfa-1ecc-4b46-9f81-757ecd3d2a60,Clinician
-2f812806-f95c-4c82-a34b-63537cc361fd,Lab
-585105bb-c18d-4e9e-ba3a-24f5d4f4e087,Clinician
-585105bb-c18d-4e9e-ba3a-24f5d4f4e087,Nurse
-585105bb-c18d-4e9e-ba3a-24f5d4f4e087,Registration Clerk
-585105bb-c18d-4e9e-ba3a-24f5d4f4e087,"Superuser,Superuser,"
-61e0d63a-5a49-4ea9-b6f8-8455ce1fa14f,Registration Clerk
-73f98d4a-2f46-4d74-af41-30b8dc29c6ab,Nurse
-96b3e191-e091-403b-ace9-a055761b20ba,Nurse
-70e16f1d-f13f-451b-b162-76fc5a72de62,Clinician
-cb2feb80-8cc7-4cc1-9271-f7e25a127a92,Nurse
-0d27dc21-e02d-48d9-8f78-31adb4d211d4,Nurse
-1b37e141-8351-4fd1-b89b-e799cc4848ea,Clinician
-63a7ab37-8303-4790-9763-38e41115828c,Clinician
-f2341325-7686-4dac-80ba-b58eb787ac55,Registration Clerk
-6bfb6491-9d4e-4f7e-85b6-ac273c85dbce,Pharmacist
-40674270-ecd8-46e2-8644-58df1aa6ff89,Registration Clerk
-9c21ef05-a087-4cf3-ac99-e934f7fe63a6,Lab
-4bc3d28e-277b-49b1-ae92-042450292930,Registration Clerk
-7281be90-0138-44d3-b2fd-aec4aaa9fd81,Registration Clerk
-b5443926-5a15-46a9-864a-02b449b713a9,Clinician
-31e942f7-0e80-47bf-9a0c-11cf8d72fdb5,Lab
-945ee0e0-223b-4bf1-945f-39a37dc182e6,Nurse
-1521c046-ec4d-49ae-861b-da26fa208ed4,Nurse
-86ed1cc0-ab22-40d0-9717-90a38c13fb72,Registration Clerk
-3c5beea7-f186-40d1-8fbe-ac2ee24b6a59,Clinician
-06885062-4516-481a-b8c0-ca137fffdca5,Pharmacist
-9c37809f-145d-4dd2-b189-97db1ca0dcda,Pharmacist
-17965751-ae46-4b30-947e-24fe3a110e41,Pharmacist
-139ab723-e28f-4923-bb7d-a7d2907522c1,Pharmacist
-33cb2efb-51e6-477f-a10b-403e06224b75,Clinician
-33cb2efb-51e6-477f-a10b-403e06224b75,General Registration Clerk
-33cb2efb-51e6-477f-a10b-403e06224b75,Lab
-33cb2efb-51e6-477f-a10b-403e06224b75,Nurse
-33cb2efb-51e6-477f-a10b-403e06224b75,Pharmacist
-48f542f1-1203-4686-b16d-c0a717efa9c0,Clinician
-48f542f1-1203-4686-b16d-c0a717efa9c0,General Registration Clerk
-48f542f1-1203-4686-b16d-c0a717efa9c0,Lab
-48f542f1-1203-4686-b16d-c0a717efa9c0,Nurse
-19ce078e-5f45-473c-a657-5b521f2cea0b,Clinician
-19ce078e-5f45-473c-a657-5b521f2cea0b,General Registration Clerk
-19ce078e-5f45-473c-a657-5b521f2cea0b,Lab
-19ce078e-5f45-473c-a657-5b521f2cea0b,Pharmacist
-c39a0373-ced7-4fa0-8ae3-24d1810cd46f,Clinician
-c39a0373-ced7-4fa0-8ae3-24d1810cd46f,General Registration Clerk
-c39a0373-ced7-4fa0-8ae3-24d1810cd46f,Lab
-c39a0373-ced7-4fa0-8ae3-24d1810cd46f,Nurse
-256f78f3-e364-4350-88c8-9e1e9802e4a2,Clinician
-256f78f3-e364-4350-88c8-9e1e9802e4a2,General Registration Clerk
-256f78f3-e364-4350-88c8-9e1e9802e4a2,Lab
-256f78f3-e364-4350-88c8-9e1e9802e4a2,Nurse
-9005c6c5-df96-4d6a-976a-157cb45a69b4,Clinician
-9005c6c5-df96-4d6a-976a-157cb45a69b4,Lab
-9005c6c5-df96-4d6a-976a-157cb45a69b4,Nurse
-9005c6c5-df96-4d6a-976a-157cb45a69b4,Pharmacist
-9005c6c5-df96-4d6a-976a-157cb45a69b4,Registration Clerk
-0af89f12-0537-4718-968a-6396bc579778,Clinician
-0af89f12-0537-4718-968a-6396bc579778,General Registration Clerk
-0af89f12-0537-4718-968a-6396bc579778,Lab
-0af89f12-0537-4718-968a-6396bc579778,Nurse
-0af89f12-0537-4718-968a-6396bc579778,Pharmacist
-31f332dc-f8ef-4ec3-870f-09aff3be453f,Clinician
-31f332dc-f8ef-4ec3-870f-09aff3be453f,General Registration Clerk
-31f332dc-f8ef-4ec3-870f-09aff3be453f,Lab
-31f332dc-f8ef-4ec3-870f-09aff3be453f,Nurse
-31f332dc-f8ef-4ec3-870f-09aff3be453f,Pharmacist
-503503b4-2d2d-4a81-8eb8-ae6d9a9ec0f9,Clinician
-503503b4-2d2d-4a81-8eb8-ae6d9a9ec0f9,General Registration Clerk
-503503b4-2d2d-4a81-8eb8-ae6d9a9ec0f9,Lab
-503503b4-2d2d-4a81-8eb8-ae6d9a9ec0f9,Nurse
-503503b4-2d2d-4a81-8eb8-ae6d9a9ec0f9,Pharmacist
-806fa255-393a-407d-9ba4-9c8c7b4483cd,Clinician
-806fa255-393a-407d-9ba4-9c8c7b4483cd,General Registration Clerk
-806fa255-393a-407d-9ba4-9c8c7b4483cd,Lab
-806fa255-393a-407d-9ba4-9c8c7b4483cd,Nurse
-806fa255-393a-407d-9ba4-9c8c7b4483cd,Pharmacist
-9c52c0a0-c56c-4a63-a181-040e3e7a2dd0,Lab
-3f21b24e-701c-4152-839f-c0fa49bbfad9,Nurse
-03d723e5-152b-4b5e-9b87-6dae280a516b,Clinician
-9c7a3ddc-7822-4a76-84d3-69c3a0e31567,General Registration Clerk
-83dc223d-7a49-4c25-8639-a0b2db710e3f,General Registration Clerk
-2f1b606f-7a15-43e1-8654-92a3884995f2,Clinician
-2f1b606f-7a15-43e1-8654-92a3884995f2,General Registration Clerk
-2f1b606f-7a15-43e1-8654-92a3884995f2,Lab
-2f1b606f-7a15-43e1-8654-92a3884995f2,Nurse
-d8194d81-822c-4415-9fa5-62df81bf1f19,Clinician
-024e58de-26e8-4664-b82d-74e3bf725380,Clinician
-20764de4-c03a-4ef9-911c-52ac56367d47,Clinician
-09b72fb9-391d-46c7-99ce-35e852a9ea8b,Lab
-1f667dbc-d16e-4834-a8d2-4afe51881ead,Clinician
-6e2a0494-5f2f-4561-9d05-6b7a49ecdadf,Clinician
-d6ca5f39-e3c0-41fc-afe0-8af4c60e97d1,General Registration Clerk
-d6ca5f39-e3c0-41fc-afe0-8af4c60e97d1,Lab
-d6ca5f39-e3c0-41fc-afe0-8af4c60e97d1,Nurse
-03ad7f5b-f79f-4b25-974f-87e8fefa4ac2,Superuser
-73b4d2e0-b119-482e-a407-024c0c5a9dea,General Registration Clerk
-bd85fe1c-95df-4b58-88be-b44448aa50f3,Superuser
-bd85fe1c-95df-4b58-88be-b44448aa50f3,"Superuser,Superuser,"
-b9020f9f-a352-4e4b-9841-bb72c8f177c6,Clinician
-b9020f9f-a352-4e4b-9841-bb72c8f177c6,General Registration Clerk
-b9020f9f-a352-4e4b-9841-bb72c8f177c6,Lab
-b9020f9f-a352-4e4b-9841-bb72c8f177c6,Nurse
-b9020f9f-a352-4e4b-9841-bb72c8f177c6,Pharmacist
-702ca6a7-6e35-4ef3-9a2d-474a2303971c,Clinician
-702ca6a7-6e35-4ef3-9a2d-474a2303971c,General Registration Clerk
-702ca6a7-6e35-4ef3-9a2d-474a2303971c,Lab
-702ca6a7-6e35-4ef3-9a2d-474a2303971c,Nurse
-702ca6a7-6e35-4ef3-9a2d-474a2303971c,Pharmacist
-6748b6cf-789f-4695-bd68-272bf5ad7c26,Clinician
-6748b6cf-789f-4695-bd68-272bf5ad7c26,General Registration Clerk
-6748b6cf-789f-4695-bd68-272bf5ad7c26,Lab
-6748b6cf-789f-4695-bd68-272bf5ad7c26,Nurse
-6748b6cf-789f-4695-bd68-272bf5ad7c26,Pharmacist
-28fc307f-7748-4780-96f5-6fe85a972173,Clinician
-28fc307f-7748-4780-96f5-6fe85a972173,General Registration Clerk
-28fc307f-7748-4780-96f5-6fe85a972173,Lab
-28fc307f-7748-4780-96f5-6fe85a972173,Nurse
-28fc307f-7748-4780-96f5-6fe85a972173,Pharmacist
-b14169c9-f0bb-4e76-894e-4ff2ceee8fe1,Clinician
-b14169c9-f0bb-4e76-894e-4ff2ceee8fe1,General Registration Clerk
-b14169c9-f0bb-4e76-894e-4ff2ceee8fe1,Lab
-b14169c9-f0bb-4e76-894e-4ff2ceee8fe1,Nurse
-b14169c9-f0bb-4e76-894e-4ff2ceee8fe1,Pharmacist
-440fce7a-06f1-44a4-8383-fc23b711587c,Clinician
-440fce7a-06f1-44a4-8383-fc23b711587c,General Registration Clerk
-440fce7a-06f1-44a4-8383-fc23b711587c,Lab
-440fce7a-06f1-44a4-8383-fc23b711587c,Nurse
-440fce7a-06f1-44a4-8383-fc23b711587c,Pharmacist
-5141c65b-dee3-47ee-8f17-c7b28c312995,Clinician
-5141c65b-dee3-47ee-8f17-c7b28c312995,General Registration Clerk
-5141c65b-dee3-47ee-8f17-c7b28c312995,Lab
-5141c65b-dee3-47ee-8f17-c7b28c312995,Nurse
-5141c65b-dee3-47ee-8f17-c7b28c312995,Pharmacist
-cafb8f6c-7397-4bcb-9bf2-bf68c3caa58f,Clinician
-cafb8f6c-7397-4bcb-9bf2-bf68c3caa58f,General Registration Clerk
-cafb8f6c-7397-4bcb-9bf2-bf68c3caa58f,Lab
-cafb8f6c-7397-4bcb-9bf2-bf68c3caa58f,Nurse
-cafb8f6c-7397-4bcb-9bf2-bf68c3caa58f,Pharmacist
-01d45c32-21ef-4f98-b260-707b10dba98a,Clinician
-01d45c32-21ef-4f98-b260-707b10dba98a,General Registration Clerk
-01d45c32-21ef-4f98-b260-707b10dba98a,Lab
-01d45c32-21ef-4f98-b260-707b10dba98a,Nurse
-01d45c32-21ef-4f98-b260-707b10dba98a,Pharmacist
-b9a65784-83ab-487e-b916-e038803204ed,Clinician
-b9a65784-83ab-487e-b916-e038803204ed,General Registration Clerk
-b9a65784-83ab-487e-b916-e038803204ed,Lab
-b9a65784-83ab-487e-b916-e038803204ed,Nurse
-b9a65784-83ab-487e-b916-e038803204ed,Pharmacist
-1eb03795-2f3a-4673-8ec7-dd815e4206f0,Clinician
-1eb03795-2f3a-4673-8ec7-dd815e4206f0,General Registration Clerk
-1eb03795-2f3a-4673-8ec7-dd815e4206f0,Lab
-1eb03795-2f3a-4673-8ec7-dd815e4206f0,Nurse
-1eb03795-2f3a-4673-8ec7-dd815e4206f0,Pharmacist
-bff92d78-8f03-4f14-8b6e-fd3151378900,Clinician
-bff92d78-8f03-4f14-8b6e-fd3151378900,General Registration Clerk
-bff92d78-8f03-4f14-8b6e-fd3151378900,Lab
-bff92d78-8f03-4f14-8b6e-fd3151378900,Nurse
-bff92d78-8f03-4f14-8b6e-fd3151378900,Pharmacist
-6ef497ec-a986-45e1-a89c-4d0290821504,Clinician
-6ef497ec-a986-45e1-a89c-4d0290821504,General Registration Clerk
-6ef497ec-a986-45e1-a89c-4d0290821504,Lab
-6ef497ec-a986-45e1-a89c-4d0290821504,Nurse
-6ef497ec-a986-45e1-a89c-4d0290821504,Pharmacist
-c7d14e2f-c90b-49f6-8db2-d0612e49d3d9,Clinician
-c7d14e2f-c90b-49f6-8db2-d0612e49d3d9,General Registration Clerk
-c7d14e2f-c90b-49f6-8db2-d0612e49d3d9,Lab
-c7d14e2f-c90b-49f6-8db2-d0612e49d3d9,Nurse
-c7d14e2f-c90b-49f6-8db2-d0612e49d3d9,Pharmacist
-a279be99-89e9-4fd6-8322-50fc8895b3c8,Clinician
-a279be99-89e9-4fd6-8322-50fc8895b3c8,General Registration Clerk
-a279be99-89e9-4fd6-8322-50fc8895b3c8,Lab
-a279be99-89e9-4fd6-8322-50fc8895b3c8,Nurse
-a279be99-89e9-4fd6-8322-50fc8895b3c8,Pharmacist
-4cb4e900-c9d3-4043-bf15-b3b75c9abc48,Clinician
-4cb4e900-c9d3-4043-bf15-b3b75c9abc48,General Registration Clerk
-4cb4e900-c9d3-4043-bf15-b3b75c9abc48,Lab
-4cb4e900-c9d3-4043-bf15-b3b75c9abc48,Nurse
-4cb4e900-c9d3-4043-bf15-b3b75c9abc48,Pharmacist
-ae5af418-e544-4ac0-b92a-00319b3d444d,Clinician
-ae5af418-e544-4ac0-b92a-00319b3d444d,General Registration Clerk
-ae5af418-e544-4ac0-b92a-00319b3d444d,Lab
-ae5af418-e544-4ac0-b92a-00319b3d444d,Nurse
-ae5af418-e544-4ac0-b92a-00319b3d444d,Pharmacist
-da0e043b-5b5f-4e80-b367-03f18007ccf9,Clinician
-da0e043b-5b5f-4e80-b367-03f18007ccf9,General Registration Clerk
-da0e043b-5b5f-4e80-b367-03f18007ccf9,Lab
-da0e043b-5b5f-4e80-b367-03f18007ccf9,Nurse
-da0e043b-5b5f-4e80-b367-03f18007ccf9,Pharmacist
-c78394f2-d26a-44b5-8bec-b815823156ff,Lab
-93f9641f-aa5d-451c-9a73-92d5bccf3a41,Registration Clerk
-ae8877bf-97f1-434e-8abe-2092b83117f2,Registration Clerk
-e6063776-069f-4ffe-aa8a-ea7004fe52a5,Pharmacist
-65d28136-4693-424e-86e9-2a0c7ce04c47,Nurse
-f0f357d3-f3cf-4a40-a0f8-156118920fd5,Pharmacist
-fa5410aa-81af-402c-a651-bd1a7490b997,Lab
-83569b9d-1bf5-4285-b68c-ce5ea39f90e1,Nurse
-8d016adc-15a2-4077-9a8b-fe8a32f901dd,Nurse
-089941d3-a75a-4f0c-9c03-94c90668b791,Nurse
-749e90e3-2c0e-4e25-9cfa-4a0a6dd8e695,Nurse
-eb2d1187-1bfe-466a-b438-46efbea5c0b3,Nurse
-a6ed5ac4-b746-475f-b927-5b5425c26a93,Clinician
-ae323bd1-f351-4ed1-803d-444534cbaa56,Nurse
-d1f59cdd-3d07-4a90-bb44-8a189f976b91,Clinician
-8a8ce53f-f22c-43c3-b9a1-fe03fa3e19af,Pharmacist
-17770079-b056-4bba-813a-7216a08e17fb,Lab
-73d75759-c7dc-4e4b-970c-c7bc82e747b5,Lab
-0c2d9038-fd4b-46d4-96b7-b6e0b9cdf094,Clinician
-2110a0d9-e877-4fe2-bf4c-bdb4e5046ca3,Nurse
-8dd86d08-eac7-42e0-8495-ae132f72fe9a,Registration Clerk
-6cfbaf5e-84b7-4b19-8cc5-e260a69bf965,Pharmacist
-7c7af97e-1580-4357-98fd-95319d7c0544,Clinician
-cdf68233-dbb3-47d8-9b42-550469f99285,Lab
-5ca77fcc-e73e-4a25-8407-fbdade873260,Nurse
-e9325e69-ce84-4abf-b974-f30f212bc7ca,General Registration Clerk
-e9325e69-ce84-4abf-b974-f30f212bc7ca,Registration Clerk
-d9c49e35-236d-40eb-8979-02445c438a31,Lab
-d44c6734-8b5d-4d0a-b041-8c8e9379a4c6,Nurse
-3795c108-d721-407d-98e8-161c5a5bcab7,Clinician
-a11929e7-6302-4be9-9ed0-bd5fa7386a1d,Data Assistant
-8c21e1a3-3560-4010-9cab-c721ce95c046,Clinician
-ae658e9e-728e-4bdb-b224-3b5aad552176,Vitals Clerk
-ececb664-d6b2-4c19-af2d-929bbfe9b183,General Registration Clerk
-ececb664-d6b2-4c19-af2d-929bbfe9b183,Registration Clerk
-5646ae99-fcf6-4b78-b46d-91ffa4841b07,General Registration Clerk
-5646ae99-fcf6-4b78-b46d-91ffa4841b07,Registration Clerk
-972824dd-105f-445c-af50-4ce1b5b37ecf,Clinician
-adc83a97-3290-4b03-ada5-1e1599f26c5d,Lab
-0f6546e1-ff77-4926-a563-b6a0926031a4,Clinician
-c5e6fe8a-7560-48b5-9cf1-f95256e2a118,Clinician
-9fa0b6ca-b0ca-4873-a045-08b62ee3f144,General Registration Clerk
-9fa0b6ca-b0ca-4873-a045-08b62ee3f144,Registration Clerk
-e9525884-9736-44e1-901f-bf7f6244c205,Lab
-41dd08ff-83d0-400a-a53b-0893b4430e68,Nurse
-cf230e94-eb20-4f6c-8668-264024cc498c,Clinician
-6c2c6929-4c4a-462d-a2ae-88a805c53af0,Data Assistant
-ea36a656-8097-4974-a966-a41a8aea8e77,Pharmacist
-d63f70f2-3714-4e74-8209-557197fd8c14,Clinician
-aa93c27f-ec41-4bb9-b082-b2b3547ac317,Nurse
-a4d9e30d-8c41-4f4e-a98b-23cc889ee189,Nurse
-17c903ab-d584-42c2-86d3-3f992edee800,Pharmacist
-ae54fc41-8d59-44a3-91d1-6ef506d82f11,Nurse
-8f34d4c4-e82a-4455-8981-0adc902f9df5,Pharmacist
-98294f09-e2a6-4150-9d07-f8895d6962e5,Data Assistant
-2fd4f8e3-fdc9-49ef-9905-bd19026a3661,Superuser
-5876df0a-365b-4a56-9777-f3dfb3e1a846,Nurse
-9bbcefb1-b7e0-4571-adf1-55ebc1fbbae5,Nurse
-f4a2d1a9-69b5-4a36-9646-e24f5f58bf03,Pharmacist
-a3bd1f53-1491-4245-b10f-43620c4d146a,Pharmacist
-df010fb0-568c-4c9e-a909-23bd51d4241f,Pharmacist
-05b930d3-0034-4b61-9802-0f75fb97c306,Pharmacist
-357850f2-a001-43fe-b700-f2222759d835,Nurse
-4b3a8c6f-cb4e-48e4-9061-3549cee79f5a,Nurse
-f2897944-5686-4333-bbbc-2f9a7d1e5783,Clinician
-1471bcce-966a-48e6-9565-c825a5cde639,Lab
-f008fe7f-c1c3-4e86-b7e8-0eae22875c23,Registration Clerk
-45791ddd-3064-4a9c-9112-0f48dc541665,Clinician
-a89851fd-660a-4b6a-ab96-32ef225a9e3c,Nurse
-4c415f87-484f-4d3e-a7fc-3178193fa6ff,Clinician
-4c415f87-484f-4d3e-a7fc-3178193fa6ff,Medical Assistant
-b7aa8ee3-56a6-491f-ab53-c3e0e3fbd424,Lab
-8acadc3b-cb9c-44ef-9916-c4945f5d892d,General Registration Clerk
-8acadc3b-cb9c-44ef-9916-c4945f5d892d,Registration Clerk
-e94089c0-d540-4be1-ac93-934863d58009,Nurse
-beb9521f-6b58-40ee-82e3-5ad0b58ca843,Medical Assistant
-57a6ec2a-e512-4fb2-a8ff-d0ca9a77c726,Clinician
-1adbcf16-1b03-44c0-802f-7772170ccbe8,General Registration Clerk
-1adbcf16-1b03-44c0-802f-7772170ccbe8,Registration Clerk
-7d03dbf1-e83e-4a6b-b8e0-8a32f5e3131a,Lab
-1e76fd4a-429e-4927-88bb-ae86ac675267,General Registration Clerk
-1e76fd4a-429e-4927-88bb-ae86ac675267,Registration Clerk
-e6381e02-1d46-4d34-a705-cc76d01bb919,Lab
-913ce3e6-eb8a-42fe-84ef-d02b2e170388,Clinician
-1187fca6-d320-450d-b4bb-81778e33e49c,Superuser
-8314358b-589d-4316-8720-889410edc0a8,Superuser
-88ee7d69-e5e3-44bf-9a3a-05b2e59a1089,Superuser
-593e507e-ee49-4ac2-a4ce-c334787cc9cc,Superuser
-14635358-a5b5-4044-aad1-dafc921019d1,Clinician
-359d33ec-c354-41f4-acb0-04fe6e4ad47a,Pharmacist
-029643b0-2e5a-47bf-b531-82ea3c1eae48,Registration Clerk
-499d3315-3cbf-4d19-bf1e-2e204a029008,Vitals Clerk
-37467178-4756-4d50-8a47-8ac261571f7c,Clinician
-d811c1c6-c118-47e8-82ac-eb7fd8fe8f03,Nurse
-46c98803-056d-43ea-bc8e-447b7c13e1ac,Clinician
-23b6ed96-52c7-4a89-9e3e-4400e6a61d19,Clinician
-82f9f280-2eb1-461c-a835-a159adcfe0cc,Clinician
-d8cd64c2-0494-42cd-afb3-e8e884cd1372,Clinician
-ae076d36-fc3a-4006-ae97-c641b794834a,Clinician
-64e1b22c-a6fd-49fd-abba-9d585562e5e1,Pharmacist
-b57c990d-30b7-470b-b4d3-91bc4c13a0d1,Pharmacist
-9911b829-219f-48a8-9260-3aacd9b0edb6,Pharmacist
-76e70963-f375-4d5d-be12-6cd1e3f6a781,Pharmacist
-865c5b31-e765-405c-8d87-7a6b6e435866,General Registration Clerk
-865c5b31-e765-405c-8d87-7a6b6e435866,Registration Clerk
-3aeef64d-50e5-42d0-8a4b-a72700fcb274,Lab
-c6ca3510-2022-41fd-9bc5-9f6864705820,Lab
-b310e704-d308-446d-b0ac-eeb64fb6e6cd,General Registration Clerk
-b310e704-d308-446d-b0ac-eeb64fb6e6cd,Registration Clerk
-b29dbd39-79a4-4bf0-b972-2f45a1df3fff,Nurse
-0f3a0890-33a3-4763-9ba4-6b38ed0bc6b9,Nurse
-bf183685-0fed-472a-af98-960e8e126370,Nurse
-3a1db33b-8901-497b-9f2b-50d2405d5f55,General Registration Clerk
-3a1db33b-8901-497b-9f2b-50d2405d5f55,Registration Clerk
-c2ff8989-fd9a-447d-abb2-77e8d65ab3de,Lab
-5ff5e70e-6852-402d-8b63-0498507c54e2,Clinician
-71f6c59e-faac-4241-bee6-ea1f36a14909,Nurse
-a7e39226-304a-4150-9f47-a5e72934316b,Nurse
-f6d3b411-a7ec-478a-9527-1f48afe6a141,Lab
-62099b49-92ab-4e3a-a32a-a5b978252659,Nurse
-21c6eeca-da6b-44c5-8e82-849cd6c4cf37,Nurse
-0532b5a5-66f6-4ca6-839e-69d6bf95324f,Clinician
-fc9d7379-eeb6-41d9-8aa6-970d12b42734,Clinician
-8da92e24-b64c-4670-8813-c79f61d3094c,Lab
-49a70421-4d71-494f-bfb9-1a2eb98b7e99,Nurse
-eb989e9e-b9a8-4483-aae3-9f599dde6fce,Superuser
-df303e50-c20b-4402-9044-d1221116609c,Superuser
-d4d99a81-ad58-4505-9217-98371cef8cfc,Clinician
-d4d99a81-ad58-4505-9217-98371cef8cfc,Superuser
-d22a1980-f5f0-48d0-bebc-f6c58b3ce90c,Clinician
-d22a1980-f5f0-48d0-bebc-f6c58b3ce90c,Superuser
-af382edd-bc95-4fde-9f0b-61b916b6c3f6,Clinician
-af382edd-bc95-4fde-9f0b-61b916b6c3f6,Superuser
-0509ba28-5723-4328-b43c-9dfc3b3b64ae,Clinician
-0509ba28-5723-4328-b43c-9dfc3b3b64ae,Superuser
-6879695d-98ec-43a7-bcbd-890489c7cf2f,Clinician
-6879695d-98ec-43a7-bcbd-890489c7cf2f,General Registration Clerk
-6879695d-98ec-43a7-bcbd-890489c7cf2f,Superuser
-6879695d-98ec-43a7-bcbd-890489c7cf2f,"Superuser,Superuser,"
-6879695d-98ec-43a7-bcbd-890489c7cf2f,System Developer
-c2a342d2-7ea2-40c2-bce3-9e84432c98ad,General Registration Clerk
-ada2e394-4f6f-449b-b56f-bf583d0d0040,Nurse
-3af39649-00d9-4f1d-b316-dad76c8bfa2c,Clinician
-280888cf-2ef7-4653-b91a-920285f6fd11,Superuser
-79b37b0b-c3f9-4043-8ea6-61c93442547b,Clinician
-79b37b0b-c3f9-4043-8ea6-61c93442547b,"Superuser,Superuser,"
-fb1657c8-65d0-487a-bc73-963dcd0cfc71,Clinician
-fb1657c8-65d0-487a-bc73-963dcd0cfc71,Doctor
-fb1657c8-65d0-487a-bc73-963dcd0cfc71,General Registration Clerk
-fb1657c8-65d0-487a-bc73-963dcd0cfc71,Nurse
-b5d24e69-f988-4ae5-b7ac-154c4610b879,Superuser
-4d87e89a-5bcf-44cf-bbae-768644e29c68,Superuser
-c6d9ccc4-23f2-49b5-b0da-fca29fe79011,Superuser
-196df6a4-7e4e-4ee0-924d-12a340849732,Superuser
-1b99e590-7dc6-47e3-b14f-be4623ff0795,Superuser
-8f4e64b1-9a93-4f78-a085-9e4f121495c8,Superuser
-15a15072-8a56-43ff-9bb1-9af5d9317f29,Superuser
-590a02b7-3661-4038-a943-1bc9f4be0949,Provider
-3e1f54d6-ac7e-404f-8aa7-3d53f1804367,Superuser
-a0d51505-51a9-434b-ab0d-2db1503717d6,Clinician
-a0d51505-51a9-434b-ab0d-2db1503717d6,Lab
-36883835-fd50-4fa4-9cac-ada776a93b7b,Superuser
-41f4cba7-371f-4818-b77d-0a625104f232,Anonymous
-41f4cba7-371f-4818-b77d-0a625104f232,Registration Clerk
-c202105c-210b-4fb5-9e29-e8bb5e4178e2,Nurse
-c1d7351a-f766-4e10-8411-2a62b941c4c9,Nurse
-464c0cff-0190-44ba-a280-afc0368ac222,Clinician
-464c0cff-0190-44ba-a280-afc0368ac222,Provider
-464c0cff-0190-44ba-a280-afc0368ac222,Superuser
-df15603f-54d0-41be-8613-a992170fcc70,Superuser
-43feb986-13a6-475e-a038-ea9febc13513,Superuser
-43feb986-13a6-475e-a038-ea9febc13513,Supervisor
-a92accb9-7f88-47a5-9271-85c6269184dd,Provider
-a92accb9-7f88-47a5-9271-85c6269184dd,Superuser
-a92accb9-7f88-47a5-9271-85c6269184dd,"Superuser,Superuser,"
-a92accb9-7f88-47a5-9271-85c6269184dd,System Developer
-f06042a9-6083-4e60-946b-0c80a5a0f4bf,Superuser
-f06042a9-6083-4e60-946b-0c80a5a0f4bf,"Superuser,Superuser,"
-93af5875-60e9-4dad-8715-c1eaee6c694e,General Registration Clerk
-93af5875-60e9-4dad-8715-c1eaee6c694e,Provider
-74b37f28-b0ac-455b-9995-8dff78d88b2b,"Superuser,Superuser,"
-ceec387e-2e43-4799-b720-fc6c8f07824f,Superuser
-98463314-b750-44a2-b861-7b04b011c5c9,Clinician
-98463314-b750-44a2-b861-7b04b011c5c9,Superuser
-ce91933b-1e96-4fa8-892f-e24e57c442ac,Clinician
-ce91933b-1e96-4fa8-892f-e24e57c442ac,Superuser
-a85e9502-02bc-4f96-9375-0e77a8f87861,Clinician
-a85e9502-02bc-4f96-9375-0e77a8f87861,Superuser
-3bd6001e-d38f-4a33-a0f5-207bea98c9e1,Clinician
-3bd6001e-d38f-4a33-a0f5-207bea98c9e1,Superuser
-4309ecf7-ab6c-4eec-accd-5d2fc0d03059,Clinician
-4309ecf7-ab6c-4eec-accd-5d2fc0d03059,Superuser
-4309ecf7-ab6c-4eec-accd-5d2fc0d03059,Supervisor
-858a7480-2f26-4691-9ea5-6f6a30ba833f,Provider
-858a7480-2f26-4691-9ea5-6f6a30ba833f,Superuser
-858a7480-2f26-4691-9ea5-6f6a30ba833f,System Developer
-eeaa0501-e421-48d2-8549-02352af5de97,Superuser
-d5592c81-5f9b-4f35-ada1-123c9cfcda75,Provider
-d5592c81-5f9b-4f35-ada1-123c9cfcda75,Superuser
-72709390-8102-4057-98ea-6d17b1c09cf0,Superuser
-72709390-8102-4057-98ea-6d17b1c09cf0,"Superuser,Superuser,"
-11ef2abe-8bb0-4619-a213-b644d4b2e717,Superuser
-969805f6-09a5-43ae-851f-5b470b758fc7,Nurse
-969805f6-09a5-43ae-851f-5b470b758fc7,Provider
-969805f6-09a5-43ae-851f-5b470b758fc7,Superuser
-969805f6-09a5-43ae-851f-5b470b758fc7,"Superuser,Superuser,"
-3cfdd2e1-c9bb-45fa-8c21-04fb44ef60f2,Superuser
-b6163aae-1a4a-4182-96cc-1e7884a4d63f,Clinician
-d9241f58-e4c8-4ff9-8a65-70842da6f4c4,Superuser
-77d85401-d47d-4fa3-a93f-12836c6cce1d,Superuser
-761956b2-7c4e-49c9-a0c1-b0c972c74c24,Superuser
-30f8d250-e5e8-4011-8d0f-4733ba3619f4,Superuser
-104049a9-cd54-4163-99c2-0c1383ca78bb,Data Manager
-1ffc53a5-d390-4c61-8160-0b357a1cffc7,Superuser
-944d6e26-9319-409e-abce-d1db15ebc561,Superuser
-3f8ccab8-901e-4ae8-a496-30742672dfe7,Superuser
-d1d521eb-b88a-4e52-8415-3e6dc06c43e5,Superuser
-5491dde5-9afb-412c-ae24-b5371156e1bd,Superuser
-04ed4c18-c203-402e-88ac-a65755eaf29f,Clinician
-04ed4c18-c203-402e-88ac-a65755eaf29f,Nurse
-04ed4c18-c203-402e-88ac-a65755eaf29f,Provider
-04ed4c18-c203-402e-88ac-a65755eaf29f,Superuser
-0d33dc3b-b9f1-433e-b653-50a9f58f502e,Provider
-0d33dc3b-b9f1-433e-b653-50a9f58f502e,Superuser
-a470f603-f3da-4288-a291-f4b1093d0f2f,Data Manager
-a470f603-f3da-4288-a291-f4b1093d0f2f,Superuser
-5fba40b6-8404-46dc-8fe9-06904181ba5b,Provider
-5fba40b6-8404-46dc-8fe9-06904181ba5b,Superuser
-803bff51-0716-4ac9-9afa-3818faa8217e,Superuser
-f6cf9d58-491f-4841-a6ea-d7f33959971e,Superuser
-33f74738-2dee-4944-aedc-6421d6ed0480,Superuser
-3ba72489-55a3-4b79-b1d2-4b4f06c56b26,Superuser
-10faf455-520a-4f53-bc27-006aa40b1ac1,Superuser
-7a0ea044-c3d7-4173-a9a2-aea3e4ef186b,Provider
-7a0ea044-c3d7-4173-a9a2-aea3e4ef186b,Superuser
-40d60f56-235e-4c06-bd52-f0f0dcf130f9,Superuser
-e1fa8db2-948d-46d2-9185-08e56b9e356a,Superuser
-23d11c5c-c90e-4e61-9ec4-005d91e0be15,Informatics Manager
-4aa66c51-a221-4ea0-b494-243d5e7c6a2b,Superuser
-c736ebc9-cad3-49ac-ae33-238534070b38,Superuser
-fd6471d3-4eeb-4c7e-826a-f80a8e75fc6a,Superuser
-f250c1f3-0f2e-477a-9245-cb2cfb9141f0,Superuser
-becdb7fb-5c5a-4453-9535-ee6f54ef903d,Superuser
-7631a2f4-ddf3-463c-9356-30109a985fa5,Superuser
-f56059f4-b4cd-4cb2-aa9c-8765d9871368,Superuser
-84f70a72-4cd5-4d05-8b92-153e0e6c66bc,Clinician
-a3c9f49b-eabd-4a87-af24-bee4e204d772,Clinician
-1bd28809-902f-4865-8d41-336e2acba807,Clinician
-7aaf617a-f212-4d45-ac97-c74bb758d393,Data Manager
-7aaf617a-f212-4d45-ac97-c74bb758d393,Superuser
-b90bd3b0-b598-42a7-af21-3bd7aae4b255,"Superuser,Superuser,"
-9834f21a-8696-4ce5-986b-8d8805bb364d,Health Surveillance
-f83f758b-a845-4bcd-b855-dc793603ca1a,Health Surveillance
-74ca25da-bf1e-4361-beeb-85e5b8852400,Health Surveillance
-b503a597-5578-4be0-80e3-c77955cf938d,Superuser
-baa6f90a-be8d-4f6e-b487-6f969c862de0,General Registration Clerk
-baa6f90a-be8d-4f6e-b487-6f969c862de0,Superuser
-baa6f90a-be8d-4f6e-b487-6f969c862de0,Supervisor
-2a2fcc38-2a3e-408d-b5af-7eb6dbc2335c,Superuser
-93b9659e-04a7-4f92-bc1f-a74022197045,Superuser
-fd5297cf-b145-4b31-b910-897754893cfc,Superuser
-e5422543-1ad3-4b23-aee7-6908c58d5bc9,Provider
-e5422543-1ad3-4b23-aee7-6908c58d5bc9,Superuser
-5fcabbe2-ee4c-47c3-a4d4-1aab2d14ef75,Nurse
-fb85f6c6-df9a-4382-b9b6-063b947e82ee,Superuser
-35ccc5fc-4a72-49a0-a583-da29ee41989b,Clinician
-c61705be-9bb8-4143-9537-2542c4b109be,Data Manager
-c61705be-9bb8-4143-9537-2542c4b109be,Superuser
-c61705be-9bb8-4143-9537-2542c4b109be,"Superuser,Superuser,"
-c61705be-9bb8-4143-9537-2542c4b109be,System Developer
-0c86b7a9-4f6f-4985-a105-d83742ac9fde,Registration Clerk
-2562b099-d28f-4041-ac29-eaf7e0bacd43,Nurse
-6d0a607a-8d71-46ed-81da-17051e1e35fa,Clinician
-7cd4535f-287a-4562-9a8e-6fec433c4842,Nurse
-374a3f37-a2dd-414f-afeb-5eff4e7a17b2,General Registration Clerk
-374a3f37-a2dd-414f-afeb-5eff4e7a17b2,Registration Clerk
-39e47cb9-4b15-4eb4-9d0d-05fba3200c33,Clinician
-a406a5e0-5481-46c5-bb42-cd87dc6a27c1,Clinician
-123805a1-aea3-44df-8f1b-1592ef1b3af5,Clinician
-a9b0c70d-fc61-4425-a9a8-0a27cc63e6e8,Clinician
-dda9a651-af88-4193-b4b6-66e06c68cd69,Nurse
-df600bee-c09b-4982-ac96-aacf1e422632,Clinician
-656b0473-a26a-4ae6-8eb5-dde8a56dc605,Clinician
-64d818d4-6ace-4285-b2c2-37d3b8cc794f,Clinician
-0481c233-a828-4c35-b76a-cf14cfb1be07,Clinician
-0481c233-a828-4c35-b76a-cf14cfb1be07,Superuser
-3ba7eac3-3a6a-498e-ae4e-4487b42132ef,Clinician
-724f3083-8e1b-4ded-bbba-f99199ffcfc2,Clinician
-724f3083-8e1b-4ded-bbba-f99199ffcfc2,Superuser
-e430dbcc-e167-4b12-b837-7644e41ef7b8,Clinician
-24d44602-b3ff-439d-b0b2-5d0b5ce9fb6d,Clinician
-24d44602-b3ff-439d-b0b2-5d0b5ce9fb6d,Superuser
-55fa9a53-00ad-498d-9a3d-b2eafc464f9f,Clinician
-c12be787-f731-4099-85fc-6a9683b8de73,Clinician
-d4d5c6f2-f56c-4222-b1cd-7b8b10a40890,Clinician
-ca3f8e88-05f7-4204-bc36-4de83b21218a,Clinician
-ca3f8e88-05f7-4204-bc36-4de83b21218a,Doctor
-ca3f8e88-05f7-4204-bc36-4de83b21218a,Nurse
-ca3f8e88-05f7-4204-bc36-4de83b21218a,Superuser
-15cec8c6-cdc8-4153-aa08-576829aba143,Registration Clerk
-15cec8c6-cdc8-4153-aa08-576829aba143,Superuser
-98a2bf11-e59e-497e-98cf-8b0287195137,Data Assistant
-98a2bf11-e59e-497e-98cf-8b0287195137,Superuser
-a9c4963f-69f4-4e13-89ec-868e982aa555,Superuser
-90e4b143-287b-46f6-81ba-670dff9339d9,Superuser
-8ef47961-0fed-47a8-9022-2a323de04264,Superuser
-8ef47961-0fed-47a8-9022-2a323de04264,Supervisor
-023ac035-a52a-4600-aa5e-da5bd56c78bd,Counselor
-9d47b18b-7d9e-4ec3-8fcc-2de3cce363a9,Clinician
-ab86356a-86d9-43a9-95e0-f2ddb9792421,Superuser
-fa601dbe-c0a9-44dd-85c9-db55e802f96a,Clinician
-fa601dbe-c0a9-44dd-85c9-db55e802f96a,Superuser
-1abcc260-92a9-4f87-adf2-b1261887e49b,Superuser
-9190b0cc-fe5f-490c-b877-826157399085,Superuser
-4ac15e86-c827-41a9-8612-b95307652263,Nurse
-602d5d3d-e511-46bf-a935-e1b0d1d4c575,Superuser
-7906aa0e-bbc8-43d5-aad7-bff1666a824a,Superuser
-95f33fe9-a65d-4b71-ae2a-816ddcb733c3,Clinician
-95f33fe9-a65d-4b71-ae2a-816ddcb733c3,Superuser
-6669b2a6-91c3-4017-9700-fed15534b323,Registration Clerk
-ffc05777-142b-46fe-a551-e2383fdebf4a,Data Assistant
-ffc05777-142b-46fe-a551-e2383fdebf4a,Data Manager
-6f696510-47fd-4b45-9d65-f705c89f83dc,Superuser
-f3e01a27-8381-4387-8385-d38c81bad6e6,Adults
-f3e01a27-8381-4387-8385-d38c81bad6e6,Clinician
-ec344f7c-a669-4333-8189-d0de73689512,Data Manager
-7bfe3c21-ead7-4f85-9980-d29821745b36,Superuser
-3f3e9f32-bfe1-4a8f-a822-e853aa29b4bc,Superuser
-acb9939f-a8fa-4ff4-bab6-5a8bdde2cb0d,Data Assistant
-fabe0f0e-318d-4deb-baf9-d710a38bb28d,Superuser
-00901932-7004-48c9-9331-5fa595ef263c,Clinician
-807d588b-ad2b-49da-905b-f2819eabfc64,Superuser
-93b8fc4d-73a0-4b76-a16c-c5b1e235ad5e,Data Manager
-93b8fc4d-73a0-4b76-a16c-c5b1e235ad5e,Superuser
-bcc71071-c6a5-491c-a6c4-3b9e12d7d613,Clinician
-43afeb50-d4a0-4670-be71-a1e67df3ea1e,Clinician
-43afeb50-d4a0-4670-be71-a1e67df3ea1e,Superuser
-eb1fa2d9-3888-4ff9-973f-f55fe945e3ae,Clinician
-c042cdd4-d9eb-4dbd-bfa5-d5a009ce9c31,Clinician
-c042cdd4-d9eb-4dbd-bfa5-d5a009ce9c31,Nurse
-c042cdd4-d9eb-4dbd-bfa5-d5a009ce9c31,"Superuser,Superuser,"
-f9f31077-2e62-49d6-9da9-e82f501a564c,Clinician
-c7e35204-1790-4a63-ac02-63a8e3c30ec6,Pharmacist
-e05f7008-4bf7-48b5-8b0c-0023363b8548,HMIS lab order
-e05f7008-4bf7-48b5-8b0c-0023363b8548,Lab
-e0b64242-7c96-4524-b9b8-ce2c085b7200,Data Manager
-e0b64242-7c96-4524-b9b8-ce2c085b7200,Superuser
-e0b64242-7c96-4524-b9b8-ce2c085b7200,"Superuser,Superuser,"
-a45916a7-455a-4615-8c27-e97bd3e04797,Clinician
-d4d03b32-672e-45c1-9b89-341260b9e9f5,Clinician
-0940c0c4-0b47-4966-8f21-7ea98d18f153,Clinician
-85598d70-dfe2-4a44-9c9e-63e9ecf47282,Clinician
-c5e096ee-e432-4741-8e2f-9c9f6648ca60,General Registration Clerk
-c5e096ee-e432-4741-8e2f-9c9f6648ca60,Registration Clerk
-7550683a-5239-40d2-82d5-c41f9e367ab1,Lab
-a081fee5-7610-461b-8cc9-a999e5e25b97,General Registration Clerk
-a081fee5-7610-461b-8cc9-a999e5e25b97,Registration Clerk
-34e455ba-189c-4fbe-962e-7ca646c62acf,Nurse
-e751ff99-47c9-455c-bbec-12918477c3d8,Pharmacist
-111e0495-19c7-42c3-ad5f-4e055feb2494,Clinician
-0cc9f713-72f8-4073-bdd2-4274beb9e555,HMIS lab order
-0cc9f713-72f8-4073-bdd2-4274beb9e555,Lab
-1a8ab9a3-283a-42c2-8969-1f56982da340,Superuser
-0101995c-fa85-4ecb-b82c-e53d99f2533c,Superuser
-7fc971ef-a3cf-46b3-9796-1caacb8ccb24,Data Manager
-6d657dcd-0f38-41a9-a90b-c5712218463b,Clinician
-efe6861b-16d8-45a4-bc20-3a24449ef7d3,Nurse
-d8061ce8-54c6-4e75-bfeb-ce4a200c2027,Nurse
-d70e43be-bd61-42fe-84a5-793ad70ccadc,Nurse
-7c675bdf-7865-4d60-b6c2-7966a1a1f50f,Provider
-1e7eff3d-2f4d-4456-a14c-c57abc30fc9e,Provider
-dd818ede-e281-405c-be4e-1eda1d135eef,Data Assistant
-3fee2788-bc6d-46a5-99a9-d97bb9b17949,Provider
-96d390dc-72ac-4d92-9fb8-b437e3589958,Superuser
-0ec16c4c-af3d-43ed-a019-e815185da5c0,Nurse
-bc682135-8c67-42e5-95b9-4c557a1a0d3f,Superuser
-8b531eb4-5ab0-4d89-9a29-9d2207890831,Informatics Manager
-823f7608-7ad5-40c8-a72c-4450d2e2c730,Program Manager
-a0bb93db-a3f4-43c9-a5c0-c9082f4d1c95,Provider
-42233c9d-a598-4f9f-97e9-021b45173be3,Informatics Manager
-42233c9d-a598-4f9f-97e9-021b45173be3,Superuser
-68c1012c-f4ca-4f94-b90f-591da7b7aa3f,Clinician
-505b4135-d9db-4513-98df-a5c3883a59ff,Superuser
-049c368d-ca1e-42a7-bf94-053ddafd2ded,Superuser
-a87a06ec-4cc9-4973-93c6-7e988d71350f,Clinician
-cb1dc01a-54ab-4ea6-b8a4-8bc9a445cf6a,Superuser
-502856ca-236e-4b80-ba0d-05e101693075,Superuser
-ec4cbbfd-30cc-48b3-bec2-5bde333b16b3,Superuser
-d43746eb-0586-4389-8d35-dcdecd7a8366,Clinician
-f87b5a17-6dad-4fe7-a30a-4c2d318ff702,Superuser
-6bf116fb-4d6e-4aae-a243-0caec4d6f77b,Superuser
-f5e28077-742e-44c8-842a-e0177e429ada,Superuser
-051409fb-4424-489c-9f0b-65074ee96229,Superuser
-5c873841-5bde-4576-81d1-cdda1178efa0,Superuser
-10fa2b5f-d073-473d-b4ec-2349e169bbca,Superuser
-fe655586-b8c4-47c6-be29-267322036c5e,Superuser
-c60b1f3b-037a-42df-bfa7-b9e3c112527d,Authenticated
-d4bea6f8-5195-4a8b-87d8-c40d0e39fb0d,Superuser
-21e4ac3d-84e5-45bf-8cae-633f619f3e68,Superuser
-a1930f46-0622-4ee0-8b10-148a5b074c4f,Nurse
-d31841a2-559f-499b-b70c-e58dbade006e,Superuser
-51bd5363-b150-4834-b26c-39ca885c09a2,Superuser
-f09d151e-74aa-47bc-bf1b-0aa0fdf9d72d,Clinician
-4b173604-25eb-488f-841d-8355f5715552,Clinician
-4b173604-25eb-488f-841d-8355f5715552,Lab
-4b173604-25eb-488f-841d-8355f5715552,Superuser
-26881678-3f2c-43bb-bcc5-2f23944ce7e5,Health Surveillance
-7a4fa9d0-2930-46fc-9256-624814e255e5,Lab
-80703d35-70e8-476b-b905-7f2454bda38c,Clinician
-80703d35-70e8-476b-b905-7f2454bda38c,"Superuser,Superuser,"
-962755f7-1227-4864-a249-684d7e6e1e31,Data Assistant
-962755f7-1227-4864-a249-684d7e6e1e31,Nurse
-962755f7-1227-4864-a249-684d7e6e1e31,Superuser
-962755f7-1227-4864-a249-684d7e6e1e31,"Superuser,Superuser,"
-10b71404-d766-485f-9168-d218cbbdbc61,Clinician
-f54a4fdd-0a1b-4b50-b8c2-ae403a24c6f4,Clinician
-f54a4fdd-0a1b-4b50-b8c2-ae403a24c6f4,Superuser
-e46d7848-a8a4-4157-8f4c-76ff36b1b9c0,Clinician
-e46d7848-a8a4-4157-8f4c-76ff36b1b9c0,"Superuser,Superuser,"
-3010a313-5bb9-4249-a3fe-e2e4045d0a17,Lab
-3e4fb9bc-918d-4b3a-ba77-3561768254ed,Superuser
-3e4fb9bc-918d-4b3a-ba77-3561768254ed,"Superuser,Superuser,"
-eb4d17d4-f8ce-4f20-b913-24f9a3c4429f,Clinician
-eb4d17d4-f8ce-4f20-b913-24f9a3c4429f,Superuser
-65453f9a-b33e-4962-9fb5-402b45d32da1,Clinician
-e3cb668d-f6a8-4c0e-832c-8de946519705,Clinician
-df9c4acf-f9aa-46d3-8604-b81ccf7456b7,Clinician
-75a5f581-5337-4d11-81f3-45012f192566,Clinician
-75a5f581-5337-4d11-81f3-45012f192566,HSA
-75a5f581-5337-4d11-81f3-45012f192566,Lab
-75a5f581-5337-4d11-81f3-45012f192566,Nurse
-75a5f581-5337-4d11-81f3-45012f192566,Pharmacist
-75a5f581-5337-4d11-81f3-45012f192566,Registration Clerk
-75a5f581-5337-4d11-81f3-45012f192566,Vitals Clerk
-d7dccf25-a6f9-4b9c-b82b-486e08fd6edc,Clinician
-924c2ea1-7cdc-42dc-a787-ca07a5b0422e,Clinician
-924c2ea1-7cdc-42dc-a787-ca07a5b0422e,Nurse
-924c2ea1-7cdc-42dc-a787-ca07a5b0422e,Vitals Clerk
-0aec424e-7b8b-4c1b-97c7-c8d76677b135,Clinician
-a0aafcbc-61f6-4818-beac-bb2d34b5fb31,Clinician
-cc9fa6bb-4c98-4d0a-84f4-5e332760c45b,Clinician
-cc9fa6bb-4c98-4d0a-84f4-5e332760c45b,Lab
-cc9fa6bb-4c98-4d0a-84f4-5e332760c45b,Nurse
-cc9fa6bb-4c98-4d0a-84f4-5e332760c45b,Paediatrics
-cc9fa6bb-4c98-4d0a-84f4-5e332760c45b,Vitals Clerk
-f3fb06ef-8edc-4564-bc93-89b84d5640d0,Clinician
-8d91658e-8c5d-43bf-bcaf-da586e0c868e,Clinician
-673b5499-3c2d-4fd6-8c70-2c346a6d8d33,Clinician
-673b5499-3c2d-4fd6-8c70-2c346a6d8d33,Lab
-673b5499-3c2d-4fd6-8c70-2c346a6d8d33,Nurse
-673b5499-3c2d-4fd6-8c70-2c346a6d8d33,Vitals Clerk
-cf1f769d-716a-46ef-adc0-399f9c1932a2,Clinician
-89d6e3c8-58d4-4a9f-bad4-ae2162398704,Nurse
-6463a9f9-1c2d-451d-9bad-abd376833a62,Nurse
-d2112b7f-b3f5-4e48-9eca-ae12a19328b4,Clinician
-d62b0f59-e123-45e7-8f5e-56b333de3614,Counselor
-1605a5de-7878-47ac-9f03-f5bb2b09636b,Lab
-e92c3f17-b9f4-473d-9a95-3bc6c1d523f2,Clinician
-e92c3f17-b9f4-473d-9a95-3bc6c1d523f2,Nurse
-e92c3f17-b9f4-473d-9a95-3bc6c1d523f2,"Superuser,Superuser,"
-2e0996e9-4d4d-4145-94e4-b2ada9cfcdfe,Clinician
-591b5744-185f-430b-885c-3722223c43d9,Clinician
-e6251084-cb84-4950-8775-a6bfaf403cd0,General Registration Clerk
-e6251084-cb84-4950-8775-a6bfaf403cd0,Registration Clerk
-27c06212-b967-413d-80d6-0a0d5ebd6552,Clinician
-d6af283b-53f6-4b69-980e-5a6be3592f26,Registration Clerk
-b58ad295-d379-4f88-99f9-32fd3a2bc01a,Clinician
-6884bdeb-3846-445e-a59c-4e021b0bca63,Pharmacist
-af45089a-53bd-4adb-a541-a3cf10ca0f95,Pharmacist
-bd59fbcf-36c1-4979-9288-13b8dc399b75,Lab
-1b2cc0b9-1eff-48f8-8c3e-77304719fef0,Lab
-903379d8-afad-49a2-a5a9-5155404cb7c9,Clinician
-fa532579-af31-4a62-964c-e5d0eac9aca6,Clinician
-da8458a6-b2c2-4e38-9ce5-95154920ce14,Clinician
-da8458a6-b2c2-4e38-9ce5-95154920ce14,Superuser
-da8458a6-b2c2-4e38-9ce5-95154920ce14,"Superuser,Superuser,"
-6857a791-2ada-40b6-a409-5d9839b4791f,Superuser
-6857a791-2ada-40b6-a409-5d9839b4791f,"Superuser,Superuser,"
-573e0ab3-9b08-45a8-8296-ccb8fee1c9af,Medical Assistant
-573e0ab3-9b08-45a8-8296-ccb8fee1c9af,Nurse
-573e0ab3-9b08-45a8-8296-ccb8fee1c9af,Superuser
-1ad65576-fbbc-4bdf-8b1c-8e33c8a2ec1d,Superuser
-e014d376-9f64-4131-abab-541f2508b4dc,Clinician
-e014d376-9f64-4131-abab-541f2508b4dc,Health Surveillance
-e014d376-9f64-4131-abab-541f2508b4dc,Superuser
-75029f14-fe54-45d4-a4e5-2b9c01626364,Clinician
-75029f14-fe54-45d4-a4e5-2b9c01626364,Health Surveillance
-87f5dd6f-cc5d-49aa-b966-8c981fc95365,Clinician
-87f5dd6f-cc5d-49aa-b966-8c981fc95365,Health Surveillance
-87f5dd6f-cc5d-49aa-b966-8c981fc95365,Superuser
-736daaba-4320-46ca-9076-4ad7b3aeb50e,Clinician
-736daaba-4320-46ca-9076-4ad7b3aeb50e,Data Assistant
-736daaba-4320-46ca-9076-4ad7b3aeb50e,Data Element Contributor
-736daaba-4320-46ca-9076-4ad7b3aeb50e,Data Manager
-736daaba-4320-46ca-9076-4ad7b3aeb50e,Health Surveillance
-736daaba-4320-46ca-9076-4ad7b3aeb50e,HSA
-736daaba-4320-46ca-9076-4ad7b3aeb50e,Informatics Manager
-09d1108e-3b5c-4cf1-8803-1ad6c9150ed1,Clinician
-09d1108e-3b5c-4cf1-8803-1ad6c9150ed1,Superuser
-9a95f4bc-afcd-4e49-8daf-0cf804e3273b,Anonymous
-9a95f4bc-afcd-4e49-8daf-0cf804e3273b,Clinician
-62b82a93-de15-4262-a0bd-d7897dfca5a0,Clinician
-9a02703e-31ff-43be-aa00-10f1299ec187,General Registration Clerk
-7c44696b-92a3-4e53-a1bd-094354935fe6,Nurse
-10f9d592-1055-4f6d-ae94-9deddec1529c,Registration Clerk
-38894932-685b-4016-aa5c-294cf3da6651,Lab
-2ef27c01-48ef-4871-91f4-9953864cd82e,Clinician
-879ec631-2620-4d7c-919d-5d83118b9f60,Clinician
-5cfe9fb8-f4d6-418b-916a-d5f93306aec1,Clinician
-00933a0f-a56e-4a67-af7d-732de7ba8327,Registration Clerk
-0fd6acac-77bb-4dd0-b571-28a39715612f,Nurse
-61396ec6-bada-4c7d-881f-52cc0750214c,Pharmacist
-a1976b08-e9cb-413e-8cc3-11f16e7d7109,Clinician
-309acc78-d557-4a8e-9f50-49d39bbd588a,Clinician
-175391d6-955f-44ae-8d61-ad6359d7a193,Clinician
-a16867c1-34dc-4a8e-a1fc-1f52d680bfcb,Clinician
-da40075e-3585-4fb7-bca4-6b2e7e41f946,Clinician
-2c269a02-e639-4aca-ac71-1db199e79ec7,Lab
-2c269a02-e639-4aca-ac71-1db199e79ec7,Superuser
-2c269a02-e639-4aca-ac71-1db199e79ec7,"Superuser,Superuser,"
-2c269a02-e639-4aca-ac71-1db199e79ec7,Supervisor
-be5f8800-b315-43b1-90ce-59a44c4a33c9,Nurse
-ddb041f2-0c96-4900-a3ac-50a214b97080,Clinician
-98d67c5d-5d5b-4360-ad10-c42581a825ec,Registration Clerk
-db0a6345-c510-48d3-b4b2-a7a15f9966ea,Clinician
-fe6c82e3-b144-4b8c-8222-3cb741d2d204,Registration Clerk
-26385f9d-b0d7-4900-b275-d7df883c3421,Pharmacist
-a2335f9f-68d2-4003-80f3-97c72f729159,Nurse
-5b058923-d40e-4297-830f-378e291deec7,Clinician
-7936f0f9-631c-4fb2-84bb-9ee54ac90fb5,Clinician
-2592bd86-e622-4ebc-9b88-6a825a6e5fb4,Lab
-cba4c095-4bca-44d5-a589-523d54df9458,Clinician
-cba4c095-4bca-44d5-a589-523d54df9458,General Registration Clerk
-cba4c095-4bca-44d5-a589-523d54df9458,Nurse
-cba4c095-4bca-44d5-a589-523d54df9458,Registration Clerk
-cba4c095-4bca-44d5-a589-523d54df9458,Superuser
-cba4c095-4bca-44d5-a589-523d54df9458,System Developer
-cba4c095-4bca-44d5-a589-523d54df9458,Vitals Clerk
-4304325f-a672-4e3b-b1c6-4f4dc4e7989c,Clinician
-ad22d105-ddef-4f30-a16e-5ce1684e86b1,Clinician
-6a101b00-d24c-4212-8e53-953b57c43e8b,Clinician
-11299924-f936-4621-977e-dd8f8c7f32ed,Clinician
-a72e0d33-1839-4777-bb42-7612c3f9b044,Clinician
-7a839f27-22b4-45ae-ae76-4b863ee6295f,Clinician
-6a8bae84-78ca-42db-b30e-44d0eab9b0d9,Clinician
-6a8bae84-78ca-42db-b30e-44d0eab9b0d9,Superuser
-6a8bae84-78ca-42db-b30e-44d0eab9b0d9,System Developer
-6eff0146-9ea5-4178-aab2-5ec41df29f96,Superuser
-2481eb1e-c8fa-470d-a1ce-1c38efb3cec4,Superuser
-b7c12def-33d5-4eb0-b4bc-354ae66c6371,Superuser
-ebc840d2-70fd-464d-aa3b-0ac14a5e805c,Superuser
-23e61361-0eb7-40de-8868-165146db3972,Superuser
-e44fb535-de8a-420b-8917-62a7b804d2ad,Superuser
-69e45e7f-0ee3-43e4-a68f-cafd86abbca0,Superuser
-f8ae5709-3a83-48ec-9f40-1f3f4e91b4f7,Superuser
-9fd7a005-47a6-434b-aa6e-76dc39e9ae0e,Superuser
-319b2da3-775b-44ff-b40e-f43f0b66c2b3,Superuser
-4016bdb8-92b6-4863-b959-f0130522c775,Superuser
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Accompagnateur
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Accompagnateur Leader
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Anonymous
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Authenticated
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Clinician
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Counselor
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Data Assistant
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Data Element Contributor
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Data Manager
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Doctor
-c6c3b98e-5614-45b0-995e-ad7b858adf88,General Registration Clerk
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Health Surveillance
-c6c3b98e-5614-45b0-995e-ad7b858adf88,HMIS lab order
-c6c3b98e-5614-45b0-995e-ad7b858adf88,HSA
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Informatics Manager
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Lab
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Medical Assistant
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Nurse
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Paediatrics
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Pharmacist
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Program Manager
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Provider
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Registration Clerk
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Social Worker
-c6c3b98e-5614-45b0-995e-ad7b858adf88,SPINE clinician
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Superuser
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Supervisor
-c6c3b98e-5614-45b0-995e-ad7b858adf88,System Developer
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Therapeutic Feeding Clerk
-c6c3b98e-5614-45b0-995e-ad7b858adf88,Vitals Clerk
-bf6a590d-6b0f-41c3-a1b0-fb0b1eb42760,Clinician
-88ec86d5-3178-4ae0-8e87-b5edee34f77f,District Superuser
-88ec86d5-3178-4ae0-8e87-b5edee34f77f,Superuser
-37468bef-9979-4ecf-90d7-cbed993a52bb,District Superuser
-37468bef-9979-4ecf-90d7-cbed993a52bb,Superuser
-0d93a65a-3d76-4e4b-8b86-910a98888bd6,District Superuser
-0d93a65a-3d76-4e4b-8b86-910a98888bd6,Superuser
-1a410c99-a4c9-4eca-84ca-ca3c34085955,District Superuser
-1a410c99-a4c9-4eca-84ca-ca3c34085955,Superuser
-3d5d5120-d6e4-493e-ae3d-0b059241f4f9,District Superuser
-3d5d5120-d6e4-493e-ae3d-0b059241f4f9,Superuser
-03da21d5-eb1a-41df-b784-a1432f1cde73,Superuser
-3d3ceec4-dec9-4472-bf0e-dd25fdf279ba,District Superuser
-3d3ceec4-dec9-4472-bf0e-dd25fdf279ba,Superuser
-6aa6d953-8603-46a6-813d-f1620846142d,District Superuser
-6aa6d953-8603-46a6-813d-f1620846142d,Superuser
-5d9279be-2bcf-447a-ae20-36e63b8b5182,District Superuser
-5d9279be-2bcf-447a-ae20-36e63b8b5182,Superuser
-756405a1-b47b-4161-8fc5-fd4fa5c5def9,District Superuser
-756405a1-b47b-4161-8fc5-fd4fa5c5def9,Superuser
-11f2b499-a49b-401d-98cc-3c1f1258d0a7,District Superuser
-11f2b499-a49b-401d-98cc-3c1f1258d0a7,Superuser
-cd55fb45-2b6c-43b6-a2b0-1e36f39ddc08,Superuser
-146bb8a7-8cb0-4781-9afa-79137666b824,Superuser
-030c0188-ed53-4616-87aa-b26ae1390d40,District Superuser
-030c0188-ed53-4616-87aa-b26ae1390d40,Superuser
-15610032-e999-4abb-bd25-a6a8917e68c9,District Superuser
-15610032-e999-4abb-bd25-a6a8917e68c9,Superuser
-5e9b08ba-6834-4431-af97-47fc237b8e63,Superuser
-2634d981-6b1d-4b2c-b0a8-d12da2c684cc,District Superuser
-2634d981-6b1d-4b2c-b0a8-d12da2c684cc,Superuser
-234571cf-3d92-4c17-a9f3-3758487e2c59,District Superuser
-234571cf-3d92-4c17-a9f3-3758487e2c59,Superuser
-928e5c13-d534-4693-a6ca-f9e33ca5c7c7,District Superuser
-928e5c13-d534-4693-a6ca-f9e33ca5c7c7,Superuser
-51adb8e3-1582-4545-801f-ab2e5660c1df,District Superuser
-51adb8e3-1582-4545-801f-ab2e5660c1df,Superuser
-49e28e9c-340d-4b48-81b1-66a9cd4f918f,District Superuser
-49e28e9c-340d-4b48-81b1-66a9cd4f918f,Superuser
-3e6d090e-d197-4d07-ac89-b0685d935aff,District Superuser
-3e6d090e-d197-4d07-ac89-b0685d935aff,Superuser
-61823ae1-7e7d-4a61-8294-6418942872d3,District Superuser
-61823ae1-7e7d-4a61-8294-6418942872d3,Superuser
-4d93f8a5-6f48-49f1-a014-1a8e160f1a88,District Superuser
-4d93f8a5-6f48-49f1-a014-1a8e160f1a88,Superuser
-4bb5ef08-1b89-4985-a23e-9d5c2b85ea96,District Superuser
-4bb5ef08-1b89-4985-a23e-9d5c2b85ea96,Superuser
-56018ad9-177a-4988-83ac-1a7d02263e67,District Superuser
-56018ad9-177a-4988-83ac-1a7d02263e67,Superuser
-a751b2f9-6a34-49bf-8016-f06772ba147c,Superuser
-a751b2f9-6a34-49bf-8016-f06772ba147c,"Superuser,Superuser,"
-e826f911-f0d3-4ef6-bd93-b2311e92767e,Clinician
-142bbf46-8f44-4163-a473-5f4488034c10,Clinician
-142bbf46-8f44-4163-a473-5f4488034c10,Superuser
-a7282eae-e707-4f02-a6c9-097a66535a83,Clinician
-fc1d6be4-3ae5-40e7-87fa-2ce5a90108b7,Clinician
-21e1c258-e564-4e21-8da6-5ec0ea51610e,Superuser
-6a15a50e-9827-4a12-80e0-41dc2f88c9c1,Superuser
-e621ad24-f42a-4f57-94fd-04aab75adf53,Superuser
-d3ad0d16-b70d-4cee-965f-57419ca8afbb,Superuser
-121615ab-0b04-4d0a-9b3c-114fa9a3cab6,Clinician
-491686fe-a4f0-46ad-aec9-19e8c15d287d,Clinician
-2dc8f2f2-6851-46ed-aa96-1a58c98edb3e,Clinician
-ade78d24-234f-4c2f-83a7-c8289da0a47d,Clinician
-da1d7263-f557-4fa8-afc8-34d941fc18b0,Clinician
-04c64384-7a85-4c5c-9528-1bebc95b40c9,Clinician
-04c64384-7a85-4c5c-9528-1bebc95b40c9,Superuser
-04c64384-7a85-4c5c-9528-1bebc95b40c9,"Superuser,Superuser,"
-04adc057-a1d0-4114-af6c-930dd799399e,Clinician
-f0e169f7-6877-4925-b5b0-ce48f3c3d728,Clinician
-7f5fe26e-fb73-4653-8b2d-25a9d91316a2,Clinician
-08bb5f18-6884-4864-bcc2-46593c3e9e10,Clinician
-f075acdf-c8cf-4e5d-8247-1db9ccb1681e,Clinician
-45860284-68c2-4a91-bd13-2f61875b0e20,Clinician
-4da326c9-91af-45b9-8964-555d55c01a72,Clinician
-9dfe596a-ee99-4ef1-b365-40610a136771,Clinician
-96f28a28-f0b9-464a-9452-43de71823aa2,Superuser
-887b8a67-c331-4896-8d23-392c3a70129b,Superuser
-70d186e6-d8ae-4e89-b491-2a68b7813a5b,Superuser
-ab6989ee-b977-4e41-912b-38fcdf5c18cf,Superuser
-e7d4a296-9730-4681-9501-871648a38162,Superuser
-12a85ac5-26c4-4adb-abb1-fb754d693468,Superuser
-a45c06fa-81f0-4f03-9daf-cae5edcfcfcc,Superuser
-edac2f0f-40e0-46db-a050-daeb1b69a5f1,Superuser
-e8388839-445a-4419-b75e-77cb61d1d5fe,Superuser
-8ab56c09-776b-49cd-ae1a-d60dce1fa6d9,Superuser
-0e873f4e-c385-4bbd-98d1-713dd6abe0b5,Superuser
-84b69bfa-381a-47a8-a7ff-2f0e07599a17,Superuser
-d184ca51-1ef4-403e-b972-a4c10846bc9d,Superuser
-020083d6-f92c-4747-bd01-2d4b5a6bff12,Superuser
-cf00d520-9a27-4d1d-8280-9f65261ca5bd,Superuser
-e959cc4a-b133-4ded-b171-580d0df32d0c,Superuser
-9accc5df-67f2-4085-8228-7fc6685fcc1d,Superuser
-9632d095-8411-459d-8ecf-be6dfa261549,Superuser
-5e7de101-9323-4884-a49b-f19bf65bc145,Superuser
-3c34fb31-9d28-459e-b25b-6766e7650bcf,Doctor
-3c34fb31-9d28-459e-b25b-6766e7650bcf,Superuser
-3c34fb31-9d28-459e-b25b-6766e7650bcf,System Developer
-487dccf4-03b4-4178-9b0e-98d63ef7e708,Clinician
+14d62813-aec7-45b3-b76f-93c00d05c1ea,Clinician
+14d62813-aec7-45b3-b76f-93c00d05c1ea,Superuser
+14d62813-aec7-45b3-b76f-93c00d05c1ea,"Superuser,Superuser,"
+f1c916b4-7527-4946-9169-381677e1fa80,Clinician
+8268cdd2-bb01-434d-b3c6-d861844390ce,Superuser
+8268cdd2-bb01-434d-b3c6-d861844390ce,"Superuser,Superuser,"
+5e7b7c97-73d6-4d67-b052-dd4608ee471a,Superuser
+6b53e567-7ccf-4262-a858-8bd084b99d3c,Superuser
+6b53e567-7ccf-4262-a858-8bd084b99d3c,"Superuser,Superuser,"
+07a27134-3ecd-48f4-85c9-6e419db821b6,Superuser
+f83afc90-12b8-4fba-aeaa-6499da54c5ac,Lab
+e1f74ddb-5140-4f15-9673-846d96e8f6f4,Lab
+d78655d3-b6eb-478e-8c3e-b10f36692058,General Registration Clerk
+d78655d3-b6eb-478e-8c3e-b10f36692058,Registration Clerk
+ee27beed-1330-49b0-89f3-e8c894cec782,Clinician
+79541cbb-39b9-4dbf-8ba4-af1c68211eec,General Registration Clerk
+79541cbb-39b9-4dbf-8ba4-af1c68211eec,Registration Clerk
+96ab7533-eb56-4764-84eb-545eb0810cd3,Lab
+0699a9b7-430e-4aa2-a741-084259df7464,Lab
+25bb4eae-b946-4517-9396-cba0cc0946f9,Pharmacist
+415ad4b8-e8b0-4cf4-9842-0552fdbce86f,Clinician
+0ffe34db-63a8-4b72-bd10-518ede8733c9,Lab
+23c5971f-b98e-43b0-a5b2-4f38b0410047,Clinician
+92aa4977-1428-4ad4-b9dc-3367f72138c9,Clinician
+e6a14ca0-0a88-4dce-beda-d6a529fa5d99,Lab
+9d9c15f0-2aba-4347-bf5c-f9e864146767,Lab
+e9d3ccdb-176d-431a-8a8f-b3ea5c2a7fa3,Clinician
+e77c5111-0d40-43a2-ba45-86536621b79b,Registration Clerk
+6227132d-4920-4724-9a08-ac9fe0fa3a2b,Lab
+968dac74-d55f-49eb-a4fa-314b1366b6da,Clinician
+2ba6d791-4163-460e-b556-2aae61dc372f,Lab
+d134b47a-0295-4c31-9582-0884b986d14b,Registration Clerk
+7a198ddf-2aee-450c-9567-c10abfe16b9b,Clinician
+ee7b9ba9-92fb-4e6d-957a-98b25fa0ddf6,Lab
+bba3a39c-b317-4db2-851a-ef7b0fc1e4ed,Lab
+42167712-369b-45f8-a93d-73d1790f357e,Lab
+7ff911e3-60c6-4025-8704-e9b9c6a7261c,Clinician
+f967542f-5948-468b-9bcb-3da18a80d33e,Clinician
+f967542f-5948-468b-9bcb-3da18a80d33e,Superuser
+88e278f1-faf6-429b-a7ea-4d2164945b80,Lab
+9f21f598-20d9-425a-9f09-9a762bf110e3,Lab
+20e77b92-79ea-4e95-9979-2dd19da4c98f,Registration Clerk
+2f21a2cb-3954-47ca-a6bd-3d48264b4d4b,Nurse
+e83ec0ea-9340-4769-ab6d-d5ed1e835249,Lab
+b526b660-9abc-4e76-9044-88a136fc7a91,Lab
+b526b660-9abc-4e76-9044-88a136fc7a91,Registration Clerk
+6e061e89-8bd2-406b-bf3a-b15e5abd8e55,Lab
+d35211e6-d126-4cb3-b6d9-d763f24f2ad8,Lab
+22d64fdf-4148-4cec-9685-5e8a46f5a062,Lab
+2bdc0b0d-087d-424a-a10e-3d34cc6dce8e,Clinician
+9e6d4e1f-6fcb-4954-bd35-d67b06cd3a95,Lab
+a4f8e80d-ac2b-43aa-ad08-804e20c9d2c1,Lab
+b7afaa5b-fa1f-4527-b739-16189260a976,Clinician
+b602278b-19a4-4bb7-9db2-06b973a9d1e1,Lab
+4f62e9c7-c4c7-4731-8501-bd1c853d30a5,HSA
+4f62e9c7-c4c7-4731-8501-bd1c853d30a5,Lab
+4f62e9c7-c4c7-4731-8501-bd1c853d30a5,Registration Clerk
+470ebaf8-6602-453c-829c-24fb03865bc0,Lab
+3e1dd49f-a158-404b-b12e-160e0be99cbc,Pharmacist
+809bb091-1b50-4412-a83a-5fd7075d540b,HSA
+809bb091-1b50-4412-a83a-5fd7075d540b,Lab
+809bb091-1b50-4412-a83a-5fd7075d540b,Registration Clerk
+1838c329-d5e6-4d79-a552-d6bdec093e51,HSA
+1838c329-d5e6-4d79-a552-d6bdec093e51,Lab
+1838c329-d5e6-4d79-a552-d6bdec093e51,Registration Clerk
+264f67e7-7513-4bb2-b3ed-8a8930106c12,Clinician
+2319bb9b-c9db-4b9e-9a02-38d7465be4cc,Pharmacist
+31d82e76-17bd-4b33-852a-61accfd863c1,Lab
+31d82e76-17bd-4b33-852a-61accfd863c1,Registration Clerk
+ec0b21fe-dfa9-4e73-af7e-987afe6bb0df,Lab
+ec0b21fe-dfa9-4e73-af7e-987afe6bb0df,Pharmacist
+73801f6a-1e92-4c5b-ac9c-108e8d182e22,Lab
+73801f6a-1e92-4c5b-ac9c-108e8d182e22,Registration Clerk
+41f10ebc-dc5b-469f-b1cb-25824d864c8d,Pharmacist
+eb1491c9-74f5-4965-96d9-973c663d297d,Clinician
+54a6a75b-1738-454c-bfe8-b192d182ce2c,Pharmacist
+d1102369-30d2-43d6-afad-0d4804697a85,General Registration Clerk
+d1102369-30d2-43d6-afad-0d4804697a85,Registration Clerk
+b06f066f-8ec5-48b9-b20c-9c0e8574a32e,Pharmacist
+439f3f35-5050-4abd-9056-31ee15d939fd,Clinician
+e92a58f2-79a5-4cd1-9da1-9e45307d69ac,Clinician
+ec7970a2-4b13-4262-9877-ba7e4c76a3fa,HSA
+ec7970a2-4b13-4262-9877-ba7e4c76a3fa,Registration Clerk
+61996e4d-626a-4cb9-92d5-041345567d59,Pharmacist
+d180c343-5118-4829-b01c-0ce81aab3663,Registration Clerk
+35f5bbe1-e63e-4115-b4a2-c401c4c6a163,Lab
+dd6467ee-617e-478f-a79a-83be4f386397,Lab
+eb36d0d1-1e1a-4a23-9af7-b2fa808b71f6,Clinician
+c8026d2f-fffe-40a2-b396-f1d0577618f1,Clinician
+ab13e6fc-323c-4a93-a369-3da6dcd1aa9c,Clinician
+c8b12ade-d130-4f68-94e1-40d3afebf22e,Lab
+55644b02-d6d9-4d8a-9c1f-dc4c96932f7c,Lab
+c0abe3fa-5bd0-4d50-ae5d-ab73224dd2da,Lab
+03c7ca86-829a-49d8-988b-cb691ae1db8c,Lab
+90dd4fcb-2c66-4cd5-97d2-a15c19e61f74,Lab
+485c3b74-d164-48d6-b20a-0fb82e00a01d,Lab
+139915fe-3254-4886-8cd6-425ab46fa0ae,Lab
+139915fe-3254-4886-8cd6-425ab46fa0ae,Pharmacist
+c8e798fb-d237-40b5-96b2-c258d1c71bc4,Clinician
+c8e798fb-d237-40b5-96b2-c258d1c71bc4,"Superuser,Superuser,"
+02c3aab3-0bcd-4270-a338-1e74f5bc6e7e,Clinician
+a08aa208-4ebf-467d-b1da-9113bbc0a7f6,Clinician
+10f87ebe-206b-44ca-bc5e-7595b08da347,Clinician
+637158ae-0207-49a3-959f-84137364af6d,Clinician
+443877c9-c677-442f-af95-810b816d203a,Lab
+2aa0d546-cb53-4972-91d7-8f454b1785e8,Lab
+41a86e9b-72ae-47ac-b78a-673887fc015a,General Registration Clerk
+41a86e9b-72ae-47ac-b78a-673887fc015a,Registration Clerk
+af318a42-9209-41ef-9630-d0f2817491e3,General Registration Clerk
+af318a42-9209-41ef-9630-d0f2817491e3,Registration Clerk
+f17ceeb4-92c2-4230-91d9-e2cced385a2a,Pharmacist
+f109157d-1e09-4391-8ac6-4c4e5f7515a9,Pharmacist
+a4aae5e5-8592-403c-b706-eac6d294de7f,Lab
+a4aae5e5-8592-403c-b706-eac6d294de7f,Pharmacist
+6cfb7363-07f1-42cb-8576-d1bc497508fc,Lab
+6cfb7363-07f1-42cb-8576-d1bc497508fc,Pharmacist
+922ab543-f719-488b-93d7-6416c3beae43,Superuser
+922ab543-f719-488b-93d7-6416c3beae43,"Superuser,Superuser,"
+c7203fdc-7e1e-4a3c-9410-4645dce32a67,Informatics Manager
+2fdb97bf-3ed4-4d89-9ba6-9f717c1d826f,Clinician
+45aa507e-be0a-4ff1-8cf3-78556f06b77a,Superuser
+5e5e9a09-a8fa-498f-a852-5063b3fb5edf,HSA
+e5692407-edea-425c-b9c4-6f992206ee81,HSA
+597e3669-a1f9-4a24-b965-be6035fa39dc,HSA
+0942ec31-d210-435c-b828-04dcf0d6e8df,HSA
+0942ec31-d210-435c-b828-04dcf0d6e8df,Registration Clerk
+05cf83e4-f03c-4dd9-b0bb-97512ab9523b,HSA
+05cf83e4-f03c-4dd9-b0bb-97512ab9523b,Registration Clerk
+73fc2e34-aff3-4206-aca5-ba3a91e9c7f0,Superuser
+77bf2f25-0d1b-4734-8774-59fed58e6420,HSA
+6530e50f-a13b-47fe-840f-4bca1e7bf5c6,HSA
+d6022de5-9145-413f-a2da-3c19993aa4e6,HSA
+edefde02-69a0-47d3-a937-b41891dee74d,HSA
+ee450fa9-c1f1-40a0-988e-b076bfb2ce3a,HSA
+b2bb2125-ce62-4998-87ac-370900dd3028,HSA
+2f7e15fe-2e23-4abf-8b52-c81ad326606d,HSA
+a6e74800-295f-41c6-8109-a97bbb78caf6,Superuser
+e1639db9-062e-4835-9b2f-be9f365b5ca5,HSA
+d760d132-7ce8-4b3f-9e81-36b3dc5d2733,Superuser
+f227d526-82ab-4151-adfd-db686f16f2b5,Superuser
+f227d526-82ab-4151-adfd-db686f16f2b5,"Superuser,Superuser,"
+0a72e73b-48d2-4fc8-8d93-5837235ddf08,HSA
+0a72e73b-48d2-4fc8-8d93-5837235ddf08,Registration Clerk
+a70cd172-82ec-4611-96c2-1d5a69f9906d,Superuser
+ffabb384-7f6a-40df-a68d-d0067daf21e1,Superuser
+ffabb384-7f6a-40df-a68d-d0067daf21e1,"Superuser,Superuser,"
+401a3034-0cad-468d-a289-524f1779cdf0,Superuser
+401a3034-0cad-468d-a289-524f1779cdf0,"Superuser,Superuser,"
+5542028b-c0d8-4422-aac5-32ab683e05ae,Superuser
+5542028b-c0d8-4422-aac5-32ab683e05ae,"Superuser,Superuser,"
+6ea5f166-a106-4e88-b5ab-30ac2da33b91,Superuser
+513eaf84-e6f1-4630-9e59-e8b59411354e,Data Manager
+513eaf84-e6f1-4630-9e59-e8b59411354e,Informatics Manager
+513eaf84-e6f1-4630-9e59-e8b59411354e,Program Manager
+8b497cb5-b1e6-4c47-990a-c2f410f922f1,Superuser
+8ba75b17-2254-45ce-880b-c96698b5df21,HSA
+4d72d977-5227-4184-9520-3d485414c4a8,HSA
+60e9ebe6-c454-4fb9-b47a-cc6f6e91388b,HSA
+c61bac6f-c745-4d59-9b81-74cc10796a2a,HSA
+d74d49e3-97b3-447f-a429-51094132064d,HSA
+c8791924-9ff4-42fa-912c-5b56cd78f724,Superuser
+8e4e9545-a669-4ad5-9f80-c8fb79aab21d,Superuser
+e0d15acc-a3bb-4e9b-813c-847c1b056652,HSA
+8226d136-4858-4a9b-a29f-fff5f4e3bac6,HSA
+9c6a5635-b00b-4d82-9d02-6adadf10ff56,HSA
+e9ac2264-2d8d-4284-a717-86e49b8e0ac8,HSA
+36026c29-cc52-422f-8b13-2c190540a77b,HSA
+bcdcb65c-098d-40f3-85a9-4d4037ece664,HSA
+de68a43b-7895-4d23-a7fc-c630c79a6e0f,HSA
+0c5b5d82-d639-4eff-a56e-158a1bcca87d,HSA
+4f670677-d416-4110-a574-4454b29d4f92,HSA
+22838ac1-591a-4a33-a8b2-387db9c2bf09,HSA
+36d2a18b-c550-41aa-ae2f-2bd09cbb95a8,HSA
+db33b8a9-1a0f-4ffd-9d3a-5e1168433f3e,HSA
+a98a1c4c-6209-45d0-957d-07538bf78b82,HSA
+946bd29b-7761-4fe0-bb5f-fb9551b67b3d,HSA
+138e1c4c-5124-4408-a6b0-12bd82411a8c,HSA
+d48ccbd3-94ae-4ea8-91ba-b7b636bc5d83,HSA
+ceefe7da-fe94-4be3-a6a9-e8b36fcaefee,HSA
+d6f2ae8d-160f-42f6-a870-a113ba57d51c,HSA
+24304fe4-bf99-45bd-98af-7376269463c6,HSA
+8025da09-642e-466f-88c3-98bab1095835,HSA
+b3db9a5f-1b9e-4dff-9b03-4e8ba9020d50,HSA
+cc5d0c62-02a9-43db-a99c-311759781f09,HSA
+f5b43507-b441-4fbf-991c-ad145f304bc5,HSA
+696c7abe-c033-460e-8624-4264b7737c1a,HSA
+dc24f21d-5f4e-4df4-8a63-0569377c8b48,HSA
+79fdbc3f-f40e-45d8-bb45-b861e8c48500,HSA
+37c15892-35ce-4a59-8fce-7348f494ac45,HSA
+90fbfdd9-79a1-4240-b9a7-f7d498f2f336,HSA
+560472aa-7cfe-4a84-b3cb-60a9621ebf01,HSA
+6f13b967-5390-418c-87ca-7710432cb1ef,HSA
+8e667747-479e-4b4a-96c8-cc9ce3f93a4f,HSA
+a5a1be7b-4a73-4319-bb5a-f430c5d6e552,HSA
+5f6132df-5b72-4152-b35e-c5bac774a38b,HSA
+b816d5bf-4326-4b38-957b-02a536a896bd,HSA
+c3543b51-2e48-4664-af11-e2ece135bd3d,HSA
+6cab409b-a353-4419-857b-c4b5406dbf62,HSA
+078d9763-8db6-4e8c-b7d8-8559dc57dc55,HSA
+1ca84156-8930-44f2-9a16-c755a6f4aeed,HSA
+e78115e7-4b89-4610-ae31-db5876cf2c45,HSA
+86ece980-2513-4aa6-a3ba-dea8b7d1066a,HSA
+23c8a258-b0c4-45f0-a2b2-8b7a8742d690,HSA
+77b74a17-982b-4b0d-a581-2fe16a635548,HSA
+cfd0acb2-aed4-4859-b3ff-bb03511886ab,HSA
+f278b9a8-c2eb-4cae-984a-132c36f1c1ef,HSA
+a97353af-09d4-430c-a0a2-b4e6d9994a27,HSA
+4207c6fc-7c65-485f-b70f-1db5e8f8a89e,HSA
+3cc76f6c-ccbc-4f5d-bfa2-4518b8be3f39,HSA
+529a1d35-e029-47ea-a22c-83ea746cef86,HSA
+f99a8f5d-48d7-4aea-ad31-6d2fc3453416,Superuser
+f99a8f5d-48d7-4aea-ad31-6d2fc3453416,"Superuser,Superuser,"
+ff4be582-9b4a-4f6e-9bf3-13e03ebcc19c,Superuser
+ff4be582-9b4a-4f6e-9bf3-13e03ebcc19c,"Superuser,Superuser,"
+07e92349-1db4-4624-8475-8b731dff1cad,Superuser
+5ba582bd-31e0-4440-907d-dd49cac2f724,HSA
+8733c985-7dfe-44f3-b480-432698d5884e,HSA
+c612d665-1961-4dae-8116-7909b595bbcf,HSA
+abb6e8b2-1ab9-4de6-8a69-3ae5846b669e,Superuser
+abb6e8b2-1ab9-4de6-8a69-3ae5846b669e,"Superuser,Superuser,"
+abb6e8b2-1ab9-4de6-8a69-3ae5846b669e,System Developer
+ee8f86e5-e4e9-4db9-8cff-78f0f6cbaf66,HSA
+85095af5-6df2-4803-b1de-0c2f603671c6,HSA
+b5a24e49-e74a-47b2-846a-d18836ad8e84,HSA
+f22ca89c-80e3-4778-a16a-052a980469fd,Data Manager
+f22ca89c-80e3-4778-a16a-052a980469fd,Superuser
+f7cdc17e-8fde-4f77-8ef9-372dedb6ecbf,HSA
+07bd834d-855c-4141-a50d-8b873c3ed691,HSA
+7c6b2129-22cc-4299-ba2f-761a17d08ab6,HSA
+ea186caf-bf12-4a7a-a3c6-3fb4915308ee,HSA
+da62b5ff-3bf0-465d-9a48-f1c440230639,HSA
+7c34882e-5924-4775-a416-0e329f3300d5,HSA
+f391a6e7-f80a-40ea-925b-13d7433caedb,HSA
+42fd0fd1-8a55-4163-8ee9-561eabad23a8,HSA
+9f4b89ac-2836-497d-acd5-e4ee5f1ff1c0,HSA
+8de668c2-7b82-4e3f-8dba-a95a987f0787,HSA
+29a01d77-f911-4c33-abbd-a0f321c47bf3,HSA
+4bd1f939-b94a-4daf-af9f-bbf79dee6783,HSA
+3981b3ce-f1b6-4911-b891-4fa65a29d0b5,Program Manager
+3981b3ce-f1b6-4911-b891-4fa65a29d0b5,Superuser
+3981b3ce-f1b6-4911-b891-4fa65a29d0b5,"Superuser,Superuser,"
+e3488eea-08da-48a6-b5de-cf997f5832cc,HSA
+137b74ef-a043-4c72-a156-c96082095b70,HSA
+8cdc2bc1-27fa-4032-a386-9b507e489795,HSA
+2831c045-d642-49b4-9cdb-4e620466eec9,HSA
+1b11dc0b-db69-44e4-95ce-5d2302e98678,HSA
+3a241e7c-2391-40b3-8376-631870eb608b,HSA
+fd1f7e9f-abf4-472e-8b0f-1dcfb80cd1f5,HSA
+6353d0df-5327-4cfa-9f50-0de641930c13,HSA
+b86bf43e-a5ec-49b4-808a-14f2b0e4fdbb,HSA
+f91e20c3-08d8-4d3e-b423-b98ab8254c3f,HSA
+135445a2-43c5-409b-ac9c-a8839e1e3580,HSA
+04482585-ce23-4790-9745-7b2c92e444a8,HSA
+3ec45a04-555b-48fd-9066-ad3a79218f2f,HSA
+ff667094-7bd4-44d9-9fec-e38acb4887ff,HSA
+8610e919-e464-4bee-8716-f90fb83904b3,HSA
+5943c03a-1a68-4072-8a60-4b65a239f1a8,HSA
+d48d2766-403f-4af2-a83f-398e123e9f20,HSA
+266e15e9-e16c-4c51-89b3-33e824dc47e9,HSA
+2ddc8890-0dbf-4a2c-b016-f4dd5384ef95,Registration Clerk
+1581a1e4-639d-4790-bac4-9ff31b5e871d,HSA
+7a91c35b-ce83-4efa-b4b3-082be0314380,HSA
+303dd9b8-3c92-4204-8f8f-65a22dac95b4,HSA
+6fd68250-d908-444c-9791-b1ba7063f39b,HSA
+c20914a0-b7c1-4d17-86d0-e6de789c99cd,HSA
+15eb9517-3769-4a09-9477-ca0da8d7fa91,HSA
+8f31462b-6d68-46c1-85a6-0249604e9175,HSA
+7adf0e71-4e3d-44d7-8471-b3e0a0398932,HSA
+fbff751b-4114-4f5e-97e3-a4cf698dbcc1,HSA
+e67cd4ea-4f52-465e-b3e0-1a4434a650d5,HSA
+e67cd4ea-4f52-465e-b3e0-1a4434a650d5,Medical Assistant
+6eaf70c3-63b3-4c1d-ab37-4751b77cda39,HSA
+6b1ee922-e7ed-4ac7-b777-6a9e13135df9,HSA
+850988fc-84e0-452a-bfdf-eea33a9e66e0,HSA
+5f094b2a-59eb-4f9c-901e-2f68f13a2a30,HSA
+bcc799d9-9418-4aaa-9528-6da0f161dcdd,HSA
+64f46acb-a64c-4a9d-83ab-f09aee974c27,HSA
+00a8c9d3-d67a-419d-88c5-44996839b218,HSA
+3ae08c1f-0992-4c49-b6bc-7b0a10d665d8,HSA
+e0b36017-1b9e-4c17-9120-a1d42698cee1,HSA
+8d131567-59cb-4f0d-b94d-0c3152dda5a2,HSA
+3d4d3ef4-9201-4043-949e-c122a57ae9db,HSA
+06cda977-ffd6-4640-8b89-22f26944f03e,HSA
+dc69133b-c4e6-4bca-8672-c70f730805da,HSA
+4c696bcc-76c2-479d-8f15-f0681d244ee6,HSA
+eed9a99e-428e-43bc-9234-17c4d8e6f837,HSA
+5d7b51b8-8b73-4e96-a6bc-74cf1f268686,HSA
+cb8f3c5d-9b2f-42e9-a1d1-0dee7c9b3820,HSA
+2df32da6-73d8-4d24-ba19-e03f44e495ee,HSA
+5b3a561c-7c78-49c9-8d65-3580e345926c,HSA
+7e598e34-84a8-437e-bf52-82984529ba0b,Data Manager
+7e598e34-84a8-437e-bf52-82984529ba0b,Informatics Manager
+7e598e34-84a8-437e-bf52-82984529ba0b,Superuser
+7e598e34-84a8-437e-bf52-82984529ba0b,Supervisor
+41033e44-4bad-4213-89ab-c2131e1b45cc,HSA
+5197d247-8bb7-4648-81a0-ed285ba5a99f,HSA
+475ec9cb-4dfc-4575-a5f9-6ae75869d216,HSA
+47a6ddc0-8f9f-4315-a693-7d3ea77c89b8,HSA
+ae34e4fa-7601-4521-a6b8-997ce8a0d85d,HSA
+16039755-cabf-44a2-85aa-767b499ee954,HSA
+8ac6fd3c-b913-4ada-8536-01863aae55c7,HSA
+8ac6fd3c-b913-4ada-8536-01863aae55c7,Supervisor
+d5c0b46c-8cbe-4476-bbb8-575ce9356436,HSA
+d5c0b46c-8cbe-4476-bbb8-575ce9356436,Supervisor
+34371042-bf91-41af-87b2-f2595f30cc01,HSA
+262c51b1-43a5-491c-b275-31894bfc90c3,HSA
+7312bbc1-ca68-4998-b653-4ec56a8faae4,HSA
+4c154aa9-8548-4012-8169-499abe542351,HSA
+4c154aa9-8548-4012-8169-499abe542351,Superuser
+4c154aa9-8548-4012-8169-499abe542351,"Superuser,Superuser,"
+776a7de7-524b-4cbf-b777-773a40ea3364,HSA
+35a2541c-b551-413f-ba03-41efed2966cd,HSA
+93ad01c5-3be6-4830-9f9b-dd9da6c44255,HSA
+c2049dbc-73ab-47a5-8d7a-a9ad719f0622,HSA
+da6cf1e4-9844-4f56-abf7-b6204b6c2152,HSA
+ad77cc0c-be9b-4b87-8a5d-3caae9818a37,Superuser
+ad77cc0c-be9b-4b87-8a5d-3caae9818a37,"Superuser,Superuser,"
+8e324d19-33f8-421a-89ae-9c5598090df7,HSA
+1fd5c7f5-f2ea-49cf-823e-ff73bfc8ef35,HSA
+b322626d-6487-473e-8c64-2b6a2f44f23e,HSA
+b2bb7000-002d-4504-9792-02ee7b814aa6,HSA
+6fb89036-92c9-43ce-9073-c20e1c00b21f,HSA
+ccca52d7-0c3a-4e09-b088-3a993b59fbf5,HSA
+132909c5-4260-4d10-8425-b2e06416d1df,HSA
+439a6e92-b513-4b86-9d27-c7c148eaeede,HSA
+bd7daa6c-283e-4620-ba4f-6aa193e1433f,HSA
+2b2edad9-fbc9-47c9-b239-9e9f16f46f32,HSA
+9a84a51e-96a9-49eb-8fef-43624322e775,HSA
+9743bf18-3ed2-4d3c-b249-1b1c3845f616,HSA
+2c8e6f5e-7944-4292-9bb6-8b47f21633c6,HSA
+85677ba8-a64d-4c79-9a5a-8f983161ab71,HSA
+9328bb7a-4207-4a29-8b59-a9d210ed826a,HSA
+ad36dc0e-acbd-46de-830b-4a1140530873,HSA
+56fc38ac-ad87-4e57-9158-4a0c2b91edf0,HSA
+c92bf1db-ec26-4bdd-9569-c012ceb94913,HSA
+30cc7a0f-2d26-49e5-bc53-b95413eca1ea,HSA
+30cc7a0f-2d26-49e5-bc53-b95413eca1ea,Superuser
+2db2d27e-66c4-43c1-bc14-9cf7ecf9c5a7,HSA
+6f77f4cf-0308-4d71-8c65-ad4b5692bf64,Supervisor
+19c2012b-4f4b-4e6d-b87d-c6379aae1027,Superuser
+19c2012b-4f4b-4e6d-b87d-c6379aae1027,Supervisor
+544d0004-b12c-41b3-8636-f8c645e6350b,HSA
+9e8427e9-dd9f-4fb4-ac42-13ef4dc3296b,HSA
+9c2d9e07-45c4-4d5e-bc18-3b140d4c17bf,HSA
+0c3090e1-8264-4f56-922d-d11b968ffb06,HSA
+2b6a5e5d-369b-4ef4-bf33-a2e49de51a17,HSA
+01f5afe5-e57b-4c86-97b8-5a13caaf41b7,HSA
+f784177c-fd20-461a-a475-ea1b5acc3190,HSA
+dc58264f-18f1-45a7-890d-8f135264be31,HSA
+6d14067d-a939-408b-ad1f-fed7f5dc74a0,HSA
+6fa0f218-54b6-4088-9d3f-491d8d5358e4,HSA
+6fa0f218-54b6-4088-9d3f-491d8d5358e4,Registration Clerk
+716a3ecc-290b-41a7-bac6-168249dc19e6,Superuser
+3e44e0ae-e7c1-4c85-9814-5d7ea828915a,HSA
+66980d67-2e0a-4b13-9ef3-7df37ec19fab,HSA
+c63908a6-0c85-45e7-8cda-fa2ae8c7509d,HSA
+f94dc9f8-fd9c-4095-aa65-eed986e689e1,Clinician
+f94dc9f8-fd9c-4095-aa65-eed986e689e1,HSA
+553f79ae-5c2c-4b48-b9bb-6ea3610b0028,HSA
+3bff762e-8d37-4af9-b265-d624aee2ec94,HSA
+87ec1d9e-d666-46ea-8d97-a85c4669953f,HSA
+6e4e892b-472b-4258-86cc-2d1c9e4a1ade,HSA
+04a0c755-9c98-4924-b85f-965fccf5e30d,HSA
+851d6a7a-ea56-4487-b376-1a499a3c5ad1,HSA
+bf8b4e63-6ae8-42b0-9bb2-2e79ef87e179,HSA
+8b0fa20e-af7f-4e5a-b57d-763bb8f7e02e,HSA
+db87d3f4-d78b-450f-99d0-a8dfa63f2901,HSA
+42630fe7-4837-4b18-9145-c4fed8444a8b,HSA
+d0ce16fa-02a0-45cf-b3db-3a6b3593d55e,HSA
+30e56efb-2370-4f2c-bca5-5bdb772408e2,HSA
+f7380b2a-11ed-42b5-b80e-c40fea3a167b,HSA
+d6a7e37f-aae2-4a94-8ccb-0e01c21fa327,HSA
+99b85185-4dc5-4807-861e-77a99f9c8100,HSA
+0504dfae-71a6-4e8f-962f-d6914a90f365,HSA
+cfc5725a-f82c-40da-960b-50f7dbd97c3e,HSA
+51582fbb-0616-4177-8ff4-dae8dd1b4c00,HSA
+2d0e7ffe-e960-4ca7-8b77-20b6c2ecde17,HSA
+ec3e7a3e-b719-46cd-b225-b8191cd8b73d,HSA
+c6888b62-b9d8-43a3-a797-3d105342347f,HSA
+0a001591-b70d-4287-b8e6-506a9f3f960a,HSA
+7e539c13-e5b3-472a-b8b8-80471599c93a,HSA
+b3054405-6109-4d28-9f3d-c5ada8316859,HSA
+88c66a2b-f0f8-4630-bc31-f0f204c47592,HSA
+a9c60501-2b55-4eca-954f-159e3b10bcde,HSA
+0bb4d889-58cc-4134-9070-0934d8657815,HSA
+f7a652c8-c4b5-48ab-ab91-1a56f6b45c7c,HSA
+627f5d84-8a2d-46db-8e3e-58fb8953ee09,HSA
+05528b31-a720-43bd-94ba-03911157c6cf,HSA
+f6fdc860-ea11-4600-852c-07e95ffae2d4,HSA
+e8f6f4c1-d4d5-4edd-bce2-360db0a5d4eb,HSA
+c9c67000-434b-4bef-911e-7a5312d52abe,HSA
+81141b30-e585-41dc-a60f-41ff53f2d63f,HSA
+856f2348-50b0-488a-b40a-502a2bbbfe86,HSA
+9af30caa-8fc8-4123-926f-ea436fe8c3b9,HSA
+07cdaf1d-1dc9-4dfb-96a8-92c6bca01bfe,HSA
+ed5417ed-9c34-4d53-9199-7d8777f55ea9,HSA
+bae2b185-082d-45a9-9121-ba0099d82700,HSA
+6c010985-4c6c-496d-bb0a-9b654e2b5160,HSA
+9fc3a426-8a60-438e-a066-a791c35de98c,HSA
+29cd11f7-e4ac-4139-91d2-c0f7923aa29d,HSA
+d9419b6b-34d0-442a-8b57-9527c4ca9c50,HSA
+90d543ca-1a61-422a-b1c4-1285dff9c36d,HSA
+5b0b38e0-4d54-4be8-9b85-2f0085145b88,HSA
+107b32d7-01f3-4efc-a166-756a14d55a57,HSA
+5cf32926-baba-4426-80b0-c8c34d877275,HSA
+0a3860e9-fee4-486b-8972-9b61d7ce62a7,HSA
+1a05e63b-4475-44a6-97bc-414675cdef5a,HSA
+45c048b7-4c08-4c6d-8f59-796ddd253c57,HSA
+74aba03c-b937-4202-aab8-0c269c3e3fe8,HSA
+638adf49-647e-4dde-b76b-4949d13ef5cc,HSA
+b2401f2a-b9df-424a-b79d-d41c5c130cad,HSA
+bcf75eaa-f5ab-4ccc-bcee-8a6811b21b66,HSA
+ab1c912a-2b87-431c-9aa3-18eedfa14aa3,HSA
+f0c73164-9025-4f6e-b630-f592ae2f166b,HSA
+95013ae4-22f1-4b94-8b4b-b8123d6d143c,HSA
+008dc902-7740-4bff-9c4a-bdfbb5869201,HSA
+8a5788c9-fa03-46ea-8b21-11eaa87d65d7,HSA
+cfcb824d-3531-4308-9e2b-a3f4c0e9bbec,HSA
+fc3c7f06-f905-44c5-82b6-2ed48283d210,HSA
+4bdea916-3574-4d73-b24f-fb27694bfdb3,HSA
+d950c714-d607-45d8-8317-0a6592f51697,HSA
+c7096638-4b13-4068-9a50-3848a14cf016,Registration Clerk
+46217935-9165-44c3-a884-6d2db13cb1fc,Registration Clerk
+54d0d6e8-2a4b-49a0-b6f8-57474af77618,HSA
+f2bb133f-2532-4fe1-a977-cc46873034ca,HSA
+bd03c941-3270-42cd-a80e-b1c253ebb777,HSA
+a790b524-89a9-4bf7-85e4-7a242d09223e,HSA
+5012998c-96b3-42f6-872a-e354d071850d,HSA
+e82192c1-8ef0-4fbb-8e26-09c7d4d20db9,HSA
+642efb3f-c90a-4793-a5ff-ab4adf501e1f,HSA
+74167d07-dc5d-4607-8f3a-c1f4a4c85ffb,HSA
+5382eed5-062d-4955-9328-1d667a4e920d,HSA
+e9fcae16-1566-40b9-a5ac-48171bb62059,Clinician
+f2de41cb-fa57-4b80-a5f8-713fa64f9e07,HSA
+f6eaf7e4-a1e1-4652-9d8b-f7cc78cd0a40,HSA
+ada16a07-980d-475e-b3f8-6d5ab7109d7b,HSA
+1de493bf-577c-4d1d-a409-d704e2af13ba,HSA
+2e27d967-80c1-4b9c-9c43-a3e979981815,HSA
+9f7d0169-4abf-4919-a734-412699bc9a61,HSA
+4397bf47-c082-41b6-b1e7-10907fbe5822,HSA
+d1d78585-f666-4dbe-b809-f853c9b0b897,HSA
+2f2f77c7-4f63-4b93-9de3-99b868b6b262,HSA
+b7cd1f99-942e-460f-8547-6c7229406c50,Lab
+bfab0726-38f1-403e-a391-e7c3b3976abf,HSA
+bfab0726-38f1-403e-a391-e7c3b3976abf,Lab
+9fac8d83-7ee8-4bb5-aa35-84f10c659d37,HSA
+4a292826-2a21-4fab-802c-81d0d3800400,HSA
+bd3f8bcd-1928-4d44-8898-9af49a1844c2,HSA
+bd3f8bcd-1928-4d44-8898-9af49a1844c2,Pharmacist
+c09b6b4f-abf4-445e-adbc-1ec911d26c94,HSA
+79825618-f970-4b7d-9b3d-1fe0fce0f487,HSA
+79825618-f970-4b7d-9b3d-1fe0fce0f487,Lab
+154448bb-60a5-436a-b43f-5ee98cd00f85,HSA
+ec4d91a7-b1b3-4d10-ad81-d90749c43b95,HSA
+52e0ab8f-8c2c-47ab-94a7-1db43341b3ee,HSA
+968e73cb-d585-4d08-b9ca-f1aa41d48cd6,HSA
+82e9de5a-85f5-44a9-8ce0-b0f971f13d93,HSA
+1d6d6112-c307-4c47-aaa4-ef1683cdcc8f,HSA
+84550094-a174-48d3-840a-f70f03e69d8d,Clinician
+84550094-a174-48d3-840a-f70f03e69d8d,HSA
+0cdd6fa6-0518-41c4-9b53-590ce9b1633a,HSA
+a01976e5-df78-4a6c-ba7c-54afbe02a2b1,HSA
+6a00ff2e-1deb-4279-9e07-098d97dce699,HSA
+0bb22db7-b886-4559-be55-efa376094dbd,HSA
+19a30606-c7e0-4dc7-b8fd-2885032287f2,HSA
+bd98e8c0-afc6-4c7c-aefc-9b49fdc1eb89,HSA
+aec538fc-de0d-42e2-b5d6-d5ce408755d9,HSA
+eac275ef-f60f-40c9-ab44-ebac7185bdda,HSA
+85c2b09c-981a-4212-b892-dda61e74edb6,HSA
+da6e820a-28aa-4700-95a6-dbbb6fef9f6c,HSA
+bc085b91-b5b5-4141-b776-dc481a2c52af,HSA
+b8a5f20f-fba8-4c5a-b1fb-7bdab219bdcf,HSA
+4ee78868-8a95-4210-9599-90a30242902a,HSA
+b9dcd299-aacb-4c5e-82ef-08ac6a14b58d,Superuser
+56933d24-0bc9-4775-8a1a-26b79b7f1382,Superuser
+56933d24-0bc9-4775-8a1a-26b79b7f1382,"Superuser,Superuser,"
+2f434e77-2b8b-458a-abc6-d843d34f842a,Superuser
+859bda9a-3fc5-4cd5-99ea-94b94091836c,HSA
+2dc0fe97-1745-437c-b5bd-d699bcba6b8b,HSA
+e8ee0776-9807-4f40-83e5-c0ab70a99159,Medical Assistant
+cfb68222-8f2b-47a9-acce-7469a9d2c872,HSA
+11fcff6d-f1e9-49b9-a356-ab3ae693640b,HSA
+98981ec1-4296-454e-a2ce-1a782de3e11d,HSA
+b0484849-0012-4884-a0e9-483194987bbc,HSA
+86bb3842-229c-4212-903b-0c35af74142f,HSA
+df415132-6b40-4db1-9eb5-9140faca5bd5,HSA
+7df8a2a1-a5ee-432e-9e76-eee55dafb006,HSA
+a67f54aa-850b-4a41-8437-a1841cdfa813,HSA
+fd682eaa-5c1a-428e-b7c8-c1e6af2b4d20,HSA
+7699792f-9d8c-4331-9fbc-58bf65631b7f,HSA
+ea62f3e4-7095-480e-bebd-33cb2b6aa122,HSA
+6392bf21-94a6-430a-a729-40fb873a1533,HSA
+d19ab75d-3339-4c9e-8ca5-d6dd811b2cad,HSA
+900d546e-c7ac-49be-8781-955db7a6272c,Superuser
+900d546e-c7ac-49be-8781-955db7a6272c,Supervisor
+200ddf30-8ddd-46ab-865b-807da6769dab,HSA
+cdfb4684-525d-483f-a5db-d9c04a0291a4,HSA
+153885bf-aa26-4eb2-b11e-8d5ec2e0b9d0,HSA
+683a8a62-8cd2-48c9-bbda-cc4a92abfd59,HSA
+3865fe2f-2f20-4b3c-985e-666504ef3cde,HSA
+7b27648b-0dc3-4357-b1d2-32d7cd66ef8f,HSA
+c02b1950-47d8-41a3-aa90-4f410d4407c9,HSA
+8a82ae75-33f5-4d02-916d-dd50a35d7c70,HSA
+6487aee7-833b-421f-844c-9b6c03b1413a,HSA
+e9c2c6cc-8647-4fe0-9c21-79342d959e9d,HSA
+1595b6d3-6db3-44dc-8faa-12a372af4f15,HSA
+aac7be06-b225-48c8-b0ff-c026434f72db,HSA
+258419aa-92ab-4a48-9a6d-4662c066322f,HSA
+50e85490-e549-473c-bdb3-f136f7cb2ce2,HSA
+d515b3a9-36e0-4ab5-b880-f2c3482e5945,HSA
+4fe39496-c71f-4c7a-afd9-50386d4ea7b8,HSA
+3745790c-5d27-4026-8bcc-e273864da0df,HSA
+97886adb-e91a-4512-926f-a394709d2fab,HSA
+83790ee1-7436-4a9b-9a5f-0027391e1381,HSA
+9e0ec1ed-4f4d-402f-9ba4-ec00c5ec6766,HSA
+452a8f74-b831-4feb-bddf-d5b6257c45ae,HSA
+83f87613-9a59-4e06-8d39-df2f65d5aab6,HSA
+8f558b07-1395-431d-8716-c12663f635d1,HSA
+7864b9ad-eb19-4da4-8b8c-fb9ced6b836a,HSA
+4b3ab73e-ef98-4032-a798-aa492604498f,HSA
+94466724-8e6b-4755-8ffb-edc650b936a1,HSA
+2222134e-e000-438f-bad3-5deac32dbd3a,HSA
+f82a6358-b2e9-44dc-8c63-f1c4e6a52baa,HSA
+7bcefec9-1dc8-4010-bc04-a9fd8bd89d71,HSA
+a71d790a-fd64-4d4a-a2da-bbcb871771e2,HSA
+b5e4aeba-7f4c-4665-a582-0a8c6f06cfad,HSA
+f981028c-ba9d-47f1-9652-568a92976359,HSA
+68081097-f7e8-464a-8f50-8d6078c2b016,HSA
+3f378f2e-332d-40ff-9aa7-571f28ed6636,HSA
+91174b5d-5482-42fb-8eaa-b435aac6d0ea,HSA
+54e5b72d-c10b-4eb0-8803-34c10b933059,HSA
+4545ff18-a219-4c0a-ba66-eb159b6ab0c3,HSA
+c93efa5b-1517-41c4-bbd3-6ebeb6b1bc64,HSA
+5b08f7ac-411f-4246-b6a8-f0fbcca8e905,HSA
+7e03efd5-1129-4db5-8580-437774e4c642,HSA
+5059eb88-f001-42cc-b076-17054422a450,HSA
+60d05a1e-6f70-4571-aea5-01d93886b134,HSA
+c4559521-361a-46e9-9073-27e8153721e8,HSA
+49b848b8-bc85-424f-a863-156e4aaa7e16,HSA
+10de486a-ce69-4ce1-a6c6-c1f69548efb8,HSA
+9bf0e44f-fe9f-46a3-b43b-befe5e551518,HSA
+1e378861-3f73-4fb6-b0d9-fa508a929461,HSA
+b87fdf30-e2e2-4f50-8433-795a17a4a914,HSA
+0663fa7c-8810-4eed-b7ec-8c0bc5d45554,HSA
+c0d1aa53-8c91-4ec9-b14c-adcc2a5b5369,HSA
+a9039f00-8864-4a0c-959b-4121dc0b547c,HSA
+39e663c9-76c2-42cc-9086-765140270b6c,HSA
+78ac936f-07fd-4dad-aa98-93868fe356ba,HSA
+2da73795-8420-4714-ab39-102703ce9fe9,HSA
+360c35be-f496-474d-9f09-148cab19fdae,HSA
+073b44cc-e8e9-4a7b-931a-9a95e4796e4d,HSA
+d2bc89dc-d2df-4de8-8a00-c38c995df41a,HSA
+41ce205a-18f6-4032-b2b3-b6dd766d2f76,HSA
+158e24a0-c923-45f9-b20b-71549b399709,HSA
+22813520-a228-4e62-b424-d198ea255bf5,HSA
+7c96a7f0-cc6b-498b-a4d8-c0e42466d5d7,HSA
+825205a7-8221-43d7-9ef2-b2c216429e0a,HSA
+427d3dc7-8526-4fd8-9573-f26fa9de3d5f,HSA
+ec20f425-ebb1-4459-bfa0-e8ddcd95ecaa,HSA
+c135cbbb-8a05-4e32-a5cb-490917a3b596,HSA
+78c03df1-cb54-4582-a34a-9a61345e5762,HSA
+a10c894d-5194-430f-8016-3fe93a0b5c45,HSA
+b7ae530d-c6a8-4b36-b916-a907813a805e,HSA
+29cca1f5-3a46-4bdc-8b81-2d1411850e1c,HSA
+3b8e0bcd-45ef-4e00-ac73-b6c4cf00cdfb,HSA
+5dfe57b7-9fc6-43ff-9fd3-1e9b3faf59a5,HSA
+dd56b567-c7a8-474e-a12c-d8b69abe66fd,HSA
+35735f1b-d870-41fc-8167-b095a81eca8c,HSA
+168d1aee-b590-43a4-a062-e10d220e5237,HSA
+9493b3ae-7b62-4d2e-a90d-92db03e5f3f8,HSA
+9809bb8c-acf3-45f9-b0ff-3b056d4b2c41,HSA
+541616dd-94ad-4fee-aa5a-ff599914f35e,HSA
+643e6275-d7dd-4982-bf5c-2dcc07166ac8,Superuser
+c052ba26-51da-4d4b-a130-db414374d8ff,HSA
+7b540087-642e-4242-879d-dba13e0a68eb,HSA
+c36faaf3-aca6-4503-b1e5-712849319c2b,HSA
+e7f18012-2fe3-4922-b93c-4d88c870afb0,HSA
+21d549e5-37d1-41ab-837a-aacb05564ab6,HSA
+3f6bd98c-8a5a-4dfc-b660-a5c29d9a1ae8,HSA
+2f19d356-cd6f-496d-a4e8-2c94d081ca35,HSA
+5a46c7b9-3d5c-47cb-8390-ded49ad40014,HSA
+11ab84b0-d14a-4cd9-8415-b995efeed739,HSA
+df80a192-443a-46b1-a984-6f307e3206bf,HSA
+2349a8e6-6cfc-4027-b3d5-62f4bce80f4d,HSA
+838577d7-cbf6-47a2-a95e-b0e1381ff214,HSA
+fcc27bb6-0b9d-4d68-9c20-7d195598c783,HSA
+599b1ac3-216a-4027-9208-4b99ee760583,HSA
+2714f124-fc29-4641-900c-f4ee0f5496e3,HSA
+a333edea-cbb4-4b0d-91ee-bf01d4195645,HSA
+a9076374-7048-488b-9502-803f0aafa1c9,HSA
+db5cd97d-105a-4401-9ad3-762ce619301f,HSA
+4b909493-7b02-4212-bdfb-f81495d23948,HSA
+cad340dd-5724-4788-b581-a2333e4114fb,HSA
+f023fd01-a338-4a1c-9cbb-3cfdb8adb5f3,HSA
+ef913012-f8d5-43ca-aff7-3d026bea746b,HSA
+8681b80d-40ad-46f1-aafa-17946d2c5dd1,HSA
+93463d48-5542-46b1-a0e6-7f9c2c37e4fc,HSA
+d9ea357f-e1cf-42e7-aaa3-545a529edabe,HSA
+c6002f2f-c6fb-47a8-a706-5fd26d4506aa,HSA
+70c946d2-5f90-4124-9651-d8162de08ecf,HSA
+eb98da78-2010-4ca3-a69d-031c9696fa00,HSA
+4cb4b45b-0bae-4923-8754-11699ef03f49,HSA
+bd1f89fd-e5be-42e0-a816-72472dd80942,HSA
+976962a8-e3ce-4aae-b943-26e666892172,HSA
+9dde9b6d-c5ac-4dab-a9f4-4fb05d672326,HSA
+b76319d7-b580-4c14-a4c5-2d5f93bf13d1,HSA
+dd03f0a5-b3b3-4e11-b2af-2b3a0ccc0281,HSA
+cba03f86-a397-4e2f-994b-75d826e06b14,HSA
+ce3d7fc2-a4b0-4b8e-a6f7-ed73ea305559,HSA
+ac9117cc-ed03-4651-b9b8-beedae6dfa2b,HSA
+91edd745-22b8-4769-8fa0-120eaf1791b7,HSA
+16561840-4f9f-40b2-8525-81accc6725c2,HSA
+203de13d-2845-4cc7-a93a-01e8698e5871,HSA
+780a2d0d-ed62-4490-a66d-09e57c02e890,HSA
+e4a0f79c-e83b-4aac-9fdb-51383227b0ce,HSA
+891fb534-dcb9-4742-87fc-83926282c6b6,Registration Clerk
+5d76023c-dceb-4f70-a88d-23849e5c52d7,HSA
+59a350fb-bea8-47ad-a767-ef04b17b78bf,HSA
+f11791be-5266-452b-98bb-1379232bba6e,HSA
+3342ede3-45ff-4fa9-b45d-0606e35f787e,HSA
+f928685e-588b-402e-a6d9-d5ae45630bc5,HSA
+b0164e0b-d240-4b30-91cd-01c156d4fb32,HSA
+80eb94df-0414-4396-9f88-41d67f7c6b07,HSA
+e83a20ec-20ce-4359-a6fb-e56bd566b836,HSA
+5506bd75-2741-4ce8-9cc6-f4f0a92e7f3d,HSA
+7030e52a-d02e-4a7c-94b8-e715a43a2054,HSA
+bdfafc7f-cef6-4a24-a246-5b14018399ff,HSA
+949014f0-6de8-46cb-8aba-446f2f08e20e,HSA
+8df7e857-cd14-4aa6-920f-033e8f9849a6,Data Manager
+8df7e857-cd14-4aa6-920f-033e8f9849a6,Informatics Manager
+8df7e857-cd14-4aa6-920f-033e8f9849a6,Superuser
+8df7e857-cd14-4aa6-920f-033e8f9849a6,"Superuser,Superuser,"
+8df7e857-cd14-4aa6-920f-033e8f9849a6,Supervisor
+27c097c8-e537-47c6-b84b-091b069a155a,HSA
+1d80c377-a1cd-4f99-9a82-28e7a7e5c48d,HSA
+7dec4dbc-d0b1-4749-b8a4-541bfe7e6183,HSA
+98bcd5b4-7906-4f76-89cb-e218452b1d32,HSA
+14817318-f47f-4e50-8a77-8b4f2048ed18,HSA
+ab5e055e-6c70-44cf-9b9e-b68945fe38e7,HSA
+22b5f9cf-f179-4e8b-9cf1-82b0030abe51,HSA
+48e05ac6-49c6-43f0-b5ab-536006637444,HSA
+88c97ed6-9e2d-4725-9062-02c74066db42,HSA
+094efe8a-0f7f-48c5-b45b-3f8fa17db606,HSA
+cd907f48-76ea-4317-bfbb-9f949d133ca5,HSA
+db5ca58a-fe20-499f-b002-51f8213dced0,HSA
+2ebca134-4c73-4d7c-9fb0-1281b4c37e24,HSA
+5e939f08-2204-4225-ac8b-0b95677f2b0b,HSA
+0460a3c8-fee5-4638-8c52-592d8f9d8602,HSA
+e5d405cb-a530-49f1-9493-76bd3ac706d9,HSA
+10833e5e-10c3-42c7-a514-5269436f8d07,HSA
+efd9bcbd-16a8-47e0-b7a6-910396f90422,HSA
+75f200cc-84bb-4d25-99ac-8d696dff7ab9,HSA
+d911c4ab-c649-4e3d-bd02-3eea668e69ae,HSA
+b083ec1b-1e25-4ae9-8268-8ffe9a1619ea,HSA
+180472c8-dac9-4407-9faf-4c7f5b721cbf,HSA
+c0dea2dd-e373-4bc0-824b-32036e3ba587,HSA
+49c59899-4e5f-434b-b13a-59e0926a5455,HSA
+afd979d8-316d-45fb-8b4a-c59c5cd25b58,HSA
+811deaa1-c6a6-459d-b552-6d1a88522b87,HSA
+68a7d9b4-bf3c-4729-a7a2-2a39854386c6,HSA
+b04f130b-0da8-4c75-96e0-bc4af6ab3421,HSA
+5fc8c356-4dab-486a-997f-ffc155bc4684,HSA
+f943e37c-1d26-4dd8-ab92-f6990d289e6a,HSA
+2c5b54ab-85a5-41e8-a6fb-d82ce370fd7e,HSA
+4413dedd-653e-400e-a83c-4ad53abb366f,HSA
+806b445b-bab1-4183-86ff-8b57d8be5208,HSA
+adfc3533-4364-4fda-a317-abc7eade6552,HSA
+5443eddb-5b3a-4c69-a6a0-e4addddddb7a,HSA
+f574ed43-ae5b-4ee6-bfc3-b387010c3c54,HSA
+a467594b-8d66-4514-9235-6521b5b28b15,HSA
+1ccd0c9c-e667-46fb-922b-ddba2f6eebc2,HSA
+6c49e085-ab82-4a09-9c9b-c83e8688d8b8,HSA
+d1f0ae64-3307-47f5-998c-06931c528907,HSA
+7f4e7539-5f0d-4cf9-814d-7203bca249f8,HSA
+0ec5b0b5-bce9-4905-9419-b5201c010e77,HSA
+d88387f6-fade-472c-a9d8-3d823a5c8526,HSA
+d7ab1761-ec57-457a-b503-91facff12d98,HSA
+c7a80d08-b948-48ec-a68e-7fef39170f7d,HSA
+96e85dee-dd7a-4ec4-b5c4-2dc8e6d7adce,HSA
+f1c1880a-6109-4eac-94d0-de66f95f0cd8,HSA
+2ccf32c4-eb91-4af1-b0ee-28a78ff6848f,HSA
+70e6ea40-bd9c-4ca1-8ba6-ca647fb8f5b9,HSA
+16d977c0-f95e-4793-8c1e-077f0a719a32,HSA
+0b86dde2-b542-4db7-b9df-500682cc1d81,HSA
+e474ea67-7e47-4b34-8907-b6cb08daecc9,HSA
+9038b4f0-5dbe-4585-8b8c-ee5335613468,HSA
+e849bfe0-d176-4379-8392-a93e4164f813,HSA
+847e6ffd-c927-4656-b417-0ddced1b7484,HSA
+0588d71c-ef91-4de9-a38a-4ebd67be8d33,HSA
+4319a9a0-ad54-48fc-bb71-efdcd3075b3b,Superuser
+4319a9a0-ad54-48fc-bb71-efdcd3075b3b,"Superuser,Superuser,"
+e12c1e6b-c41b-4b39-83ad-00524475cb56,HSA
+f45dbefd-3d28-4e09-b8f7-516a6f9cbb5d,HSA
+461d9620-88ee-44a8-bc26-2eb1c7bb83f0,HSA
+1353907d-b146-4e0c-9800-84135a6dfef7,HSA
+24c6911e-8a74-4ea6-b5e2-833c5bbdff34,HSA
+9f2cc5c7-9de8-406c-a2a9-540cef2d24e9,HSA
+f6c77a3b-2163-4d3d-9a06-3168aa31bf44,HSA
+1c3d07e4-b686-4dea-b636-42c2b6862f8a,Supervisor
+ad9ac72d-f27a-44b6-8737-3a4891876e50,Superuser
+ad9ac72d-f27a-44b6-8737-3a4891876e50,"Superuser,Superuser,"
+dcbf47f6-f432-4653-975c-9882372a6b09,HSA
+e32c83e8-f96e-4e50-8d79-7654fe88b0f8,HSA
+b23cfde3-a828-41aa-8353-e43ce159f3f3,HSA
+541b1737-536d-448d-a343-ac9e14d1e9cf,HSA
+b59a4d17-a96d-4cfd-877b-78acea6015dd,HSA
+ceef5b24-452e-429a-ab15-e887e44af039,HSA
+5a044de0-9804-4cfe-915d-40376015ebcb,HSA
+c839063d-b82d-4ec2-85cb-07ad770d4561,HSA
+f587c287-de41-4704-ac7c-c6d0e231faf6,HSA
+2ade0ccc-cfed-437c-bbf7-8093d8a1c221,HSA
+4887b452-151b-4daf-b007-43c55551d681,HSA
+c62b0e13-7aa0-428c-9ada-2e139f78859f,Counselor
+345bb501-b899-417a-85e4-6d52501e7dba,HSA
+8ee26c10-12af-4cc0-b9f8-0bef3e8a9d6b,HSA
+f96a7d80-8c0d-4fea-9649-1a58f27c775f,HSA
+ff46bdae-15ea-4656-9f5f-c282d8ebe553,HSA
+2de345fd-52e2-48d3-8884-9f652b3762fd,Supervisor
+1e6c925c-54b0-4622-bb83-cd6d560413f8,HSA
+135b08e3-363d-46f3-849d-adaaf0341e13,HSA
+f753221f-d7a7-4e30-b026-2a169a8b0b93,HSA
+50fb0472-88a7-4479-802a-10acbd4f8deb,HSA
+e640b6ed-88bb-48de-adf9-c7f1492e4cb4,HSA
+02a0cc9e-396a-4d7e-9220-93a3604ee490,HSA
+36fe0cfc-25e3-4288-9f3a-ae023a4c431d,HSA
+c9e5c03e-e3c5-4b10-ae23-af88bd2b3fe5,HSA
+479dbad7-4aab-48d4-84ae-73bb7b59538c,HSA
+bf3b9619-ab07-4dac-88e6-f5e9ba012c39,HSA
+4802dd25-06fc-4ee0-986a-a377ec5e4095,HSA
+06565ba7-f3a4-496a-a90d-3c96557c035f,HSA
+914507dc-0f9e-4cad-9bf4-f878533c700f,HSA
+23c7df0c-0fa5-4d29-ae0c-358b0979f4ef,HSA
+929c9ce9-4871-4a2d-bf57-2fbfc81ed619,HSA
+fa3d8cf4-f2f1-4f74-bb86-a71e4d6482a0,Superuser
+c0b507ad-4d34-45b6-9c93-9294adb15e79,HSA
+95cdc1b8-bd08-4c11-8eba-6644d37fb8ed,HSA
+23b64917-abe5-40ca-bbd8-40d8fc160343,HSA
+0c7a12e8-a1f6-4337-a299-43840c4f4a65,HSA
+0fb50d80-96fe-4be4-858a-88d531635074,HSA
+1c646a23-957f-41cd-a53e-0f99b7b03fd5,HSA
+c548e8b2-deca-4ff1-94b7-1b2ec04c62f0,HSA
+4e239bb9-7509-4216-944e-05308bb5aa5f,HSA
+221cad60-6120-44d4-a08c-143b5a7197f1,HSA
+90009b61-4512-479c-8e7f-6ffa41705455,HSA
+77c3b43e-3e10-45d2-a05c-a0725772b2b6,HSA
+e0444b94-2357-4f0e-b4f0-fec97283514b,HSA
+0d76fb4f-7bff-4bc5-b30f-e726e51b9f44,HSA
+63f48943-4b0c-4d38-9a51-f954f2fc2f60,HSA
+209d276a-8d04-48d3-8cf5-5649b6d35150,HSA
+f1480be7-0de7-4f78-84fa-aab50406998d,HSA
+3b612c5f-1088-4bf5-afab-9c740843273f,Superuser
+77ef60e7-c577-4203-92dd-af30f9413541,HSA
+77ef60e7-c577-4203-92dd-af30f9413541,Superuser
+77ef60e7-c577-4203-92dd-af30f9413541,"Superuser,Superuser,"
+c270b13c-263a-428e-a1be-4c61e208c5e5,Superuser
+c270b13c-263a-428e-a1be-4c61e208c5e5,"Superuser,Superuser,"
+0d880850-b63b-4b1f-9f19-d2aa3cbf2a53,Superuser
+3019b678-3a09-4a40-955c-6b7f249416dd,HSA
+3019b678-3a09-4a40-955c-6b7f249416dd,Superuser
+3019b678-3a09-4a40-955c-6b7f249416dd,"Superuser,Superuser,"
+b477127d-7814-4bb5-b2ab-4205ff1e6b55,HSA
+c56a797f-c6a6-4413-ba53-a2d5816c0f1c,HSA
+20a313b8-635d-498a-9286-97218e69ff1b,HSA
+3c038736-3c0f-466c-b964-dfd25631c203,HSA
+fe48b9eb-135e-4590-ba48-4e420b1f30b1,Superuser
+fe48b9eb-135e-4590-ba48-4e420b1f30b1,"Superuser,Superuser,"
+8abaa132-c2ab-4307-97ed-67ac13bebd8b,Superuser
+8abaa132-c2ab-4307-97ed-67ac13bebd8b,"Superuser,Superuser,"
+784c84c8-fe39-44e5-90b6-9b4fe455a1cb,Superuser
+784c84c8-fe39-44e5-90b6-9b4fe455a1cb,"Superuser,Superuser,"
+6ee62059-a797-4d5b-9bb1-b72854908035,HSA
+ff74f425-f1b1-4b26-9ef2-5424c78ae5d1,HSA
+e474af0c-0396-446f-97c5-170ec88b877c,HSA
+94f56bfc-2ffa-4082-91e9-cc90217bbc29,HSA
+91109e5f-3175-486a-9593-f17b7e28e4c7,HSA
+dddd15cc-b1fb-4fee-ad47-7ddd8a3fe2dd,HSA
+d39b2ecb-1272-42b8-9552-87e868307f9d,HSA
+708a982b-f270-4a3a-8a05-9a203a9e42cf,HSA
+3804c1b1-bce1-4f37-a90a-27c71c5723f4,HSA
+44bb96db-2ec4-4200-9180-98fde0aca020,HSA
+fb433061-4b7e-4deb-ad1a-0b340e13cc8c,HSA
+c54d5cd5-3eb2-4e76-9dad-6aad158b8e31,HSA
+553a5e91-cc2f-4606-b643-a79ad83b0022,HSA
+8e1eac72-a357-4be4-bdd9-0c15643b09da,HSA
+638b6cf0-4e2b-4fd9-ad74-a693cf53a9e2,HSA
+bb42f81b-15c5-4d30-8705-c712cbcef43e,HSA
+2e62de05-fc1b-4449-bbd9-2dd6a2f9fe0c,HSA
+819efbdf-e7c4-407c-87bb-7d2aac3fbbb7,HSA
+8813757e-2992-4f68-8159-73d1056740fa,HSA
+4efd2a42-dc16-4eee-83bf-31c2fcff3dd7,HSA
+a2e2c77b-612e-4198-b481-652818aecda1,HSA
+bb696eef-6d3d-4045-993a-341300e417ef,HSA
+fe41bc52-31fe-4543-9ff2-452a3cd2859e,HSA
+0498806c-c352-4093-8048-6db598b3c1d6,HSA
+345aa95c-7047-4b3c-87b0-dabfa463f51a,HSA
+dcd7fcb5-b89e-4d4b-b17a-a8ef71f60289,HSA
+52d88b5b-ec32-4e37-9eb7-60769fc59a67,HSA
+c67260e0-e345-4370-88de-563907f3199a,HSA
+a5719c2c-2b7a-4ca9-bb14-8e98b36da76d,HSA
+182b230d-12e6-44bb-b117-7feae0c07a58,HSA
+dd48027c-32e6-452c-8c1f-540a2190462c,HSA
+e250cc74-419b-415f-ae57-936f07ebc8f4,HSA
+fe286a97-5e8e-46ac-8dc5-c8f7de1c4cc3,HSA
+2f64e064-1338-4576-bfde-0c0a37ccec44,HSA
+ced58eb4-d88b-428c-8bb6-53bd81f777a9,Superuser
+ced58eb4-d88b-428c-8bb6-53bd81f777a9,"Superuser,Superuser,"
+17edfa93-6070-45bf-88b4-1fb5e90c004c,Superuser
+17edfa93-6070-45bf-88b4-1fb5e90c004c,"Superuser,Superuser,"
+3628da61-30f1-4560-8f3a-b41ac0ef0a43,HSA
+56d17033-6ffa-46ab-90cf-86563f6dbc7a,HSA
+73badcac-f0de-43b8-b4c6-f001d8d1ccb2,HSA
+ad4b46f5-2a8c-4036-b5c5-47eba68fc4ee,HSA
+7cb6e8e7-549d-4379-81e6-6abfb5c0ebe5,HSA
+3c10aa4a-7377-4bef-b04a-15951fd56384,HSA
+7ab2aeb4-e658-43d7-b008-245231c0387b,HSA
+702915f5-5e52-41d0-bce8-f61229dd4aad,HSA
+fec3b22d-0d02-4b69-be8a-37c0e64798aa,Superuser
+fec3b22d-0d02-4b69-be8a-37c0e64798aa,"Superuser,Superuser,"
+41d1fffe-c0f7-43cc-8819-39f7c79520c9,HSA
+9db05419-cb87-42dd-bb28-1abf1d0a8262,Superuser
+9db05419-cb87-42dd-bb28-1abf1d0a8262,"Superuser,Superuser,"
+e7af5338-d689-4e5e-8f36-3332cfa9fd7f,Superuser
+e7af5338-d689-4e5e-8f36-3332cfa9fd7f,"Superuser,Superuser,"
+f4826e7e-632e-4fe6-b19e-95fff4ed0e63,HSA
+8cf055b5-3b0f-4318-adde-daa2e3303ccf,HSA
+24f07540-08e2-415d-95e6-4a77bf55fd06,HSA
+84c75d2f-2a43-4332-90e1-4da62809af05,HSA
+21533225-c8b3-4f81-83ea-0d861c50c83b,HSA
+15a92a88-2fc8-417a-befc-f697bc767453,HSA
+660820be-0956-43ff-80bd-321bbb61326e,HSA
+0069605a-f3a5-4ef2-9e1e-e7d95185e03e,HSA
+3ab0cc83-f00a-414f-897b-eddf5abef254,HSA
+9bb9b2b9-f194-4a95-8cd0-c443f1c15c61,HSA
+1c5afa56-103a-4a77-8a1b-b250f1178c7a,HSA
+728a2635-a8a6-4507-b5ed-9044a889fb6d,HSA
+f1c8cb68-6f94-40ee-938c-6e87744f059f,HSA
+537ef204-0726-434a-ad32-35c239811293,HSA
+19f7e743-ac8e-4087-b8c2-9a59e6f29401,HSA
+955aabea-1bd4-495e-9fc5-4cfbf3fd83aa,HSA
+e20aa574-5a7c-4a03-8e6c-f6e5633a252e,HSA
+588ae231-a721-4b73-80b4-286aaad17567,HSA
+aee4aa0f-938b-4802-a25b-f3d3e5b9e2a2,HSA
+e0e88feb-edf4-4ef7-9c4b-ee9679c0bc55,HSA
+51ec76ba-3975-4558-9052-cd4ee7438bd3,HSA
+a5230962-69b7-47e2-8183-fe7de71582e2,HSA
+aaa254a5-ac70-4ff0-8229-fa56a0b69db4,HSA
+be695fc3-2530-43b1-b499-a417db33a440,HSA
+fa2f5ffb-edf4-4f97-9f3f-21bfef365a08,HSA
+b3357aca-80f1-46fa-9a03-32761adfcce2,HSA
+d8d471d6-ddaf-47df-ae55-f877dbdba231,HSA
+58959fc3-10e9-4663-8ade-5b47034f240d,HSA
+138b84ca-7dcb-4a9d-b516-b6cfc716ed98,HSA
+0cf29c5b-db9f-4cfc-97c8-07d336af5517,HSA
+4dafa6fd-e670-4e7c-a83f-7b54979cf3ce,HSA
+4dc62335-558d-433c-b5ea-0aac6cc3e038,HSA
+960f2aa2-33fc-4c85-a66f-3bb88687d2a5,HSA
+357a02d8-ed39-40fe-89f1-7389a675cb8e,HSA
+33f0fcef-092f-47bf-a51d-ad9501577bdd,HSA
+97a39bc3-a5e9-40fa-81e7-0ac3cb278fb0,HSA
+4e878753-806c-4b5a-ab1d-43bf834171cc,HSA
+4d7708c8-fc09-4ead-8a8b-5cf129117b0e,HSA
+d2d844ee-941e-4ef1-9fd9-c7788314950b,HSA
+691422f6-4969-43c9-ab60-93fc0ebe3375,HSA
+d790489a-6122-4b23-982c-26f980a2d624,HSA
+219c99a7-7523-4b8f-a7a0-6ebb344505d3,HSA
+2036a0b2-9c49-49e9-a09b-c2c232ee4769,HSA
+b7e59943-55a5-46fa-8807-62114f4d96ca,HSA
+1b24d3ed-3b18-4124-9303-937355a1844f,HSA
+b8bf40ac-e9b2-4d4c-9cd7-26313c9f3a60,HSA
+98a172ed-9fdc-45d7-8327-680c479cfeda,HSA
+a23c838b-119a-4230-a29a-95a607a0222b,HSA
+c9c942b5-4322-4fd9-8a7d-7fa06f190117,HSA
+f538e78a-8194-4a67-9d7b-751a868cd2bf,HSA
+64a2ba7d-bbc7-4f82-9607-dc53c482ed75,HSA
+437c1ac6-a5c2-461d-9620-3d27b27b1337,HSA
+518367ed-75aa-41c0-9354-e9e4c4f0b95f,HSA
+37363cff-cfb3-47e0-9334-cdf6dd9cc2d5,HSA
+a70f0cda-5f04-43a6-a612-1f5abdd0c00d,HSA
+ce8dc567-ebb9-49e4-adeb-a9772bb1c103,HSA
+fbc0937f-01d2-424e-b2be-4373dca2c280,HSA
+11dcd1f6-5c0b-4fc5-a6ac-c34477ac0729,HSA
+be300819-be6c-43bf-aa8a-c69534cd5d47,HSA
+81cb30eb-1197-4833-8f68-7d9308c96a00,HSA
+1bb5d80d-60cf-4389-8c93-d558e3feaede,HSA
+1bb5d80d-60cf-4389-8c93-d558e3feaede,Superuser
+1bb5d80d-60cf-4389-8c93-d558e3feaede,"Superuser,Superuser,"
+28f40d95-a5e2-42ba-9063-1b981167d8e7,HSA
+28f40d95-a5e2-42ba-9063-1b981167d8e7,Superuser
+28f40d95-a5e2-42ba-9063-1b981167d8e7,"Superuser,Superuser,"
+cc4de83e-7a33-4622-8718-cecd2c5f0d46,HSA
+cc4de83e-7a33-4622-8718-cecd2c5f0d46,Superuser
+cc4de83e-7a33-4622-8718-cecd2c5f0d46,"Superuser,Superuser,"
+d4a8c8b4-0280-4970-aed9-8e43e90f2b0f,HSA
+d10bea9b-4885-4deb-a9e3-a7a5e6ceff51,HSA
+5b52ea0c-eaa7-421d-8b00-902e4026f6c1,HSA
+f0ac4669-42dc-4cc5-852d-7d7b64f0095a,HSA
+70010a68-e858-4cb1-b4ce-508adff03d4a,HSA
+1d60994b-7e6f-4d26-89ab-2535d1413473,HSA
+99f04b97-de59-43c6-9439-043558b0fdda,HSA
+a8d882a1-76dc-40d2-9fc6-c6c5d303e04a,HSA
+1d495913-87dc-4706-af50-a4d4f1218bba,HSA
+1d95fa7d-6173-4184-937c-1ff5eb7ed510,HSA
+2c7dd8d4-a6ce-47ad-9d4d-450794df0b2d,HSA
+df32b80f-8856-473b-94f2-d3c8762635d4,HSA
+9f97be69-8c16-43bc-b29a-f2ce38ba2ac2,HSA
+a398d57b-5473-4fcf-b337-dc5b5e6fbffa,HSA
+7a94702a-1793-4eda-a848-a169a8445905,HSA
+794b98e1-fb56-42b6-9f91-f540e5f57a0b,HSA
+31e4d7af-86a4-48d8-bb06-789386b1312c,HSA
+e93fdb9c-f0da-4a5e-85e4-ae402bcbc8d9,HSA
+058c43a1-9c3a-4b2a-b292-a4e9c1737fd3,HSA
+e0c6b896-48d1-4061-8af6-06f6c13d8bd1,HSA
+989eea94-32b9-4e16-9eb2-92a0cbaf7255,HSA
+40a6ef4e-cbe3-4edc-9a46-30bc959ffb27,HSA
+0a839e0d-5219-415a-917a-4a1aac74c4fb,HSA
+80c54680-c286-4c8b-ae8c-32ff1d67efbe,HSA
+42f1766f-761f-4fbe-b33e-d1346a230f17,HSA
+407ab323-0b3c-49d3-a1dc-7d4a89039d80,HSA
+56e80ba7-54d7-4758-b7e9-3435baf842c9,HSA
+1ecb567a-1a40-425a-9f67-298915374eb9,HSA
+a1adfc60-5066-4177-9114-6a3bf0a6cc0c,HSA
+67188083-6317-45ca-b285-7e7c988144ab,HSA
+1821eb74-b8c4-48bc-9d58-36a331bb876c,HSA
+c3047446-b901-4066-b5a2-ab8daac83689,HSA
+57208046-3313-4e24-a691-b57d7203faef,HSA
+a631439e-6f24-4c05-b9e1-811965c7b665,HSA
+d4c0be43-9526-4254-bd22-5e9a8d551e7a,HSA
+f7c8f527-5e8c-4c42-96f5-93bbb0d7be96,HSA
+e9b6baae-ab06-4609-90c6-61778694b4de,HSA
+f1711393-0d04-45df-a005-4683c3ca2cdb,HSA
+f7f56f7e-3ce6-4643-a647-327a3ddf236e,HSA
+be467708-efe1-41a7-a107-6e4f93d5ab82,HSA
+e852781f-0a76-4afc-9686-a7f9c82ca06f,HSA
+70ef548c-4ce3-4d66-aacf-99bcc7a5309b,HSA
+5ea3a35a-e86f-497b-9897-4037bf3353a7,HSA
+7edcc461-9c02-4e6a-bb9a-3a86046ed333,HSA
+2f822646-479a-4bb8-a9a6-7b29db07e3a8,HSA
+19cb8723-1493-44d6-8d11-d16cde235352,HSA
+256988c8-f2fb-43ff-b294-bdee78fd89f1,HSA
+a68bca0b-8743-4c14-817c-29168055e4e0,HSA
+430869f9-623a-4110-a6ce-b55df7a95183,HSA
+79d3d4a5-6f59-476a-95b5-30aabf907582,HSA
+1acee0fe-69e3-4a09-9ee6-84e106c3847a,HSA
+b281a70f-2209-4090-ae94-9c54ae27a0bb,HSA
+0acd914f-9113-482d-a564-2dc5e88db4e5,HSA
+c37105c0-9c67-4f1e-ae60-dd819bd255a9,HSA
+0e59d7f7-44de-4f79-947a-9ae405331c8e,HSA
+844933ac-81a5-4485-97e3-f9b59fce27e0,HSA
+55cdc0fb-7238-463e-8803-f2ab9a6e6f13,HSA
+999f81f7-1089-427c-aefe-c12a063e877e,HSA
+12d65e92-9b66-4b41-a644-908129b31148,HSA
+091855a7-1d41-4519-9705-a12061c99e05,HSA
+6ba4ab7e-326a-4c9b-b862-5068624141dd,HSA
+8a517c39-a92f-4c19-b14d-02c32001dd86,HSA
+4d1c8f17-4b7f-4a8c-91b2-23c247053d5c,HSA
+c77923c7-7bcc-4c22-abae-ed21f77f8454,HSA
+e25aed95-d79f-4bbd-9797-50e434b1be08,HSA
+eb9ab451-0d87-4788-ac93-e88c9ad0a9ae,HSA
+60994700-15c4-4132-90c6-e194dc54e445,HSA
+ba0cef26-d7bf-4556-8150-8a3ada0a51c7,HSA
+85d26cfb-780d-4802-985e-9e55cb13a6e9,HSA
+c16d3e7d-1ab0-4517-872b-b3ad2ad0c068,HSA
+9b84ae99-f40e-4d85-935d-556eebdd84c5,HSA
+b1cfede8-08d3-45d5-a113-834cce5e10cd,HSA
+a97af2e2-9a9d-4610-9b3b-029d6a2f6878,HSA
+526f4bbf-1ef3-4092-9b78-d9f7afa03009,HSA
+771ba2e5-a17c-4de1-a965-eef5fd50ab48,HSA
+3eb4c652-4f70-4c15-9b80-dba869625005,HSA
+973b0095-3072-4e52-abd0-c0e24f2cf9b1,HSA
+6195c8c8-e517-4b77-b060-dbff75f270c3,HSA
+e7f89e02-c798-4b51-a860-59c6e4e94513,HSA
+f60e51a9-7e2a-49a8-9bfc-e59e5c937a28,HSA
+561b6207-c81f-4063-bf02-afc0024b8be5,HSA
+f3fef581-2c3e-4a25-84a5-5faf1e52bbe1,HSA
+e1cbacf3-db3b-4028-8952-4b63635c5fa1,HSA
+b0703ad9-0f73-4bf4-93ab-379e60c27d8c,HSA
+cc93d448-5e55-4a7b-ad8d-6c8b4ddac004,HSA
+fc9ea9b8-8ffc-4133-b089-ae0db5dc5e8c,HSA
+7cab3c02-fc5b-451b-bc1a-637e3822fcd1,HSA
+d183b7fc-2923-42b0-9ffe-705f10d1cb2a,HSA
+5ce2c05f-6086-4547-9f4c-85fed968f02a,HSA
+a7295e2a-0880-41a2-8d9a-140b1ce8e74c,HSA
+d4337d98-b344-4848-b0b6-76dac1748e1f,HSA
+bdb8aac2-749f-485c-9dcc-8024f9c0ba98,HSA
+a2a00ce7-7dd9-4f51-96d1-b4678733614e,HSA
+d6163460-b02d-405b-9294-cfcbcb4a2836,HSA
+8ed4d9b8-c1b5-4975-88b8-09350cbdeaf8,HSA
+7323dbb2-022a-488c-b5c6-fd8b631a89a7,HSA
+62a6b04d-07b3-4f37-9d97-c39b770b1551,HSA
+2bbc8781-5fba-42c4-90f8-50958acc8733,HSA
+32e82148-b584-4b5d-b62f-f5a9f88f8193,HSA
+dd2214b8-7041-47a7-927d-bdf6dad58e51,HSA
+ea22a36d-23b1-45b1-9d5e-ea83cee5a921,HSA
+708e8535-5c1b-42be-9d6a-a0a5a73d3236,HSA
+96fdd655-2e8e-4467-b5ae-85f7bcd7b5d6,HSA
+e6adae94-936a-4cf4-9893-8dae020f4ff9,HSA
+2f70d1f4-2e71-4fa2-9887-b234c50aeeb8,HSA
+9539904b-1046-4f10-a5eb-f3dc30fadc1e,HSA
+465a337f-69ff-49e8-86b7-566e9a7d0f87,HSA
+a3c35240-ae40-4038-95db-526c9632df12,HSA
+01a37bbd-4242-4bc0-adcf-3e783187822a,HSA
+9033f1e7-ae52-4c44-bbc3-6218993c2122,HSA
+37538ed2-dc0a-4367-a894-a00dba5317c3,HSA
+579daed5-f9f6-4c47-b95d-95e82d7d6905,HSA
+f6d9c44b-47ac-4352-bd42-3eda3e93729b,HSA
+373017f3-6ad7-4b74-b4bb-07ad9506ebf4,HSA
+6feb20c0-5d8b-4f0f-b603-9a8bbfcdf758,HSA
+f2664614-4741-4a68-9044-fa9ea734eebc,HSA
+7faa3105-348e-454a-ba19-486fbe5ff79d,HSA
+49111240-ec2b-4532-ab7b-48c8f98bf750,HSA
+3b23b50c-7c4b-4fd8-a893-9d3faeb4f248,HSA
+f04ecb09-148c-40a7-b25f-c393fde3576f,HSA
+fd4c7009-0ea8-4847-8068-aa0fdd0598bd,HSA
+51dd4d61-96f4-442b-b31d-b1b5967dbfeb,HSA
+6eb81bce-5567-4151-bdbc-f6ec5a64dc97,HSA
+3fb21fb0-ca62-498a-a335-494fe324d502,HSA
+656167a1-9a91-41f7-bc46-407893c7c29d,HSA
+aa9eabcd-7b8b-42eb-a6e3-91bf943781b2,HSA
+e453c414-bd26-4f11-b973-7b0219f9754e,HSA
+32ea45d1-f166-48e0-8c3c-9cbc1e9daf42,HSA
+082806cf-1ab4-4004-9f27-2359045ddef1,HSA
+92830872-b2a0-4874-9b50-97be69399700,HSA
+3c9d51ed-ac95-422b-92d8-2b574efcf6a9,HSA
+ba47304d-f405-4293-877c-f17e6b5df723,HSA
+5f4a57f9-63ac-49b6-9fcd-cc513c25ef96,HSA
+bf7c686f-1f09-43dd-8bef-2ff0ab4bca1f,HSA
+9118abd1-7ae3-4597-bee5-aa742fd8e560,HSA
+b3a98432-ea41-4f7a-925a-3f6ee3cd9286,HSA
+cfec7811-c45e-47a7-9add-4d8e74291399,HSA
+040866d3-3d9d-4e18-9ee1-617fd4601afd,HSA
+418fd7a2-c0ba-4bd9-9ba6-fa4e31870854,HSA
+a96f915c-4bd1-49d9-a4d2-a893068f9c1c,Superuser
+a96f915c-4bd1-49d9-a4d2-a893068f9c1c,"Superuser,Superuser,"
+77eee366-dc5f-4ea1-b632-ec8fe9520544,HSA
+799f737f-dc90-44f5-ac14-ac5b3de69420,HSA
+18ff3e6a-bdd5-49b6-8bac-67eab765c6f7,HSA
+98d83208-e651-49a8-89ce-f3881a64c528,HSA
+0f7b8cad-fa04-4769-a802-9e04407661d3,HSA
+716a60f9-12f8-44d0-a6bf-20b56d9b03d7,HSA
+edd997b7-ef89-4a3f-b887-90d230f13397,HSA
+93f38e64-0fe1-40bd-9634-f34ed2476962,HSA
+35cb829e-53d2-4492-9768-aa20eee613e7,HSA
+57748ede-2248-4647-b037-7e298ea04e04,HSA
+571fe9aa-af0b-47e7-b8f3-5ee2d63eec92,HSA
+bafec702-8613-4097-a8fb-a212c333b1e7,HSA
+016afc38-be96-4e94-9a3d-f8aa2755e2a3,HSA
+982ea78f-c752-453c-ac9a-f03125aa7499,HSA
+1580dddb-0828-4661-aacd-d0cdce1002f5,HSA
+a548bdf9-bb6e-4976-b9a5-558edce617ed,HSA
+b94d0311-ce76-4ef6-af5a-f06f121a6fd5,HSA
+6dceea1c-6a39-46c4-bc86-19885922cd04,HSA
+92fe2d99-93d6-4778-ab03-3d7a7b943a4d,HSA
+ccd41811-1c4f-4159-a69e-ea8e306daedb,HSA
+6eca787e-8422-40dd-b80d-1e01d2b01241,HSA
+5494b191-b8b0-4cfd-ae27-3bc8cad9f5f4,HSA
+ec387512-1dd6-4ac6-bfc0-1560e84a3fcb,HSA
+5e81cfe5-6c17-46d3-b430-f1f6e300cf6e,HSA
+b8ba1b25-82f0-44a1-850c-3ca30017d9ee,HSA
+aa065e7d-1eee-4e80-a93c-095c9cdffc0f,HSA
+529ffbd6-f816-48b8-8dbe-259577fc7289,HSA
+2bc86472-5bd8-4004-b620-b1fb54a17116,HSA
+672427f1-8dbb-434f-9530-87f7b9c29119,HSA
+12531574-7f2e-4a30-9fc0-d387f80db85d,HSA
+32da4bd5-f4e0-4b9e-acaa-e7939ed88307,HSA
+6cb8d2ab-664e-4772-b58d-ac3ab018ab26,HSA
+ad36a894-c71b-4cc8-a47a-6078f836dcc6,HSA
+84ca4467-cf55-4017-8c68-e78f42c9bfff,HSA
+ade8e76a-3f3a-4efe-8448-42e6889869b0,HSA
+a798f085-30e2-4ac7-9235-7c345704efec,HSA
+ab96ccd4-5af0-4f47-9a15-b0c3605c0fc0,HSA
+75148c1e-99c0-4829-94d6-119d8d09c420,HSA
+9d850e2a-4da0-431e-9b72-34cb47720ea8,HSA
+81cceb94-b83c-4da1-b4ed-6032ca8aa8ff,HSA
+a7ad0c90-5030-45ee-8452-3497b83b77d0,HSA
+7b4534dc-7d19-4d50-b0d2-59e6e56246bf,HSA
+ab135f55-bee8-4128-acf5-638087ae7393,HSA
+a537c047-7f36-44c4-9f47-50b0f02dc4da,HSA
+c8e45143-45e9-4582-835b-b66d2e880ead,HSA
+ee4beb56-9b78-4b55-af43-9c3d564e06e1,HSA
+634ef206-bd38-404b-8528-f89df486445a,HSA
+f2b2bf7c-7069-4ea5-a170-a9972245df61,HSA
+c665a780-4ab3-4e17-8000-fc5ac71dd406,HSA
+bb6c37ef-9b93-4e9d-9290-4337982fd7c1,HSA
+f667fa46-5d9f-434b-8842-56626b876253,HSA
+a0ef2cc7-b9bf-4064-8af1-8e50de3c591a,HSA
+3f69d94f-bb1f-4b55-adb9-d797265f0403,HSA
+5e9dff87-2326-44c9-817c-35142f13d1a2,HSA
+321f0052-3d80-48c9-a0be-e6cb650cfb91,HSA
+9b3300b8-74c9-45fe-8a62-4a96e8f8309b,HSA
+56dfa3c0-ea7c-4a39-a67f-6c5440185f24,HSA
+2583601a-8f9e-4008-8411-cf4c47778892,HSA
+1b58be37-49a4-41cb-9da2-d637d808d8bd,HSA
+c66145ac-c9dc-4215-bf1b-9a5924ef2651,HSA
+27c9203f-30ee-4655-a7f9-8c4a56d09931,HSA
+4cb891ac-a3ce-468e-8833-11e10471bf14,HSA
+12ba3d0e-b5f6-4eac-b67b-88ad4ddcf463,HSA
+a80c4ea8-aeb1-48e5-9ea4-e76f46b90705,HSA
+f8e34b90-5773-4bbb-aa5f-de690a05b5b9,HSA
+b1871fb9-ec75-49c1-bc04-42d3d15be58d,HSA
+ba4d3042-70a8-487b-8f9c-3e12b258627e,HSA
+2ffdec32-87df-4084-bc24-ce75c22c7cfe,HSA
+952dd464-1eb0-4f48-b8bb-b4f317ce4dd2,HSA
+ef208c9b-0777-46c9-b56d-8b9808d88f37,HSA
+f4c6ceee-0520-4473-a81b-891ffff0e2e0,HSA
+8b46a4f9-b26b-4c0e-9ba5-cd7d240dec64,HSA
+0ae6a0c3-95c9-427a-b018-e23bece4f380,HSA
+75718417-69e1-4401-adbd-22ae9b57b96c,HSA
+1ddbc40c-0293-4626-8ae9-b9d54d6b444a,HSA
+417bf234-94fb-4ee5-aeb0-e9ed5f9a89ff,HSA
+a927df72-f3b9-413f-825d-e1f92eddb9d5,HSA
+b0bd503d-d465-465c-a072-c2a422c6322e,HSA
+f5528385-6a50-4de0-b241-846d42932b55,HSA
+319c355b-c1a3-4283-a789-de65fd7082b3,HSA
+124975f4-7414-4ff7-a786-39572e058fa0,HSA
+7be3e6f5-2662-409c-8ead-2dc7d94b8397,HSA
+f2e6373b-bb54-4eb0-ab79-77dab6fab382,HSA
+08efabf8-a2a4-4eec-b631-a3df7ae6547d,HSA
+6c207e59-dfda-4023-ad77-45c9c9788589,HSA
+e6a38a5f-63c1-4763-a9fc-4a822d765338,HSA
+aa7f7130-2c3e-409e-a695-b2cfa8add37d,HSA
+109835be-3b0b-4f3f-b3a9-8f27e412ff1d,HSA
+554d9552-accc-4918-8e69-1b516fc3247a,HSA
+d0c76d30-fa49-4674-bd96-829a93ca1702,HSA
+b1925a31-fa63-43fc-906f-525f8cbc9bfc,HSA
+6933d321-c379-45ba-a2a2-f98bb9809043,HSA
+c74a58c6-47e7-406b-b483-66538664b382,HSA
+ed3e63e6-2526-4457-96ba-00bed51916d9,HSA
+72fc2d90-48c2-4f2f-95d6-9786a701f9e7,HSA
+65d24de4-f0ac-47a2-87f0-06c766f725b0,HSA
+9fb5cb87-f757-475c-ac8a-8f7e7f4cded8,HSA
+e1aa7365-4e20-4d26-82d2-2c935bc841ac,HSA
+b7796526-4fd4-468f-b0d5-dd10ae2a2e9c,HSA
+54848778-983f-4d2b-af10-734f7a611b89,HSA
+6d6d2e8b-d9d3-4df3-884e-3faa8acc3279,HSA
+4c5de963-ed62-403b-92fc-434a3a2941e9,HSA
+45c03f9b-cd8d-430d-bef3-952bcc113d6c,HSA
+8178431a-778b-4caf-93e8-bbc59b381bd2,HSA
+1f341422-ab29-4df5-9a70-bba910a6d940,HSA
+61263518-face-4717-94bc-0a86237c3131,HSA
+021fb870-053d-42c8-8ce9-e872639e32da,HSA
+5481bfde-9bea-4888-8e73-083bcfe77137,HSA
+d18c574b-e711-4baa-a5e8-223b476c54ec,HSA
+8237acbf-cebf-4891-b2ff-075baf8b17f0,HSA
+9efbc66e-e51d-4a38-a676-082655b2f2f9,HSA
+f7216bb6-07b2-4a39-9b2d-8e117536cb7f,HSA
+8acb45c7-4d38-497c-9296-87205a5cae15,HSA
+833e2427-8347-4624-9dd2-be49ad82d297,HSA
+ef38b7eb-81f6-44ea-a326-f20070de39c9,HSA
+84863a2c-786c-47f8-aa1a-425819f85600,HSA
+c450234b-e7d8-46f7-8455-87d8fe6e1267,HSA
+c121e6c1-4ca9-4304-901a-d39838261e38,HSA
+d7066c8b-aebc-47e7-b45b-8c8f3d8bf5ae,HSA
+95d22244-cc17-4445-95f1-107e06ad655b,HSA
+e86fae11-698b-420a-a553-766e39320c3d,HSA
+6725e3bf-4af1-4632-8822-b0228e7a3976,HSA
+3034e0ec-2b19-4034-8ffa-5e45871ffbb1,HSA
+04b04f26-f1a3-4f68-abdf-b973670cea8c,HSA
+ef7003e3-eb21-4bff-a56c-8657b7b89b65,HSA
+7ecfe323-81ed-4196-992f-134008f912f6,HSA
+260c6c6b-8243-48ae-bbe6-6173b570bc13,HSA
+f66f6d0b-4f03-4507-9f79-6064fcd9243d,HSA
+b29a1987-1d19-4c7e-8e75-d1b8d53a9cd4,HSA
+53be682f-c279-4c07-a483-a4b483a4b7c7,HSA
+81771fbd-f040-4800-a47e-59bb382821cc,HSA
+3a084b3b-9af8-4f36-a3e6-c63711b45da8,HSA
+47fa7143-6de1-4fd4-9c2a-164f7e34c814,HSA
+f6098f6d-1bce-46bd-8242-cc7ff40e8284,HSA
+a87e9de8-8967-41b9-9f45-3eabe03335d6,HSA
+c7af03dc-c951-41cb-aeaa-51e33a5a9efe,HSA
+87ebf23e-d328-467f-839d-fac6b2b9036f,HSA
+090f747a-5148-44b3-9fe0-0cbbb026c204,HSA
+86493272-0d8b-46f9-a074-21bd25d31c03,HSA
+8eb80992-e760-49e5-ad15-267d6d0a495e,HSA
+29b20c67-4289-4a18-b3fb-b772e4b6586f,HSA
+c19357c6-c67c-4143-95fc-a407051be0ae,HSA
+3352e5f1-aafa-4f49-8a16-97a014a33ab6,HSA
+c6e87e3b-466c-4a29-acdb-ff8ec8487cee,HSA
+42f24ed8-6e88-4e8a-9eca-00d6de1316ef,HSA
+3c5a75fe-cb97-4e42-b5a9-82cacd4ccfa0,HSA
+95b6d133-7702-4dd3-9548-d279d2bff87c,HSA
+2ae530f4-a1ef-408a-a50d-5bf6d1cb2075,HSA
+45b6b0a3-0274-4b78-998b-a9fd7580dd23,HSA
+a82b79bb-b99a-43d2-8019-99b6285b4353,HSA
+18b8e82a-bce9-41b3-98ae-34a3cec54681,HSA
+fded1dd5-c4c5-4cac-aa0d-a7e53ae683fd,HSA
+a84dcaf7-2189-4990-b801-38255b9404a2,HSA
+7eb8f838-fa63-4041-ac7a-44495e00edc1,HSA
+cef3fb22-81b8-4454-875c-f3c5dfb3c617,HSA
+e6b94e67-e0f3-43f3-b49b-39d66bfaf1d2,HSA
+1877788c-e3ba-45d3-bb2b-b421270f52d6,HSA
+e695fb57-8e71-4927-b72f-8e87c5562141,HSA
+451e0ce1-ab3c-483b-aca0-866c790fc2f0,HSA
+14b9578a-c0f6-4e82-99fa-1fc506296fb8,HSA
+cdb26cf3-95ce-4f3d-b6bf-9873c868f5cf,HSA
+95215c4c-10fc-4dab-b1da-e7b06bde2f13,HSA
+578c95d6-f723-4f3b-8207-47fc22ff6a2d,HSA
+772710c4-fe33-43a0-abd6-996e08dc05fc,HSA
+f952dd67-7fb2-465b-ae9a-19029f384821,HSA
+5452e883-9335-4383-bbf0-c295dea7f632,HSA
+bacdb529-9420-4f08-9e35-b0b24908073d,HSA
+75169a60-533e-4041-92c8-ecffffa36c98,HSA
+8dd90305-dcd0-40d8-84d9-6aa8c9f7054d,HSA
+4087b1d2-b613-4373-811f-85aeaf0b9938,HSA
+1f0783da-5498-4d15-94ac-e43df1d3d306,HSA
+684f5b06-c995-4a9c-9d12-6b8033041e6f,HSA
+9e4d07e9-b598-4310-8f1d-edf142075e3d,HSA
+b2313782-7026-468e-b653-e5cf72272b4a,HSA
+008d3f15-ce47-4519-8c9f-85e5ba92f757,HSA
+2863b6c3-40ac-48ae-a4c6-395623be33b7,HSA
+8d5b21c8-9c9d-4c1a-a145-cd4b2edff01a,HSA
+6d3c40a2-77fb-42a2-9aba-026b7269d41e,HSA
+49b54ce8-f5d5-4873-be0b-bb381347f3f1,HSA
+dab231df-f905-4c67-b442-91afd9c84a11,HSA
+e2530bac-fd07-4b9c-a6cf-f9be42d675dc,HSA
+a0b3d556-4920-4ccd-bdfb-098695d9d1d8,HSA
+06e2332d-b400-42ba-8b58-83aacd096c45,HSA
+5fab057e-a203-4a19-8ee7-352c147a95e8,HSA
+49fd4ce8-ffb6-42c3-8a81-82fb1dcb7292,HSA
+637a6fdb-eb88-4b9c-981b-06777a4cf60a,HSA
+4957b403-eb40-4456-a24b-b01d89431279,Superuser
+4957b403-eb40-4456-a24b-b01d89431279,Supervisor
+4957b403-eb40-4456-a24b-b01d89431279,System Developer
+8b66e587-508e-43a7-9e38-9f08363d0a85,HSA
+7086b79a-ebe9-49a6-a71b-bfe03797a109,HSA
+515686ed-36fb-47bd-88a2-f0ad09c9a6d6,HSA
+6787ef41-af36-4f81-9b0b-ffedf30e56ba,HSA
+3e0abd20-784a-41cc-a57f-5fc391d7f319,HSA
+d5eb2d5b-7194-4d13-9d4b-8d793f50562e,HSA
+ac97de84-ae26-487b-8e36-963e4c4bb316,HSA
+9e713098-8264-425a-8d70-299daa976817,HSA
+2d754b95-ec36-407f-aedc-7894e22bb078,HSA
+35a60e68-c9bc-4be8-a448-c95f15908b38,HSA
+924b9c5f-a872-4d86-a3d6-3c6e844c9eec,HSA
+f6d228d8-02fc-4df9-9bf9-ae1a695f197e,HSA
+47c24f2e-31d9-4f27-bc43-d6448e5cbd65,HSA
+4f4e8b71-16bd-42d3-87a5-12dce913117c,HSA
+c6328d2a-ee4b-4418-aab1-2568bd3c1413,HSA
+a79c21e6-191b-4af0-8d3a-da712ef9b243,HSA
+2e43dfe7-bdd7-4fa8-87f1-ebe5a2c7f67f,HSA
+735b6b85-85e3-4e54-baf0-5fd7c55527e3,HSA
+a134d34c-3ed0-44c7-95e4-732205d15d09,HSA
+9f8144d5-b97d-470a-8b4a-37363ec13b0c,HSA
+cd770686-77ae-4ca8-bee8-de89c418f4e6,HSA
+7bed6880-2a37-44aa-a1d2-df1bf10ab944,HSA
+863582f4-5283-468a-8709-f0c2f5484afc,HSA
+df548252-2d56-4bf9-b2e3-7996f82a19be,HSA
+659987dc-da37-48b9-bd5d-cdbb023921c9,HSA
+ae181d9a-cbb7-498b-967f-7324cc831389,HSA
+9ae37fd5-d2a0-49aa-a13f-08c7e6039f9b,HSA
+4c8f0dbc-aaf4-4e21-946e-65d486e08116,HSA
+55c78d0d-2c48-4bf2-9142-8c0dc0282993,HSA
+e9be57f3-cf68-452e-9175-d7d0b914307a,HSA
+d0193ad0-516a-45bb-b015-c7740ba24be9,HSA
+5190c74f-04e0-43b5-b500-a93758c8a903,HSA
+0b76b112-af6d-4c05-ae53-dc6a8f7b3234,HSA
+8a85dec0-3e19-4fd6-9579-7d0a59a21a86,HSA
+fc2be2f1-4ee0-4092-a20d-4a2cd0e3ec68,HSA
+1db9edf7-2c4f-4a22-9376-94ed430feca0,HSA
+a966c5a9-8da3-4a83-afb1-e24d7c89e377,HSA
+9e041a72-42db-4917-8af9-d26778975e7d,HSA
+a874add0-66c1-48bf-b40e-5c6277bc7d76,HSA
+ee27a3ae-ab6a-40eb-9c8d-7d7a377f7339,HSA
+d008d77c-59f5-4ddd-8d0c-edd72c82ff16,HSA
+1811884c-6617-4e2e-932c-7291c8d5571c,HSA
+2f209ef9-0258-46d5-b9e7-f6e148d47ca9,HSA
+00bb354c-4859-4594-b21d-bc84deb5bfcb,HSA
+0b6ba1ef-e967-4dff-90a1-8e4d7cbbac69,HSA
+57a29e84-f855-4fe4-b536-44e6214d7691,Superuser
+cd2b6f37-b584-4f9a-9395-3c24f4e3d4b3,HSA
+3b84b5c1-9db5-4fe8-8b4e-6e7af8d3381b,HSA
+1132c173-c5bb-4c24-8542-34671ca9367e,HSA
+1c5ff8ec-d9aa-4640-8d57-812f7970acbd,HSA
+d7621619-93b2-4252-804c-356b22e8c49e,HSA
+3075aea3-cb1b-4f0e-acb3-1e1e5f74cb27,HSA
+f6f73e97-cc84-4862-8ec9-d6608467766f,HSA
+70a23a0d-5cb1-41b7-a178-76089230f4df,HSA
+e5ea47e6-6af0-4196-9bc4-a83fbb2d0fd9,HSA
+a6edc041-c1a9-4a19-aace-c6a188f5938f,HSA
+4e6d91b7-5d75-44ba-9d81-f6757c2a0a78,HSA
+cb8f8ec8-abc0-4d01-83a9-dd64c498d91c,HSA
+a0595ab8-8807-4717-bb2e-e5985a4348fc,HSA
+83eb9ad1-59dc-414b-b473-faaf6bf3c3c0,HSA
+815bbc19-a7f4-4ce7-881e-2fc1ba6fcfad,HSA
+8fef60dc-ce10-4f66-9163-895a1c048628,HSA
+0eeed610-ef30-41e1-8acd-18a49174fee0,HSA
+3dd060ed-a489-4e95-88ff-06049e24315a,HSA
+ee0c469a-804a-4238-a517-2e4973f4ff73,HSA
+0ec094fc-e8ec-4576-bd02-bc1865ea038e,HSA
+b4f546ce-1e7e-44a4-a255-16ea7a7a507c,HSA
+984adcdd-12b9-436c-bf64-d675bbe821ef,HSA
+09558d7d-487b-47c8-845c-2364270bd69a,HSA
+3f949c18-4d4c-47ae-88f4-69805343f32c,HSA
+766be84b-c649-4334-aa03-6ca69a26a1f8,HSA
+fb07199f-d8e4-4b6f-8f64-6010db7be76c,HSA
+21648cd9-be8e-416d-aee6-629bc9dab959,HSA
+6836e20f-b20d-44ed-84de-16f00688612a,HSA
+59ac8016-d306-4950-97b1-2623ddb9b937,HSA
+1c8e238c-f3f8-4d92-9974-fc5bb80ddffa,HSA
+088c5b50-24e1-4967-8198-cd83857eb53c,HSA
+1a9e7a54-010b-4b21-b724-46bcf6878064,HSA
+42599b76-215b-456d-bd50-c339be39296a,HSA
+e88231b7-d2d3-4ab6-a069-717c70524903,HSA
+06290b63-837a-42af-b019-d9a042c79dfd,HSA
+25ba1861-fac2-481b-8738-b00caaab81ae,HSA
+542ad29d-8d8b-4af1-9aea-353e657826ac,HSA
+527da79f-f09d-4e03-9dc5-b969ef7c8063,HSA
+17c26c83-9e7f-45ca-9ee3-56383f238ec4,HSA
+9f4e86f1-e339-4177-bedc-09a78ed4598b,HSA
+7552e76b-e40e-40c3-9b8a-4834a3fa6ed0,HSA
+02cb91e2-c10f-4070-a821-4b178a1df6ef,HSA
+b1af1483-cfcd-4621-8364-3cc301f7a203,HSA
+d4f8cc63-b06f-4121-a8f4-d129df5d2c17,HSA
+5ac02ebf-537b-4c64-8b0b-0ede02e3cb91,HSA
+1de3977e-92b8-4ad2-ad84-e4e072649e9c,HSA
+9d665fd6-0bb5-478e-83ca-4516bc3912e7,HSA
+d33c4429-4723-4797-92dc-13555a59b944,HSA
+44bd9fd8-26aa-489a-81aa-ba6dadc6c281,HSA
+387157ac-6d9c-4db5-8ec0-4eedb05619cf,HSA
+731daba7-64f1-4794-8303-a19d2aea8b0e,HSA
+4aa628ee-b913-4081-9962-203d3437beb5,HSA
+e20b901f-e622-4884-8580-2405b12138ed,HSA
+bef183d8-9eb5-47ec-8c26-ed793f31ce88,HSA
+7a6cd464-fd33-4a64-9768-dd5ab9cf45fb,HSA
+0a684000-3ba5-4226-891a-f69d2aeea10a,HSA
+9a117615-baa9-43dc-bba4-371e17002905,HSA
+d0007851-dc20-4a69-80c8-9c59499350ab,HSA
+9d79a57e-9722-4ee8-a53f-4c04acc518e6,HSA
+25419876-e5ed-4178-b623-51e762b141e7,HSA
+c7932e88-dc5e-4989-9e8b-c0d59c78260f,HSA
+7fddab90-3f0b-4bc1-a2ee-b74197cf2407,HSA
+72783791-2454-4cb2-9911-bc7040df3121,HSA
+57a0d910-c2d7-4015-a945-6266ab894ba2,HSA
+313a7318-28f2-4678-be9e-962fbee5830a,HSA
+232cf81f-674d-477c-bb6d-343246b52eb7,HSA
+c4e55a9a-462e-4839-99fd-0ed27e78d7d0,HSA
+b98ec608-bc04-4420-ba43-7768b43aae79,HSA
+edf2030d-edc5-433e-bb5b-caa9ef7a1a7b,HSA
+9698b3da-b3a1-4412-8e15-7e4521d4b0b7,HSA
+68fe1303-fdf2-4f38-af6a-a0ae5902758e,HSA
+53619a45-a61f-4994-bdfa-6ca7ae679f89,HSA
+abb7cfa7-2028-4494-96bb-4846cda15cdc,HSA
+2fc4e2af-9a2c-42e9-a625-98d08c1fa059,HSA
+5a20893c-4bae-4b8e-abeb-8e0787d93aa6,HSA
+07e70416-c2d7-4a81-985f-50c35add2f43,HSA
+4bc7d0b8-57a1-47e9-8428-a87090ae45ec,HSA
+872297c0-9b27-460f-8959-d813d8a62da5,HSA
+3cfa32d5-d139-4dd0-9d56-29053e0282fb,HSA
+9dffa4e4-e6b1-4c83-9540-a9e708bdf540,HSA
+4f2bdac9-05c9-4d61-94da-12aadc11f8a6,HSA
+22fdb549-78f5-44c8-aa88-f864b8c2817f,HSA
+4c7d31f6-331e-4c18-a002-2051e22b6df0,HSA
+7a464cd9-6e3e-4b53-a7b9-d6985516a3d3,HSA
+c592c2c1-b3d0-4390-b91a-881315ceecd6,HSA
+a7b7da0d-f3e1-4663-8e49-458ea49ea71b,HSA
+b76ce402-7e57-4ba5-904c-54db5e8fe935,HSA
+21af6d69-d32c-4f34-bfef-77d70d0e2131,HSA
+2d2fbb6b-46b2-4ced-a16b-cd4d0a25621b,HSA
+a537c489-fd41-4f55-bf18-03cd14f4dc32,HSA
+4bf6c908-45da-4833-ac52-a1be378c8d19,HSA
+bc358080-1529-4b03-94df-d098b266af73,HSA
+8955c379-a3c9-4c30-8154-01c26d4ac61e,HSA
+7c7eacee-3eae-4a25-bd10-2bed411efd56,HSA
+8b8300e6-a90e-448b-be8e-0a3b6be91fbd,HSA
+ff24a551-eafc-4bb2-80c3-25f83bc3765a,HSA
+e9f96d9c-53f5-41fc-8503-3e6a882c3749,HSA
+2a205e88-754c-4610-9d0b-c9cb0d8c7b0e,HSA
+e4b104b5-b602-44bb-8bc6-f0daea2dd397,HSA
+c871bdb3-e0fc-447a-9f34-288bdcc32ada,HSA
+2205fe75-1aa9-468e-9e43-1de3f11d673b,HSA
+aadbe040-5fcb-43e3-a30c-8f99e4a13490,HSA
+d27d88d3-25df-46a2-93ab-da8c70b1b7f8,Clinician
+d27d88d3-25df-46a2-93ab-da8c70b1b7f8,Data Assistant
+d27d88d3-25df-46a2-93ab-da8c70b1b7f8,General Registration Clerk
+d27d88d3-25df-46a2-93ab-da8c70b1b7f8,Registration Clerk
+d27d88d3-25df-46a2-93ab-da8c70b1b7f8,Superuser
+d27d88d3-25df-46a2-93ab-da8c70b1b7f8,"Superuser,Superuser,"
+d27d88d3-25df-46a2-93ab-da8c70b1b7f8,Vitals Clerk
+ed28e11a-f2c0-4dd2-bdcd-3c451de1ac88,HSA
+228d4480-71e6-43ff-83d5-7747a74217dc,"Superuser,Superuser,"
+4d1f72d1-dca8-41f2-bc59-2e9447984346,HSA
+fb1d62b4-ef80-42ed-9744-57b053995023,HSA
+0efd3d6a-d67d-44b0-8389-ccb222402c34,HSA
+77e8751a-f81d-4b4f-ae65-ef9090ccb6cd,HSA
+06307152-f968-48e6-a834-2c6a7832573f,Superuser
+06307152-f968-48e6-a834-2c6a7832573f,"Superuser,Superuser,"
+57c65a2d-e5c3-4152-bcec-c035db4e9099,HSA
+df8175b1-af71-49c3-b248-038556cc2cbe,HSA
+ae266538-5879-4384-9a1e-65fc71fcb45f,HSA
+32872bc6-2e00-4c71-82b7-0cc5f29bba04,HSA
+0f702943-fd6b-43c3-ad2f-2f846e0c33b4,HSA
+167f78c7-9d5e-46fe-8f2c-9a86ee1ee59a,HSA
+510e51be-d5ff-4f89-be28-7032a38f3510,Supervisor
+bb9d55f9-dbe6-4304-85b3-1d990b5c8cd9,Supervisor
+88086c62-b0cf-4e01-8a4a-34bef9a3b4b1,Superuser
+88086c62-b0cf-4e01-8a4a-34bef9a3b4b1,"Superuser,Superuser,"
+7146aa5b-6352-4dbe-ac0c-d70277d10d03,Pharmacist
+8ef73eb1-c81c-4d56-8f21-c6d3aa9e65a2,Clinician
+8292b254-e562-4e30-9392-9681067f5a15,Clinician
+7f9cf5cc-b24a-44f6-bc08-7d7bbce0a1b7,Clinician
+d0334bea-bff9-417e-831a-17fa728072a7,Registration Clerk
+a48711b5-d147-460c-947e-697f8cd8a0c1,Registration Clerk
+2523992b-d0a9-435a-a167-b729399f5d01,Registration Clerk
+10f1a96b-1e32-4596-b86d-9e14429487b9,Clinician
+3a863d80-26ea-4230-a322-c967c671b802,Nurse
+1b7fd3a1-f004-4573-abfc-ee6fdde777ef,Nurse
+8c563f17-1989-4269-b287-930b23c92e26,Lab
+b6dd8b4c-d26e-4034-a4e0-dc745bde5b6e,Lab
+f4755d7f-8905-4030-b679-ee266c9d66e7,Lab
+611c93dc-46f4-40ea-8fbd-b9d33f11f7db,Clinician
+611c93dc-46f4-40ea-8fbd-b9d33f11f7db,General Registration Clerk
+611c93dc-46f4-40ea-8fbd-b9d33f11f7db,Medical Assistant
+611c93dc-46f4-40ea-8fbd-b9d33f11f7db,Nurse
+611c93dc-46f4-40ea-8fbd-b9d33f11f7db,Registration Clerk
+611c93dc-46f4-40ea-8fbd-b9d33f11f7db,Vitals Clerk
+081ff80e-7aba-41c4-838c-1139bdaa29f6,Lab
+081ff80e-7aba-41c4-838c-1139bdaa29f6,Pharmacist
+dd395c13-3d74-4f49-b361-e7f73c0c2649,Clinician
+d08e796c-afaf-4857-ad8b-f5ce24cd0609,General Registration Clerk
+d08e796c-afaf-4857-ad8b-f5ce24cd0609,Registration Clerk
+18e888b4-a434-4620-a377-7069dbdbf4c6,General Registration Clerk
+18e888b4-a434-4620-a377-7069dbdbf4c6,Registration Clerk
+cf2e3c74-fc02-4c98-aa00-d96f6540c5c1,Lab
+a69fdb19-809c-47d2-902f-5dc838ccaae0,Lab
+bf141edc-ac4b-4440-81c1-2919c4a24500,Pharmacist
+13f4af5b-a21c-4161-ac54-85f124129917,General Registration Clerk
+13f4af5b-a21c-4161-ac54-85f124129917,Lab
+13f4af5b-a21c-4161-ac54-85f124129917,Registration Clerk
+51417cac-c6d4-47b4-9640-9881c6ecf605,Nurse
+1c454cef-e406-4783-b147-8aa580014112,Nurse
+aa561e75-6558-4b82-b461-499c27d6ad17,Superuser
+97355021-d4e8-4f19-a09c-99b46d579e3e,Doctor
+d9422266-c928-4530-8dc1-83cd03d82827,Health Surveillance
+6741c0f2-5fbb-4e09-802b-94ab66447f2e,HSA
+37ce0207-3d1b-4b4f-bb76-37fe8d914b5f,HSA
+77ec563f-ae67-4890-be3c-34b4e52c2393,Health Surveillance
+fcf50be2-ed29-416d-9cb8-9bd70e6156da,HSA
+8472a466-1af8-4ace-8b04-cffaedce2432,HSA
+325496db-432d-4b98-b5d4-6727f2505f6a,HSA
+67dc6bbc-ca4d-4ae6-9ed5-32bc401dc412,Superuser
+d65a4909-618b-47d3-9afe-05930db94bc5,Superuser
+7ce3878a-1224-4f5e-9437-6aa52bbb002d,Superuser
+1ab2ca0b-9ff7-4de8-b78f-c33ca3d1cd80,Superuser
+3804b62c-d055-4a74-b0c6-77f2e1c6302c,Clinician
+8121fec0-8ca7-4f4e-a827-1f1508b81159,"Superuser,Superuser,"
+15e3da61-ce71-4b95-8e6f-c9ddd9192d6e,Nurse
+15e3da61-ce71-4b95-8e6f-c9ddd9192d6e,Superuser
+de3f17f4-e4a9-4bce-995d-f2c348bca652,General Registration Clerk
+55ca29ac-7cf4-42ac-b598-2853bc6b91f8,General Registration Clerk
+55ca29ac-7cf4-42ac-b598-2853bc6b91f8,Superuser
+2215bc18-26cb-471f-9cd4-7fd6b31aeec3,Anonymous
+2215bc18-26cb-471f-9cd4-7fd6b31aeec3,Clinician
+2215bc18-26cb-471f-9cd4-7fd6b31aeec3,Superuser
+2215bc18-26cb-471f-9cd4-7fd6b31aeec3,Supervisor
+e313ba24-1349-491e-8453-27af6142e496,Superuser
+1f6541f2-d9e6-46cc-8e0a-64c86117dbe1,Clinician
+f5e81557-5d1e-4eea-839e-76ad0360efe1,Clinician
+441ea45c-9e67-4fe5-a85b-d241b4669df2,Superuser
+626c65ad-0739-46e5-9b1e-d3ad0a7d30f1,General Registration Clerk
+626c65ad-0739-46e5-9b1e-d3ad0a7d30f1,Registration Clerk
+626c65ad-0739-46e5-9b1e-d3ad0a7d30f1,Superuser
+c0458fdd-4857-4142-bb82-54edee92d683,HSA
+12da4efa-3cf7-45ad-a4cf-2941f0d81bc1,Clinician
+12da4efa-3cf7-45ad-a4cf-2941f0d81bc1,Superuser
+813c7bc0-20da-43f7-a899-cae6f025a241,HSA
+d27d5509-8726-4e0c-b1d1-434d1e68e16c,Clinician
+d27d5509-8726-4e0c-b1d1-434d1e68e16c,Superuser
+bfa5350f-795a-42b1-8d07-fcf7168da714,HSA
+2b9a0bd7-107f-4c62-a379-ba94ab4f9469,Superuser
+8e4d7677-5d88-4ed2-9e8d-3acc2e41ee6a,Lab
+695b034f-0162-42bc-b2c3-70f2f2e43d32,Superuser
+0c07ecfc-ddc3-4a28-ab86-673da5060967,Pharmacist
+98646e8d-729d-425d-b6eb-8993d1367d26,Clinician
+98646e8d-729d-425d-b6eb-8993d1367d26,"Superuser,Superuser,"
+ce5b501b-3d4a-45dd-bbf7-2742c4a093ae,Clinician
+33bca40b-9582-4ae6-8aa4-ab0fa847670b,Clinician
+dd063709-c0b3-431d-a969-e256e1876b22,Clinician
+dd063709-c0b3-431d-a969-e256e1876b22,General Registration Clerk
+6be09a75-bd15-43ef-b781-a2d7ab9ad3b2,HSA
+af05766d-263d-4145-b121-05204f1d81b3,Clinician
+af05766d-263d-4145-b121-05204f1d81b3,Nurse
+af05766d-263d-4145-b121-05204f1d81b3,Registration Clerk
+03e7998d-8614-46df-8f97-a020666805ed,Clinician
+03e7998d-8614-46df-8f97-a020666805ed,Nurse
+03e7998d-8614-46df-8f97-a020666805ed,Registration Clerk
+3ad05ed6-e453-45ba-88c1-b3ef726db3ef,Nurse
+4f8a1b65-fb3b-4ccc-b275-f3361a0752cf,HSA
+15305323-3100-4518-92b6-71eb6a64da4a,Clinician
+b46ed48f-2690-480f-90bd-1ad54f709cb2,Clinician
+6e19a13a-7bc1-4a57-a907-2666a087bf59,HSA
+70281de9-7e99-4bb6-9637-110072f0cbb9,HSA
+56750a6c-e23d-441d-a9f2-c0e6f72059a1,HSA
+8343a942-c978-4398-8cd8-a07e9d47f9c4,HSA
+6f0db2ba-3dfc-49d6-b609-3b302517e6e3,HSA
+c0bc0c75-ddd3-4ea0-bc75-5ecc84b1f71d,Clinician
+76ab716b-1540-43b7-b057-cb78c124d78e,General Registration Clerk
+45d57688-bf5b-47cf-90e4-0bc6041be8cb,General Registration Clerk
+45d57688-bf5b-47cf-90e4-0bc6041be8cb,Registration Clerk
+e7a31989-4e92-447b-9974-648be4ab5151,General Registration Clerk
+e7a31989-4e92-447b-9974-648be4ab5151,Registration Clerk
+2966c643-e955-463f-b842-dacd9197c34d,Data Assistant
+2966c643-e955-463f-b842-dacd9197c34d,General Registration Clerk
+2966c643-e955-463f-b842-dacd9197c34d,Registration Clerk
+d4df750d-4eb6-4e76-b355-a52a77c3f78e,Clinician
+039e85e4-de82-4d33-8ace-b73ae75fca3e,Clinician
+cd4e3e51-9ffd-46a3-9565-f20d3d226b3d,Superuser
+37530aa7-1ce4-4fac-a26d-a43b1e10315c,Clinician
+65d5ba06-905c-40bc-a2a6-17515f0ab687,Clinician
+29734a39-eb1c-47b5-9583-09c7de05cbbf,Clinician
+360bc11f-37bd-4646-af52-7418340253ee,General Registration Clerk
+5fbd5234-b9d8-4162-9cbe-16a73519348b,Clinician
+b3036c0e-b316-450b-9798-6f4f7256a122,Clinician
+b47b639a-8c89-40df-9985-99127f6a75c7,Clinician
+b47b639a-8c89-40df-9985-99127f6a75c7,Superuser
+87e4bde9-aa24-4e5d-b65d-7f17751b0bb3,Superuser
+368bf3c2-2306-4c13-9f14-96ac7bea8acb,HSA
+daa1a5d2-08d1-49cb-9ebe-79c1e296d1bf,HSA
+fa311576-e2ba-4101-a462-92d25a71dd1c,HSA
+89d751d4-e6f0-4bec-87e2-fa8f3b072e06,Clinician
+74258992-dd09-4e0f-b5aa-a7cd2e51fa7c,Clinician
+8102f309-a96c-407b-8018-a0b529304be3,Clinician
+ac579c30-b6e2-40ac-9204-9d6a0a9c997c,Clinician
+9f4d8f52-9c0b-4ed8-bad6-8e22eca920a6,Clinician
+9f4d8f52-9c0b-4ed8-bad6-8e22eca920a6,Superuser
+26acd2ac-63f6-4a7d-85b2-778df7b9b8c0,Nurse
+186caf44-4c69-4b28-9e08-b5c0770930b6,Nurse
+186caf44-4c69-4b28-9e08-b5c0770930b6,Superuser
+c75a0dd3-355b-40d0-b007-e419c6b5e34f,Clinician
+0b7dd2f2-4d54-4308-bedf-3cff75420fb6,Nurse
+0c71eca9-b83d-4b78-8668-6ffac564ba08,Clinician
+0c71eca9-b83d-4b78-8668-6ffac564ba08,Superuser
+6a2c29f0-5c89-475b-bd17-82eaec9d79e1,Clinician
+3d46ea99-9048-4fa2-a0e3-5d248bc84420,General Registration Clerk
+33ac9c38-d3e6-4dcb-8e7f-62b7d7cec358,Nurse
+aa315a3e-ae77-4194-81f5-9144a8cae1f4,Lab
+f640596f-1871-43b2-8682-4c953b89e41b,Pharmacist
+722a783b-16db-427c-9680-75cd69a5f744,Nurse
+722a783b-16db-427c-9680-75cd69a5f744,Superuser
+045307d6-9b69-4b9f-b234-2b708529bcb3,Clinician
+f534e651-61ff-41d0-baf9-64e7d389c27f,Clinician
+f534e651-61ff-41d0-baf9-64e7d389c27f,Superuser
+f534e651-61ff-41d0-baf9-64e7d389c27f,"Superuser,Superuser,"
+180a130e-1a20-4238-ae03-8ea77921e1c0,Superuser
+5e0841a1-8f8e-401a-afe1-d40dff8d17cf,Clinician
+5e0841a1-8f8e-401a-afe1-d40dff8d17cf,Doctor
+5e0841a1-8f8e-401a-afe1-d40dff8d17cf,Medical Assistant
+5e0841a1-8f8e-401a-afe1-d40dff8d17cf,Nurse
+5e0841a1-8f8e-401a-afe1-d40dff8d17cf,Provider
+5e0841a1-8f8e-401a-afe1-d40dff8d17cf,Superuser
+0bbdc177-6bb7-49cd-9d27-098b952ca829,Counselor
+0bbdc177-6bb7-49cd-9d27-098b952ca829,Nurse
+0bbdc177-6bb7-49cd-9d27-098b952ca829,Pharmacist
+0bbdc177-6bb7-49cd-9d27-098b952ca829,Registration Clerk
+0bbdc177-6bb7-49cd-9d27-098b952ca829,Vitals Clerk
+b853600f-7dd6-4b81-938d-d78b4075a118,Superuser
+b853600f-7dd6-4b81-938d-d78b4075a118,"Superuser,Superuser,"
+b853600f-7dd6-4b81-938d-d78b4075a118,System Developer
+99d96749-e173-40d2-8b7a-9c6ed0a7f16a,Superuser
+a9487e45-2595-438c-aa27-e41079cd0b8f,Superuser
+a9487e45-2595-438c-aa27-e41079cd0b8f,"Superuser,Superuser,"
+d2cb97d3-7bcf-472e-863f-5e2e656f385b,Clinician
+d2cb97d3-7bcf-472e-863f-5e2e656f385b,Superuser
+7765aba0-cec0-4500-a2d0-114381a7a389,Clinician
+c6c3e7c9-2178-457e-a71d-ecf5f0d860fa,General Registration Clerk
+c6c3e7c9-2178-457e-a71d-ecf5f0d860fa,Registration Clerk
+c6c3e7c9-2178-457e-a71d-ecf5f0d860fa,Superuser
+244798cf-80bb-44c8-9da5-21c315fd2685,Nurse
+244798cf-80bb-44c8-9da5-21c315fd2685,Superuser
+a16beadf-f353-4c12-8b2b-14e943bbbfc9,Clinician
+a16beadf-f353-4c12-8b2b-14e943bbbfc9,Superuser
+11aeed72-7c3e-4bcb-9731-83ea268d7711,Nurse
+11aeed72-7c3e-4bcb-9731-83ea268d7711,Superuser
+b5d5707f-56ba-4aef-9140-02c897f8cffd,Nurse
+b5d5707f-56ba-4aef-9140-02c897f8cffd,Superuser
+21a6fe31-793e-4da4-95f7-38b761695ddf,Lab
+5e848547-783e-4357-b107-81acd9ef57fb,Clinician
+67b88e09-9a7c-4d1e-8c00-de89945e5ade,Clinician
+dab31b03-eb7e-4ae5-be74-52e0ab031a32,Data Assistant
+72e480ab-e3e4-4701-b27b-f8edcc387456,Data Assistant
+0797144a-c7af-4139-b6ef-ee41309adf2b,Data Assistant
+0797144a-c7af-4139-b6ef-ee41309adf2b,Superuser
+a62229d7-0f87-44b2-851d-405c62ed119d,Clinician
+ca8e1ba0-2523-448b-ab59-b8f766f2e410,General Registration Clerk
+1218eab5-d660-4ca7-b2f7-0b98e5204200,General Registration Clerk
+1218eab5-d660-4ca7-b2f7-0b98e5204200,Registration Clerk
+a389c34e-6152-43f3-8e13-d26a34ae20fd,Nurse
+cfd97a94-8740-4463-91a4-233493bf12ae,Clinician
+de338434-393a-4265-b839-f2841f8ecdb4,Nurse
+de338434-393a-4265-b839-f2841f8ecdb4,Registration Clerk
+8818d042-ce3b-4f86-9b18-3fe995f80edf,Pharmacist
+ee466c9e-2c6a-45ea-906a-317a2b77e2a1,Clinician
+f49d89f9-5910-40d7-92e4-098ef26a86ff,General Registration Clerk
+f49d89f9-5910-40d7-92e4-098ef26a86ff,Registration Clerk
+56ce3c52-e7f4-4c0d-9337-4c4ba493d0dc,Nurse
+542498ee-56a1-42fb-9218-4f15a8be2c54,Clinician
+542498ee-56a1-42fb-9218-4f15a8be2c54,SPINE clinician
+8828c0cd-c6b3-4462-b1a9-3d96a9103dda,Lab
+f14b2782-4135-4f20-80ac-35f5de576c99,Clinician
+89acd916-d329-44ea-bbb7-05858c0e6b5f,Nurse
+3c218dd1-51b3-4217-8ecf-947d291181de,Clinician
+3c218dd1-51b3-4217-8ecf-947d291181de,General Registration Clerk
+3c218dd1-51b3-4217-8ecf-947d291181de,Nurse
+3c218dd1-51b3-4217-8ecf-947d291181de,Superuser
+17aa9d0e-075f-4dad-b970-e5063f564034,General Registration Clerk
+2b808ba7-ebe4-42b9-89d0-125a22036938,Superuser
+b0b40ed2-e893-4435-bd6d-44a5a52659b8,Clinician
+782b1ba0-0bed-4f8f-b54e-6b96500f8312,General Registration Clerk
+782b1ba0-0bed-4f8f-b54e-6b96500f8312,Registration Clerk
+f4ca04a4-be7a-4acc-b25d-bf085539dddd,Nurse
+f4ca04a4-be7a-4acc-b25d-bf085539dddd,Supervisor
+85d5f399-fb82-4ad1-8104-97904565f9d9,Clinician
+a6164dc7-aedc-4fc7-a2c8-bd7be9a6e7c6,Clinician
+2ed11e69-21fc-4f72-835a-87eb9c174f50,Nurse
+6ecc0d05-6ff8-46cb-b487-32944b37a8a7,Doctor
+927a4fd7-e8a5-4bd1-9827-2155dbda0dc4,Clinician
+927a4fd7-e8a5-4bd1-9827-2155dbda0dc4,Superuser
+ee516be4-5375-4147-8e1e-be437abf59b6,Nurse
+ee516be4-5375-4147-8e1e-be437abf59b6,Superuser
+820cc009-9991-41de-952a-1fff1a010865,General Registration Clerk
+820cc009-9991-41de-952a-1fff1a010865,Registration Clerk
+2f1b9bc9-6e7b-44ca-87ac-3f4162f2007b,Nurse
+5099a983-6a36-4777-8f30-59855a7df382,Clinician
+36585562-617d-4b9a-9ffc-b3aa40856a37,Lab
+41efa070-629a-4b06-9d85-0e69b05db356,Nurse
+aa2015da-4fe2-4ff1-a35d-09713e006df9,Lab
+aa2015da-4fe2-4ff1-a35d-09713e006df9,Vitals Clerk
+9b8004ac-0c0e-4c68-8265-c960b31ea1b8,Superuser
+ced0c3c2-3a17-44ff-8f22-241e99836490,Clinician
+c145ea4c-bfd2-48bc-9d99-9403f459e08d,Clinician
+1b31073c-7798-4009-85cf-643d1788c9c2,Clinician
+bc9c9302-fec7-475d-a887-cf8a440f8b12,Clinician
+bb3f7584-f8c7-4ba7-92d6-dcdd884f77bc,General Registration Clerk
+044b11b0-deec-43bf-a513-39e462e10cc4,Data Manager
+044b11b0-deec-43bf-a513-39e462e10cc4,Superuser
+2ba2730b-a0a7-4c7c-b596-5f78a01eb521,Clinician
+48afc43e-c3a0-4e30-b152-5f1e06aab1b1,Clinician
+2bfc3e3a-a61e-45de-8785-2e4beeaa0795,Pharmacist
+3caf7105-b677-4030-84b3-fd300035892f,General Registration Clerk
+6efd274c-4bba-47fd-a144-eb5e081a1391,Nurse
+57a4aba6-a70c-4a13-b511-a72762446e96,Nurse
+5f8aaea9-de15-4657-972a-37eb87e75a17,Clinician
+043ffce2-b900-4104-95a1-9f6841c1330a,Lab
+af0c12a4-1048-49b7-8967-38cd45658080,Clinician
+b66cb20f-a274-4b35-87ad-64807488f59c,Clinician
+381ca842-e3de-436e-941a-b5552b8b9121,Clinician
+8fc82a4d-fcd1-4f13-ba06-73cd72c8473e,Clinician
+8fc82a4d-fcd1-4f13-ba06-73cd72c8473e,General Registration Clerk
+8fc82a4d-fcd1-4f13-ba06-73cd72c8473e,Superuser
+8fc82a4d-fcd1-4f13-ba06-73cd72c8473e,Supervisor
+8fc82a4d-fcd1-4f13-ba06-73cd72c8473e,System Developer
+b8de3a0c-e56e-4037-bc49-c8926ae8cc90,Clinician
+2950b48f-aa0e-4b44-b0c3-d4e903254953,Clinician
+2bd95b14-a55a-4ee5-b68b-652c70f2021f,Clinician
+a7d40fa0-63d1-4074-87c5-6a32762448df,Clinician
+7e94322c-c779-4a6a-8ec0-ab467bb8d5fa,Nurse
+c6be9060-0e8f-4620-9e27-bfa0abcc0b3b,Clinician
+dd040bad-f535-47d6-b500-9391fbbf1f3e,Clinician
+3b367a12-0058-47da-8d33-b681f98c53ec,Registration Clerk
+c2b14ff7-1ac7-4873-aa4f-0f1adddca4c5,Nurse
+d4b461ae-450b-49d2-ae2b-7c6c8ef61223,Nurse
+537052d2-f4b0-49de-8d17-9e237d594187,General Registration Clerk
+537052d2-f4b0-49de-8d17-9e237d594187,Registration Clerk
+61ba2948-2841-4ece-a71e-559b8f2eaa14,Clinician
+644ec1bb-9737-43dc-aec1-bb9a458aa01d,Nurse
+ce98e4df-0135-4c24-a53a-b87229660482,Superuser
+769b72fb-ecb3-4a80-ac18-b0620b590e11,Superuser
+aab0d851-6bbf-453e-8059-d8847e56133d,Clinician
+aab0d851-6bbf-453e-8059-d8847e56133d,General Registration Clerk
+aab0d851-6bbf-453e-8059-d8847e56133d,Superuser
+4b14cded-de89-465d-a7d0-f9452d258a1b,Clinician
+c0919dae-9c07-494f-8bf6-2a8312317d44,Clinician
+8f0933dd-a4c7-4800-96ed-4d87bdba4d8d,"Superuser,Superuser,"
+3e252cf9-1c71-489e-9fff-34264e72df86,Nurse
+f8e6ad3c-9855-4131-93bf-6559c751be3e,Clinician
+bf09b1cb-c1b4-4357-8cd7-5ee8c1fbdf58,Clinician
+52f026fd-f07b-42c4-97f4-23a3c2c5ad31,Clinician
+a89fd623-f16e-445d-a183-bddfade51e38,Clinician
+6a17ccb7-fbbf-4310-98cf-9ee4dee73bb0,Superuser
+6a17ccb7-fbbf-4310-98cf-9ee4dee73bb0,"Superuser,Superuser,"
+2f9e1bb2-1554-44b4-8036-361822acdf1d,Clinician
+6776eb99-1380-4b87-a7f0-1b6b44f71202,Lab
+6776eb99-1380-4b87-a7f0-1b6b44f71202,Registration Clerk
+bc7692bf-26f5-4515-b495-b5b773dc8d5d,Registration Clerk
+ee4a42ce-3e38-48f6-8bb6-84910abd78db,Lab
+eab27735-44c9-49d6-a27c-83bd492a2afe,Pharmacist
+312faeb6-4177-41ef-82f3-6f300045155e,Clinician
+fdc252e5-8580-45d6-8e49-d058b7404d6e,Registration Clerk
+b425ab75-bdb5-4b6f-ab0a-2a2340b37260,Registration Clerk
+ff54ebf2-57b1-4d58-95ab-d2c5651bde13,Clinician
+cf19e492-6d14-4a06-9fe6-637833676560,Clinician
+cf19e492-6d14-4a06-9fe6-637833676560,Superuser
+78a25c63-912a-4587-9e99-3ba8d5064b66,Registration Clerk
+f6d4cfe4-d247-4ff5-ac1e-5f3218239a2e,Nurse
+96b1ada5-a0db-4212-a45e-3f773c9eaf07,Clinician
+8292bdc5-4526-457d-9c0d-4c645b46e069,Clinician
+7d4a2b40-b886-4255-85c5-e0a02ed20244,Registration Clerk
+151f0e83-17dc-4a5b-8d5c-9cc106592b17,Registration Clerk
+88e39a37-545e-4a95-a49f-79e7c530e884,Clinician
+6f24f42c-1e16-4cee-b5b5-a91f5c856f56,Clinician
+b12f1af4-4e67-4a8d-b8a2-4b9bd3b3484c,Clinician
+acba5117-eef8-4f27-ac15-533e3aad103a,Clinician
+ff51ec87-7e44-4e89-92de-5771a75a40f4,Pharmacist
+9611036a-b596-4035-a600-2652dc51dd56,Nurse
+263afe8b-2143-49a3-bdf8-09ad81700767,Clinician
+8499a310-b40b-4893-8835-fdbfee3b7fee,Clinician
+32e9c688-3987-42d2-a4b1-884722de07a6,Lab
+3c030f01-733b-4fab-9f52-224a24b35ae8,Nurse
+3c030f01-733b-4fab-9f52-224a24b35ae8,Registration Clerk
+3db3c260-b296-4544-9389-7cf1664c6e72,Lab
+804aa256-9b9d-4f8c-bd47-31dae49fc9f8,Lab
+161c8d0b-f202-4cfa-b563-a80c5eaceacb,Nurse
+1f4e3f96-6676-4596-b4e5-9dd729ee6782,Superuser
+1de2e9bf-56fb-4b64-8256-7d3f3f4cc2c4,Lab
+41300894-5f17-4989-a180-167fb160118f,Lab
+015aca6f-bb0c-4f69-ad3d-aff005d00fde,Lab
+6a192e23-cd04-4cb3-87da-27c25d8e331f,Lab
+2dffa933-19a5-4c23-9fc8-6c4a00f4c37b,Pharmacist
+dd988bf0-be72-4437-9108-38102b5f2d77,Registration Clerk
+fc3fc504-a714-4d49-9a4b-85a9fc90775c,Superuser
+fc3fc504-a714-4d49-9a4b-85a9fc90775c,"Superuser,Superuser,"
+445dd425-7e9a-4a15-8f4e-ba9af6b9a8d6,Clinician
+d055cd41-e3cb-4222-8a1c-4403cd5da7da,Nurse
+2c56d96c-d667-44a3-b8e2-eb47bac62b76,Clinician
+806e6d31-39ce-4e38-95ef-c9a32b26bcfc,General Registration Clerk
+806e6d31-39ce-4e38-95ef-c9a32b26bcfc,Registration Clerk
+c876deff-07d0-4523-a85a-8dff1da4dc9f,Registration Clerk
+8dfd0d1b-3662-4f57-882d-fa071c6acd98,Clinician
+b2308a42-cafd-4e29-8a4c-10b2f75c3c7a,Nurse
+51e8cba4-bc3f-455e-bde0-4a630c2a610d,Lab
+7f669b50-955c-4b16-b354-a8f3c9db2169,Clinician
+d3f0f621-cab3-4eb4-8a85-2fa019aa9812,Counselor
+88632051-3b7d-457f-9d26-ecf9db1910f8,Lab
+65864efa-9ee9-4db8-ae39-b851a7ee7ba7,Pharmacist
+13657802-f308-4853-b501-61ab08042f3e,Registration Clerk
+bbdb021e-55d8-48ec-9841-b3a8859c3d23,Data Manager
+91d35376-2b26-4bd1-973d-2500af2eb455,Clinician
+2870e040-151f-4533-88c2-ac7babaa3cd8,Superuser
+861b7d54-3f7f-4c74-aff3-77c69db5bd03,Superuser
+47867d5e-7fc0-401d-a884-20afd53aaa6b,Superuser
+d76c3673-7296-43d7-b31e-2f66300baa37,Clinician
+31a1f118-55cd-45b5-b1c0-fedc122aca33,Superuser
+8a887100-d38f-4124-922e-f57d787b87ea,Lab
+2023464f-7294-4d68-aade-822306f0d4c9,Lab
