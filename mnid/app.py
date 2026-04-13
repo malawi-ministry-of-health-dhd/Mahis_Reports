@@ -536,6 +536,41 @@ def _service_table_payload(df: pd.DataFrame, scope_meta: dict | None = None) -> 
                 ('ITNs given', lambda x: _concept_count(x, 'Insecticide treated net given', ['Yes', 'Given'])),
                 ('2+ tetanus doses recorded', lambda x: _concept_count(x, 'Number of tetanus doses', ['two doses', 'three doses', 'four doses'])),
             ],
+            'chart_specs': [
+                {
+                    'id': 'anc_hiv_testing',
+                    'label': 'HIV Testing',
+                    'title': 'HIV Testing in ANC',
+                    'total_metric': 'HIV test results recorded',
+                    'segments': [
+                        {'label': 'Reactive', 'metric': 'Reactive HIV results', 'color': '#DB2777'},
+                    ],
+                    'remainder_label': 'Screened non-reactive / other',
+                    'remainder_color': '#2563EB',
+                },
+                {
+                    'id': 'anc_tetanus',
+                    'label': 'Tetanus 2+',
+                    'title': 'Tetanus Dose Coverage',
+                    'total_metric': 'Unique ANC clients',
+                    'segments': [
+                        {'label': '2+ doses recorded', 'metric': '2+ tetanus doses recorded', 'color': '#0F766E'},
+                    ],
+                    'remainder_label': 'Below 2 doses / not recorded',
+                    'remainder_color': '#94A3B8',
+                },
+                {
+                    'id': 'anc_blood_group',
+                    'label': 'Blood Group',
+                    'title': 'Blood Group Documentation',
+                    'total_metric': 'Unique ANC clients',
+                    'segments': [
+                        {'label': 'Blood group recorded', 'metric': 'Blood group recorded', 'color': '#7C3AED'},
+                    ],
+                    'remainder_label': 'Missing blood group',
+                    'remainder_color': '#CBD5E1',
+                },
+            ],
         },
         'Labour': {
             'title': 'Labour & Delivery Summary',
@@ -552,6 +587,31 @@ def _service_table_payload(df: pd.DataFrame, scope_meta: dict | None = None) -> 
                 ('Newborn complications recorded', lambda x: _concept_count(x, 'Newborn baby complications', any_value=True)),
                 ('Newborn management recorded', lambda x: _concept_count(x, 'Management given to newborn', any_value=True)),
                 ('Birth attendant recorded', lambda x: _concept_count(x, 'Staff conducting delivery', any_value=True)),
+            ],
+            'chart_specs': [
+                {
+                    'id': 'labour_birth_outcomes',
+                    'label': 'Birth Outcomes',
+                    'title': 'Delivery Outcomes',
+                    'total_metric': 'Deliveries recorded',
+                    'segments': [
+                        {'label': 'Live births', 'metric': 'Live births', 'color': '#0F766E'},
+                        {'label': 'Stillbirths', 'metric': 'Stillbirths', 'color': '#DB2777'},
+                    ],
+                    'remainder_label': 'Other / uncategorized outcomes',
+                    'remainder_color': '#CBD5E1',
+                },
+                {
+                    'id': 'labour_referrals',
+                    'label': 'Referral Flow',
+                    'title': 'Delivery Referrals',
+                    'total_metric': 'Unique mothers',
+                    'segments': [
+                        {'label': 'Mothers referred', 'metric': 'Mothers referred', 'color': '#C2410C'},
+                    ],
+                    'remainder_label': 'Managed without referral',
+                    'remainder_color': '#94A3B8',
+                },
             ],
         },
         'Newborn': {
@@ -572,6 +632,41 @@ def _service_table_payload(df: pd.DataFrame, scope_meta: dict | None = None) -> 
                 ('Parenteral antibiotics given', lambda x: _concept_count(x, 'Parenteral antibiotics given', ['Yes'])),
                 ('iKMC initiated', lambda x: _concept_count(x, 'iKMC initiated', ['Yes'])),
             ],
+            'chart_specs': [
+                {
+                    'id': 'newborn_thermal_status',
+                    'label': 'Thermal Status',
+                    'title': 'Thermal Status on Admission',
+                    'segments': [
+                        {'label': 'Not hypothermic', 'metric': 'Not hypothermic on admission', 'color': '#2563EB'},
+                        {'label': 'Hypothermia', 'metric': 'Hypothermia on admission', 'color': '#DB2777'},
+                    ],
+                },
+                {
+                    'id': 'newborn_resuscitation',
+                    'label': 'Resuscitation',
+                    'title': 'Newborn Resuscitation Response',
+                    'total_metric': 'Unique babies',
+                    'segments': [
+                        {'label': 'Resuscitation provided', 'metric': 'Resuscitation provided', 'color': '#0F766E'},
+                        {'label': 'Not required', 'metric': 'Resuscitation not required', 'color': '#2563EB'},
+                    ],
+                    'remainder_label': 'Other / no response recorded',
+                    'remainder_color': '#CBD5E1',
+                },
+                {
+                    'id': 'newborn_respiratory_support',
+                    'label': 'Respiratory Support',
+                    'title': 'Respiratory Support Mix',
+                    'total_metric': 'Unique babies',
+                    'segments': [
+                        {'label': 'Bubble CPAP', 'metric': 'Bubble CPAP support', 'color': '#7C3AED'},
+                        {'label': 'Nasal oxygen', 'metric': 'Nasal oxygen support', 'color': '#0891B2'},
+                    ],
+                    'remainder_label': 'No advanced support tracked',
+                    'remainder_color': '#CBD5E1',
+                },
+            ],
         },
         'PNC': {
             'title': 'PNC Summary',
@@ -589,6 +684,32 @@ def _service_table_payload(df: pd.DataFrame, scope_meta: dict | None = None) -> 
                 ('Vitamin K given', lambda x: _concept_count(x, 'Vitamin K given', ['Yes'])),
                 ('Immunisation recorded', lambda x: _concept_count(x, 'Immunisation given', any_value=True) + _concept_count(x, 'Type of immunization the baby received', any_value=True)),
             ],
+            'chart_specs': [
+                {
+                    'id': 'pnc_maternal_outcomes',
+                    'label': 'Maternal Outcomes',
+                    'title': 'Maternal PNC Outcomes',
+                    'total_metric': 'Unique mothers',
+                    'segments': [
+                        {'label': 'Maternal referrals', 'metric': 'Maternal referrals', 'color': '#C2410C'},
+                        {'label': 'Maternal deaths', 'metric': 'Maternal deaths', 'color': '#DB2777'},
+                    ],
+                    'remainder_label': 'Stable / other outcomes',
+                    'remainder_color': '#CBD5E1',
+                },
+                {
+                    'id': 'pnc_baby_outcomes',
+                    'label': 'Baby Outcomes',
+                    'title': 'Baby Outcomes During PNC',
+                    'total_metric': 'Babies reviewed',
+                    'segments': [
+                        {'label': 'Baby referrals', 'metric': 'Baby referrals', 'color': '#C2410C'},
+                        {'label': 'Baby deaths', 'metric': 'Baby deaths', 'color': '#DB2777'},
+                    ],
+                    'remainder_label': 'Stable / other outcomes',
+                    'remainder_color': '#CBD5E1',
+                },
+            ],
         },
     }
 
@@ -605,6 +726,7 @@ def _service_table_payload(df: pd.DataFrame, scope_meta: dict | None = None) -> 
             'subtitle': spec['subtitle'],
             'columns': [label for label, _calc in spec['metrics']],
             'rows': section_rows,
+            'chart_specs': spec.get('chart_specs', []),
         }
     return payload
 
@@ -654,6 +776,282 @@ def _service_table_fig(section: dict) -> go.Figure:
         plot_bgcolor='#FFFFFF',
     )
     return fig
+
+
+def _service_stack_fig(section: dict, chart_id: str | None = None) -> go.Figure:
+    rows = section.get('rows', [])
+    chart_specs = section.get('chart_specs', []) or []
+    fig = go.Figure()
+
+    if not rows or not chart_specs:
+        fig.add_annotation(
+            text='No stacked metric available for this selection',
+            xref='paper', yref='paper', x=0.5, y=0.5,
+            showarrow=False, font=dict(size=12, color=MUTED),
+        )
+        fig.update_layout(
+            paper_bgcolor='#FFFFFF',
+            plot_bgcolor='#FFFFFF',
+            height=320,
+            margin=dict(l=8, r=8, t=32, b=8),
+        )
+        return fig
+
+    spec = next((item for item in chart_specs if item.get('id') == chart_id), chart_specs[0])
+    columns = section.get('columns', [])
+    metric_index = {label: idx for idx, label in enumerate(columns)}
+    facilities = [row.get('facility', '') for row in rows]
+
+    remainder_vals = []
+    seg_payloads = []
+    for segment in spec.get('segments', []):
+        seg_idx = metric_index.get(segment.get('metric'))
+        vals = []
+        for row in rows:
+            row_vals = row.get('values', [])
+            val = row_vals[seg_idx] if seg_idx is not None and seg_idx < len(row_vals) else 0
+            vals.append(max(int(val or 0), 0))
+        seg_payloads.append({**segment, 'values': vals})
+
+    total_metric = spec.get('total_metric')
+    total_idx = metric_index.get(total_metric) if total_metric else None
+    if total_idx is not None:
+        totals = []
+        for row in rows:
+            row_vals = row.get('values', [])
+            total_val = row_vals[total_idx] if total_idx < len(row_vals) else 0
+            totals.append(max(int(total_val or 0), 0))
+    else:
+        totals = [sum(segment['values'][row_idx] for segment in seg_payloads) for row_idx in range(len(rows))]
+
+    for row_idx in range(len(rows)):
+        subtotal = sum(segment['values'][row_idx] for segment in seg_payloads)
+        remainder_vals.append(max(totals[row_idx] - subtotal, 0))
+
+    for segment in seg_payloads:
+        fig.add_trace(go.Bar(
+            x=facilities,
+            y=segment['values'],
+            name=segment.get('label', ''),
+            marker=dict(color=segment.get('color', INFO_C)),
+            hovertemplate='%{x}<br>' + f"{segment.get('label', '')}: " + '%{y:,}<extra></extra>',
+        ))
+
+    if spec.get('remainder_label') and any(remainder_vals):
+        fig.add_trace(go.Bar(
+            x=facilities,
+            y=remainder_vals,
+            name=spec.get('remainder_label', 'Other'),
+            marker=dict(color=spec.get('remainder_color', '#CBD5E1')),
+            hovertemplate='%{x}<br>' + f"{spec.get('remainder_label', 'Other')}: " + '%{y:,}<extra></extra>',
+        ))
+
+    fig.update_layout(
+        paper_bgcolor='#FFFFFF',
+        plot_bgcolor='#FFFFFF',
+        font=dict(family=FONT, color=TEXT, size=11),
+        hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
+        title=dict(
+            text=(
+                f"<b>{spec.get('title', section.get('title', 'Service Snapshot'))}</b>"
+                f"<br><span style='color:#94A3B8;font-size:11px;font-weight:500'>{section.get('subtitle', '')}</span>"
+            ),
+            x=0,
+            xanchor='left',
+            font=dict(size=15, color=TEXT, family=FONT),
+        ),
+        margin=dict(l=0, r=0, t=56, b=24),
+        height=max(340, 280 + (18 if len(rows) > 4 else 0)),
+        barmode='stack',
+        legend=dict(orientation='h', x=0, y=1.12, xanchor='left',
+                    font=dict(size=10, color=DIM)),
+        xaxis=dict(showgrid=False, zeroline=False, showline=False,
+                   tickfont=dict(size=10, color=MUTED)),
+        yaxis=dict(showgrid=True, gridcolor=GRID_C, zeroline=False, showline=False,
+                   tickfont=dict(size=10, color=MUTED),
+                   title=dict(text='Clients', font=dict(size=10, color=MUTED))),
+    )
+    return fig
+
+
+def _service_stack_overview_fig(section: dict) -> go.Figure:
+    chart_specs = section.get('chart_specs', []) or []
+    rows = section.get('rows', [])
+    fig = go.Figure()
+
+    if not chart_specs or not rows:
+        fig.add_annotation(
+            text='No stacked indicators configured for this category',
+            xref='paper', yref='paper', x=0.5, y=0.5,
+            showarrow=False, font=dict(size=12, color=MUTED),
+        )
+        fig.update_layout(
+            paper_bgcolor='#FFFFFF',
+            plot_bgcolor='#FFFFFF',
+            height=340,
+            margin=dict(l=8, r=8, t=32, b=8),
+        )
+        return fig
+
+    columns = section.get('columns', [])
+    metric_index = {label: idx for idx, label in enumerate(columns)}
+    labels = [_axis_wrap(spec.get('label', spec.get('title', 'Indicator')), width=22, max_lines=2) for spec in chart_specs]
+
+    facilities = []
+    if rows:
+        facilities = [row.get('facility', '') for row in rows]
+    subtitle = section.get('subtitle', '')
+    if facilities:
+        facility_text = ', '.join(str(name) for name in facilities[:3])
+        if len(facilities) > 3:
+            facility_text = f'{facility_text} +{len(facilities) - 3} more'
+        subtitle = f'{subtitle} Aggregated across: {facility_text}.'.strip()
+
+    spec_summaries = []
+    for spec in chart_specs:
+        segment_entries = []
+        for segment in spec.get('segments', []):
+            seg_idx = metric_index.get(segment.get('metric'))
+            seg_total = 0
+            if seg_idx is not None:
+                for row in rows:
+                    row_vals = row.get('values', [])
+                    if seg_idx < len(row_vals):
+                        seg_total += max(int(row_vals[seg_idx] or 0), 0)
+            segment_entries.append({
+                'label': segment.get('label', ''),
+                'metric': segment.get('metric', ''),
+                'color': segment.get('color', INFO_C),
+                'value': seg_total,
+            })
+
+        total_metric = spec.get('total_metric')
+        total_idx = metric_index.get(total_metric) if total_metric else None
+        if total_idx is not None:
+            total_val = 0
+            for row in rows:
+                row_vals = row.get('values', [])
+                if total_idx < len(row_vals):
+                    total_val += max(int(row_vals[total_idx] or 0), 0)
+        else:
+            total_val = sum(item['value'] for item in segment_entries)
+
+        subtotal = sum(item['value'] for item in segment_entries)
+        remainder_val = max(total_val - subtotal, 0)
+        if spec.get('remainder_label'):
+            segment_entries.append({
+                'label': spec.get('remainder_label', 'Other'),
+                'metric': total_metric or '',
+                'color': spec.get('remainder_color', '#CBD5E1'),
+                'value': remainder_val,
+            })
+
+        spec_summaries.append({
+            'label': _axis_wrap(spec.get('label', spec.get('title', 'Indicator')), width=22, max_lines=2),
+            'title': spec.get('title', spec.get('label', 'Indicator')),
+            'total': total_val,
+            'segments': [entry for entry in segment_entries if entry['value'] > 0],
+        })
+
+    max_segments = max((len(item['segments']) for item in spec_summaries), default=0)
+    for seg_idx in range(max_segments):
+        x_vals = []
+        y_vals = []
+        colors = []
+        customdata = []
+        names = []
+        for summary in spec_summaries:
+            if seg_idx >= len(summary['segments']):
+                continue
+            entry = summary['segments'][seg_idx]
+            x_vals.append(entry['value'])
+            y_vals.append(summary['label'])
+            colors.append(entry['color'])
+            names.append(entry['label'])
+            customdata.append([
+                summary['title'],
+                entry['label'],
+                summary['total'],
+                entry['metric'],
+            ])
+
+        if x_vals:
+            trace_name = next((name for name in names if name), f'Series {seg_idx + 1}')
+            fig.add_trace(go.Bar(
+                x=x_vals,
+                y=y_vals,
+                orientation='h',
+                name=trace_name,
+                marker=dict(color=colors),
+                customdata=customdata,
+                hovertemplate=(
+                    '%{customdata[0]}<br>'
+                    'Series: %{customdata[1]}<br>'
+                    'Count: %{x:,}<br>'
+                    'Reference total: %{customdata[2]:,}<extra></extra>'
+                ),
+            ))
+
+    fig.update_layout(
+        paper_bgcolor='#FFFFFF',
+        plot_bgcolor='#FFFFFF',
+        font=dict(family=FONT, color=TEXT, size=11),
+        hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
+        title=dict(
+            text=(
+                f"<b>{section.get('title', 'Service Snapshot')} Indicator Comparison</b>"
+                f"<br><span style='color:#94A3B8;font-size:11px;font-weight:500'>{subtitle}</span>"
+            ),
+            x=0,
+            xanchor='left',
+            font=dict(size=15, color=TEXT, family=FONT),
+        ),
+        margin=dict(l=0, r=0, t=62, b=72),
+        height=max(352, 116 + len(spec_summaries) * 58),
+        barmode='group',
+        legend=dict(
+            orientation='h',
+            x=0,
+            y=-0.18,
+            xanchor='left',
+            yanchor='top',
+            font=dict(size=10, color=DIM),
+            bgcolor='rgba(255,255,255,0.9)',
+        ),
+        xaxis=dict(showgrid=True, gridcolor=GRID_C, zeroline=False, showline=False,
+                   tickfont=dict(size=10, color=MUTED),
+                   title=dict(text='Clients', font=dict(size=10, color=MUTED))),
+        yaxis=dict(showgrid=False, zeroline=False, showline=False,
+                   tickfont=dict(size=10, color=MUTED), automargin=True),
+    )
+    return fig
+
+
+def _service_snapshot_view(section: dict, view_mode: str) -> html.Div:
+    if view_mode == 'chart':
+        return html.Div(className='mnid-chart-card', children=[
+            dcc.Graph(
+                figure=_service_stack_overview_fig(section),
+                config={
+                    'displayModeBar': 'hover',
+                    'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'],
+                    'toImageButtonOptions': {'format': 'png', 'scale': 2},
+                },
+                style={'height': '360px'},
+            ),
+        ])
+    return html.Div([
+        dcc.Graph(
+            id='mnid-service-table-graph',
+            figure=_service_table_fig(section),
+            className='mnid-service-table-graph',
+            config={
+                'displayModeBar': 'hover',
+                'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'],
+                'toImageButtonOptions': {'format': 'png', 'scale': 2},
+            },
+        ),
+    ])
 
 
 def _location_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str,
@@ -772,22 +1170,30 @@ def _location_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str,
 
 
 @callback(
-    Output('mnid-service-table-graph', 'figure'),
+    Output('mnid-service-table-content', 'children'),
     Output('mnid-service-table-active-cat', 'data'),
     Output({'type': 'service-table-btn', 'index': ALL}, 'className'),
+    Output('mnid-service-table-view-store', 'data'),
+    Output('mnid-service-table-toggle', 'className'),
+    Output('mnid-service-table-toggle-text', 'children'),
+    Input('mnid-service-table-toggle', 'n_clicks'),
     Input({'type': 'service-table-btn', 'index': ALL}, 'n_clicks'),
     State('mnid-service-table-store', 'data'),
     State('mnid-service-table-active-cat', 'data'),
     State('mnid-service-table-cats-store', 'data'),
+    State('mnid-service-table-view-store', 'data'),
     prevent_initial_call=False,
 )
-def update_service_table(n_clicks_list, stored_tables, active_cat, cat_order):
+def update_service_table(toggle_clicks, n_clicks_list, stored_tables, active_cat, cat_order, view_mode):
     categories = cat_order or _CAT_ORDER
     cat = active_cat if active_cat in categories else (categories[0] if categories else 'ANC')
+    view_mode = view_mode or 'table'
     ctx = callback_context
     if ctx and ctx.triggered:
         prop_id = ctx.triggered[0]['prop_id']
-        if 'service-table-btn' in prop_id:
+        if prop_id == 'mnid-service-table-toggle.n_clicks':
+            view_mode = 'chart' if view_mode == 'table' else 'table'
+        elif 'service-table-btn' in prop_id:
             try:
                 next_cat = json.loads(prop_id.split('.')[0]).get('index', cat)
                 if next_cat in categories:
@@ -801,7 +1207,10 @@ def update_service_table(n_clicks_list, stored_tables, active_cat, cat_order):
         'mnid-filter-btn active' if c == cat else 'mnid-filter-btn'
         for c in categories
     ]
-    return _service_table_fig(section), cat, classes
+    content = _service_snapshot_view(section, view_mode)
+    toggle_class = 'mnid-trend-toggle is-bar' if view_mode == 'chart' else 'mnid-trend-toggle is-line'
+    toggle_text = 'Chart' if view_mode == 'chart' else 'Table'
+    return content, cat, classes, view_mode, toggle_class, toggle_text
 
 
 def _service_table_switcher(df: pd.DataFrame, categories: list | None = None,
@@ -816,24 +1225,35 @@ def _service_table_switcher(df: pd.DataFrame, categories: list | None = None,
                         'justifyContent': 'space-between', 'marginBottom': '8px', 'gap': '12px', 'flexWrap': 'wrap'}, children=[
             html.Div('SERVICE SNAPSHOT', className='mnid-section-lbl',
                      style={'marginBottom': '0'}),
-            html.Div(className='mnid-filter-row', children=[
+            html.Div(style={'display': 'flex', 'alignItems': 'center', 'gap': '10px', 'flexWrap': 'wrap'}, children=[
                 html.Button(
-                    _CAT_LABELS.get(c, c),
-                    id={'type': 'service-table-btn', 'index': c},
-                    className='mnid-filter-btn' + (' active' if c == default_cat else ''),
+                    type='button',
+                    id='mnid-service-table-toggle',
+                    className='mnid-trend-toggle is-line',
                     n_clicks=0,
-                )
-                for c in cat_order
+                    children=[
+                        html.Span('Table', id='mnid-service-table-toggle-text', className='mnid-trend-toggle-text'),
+                        html.Span(className='mnid-trend-toggle-thumb'),
+                    ],
+                ),
+                html.Div(className='mnid-filter-row', children=[
+                    html.Button(
+                        _CAT_LABELS.get(c, c),
+                        id={'type': 'service-table-btn', 'index': c},
+                        className='mnid-filter-btn' + (' active' if c == default_cat else ''),
+                        n_clicks=0,
+                    )
+                    for c in cat_order
+                ]),
             ]),
         ]),
         dcc.Store(id='mnid-service-table-store', data=payload),
         dcc.Store(id='mnid-service-table-active-cat', data=default_cat),
         dcc.Store(id='mnid-service-table-cats-store', data=cat_order),
-        dcc.Graph(
-            id='mnid-service-table-graph',
-            figure=_service_table_fig(default_section),
-            className='mnid-service-table-graph',
-            config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
+        dcc.Store(id='mnid-service-table-view-store', data='table'),
+        html.Div(
+            id='mnid-service-table-content',
+            children=_service_snapshot_view(default_section, 'table'),
         ),
     ])
 
