@@ -1,13 +1,16 @@
 import dash
 from dash import html, dcc
 import pandas as pd
-from visualizations import (create_column_chart, 
+from helpers.visualizations import (create_column_chart, 
                           create_count,
                           create_pie_chart,
                           create_line_chart,
                           create_age_gender_histogram,
                           create_horizontal_bar_chart,
-                          create_pivot_table,create_crosstab_table, create_line_list)
+                          create_pivot_table,
+                          create_crosstab_table, 
+                          create_line_list,
+                          create_sankey_diagram)
 from datetime import datetime
 from config import (actual_keys_in_data, 
                     FIRST_NAME_, LAST_NAME_,
@@ -64,6 +67,7 @@ def create_count_from_config(df, filters):
     """Create count based on JSON filter configuration"""
 
     unique_col = filters.get("unique", "")
+    aggregation = filters.get("measure", "")
 
     # Extract variables and values
     variables = [
@@ -96,7 +100,7 @@ def create_count_from_config(df, filters):
         if var and val:
             active_filters.append((var, val))
     if not active_filters:
-        return create_count(df, unique_col)
+        return create_count(df,aggregation, unique_col)
     
     
 
@@ -105,7 +109,7 @@ def create_count_from_config(df, filters):
     args = []
     for var, val in active_filters:
         args.extend([var, val])
-    return create_count(df, unique_col, *args)
+    return create_count(df,aggregation, unique_col, *args)
 
 def build_charts_section(filtered, data_opd, delta_days, sections_config):
     """Build chart sections from JSON configuration"""
@@ -159,6 +163,8 @@ def build_single_chart(filtered, data_opd, delta_days, item_config,user_role=Non
         figure = create_crosstab_from_config(filtered, filters)
     elif chart_type == "LineList":
         figure = create_linelist_from_config(filtered, item_config, user_role)
+    elif chart_type == "Sankey":
+        figure = create_sankey_from_config(filtered, filters)
     else:
         # Default empty figure for unknown chart types
         figure = create_empty_figure()
@@ -622,6 +628,43 @@ def create_linelist_from_config(filtered, filters,user_role=None, **kwargs):
         rename=rename,
         **group_kwargs
     )
+
+def create_sankey_from_config(filtered, filters):
+    """
+    Create sankey diagram from JSON configuration
+    Config:
+                "measure": "chart",
+                "unique": "any",
+                "duration_default": "any",
+                "source_col": "Program",
+                "target_col": "DIAGNOSIS",
+                "value_col": "person_id",
+                "title": "Program to Diagnosis Flow",
+                "filter_col1": "",
+                "filter_val1": "",
+                "filter_col2": "",
+                "filter_val2": "",
+                "filter_col3": "",
+                "filter_val3": ""
+
+    """
+    source_col    = filters.get("source_col")
+    target_col    = filters.get("target_col")
+    value_col     = filters.get("value_col") or None
+    title         = filters.get("title")
+    filter_col1   = filters.get("filter_col1") or None
+    filter_val1   = parse_filter_value(filters.get("filter_val1"))
+    filter_col2   = filters.get("filter_col2") or None
+    filter_val2   = parse_filter_value(filters.get("filter_val2"))
+    filter_col3   = filters.get("filter_col3") or None
+    filter_val3   = parse_filter_value(filters.get("filter_val3"))
+    aggregation   = filters.get('measure') or 'count'
+
+    return create_sankey_diagram(
+        filtered, source_col, target_col, value_col, title,
+        filter_col1, filter_val1, filter_col2, filter_val2, filter_col3, filter_val3, aggregation
+    )
+    
 
 def create_empty_figure():
     """Create empty figure for unsupported chart types"""

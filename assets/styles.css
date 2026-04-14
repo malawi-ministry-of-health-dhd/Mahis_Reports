@@ -24,7 +24,7 @@
     flex-wrap: wrap;
     justify-content: space-between;
     gap: 5px;
-    padding: 10px;
+    padding: 10px;      
     margin: 0 auto;      /* Center the block */
 }
 
@@ -171,7 +171,7 @@
     /* min-width: 250px;     Optional: prevent too small on narrow screens */
     max-height: 600px;
     overflow-y: auto;
-    /* padding: 15px; */
+    /* overflow: visible !important; */
     margin-top: 20px;
     /* border: 1px solid #f4f4f4; */
     /* border-radius: 5px; */
@@ -194,11 +194,11 @@
     background-color: #fff;
 }
 
-.card-header {
+/* .card-header {
     font-weight: bold;
     margin-bottom: 10px;
     color: #3498db;
-}
+} */
 
 .card-value {
     font-size: 24px;
@@ -341,71 +341,23 @@
     font-weight: 500;
 }
 
-/* -------- TABLE STYLING FOR REPORTS -------- */
-
-.report-table {
-    width: 90%;
-    margin: 20px auto;
-    border-collapse: separate;
-    border-spacing: 0 10px;
-    font-family: Arial, sans-serif;
-    font-size: 14px;
+.list-title {
+    font-size: 0.95rem;
+    font-weight: normal;
+    color: black;
+    margin-bottom: 10px;
 }
 
-/* Table Headers */
-.report-table th {
-    padding: 12px 15px;
-    background: #f7f7f7;
-    font-weight: bold;
-    border-bottom: 2px solid #ddd;
-    text-align: center;
+.list-item-label {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #333;
 }
 
-/* Table Cells */
-.report-table td {
-    padding: 12px 15px;
-    background: white;
-    border-top: 1px solid #eee;
-    text-align: left;
+.list-item-actions button {
+    margin-left: 6px;
 }
 
-/* Row Hover Effect */
-.report-table tr:hover td {
-    background: #f1f1f1;
-    transition: 0.2s;
-}
-
-/* -------- ACTION BUTTONS -------- */
-
-.report-action-btn {
-    margin-right: 6px;
-    border-radius: 6px;
-    padding: 6px 12px;
-    cursor: pointer;
-    border: none;
-    color: white;
-    font-size: 13px;
-}
-
-/* Edit button */
-.edit-btn {
-    background-color: #007bff;
-}
-
-/* Archive button */
-.archive-btn {
-    background-color: #dc3545;
-}
-
-.download-btn {
-    background-color: #006401;
-}
-
-/* Optional: smooth hover */
-.report-action-btn:hover {
-    opacity: 0.85;
-    transition: 0.2s;
-}
 
 /*  */
 /* Horizontal scroll container */
@@ -525,11 +477,20 @@ body {
 
 /* Form Elements */
 .form-label {
-    font-weight: bold;
+    font-weight: normal;
     margin-bottom: 2px;
     margin-top: 2px;
     display: block;
-    color: #333;
+    color: black;
+    font-size: 0.8rem;
+}
+
+.form-label-disabled {
+    font-weight: normal;
+    margin-bottom: 2px;
+    margin-top: 2px;
+    display: block;
+    color: grey;
     font-size: 0.8rem;
 }
 
@@ -548,9 +509,9 @@ body {
     box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
 }
 
-.dropdown {
+/* .dropdown {
     margin-bottom: 15px;
-}
+} */
 
 /* Button Styles */
 .btn-primary {
@@ -606,6 +567,17 @@ body {
 
 .btn-danger {
     background-color: #dc3545;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin: 4px;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+.btn-save {
+    background-color: #006401;
     color: white;
     border: none;
     padding: 8px 16px;
@@ -685,9 +657,22 @@ body {
     min-width: 150px;
 }
 
+
+.chart-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 5px;
+    width: 100%;
+}
+
+.chart-field {
+    display: flex;
+    flex-direction: column;
+}
+
+
 /* Section Items */
 .section-item {
-    border: 2px solid #6f42c1;
     border-radius: 8px;
     margin-bottom: 20px;
     background-color: white;
@@ -754,42 +739,12 @@ body {
     margin: 0;
 }
 
-/* Modal Styles */
-.modal-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0,0,0,0.5);
-    z-index: 1000;
-    display: none;
+
+.sortable-ghost {
+    opacity: 0.4;
+    background: #e0ffe0 !important;
 }
 
-.modal-content {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background-color: white;
-    padding: 20px;
-    border-radius: 10px;
-    z-index: 1001;
-    width: 90%;
-    max-width: 1200px;
-    max-height: 90vh;
-    overflow-y: auto;
-    display: none;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-}
-
-.modal-title {
-    margin-bottom: 20px;
-    color: #2c3e50;
-    border-bottom: 2px solid #000000;
-    padding-bottom: 10px;
-    font-size: 1.3rem;
-}
 
 /* JSON Display */
 .json-details {
@@ -842,6 +797,36 @@ body {
     background-color: #e3f2fd;
 }
 
+/* Stylish dropdown */
+.dropdown .Select-control {
+    border: 2px solid #006401 !important;
+    border-radius: 1px !important;
+    background: #ffffff;
+    min-height: 42px;
+    box-shadow: none !important;
+}
+
+.dropdown .Select-placeholder {
+    color: #666 !important;
+    font-size: 0.9rem;
+}
+
+.dropdown .Select-menu-outer {
+    border: 1px solid #006401 !important;
+    border-radius: 8px !important;
+    box-shadow: 0px 4px 14px rgba(0, 0, 0, 0.15) !important;
+}
+
+.dropdown .Select-option {
+    padding: 10px 12px !important;
+    font-size: 0.9rem;
+}
+
+.dropdown .Select-option.is-focused {
+    background-color: #e4f7e4 !important;
+    color: #006401 !important;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .page-container {
@@ -866,11 +851,6 @@ body {
         flex-direction: column;
     }
     
-    .modal-content {
-        width: 95%;
-        padding: 15px;
-    }
-    
     .action-buttons {
         display: flex;
         flex-direction: column;
@@ -880,23 +860,6 @@ body {
     .action-buttons button {
         width: 100%;
     }
-}
-
-.confirmation-modal {
-    background-color: white;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    max-width: 400px;
-    margin: auto;
-    text-align: center;
-}
-
-.confirmation-buttons {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    margin-top: 15px;
 }
 
 .preview-popup,

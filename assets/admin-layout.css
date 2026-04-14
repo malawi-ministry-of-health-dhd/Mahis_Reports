@@ -1,0 +1,203 @@
+/* Modern Sidebar */
+.sidebar-modern {
+    width: 300px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8f9fa 100%);
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+    border-right: 1px solid #e9ecef;
+    overflow-y: auto;
+}
+
+.sidebar-header {
+    text-align: center;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #006401;
+}
+
+.sidebar-title {
+    color: #006401;
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+}
+
+.sidebar-subtitle {
+    color: #6c757d;
+    font-size: 0.75rem;
+    margin: 0;
+}
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+}
+
+.nav-btn-modern {
+    width: 100%;
+    padding: 12px 16px;
+    background: white;
+    color: #2c3e50;
+    border: 1px solid #e9ecef;
+    text-align: left;
+    border-radius: 10px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.nav-btn-modern:hover {
+    background: #f8f9fa;
+    border-color: #006401;
+    transform: translateX(4px);
+    box-shadow: 0 2px 4px rgba(0, 100, 1, 0.1);
+}
+
+.nav-btn-modern.success {
+    background: linear-gradient(135deg, #006401 0%, #008a02 100%);
+    color: white;
+    border: none;
+}
+
+.nav-btn-modern.success:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px rgba(0, 100, 1, 0.3);
+}
+
+.sidebar-footer {
+    margin-top: auto;
+    padding-top: 20px;
+}
+
+.footer-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #e9ecef, transparent);
+    margin-bottom: 16px;
+}
+
+.footer-text {
+    color: #6c757d;
+    font-size: 0.75rem;
+    text-align: center;
+    margin: 0 0 4px 0;
+}
+
+.footer-version {
+    color: #adb5bd;
+    font-size: 0.7rem;
+    text-align: center;
+    margin: 0;
+}
+
+/* Modern Main Content */
+.main-content-modern {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #f8f9fa;
+}
+
+.page-header-modern {
+    background: white;
+    padding: 24px 32px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.page-header-title {
+    color: #2c3e50;
+    font-size: 1.75rem;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+}
+
+.page-header-description {
+    color: #6c757d;
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+.content-area-modern {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px;
+}
+
+/* Reports Section */
+.reports-section {
+    margin-top: 32px;
+}
+
+/* Scrollbar Styling for Sidebar and Content */
+.sidebar-modern::-webkit-scrollbar,
+.content-area-modern::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-modern::-webkit-scrollbar-track,
+.content-area-modern::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.sidebar-modern::-webkit-scrollbar-thumb,
+.content-area-modern::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.sidebar-modern::-webkit-scrollbar-thumb:hover,
+.content-area-modern::-webkit-scrollbar-thumb:hover {
+    background: #006401;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .sidebar-modern {
+        width: 250px;
+    }
+    
+    .page-header-modern {
+        padding: 16px 20px;
+    }
+    
+    .content-area-modern {
+        padding: 20px;
+    }
+    
+    .nav-btn-modern {
+        padding: 10px 12px;
+        font-size: 0.8rem;
+    }
+    
+    .page-header-title {
+        font-size: 1.25rem;
+    }
+}
+
+/* Animation */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.sidebar-modern {
+    animation: slideIn 0.3s ease-out;
+}
+
+.main-content-modern {
+    animation: fadeIn 0.3s ease-out;
+}

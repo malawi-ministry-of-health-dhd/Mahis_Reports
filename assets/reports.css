@@ -1,0 +1,1020 @@
+/* Report Styling */
+.report-header {
+    text-align: center;
+    margin-bottom: 32px;
+    padding: 24px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    border-radius: 16px;
+    border-left: 4px solid #006401;
+}
+
+.report-title {
+    color: #2c3e50;
+    font-size: 1.75rem;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    background: linear-gradient(135deg, #006401 0%, #008a02 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.report-meta {
+    color: #6c757d;
+    font-size: 0.75rem;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+.meta-label {
+    font-weight: 500;
+}
+
+.meta-value {
+    color: #006401;
+}
+
+/* Report Sections - No Internal Scrolling */
+.report-section {
+    margin-bottom: 40px;
+    background: white;
+    border-radius: 16px;
+    overflow: visible !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    transition: box-shadow 0.2s ease;
+}
+
+.report-section:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.section-title {
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    color: #006401;
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    padding: 16px 20px;
+    border-bottom: 2px solid #006401;
+    border-radius: 16px 16px 0 0;
+}
+
+/* Table Wrapper - Only Horizontal Scroll */
+.report-table-wrapper {
+    padding: 0;
+    overflow-x: auto;
+    overflow-y: visible;
+    margin-bottom: 24px;
+    border-radius: 12px;
+    background: white;
+}
+
+/* DataTable Container Overrides */
+.dash-table-container {
+    overflow: visible !important;
+}
+
+.dash-table-container .dash-spreadsheet-container {
+    overflow: visible !important;
+}
+
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner {
+    border: none;
+    overflow: visible !important;
+}
+
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: 100%;
+}
+
+/* Cell Styling - Allow Full Height */
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner td,
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner th {
+    padding: 12px 16px !important;
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 45px;
+    line-height: 1.4;
+    vertical-align: middle;
+}
+
+/* Cell Content Styling */
+.dash-spreadsheet td div {
+    line-height: 1.4;
+    max-height: none !important;
+    overflow: visible !important;
+    white-space: normal !important;
+    word-wrap: break-word;
+}
+
+/* Sticky First Column for Horizontal Scroll */
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner td:first-child,
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner th:first-child {
+    position: sticky;
+    left: 0;
+    background-color: #f8f9fa;
+    z-index: 10;
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+}
+
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner td:first-child {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+/* Sticky Header */
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner thead tr th {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background-color: #006401 !important;
+    color: white !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Header Gradient */
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner thead tr th {
+    background: linear-gradient(135deg, #006401 0%, #008a02 100%) !important;
+}
+
+/* Remove Any Fixed Height Constraints */
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner,
+.dash-table-container .dash-spreadsheet-container,
+.dash-table-container {
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+}
+
+/* Zebra Striping for Better Readability */
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner tbody tr:nth-child(odd) {
+    background-color: #f8f9fa;
+}
+
+/* Empty Cell Styling */
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner td[data-value=""] {
+    background-color: #f1f3f4;
+    color: #adb5bd;
+    font-style: italic;
+}
+
+/* Empty Table Message */
+.empty-table-message {
+    text-align: center;
+    padding: 48px;
+    color: #6c757d;
+    font-style: italic;
+    background: #f8f9fa;
+    border-radius: 12px;
+    margin: 20px 0;
+}
+
+/* Report Errors */
+.report-errors {
+    background: #fff3cd;
+    border-left: 4px solid #ffc107;
+    padding: 16px 20px;
+    margin-top: 24px;
+    border-radius: 8px;
+    font-size: 0.875rem;
+}
+
+.report-errors i {
+    color: #ffc107;
+    margin-right: 8px;
+}
+
+.report-errors ul {
+    margin: 8px 0 0 24px;
+    padding: 0;
+}
+
+.report-errors li {
+    color: #856404;
+    margin: 4px 0;
+}
+
+/* Tooltip Styling */
+.dash-table-tooltip {
+    background-color: #2c3e50 !important;
+    color: white !important;
+    border-radius: 8px !important;
+    padding: 8px 12px !important;
+    font-size: 12px !important;
+    max-width: 300px !important;
+    z-index: 1000 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Hover Effects */
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner tbody tr:hover {
+    background-color: #e8f5e9 !important;
+    transition: background-color 0.2s ease;
+}
+
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner tbody tr:hover td:first-child {
+    background-color: #e8f5e9 !important;
+}
+
+/* Responsive Table */
+@media (max-width: 768px) {
+    .report-title {
+        font-size: 1.25rem;
+    }
+    
+    .section-title {
+        font-size: 1rem;
+        padding: 12px 16px;
+    }
+    
+    .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner td,
+    .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner th {
+        padding: 8px 12px !important;
+        font-size: 12px !important;
+        min-height: 38px;
+    }
+    
+    .report-header {
+        padding: 16px;
+    }
+    
+    .report-table-wrapper {
+        overflow-x: auto;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .report-header {
+        background: none;
+        border-left: none;
+        page-break-after: avoid;
+    }
+    
+    .report-title {
+        color: #000;
+        background: none;
+        -webkit-text-fill-color: #000;
+    }
+    
+    .report-section {
+        break-inside: avoid;
+        page-break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #ddd;
+    }
+    
+    .report-table-wrapper {
+        overflow-x: visible;
+        page-break-inside: avoid;
+    }
+    
+    .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner td:first-child,
+    .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner th:first-child {
+        position: static;
+        background-color: #f0f0f0;
+    }
+    
+    .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner thead tr th {
+        position: static;
+        background-color: #006401 !important;
+        print-color-adjust: exact;
+    }
+    
+    .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner tbody tr:nth-child(odd) {
+        background-color: #f9f9f9;
+        print-color-adjust: exact;
+    }
+}
+
+/* Animation for Section Loading */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.report-section {
+    animation: fadeInUp 0.4s ease-out;
+}
+
+/* Ensure all content is visible */
+body {
+    overflow-x: auto;
+}
+
+/* Section spacing */
+.report-section:last-child {
+    margin-bottom: 0;
+}
+
+/* FILTERS */
+
+/* Reports Page Modern Styling */
+.reports-modern-container {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+    padding: 24px;
+}
+
+/* Header Section */
+.reports-header {
+    text-align: center;
+    margin-bottom: 32px;
+    padding: 32px;
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.reports-title {
+    color: #2c3e50;
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 0 12px 0;
+    background: linear-gradient(135deg, #006401 0%, #008a02 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.reports-subtitle {
+    color: #6c757d;
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+/* Parameters Card */
+.parameters-card {
+    background: white;
+    border-radius: 20px;
+    padding: 28px;
+    margin-bottom: 32px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.parameters-title {
+    color: #2c3e50;
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0 0 24px 0;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.parameters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-bottom: 28px;
+}
+
+.parameter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.parameter-label {
+    color: #495057;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Modern Dropdown Styling */
+.modern-dropdown {
+    width: 100%;
+}
+
+.modern-dropdown .Select-control {
+    border: 1px solid #ced4da;
+    border-radius: 10px;
+    min-height: 42px;
+    transition: all 0.2s ease;
+    background: white;
+}
+
+.modern-dropdown .Select-control:hover {
+    border-color: #006401;
+}
+
+.modern-dropdown.is-focused .Select-control {
+    border-color: #006401;
+    box-shadow: 0 0 0 3px rgba(0, 100, 1, 0.1);
+}
+
+.modern-dropdown .Select-placeholder {
+    color: #adb5bd;
+}
+
+.modern-dropdown .Select-value-label {
+    color: #2c3e50;
+}
+
+/* Parameters Actions */
+.parameters-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #e9ecef;
+    flex-wrap: wrap;
+}
+
+.btn-generate-modern {
+    background: linear-gradient(135deg, #006401 0%, #008a02 100%);
+    color: white;
+    border: none;
+    padding: 12px 32px;
+    border-radius: 10px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn-generate-modern:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 100, 1, 0.3);
+}
+
+.download-buttons {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.btn-download-csv,
+.btn-download-json,
+.btn-download-pdf {
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid #dee2e6;
+    background: white;
+    color: #495057;
+}
+
+.btn-download-csv:hover {
+    background: #28a745;
+    color: white;
+    border-color: #28a745;
+    transform: translateY(-2px);
+}
+
+.btn-download-json:hover {
+    background: #ffc107;
+    color: #000;
+    border-color: #ffc107;
+    transform: translateY(-2px);
+}
+
+.btn-download-pdf:hover {
+    background: #dc3545;
+    color: white;
+    border-color: #dc3545;
+    transform: translateY(-2px);
+}
+
+/* Run Status */
+.run-status-modern {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background: #f8f9fa;
+    color: #6c757d;
+}
+
+.run-status-modern.loading {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.run-status-modern.success {
+    background: #d4edda;
+    color: #155724;
+}
+
+.run-status-modern.error {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* Report Output Container */
+.report-output-container {
+    background: white;
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    animation: fadeInUp 0.4s ease-out;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .reports-modern-container {
+        padding: 16px;
+    }
+    
+    .reports-header {
+        padding: 20px;
+    }
+    
+    .reports-title {
+        font-size: 1.5rem;
+    }
+    
+    .parameters-card {
+        padding: 20px;
+    }
+    
+    .parameters-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    .parameters-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .btn-generate-modern {
+        width: 100%;
+        text-align: center;
+    }
+    
+    .download-buttons {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .report-output-container {
+        padding: 16px;
+        overflow-x: auto;
+    }
+}
+
+/* Animation */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Loading State */
+.report-output-container.loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+}
+
+/* Empty State */
+.report-output-container.empty {
+    text-align: center;
+    padding: 60px;
+    color: #6c757d;
+}
+
+/* Tooltips */
+[data-tooltip] {
+    position: relative;
+    cursor: help;
+}
+
+[data-tooltip]:before {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 8px;
+    background: #2c3e50;
+    color: white;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    white-space: nowrap;
+    display: none;
+    z-index: 100;
+}
+
+[data-tooltip]:hover:before {
+    display: block;
+}
+
+/* Print Styles for Reports */
+@media print {
+    .reports-modern-container {
+        background: white;
+        padding: 0;
+    }
+    
+    .reports-header,
+    .parameters-card {
+        box-shadow: none;
+        border: 1px solid #ddd;
+        page-break-after: avoid;
+    }
+    
+    .btn-generate-modern,
+    .download-buttons {
+        display: none;
+    }
+    
+    .report-output-container {
+        padding: 0;
+        box-shadow: none;
+    }
+}
+
+
+/* PROG REPORTS */
+/* Report Configuration Panel Modern Styling */
+.report-config-modern {
+    background: transparent;
+    padding: 0;
+}
+
+/* Parameters Card */
+.config-parameters-card {
+    background: white;
+    border-radius: 20px;
+    padding: 28px;
+    margin-bottom: 32px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.config-parameters-title {
+    color: #2c3e50;
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0 0 24px 0;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #e9ecef;
+}
+
+/* Controls Grid */
+.config-controls-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-bottom: 28px;
+}
+
+.config-control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.config-label {
+    color: #495057;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Modern Dropdown Styling */
+.modern-dropdown {
+    width: 100%;
+}
+
+.modern-dropdown .Select-control {
+    border: 1px solid #ced4da;
+    border-radius: 10px;
+    min-height: 42px;
+    transition: all 0.2s ease;
+    background: white;
+}
+
+.modern-dropdown .Select-control:hover {
+    border-color: #006401;
+}
+
+.modern-dropdown.is-focused .Select-control {
+    border-color: #006401;
+    box-shadow: 0 0 0 3px rgba(0, 100, 1, 0.1);
+}
+
+.modern-dropdown .Select-placeholder {
+    color: #adb5bd;
+}
+
+.modern-dropdown .Select-value-label {
+    color: #2c3e50;
+}
+
+.modern-dropdown.is-multi .Select-value {
+    background-color: #e8f5e9;
+    border-color: #c8e6c9;
+    color: #006401;
+}
+
+.modern-dropdown.is-multi .Select-value-icon {
+    border-right-color: #c8e6c9;
+}
+
+.modern-dropdown.is-multi .Select-value-icon:hover {
+    background-color: #c8e6c9;
+    color: #006401;
+}
+
+/* Modern Date Range Picker */
+.modern-datepicker-range {
+    width: 100%;
+}
+
+.modern-datepicker-range .DateRangePicker {
+    width: 100%;
+}
+
+.modern-datepicker-range .DateRangePickerInput {
+    border: 1px solid #ced4da;
+    border-radius: 10px;
+    padding: 8px;
+    transition: all 0.2s ease;
+}
+
+.modern-datepicker-range .DateRangePickerInput:hover {
+    border-color: #006401;
+}
+
+.modern-datepicker-range .DateRangePickerInput:focus-within {
+    border-color: #006401;
+    box-shadow: 0 0 0 3px rgba(0, 100, 1, 0.1);
+}
+
+.modern-datepicker-range .DateInput_input {
+    font-size: 0.875rem;
+    padding: 8px;
+}
+
+/* Action Buttons */
+.config-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #e9ecef;
+    flex-wrap: wrap;
+}
+
+.config-left-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.config-right-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+/* Generate Button */
+.btn-generate-modern {
+    background: linear-gradient(135deg, #006401 0%, #008a02 100%);
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 10px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn-generate-modern:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 100, 1, 0.3);
+}
+
+/* Reset Button */
+.btn-reset-modern {
+    background: white;
+    color: #6c757d;
+    border: 1px solid #ced4da;
+    padding: 10px 24px;
+    border-radius: 10px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-reset-modern:hover {
+    background: #f8f9fa;
+    border-color: #006401;
+    color: #006401;
+    transform: translateY(-2px);
+}
+
+/* Download Buttons */
+.btn-download-csv {
+    background: white;
+    color: #28a745;
+    border: 1px solid #28a745;
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-download-csv:hover {
+    background: #28a745;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
+}
+
+.btn-download-excel {
+    background: white;
+    color: #28a745;
+    border: 1px solid #28a745;
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-download-excel:hover {
+    background: #28a745;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
+}
+
+.btn-download-png {
+    background: white;
+    color: #17a2b8;
+    border: 1px solid #17a2b8;
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-download-png:hover {
+    background: #17a2b8;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(23, 162, 184, 0.2);
+}
+
+/* Run Status */
+.run-status-modern {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background: #f8f9fa;
+    color: #6c757d;
+}
+
+.run-status-modern.loading {
+    background: #fff3cd;
+    color: #856404;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.run-status-modern.success {
+    background: #d4edda;
+    color: #155724;
+}
+
+.run-status-modern.error {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* Reports Output Container */
+.reports-output {
+    background: white;
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    animation: fadeInUp 0.4s ease-out;
+}
+
+.reports-output.empty {
+    text-align: center;
+    padding: 60px;
+    color: #6c757d;
+    font-style: italic;
+}
+
+/* Loading Overlay */
+.dash-loading {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1000;
+}
+
+/* Animations */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.6;
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .config-parameters-card {
+        padding: 20px;
+    }
+    
+    .config-controls-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    .config-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .config-left-actions,
+    .config-right-actions {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .btn-generate-modern,
+    .btn-reset-modern {
+        flex: 1;
+        text-align: center;
+    }
+    
+    .reports-output {
+        padding: 16px;
+        overflow-x: auto;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .config-parameters-card {
+        box-shadow: none;
+        border: 1px solid #ddd;
+        page-break-after: avoid;
+    }
+    
+    .btn-generate-modern,
+    .btn-reset-modern,
+    .config-right-actions {
+        display: none;
+    }
+    
+    .reports-output {
+        padding: 0;
+        box-shadow: none;
+    }
+}

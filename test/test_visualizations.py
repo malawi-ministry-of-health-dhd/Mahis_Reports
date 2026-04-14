@@ -1,4 +1,5 @@
 # test_visualizations.py
+# run with: pytest test/test_visualizations.py -v
 import pytest
 import pandas as pd
 import numpy as np
@@ -8,7 +9,7 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 # Import the functions to test
-from visualizations import (
+from pages.helpers.visualizations import (
     create_count, 
     create_count_sets, 
     create_count_unique, 

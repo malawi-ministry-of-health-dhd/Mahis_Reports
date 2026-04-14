@@ -1,0 +1,513 @@
+/* Modern Modal Styles with Green Theme */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 999;
+    display: none;
+}
+
+.modal-content {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    width: 90%;
+    max-width: 1400px;
+    max-height: 90vh;
+    display: flex;
+    overflow-y: auto;
+    flex-direction: column;
+    /* overflow: hidden; */
+    z-index: 1000;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid #e9ecef;
+    background: linear-gradient(135deg, #006401 0%, #008a02 100%);
+    color: white;
+}
+
+.modal-title {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: white;
+}
+
+.modal-close-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.modal-close-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+}
+
+.modal-body {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 24px;
+    background: #f8f9fa;
+    position: relative;
+}
+
+.modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid #e9ecef;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    background: white;
+}
+
+/* Modern Cards */
+.dashboard-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    transition: box-shadow 0.2s;
+}
+
+.dashboard-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-card-header {
+    padding: 16px 20px;
+    background: white;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.dashboard-card-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.dashboard-card-body {
+    padding: 20px;
+}
+
+/* Modern Form Elements */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-row {
+    display: flex;
+    gap: 16px;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #495057;
+    font-size: 0.875rem;
+}
+
+.form-label-disabled {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+.modern-input,
+.modern-dropdown,
+.modern-input-disabled {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+    background: white;
+}
+
+.modern-input:focus,
+.modern-dropdown:focus {
+    outline: none;
+    border-color: #006401;
+    box-shadow: 0 0 0 3px rgba(0, 100, 1, 0.1);
+}
+
+.modern-input-disabled {
+    background: #e9ecef;
+    color: #6c757d;
+    cursor: not-allowed;
+}
+
+/* Modern Buttons - Green Theme */
+.btn-primary-modern {
+    background: linear-gradient(135deg, #006401 0%, #008a02 100%);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-primary-modern:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 100, 1, 0.4);
+}
+
+.btn-success-modern {
+    background: linear-gradient(135deg, #006401 0%, #008a02 100%);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-success-modern:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 100, 1, 0.4);
+}
+
+.btn-danger-modern {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-danger-modern:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+.btn-secondary-modern {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-secondary-modern:hover {
+    background: #5a6268;
+}
+
+/* Section and Chart Item Styles */
+.section-item {
+    margin-bottom: 16px;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.2s;
+}
+
+.section-item:hover {
+    border-color: #006401;
+    box-shadow: 0 2px 8px rgba(0, 100, 1, 0.1);
+}
+
+.chart-item {
+    margin: 12px 0;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 3px solid #006401;
+    transition: all 0.2s;
+}
+
+.chart-item:hover {
+    background: #f0f2f4;
+    transform: translateX(2px);
+}
+
+/* Count Item Styles */
+.count-item {
+    margin-bottom: 16px;
+    padding: 16px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 3px solid #006401;
+    transition: all 0.2s;
+}
+
+.count-item:hover {
+    background: #f0f2f4;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* List Items (Dashboard Items Container) */
+.list-item {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    margin-bottom: 8px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+    transition: all 0.2s;
+}
+
+.list-item:hover {
+    border-color: #006401;
+    background-color: #f0f2f4;
+    transform: translateX(2px);
+}
+
+.list-item-icon {
+    margin-right: 12px;
+    font-size: 1.2rem;
+    color: #006401;
+}
+
+.list-item-content {
+    flex: 1;
+}
+
+.list-title {
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.list-item-actions {
+    display: flex;
+    gap: 12px;
+}
+
+/* Section Item in List */
+.list-item.section-item {
+    background-color: #e8f5e9;
+    border-left: 3px solid #006401;
+}
+
+/* Chart Item in List */
+.list-item.chart-item {
+    margin-left: 24px;
+    background-color: #ffffff;
+    border-left: 2px solid #008a02;
+}
+
+/* Empty State */
+.empty-items {
+    text-align: center;
+    padding: 40px;
+    color: #999;
+}
+
+.empty-items i {
+    font-size: 48px;
+    margin-bottom: 16px;
+    color: #006401;
+    opacity: 0.5;
+}
+
+/* Button Variants */
+.btn-edit {
+    background: #ffc107;
+    color: #000;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-edit:hover {
+    background: #e0a800;
+    transform: scale(1.05);
+}
+
+.btn-save {
+    background: #006401;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-save:hover {
+    background: #008a02;
+    transform: scale(1.05);
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+    transform: scale(1.05);
+}
+
+.btn-small {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+}
+
+/* Confirmation Modal */
+.confirmation-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1100;
+}
+
+.confirmation-modal {
+    background: white;
+    border-radius: 12px;
+    width: 400px;
+    max-width: 90%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.confirmation-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.confirmation-modal-header h4 {
+    margin: 0;
+    color: #dc3545;
+}
+
+.confirmation-close-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #6c757d;
+}
+
+.confirmation-close-btn:hover {
+    color: #dc3545;
+}
+
+.confirmation-modal-body {
+    padding: 20px;
+}
+
+.confirmation-modal-footer {
+    padding: 16px 20px;
+    border-top: 1px solid #e9ecef;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+/* Scrollbar Styling */
+.modal-body::-webkit-scrollbar,
+.dashboard-card-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.modal-body::-webkit-scrollbar-track,
+.dashboard-card-body::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.modal-body::-webkit-scrollbar-thumb,
+.dashboard-card-body::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover,
+.dashboard-card-body::-webkit-scrollbar-thumb:hover {
+    background: #006401;
+}
+
+/* Card Header Flex */
+.card-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Chart Grid for Dynamic Fields */
+.chart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.chart-field {
+    margin-bottom: 12px;
+}
+
+/* Animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+body.modal-open {
+    overflow: hidden;
+}
+
+/* .modal-content {
+    animation: fadeIn 0.3s ease-out;
+} */

@@ -1,11 +1,12 @@
 import dash
 from dash import html, dcc, page_container, page_registry, Output, Input, State, callback
+import dash_mantine_components as dmc
 import os
 import json
 import datetime
 from datetime import datetime as dt
 from isoweek import Week
-from reports_class import ReportTableBuilder
+from helpers.reports_class import ReportTableBuilder
 import urllib.parse
 import plotly.express as px
 import pandas as pd
@@ -56,14 +57,15 @@ app = dash.Dash(
                 )
 server = app.server
 
-# Define the layout
-app.layout = html.Div([
-    dcc.Location(id='url', refresh=False),
-    dcc.Store(id='url-params-store', storage_type='session'),
-    html.Div(id="nav-container"),
-    page_container,
-    
-], style={ 'margin': '20px', 'fontFamily': 'Arial, sans-serif'})
+# MantineProvider wraps the whole app so DMC components work on any page
+app.layout = dmc.MantineProvider(
+    children=html.Div([
+        dcc.Location(id='url', refresh=False),
+        dcc.Store(id='url-params-store', storage_type='session'),
+        html.Div(id="nav-container"),
+        page_container,
+    ], style={'margin': '20px', 'fontFamily': 'Arial, sans-serif'})
+)
 
 @app.callback(
     Output("nav-container", "children"),
@@ -74,6 +76,7 @@ def render_nav(url_params):
         url_params = normalize_url_params(url_params)
         location = url_params.get('Location', [None])[0] if url_params else None
         uuid = url_params.get('uuid', [None])[0] if url_params else None
+        user_level = url_params.get('user_level', [None])[0] if url_params else None
         path = os.getcwd()
         timestamp_path = os.path.join(path, 'data','TimeStamp.csv')
         users_path = os.path.join(path, 'data','users_data.csv')
@@ -81,7 +84,9 @@ def render_nav(url_params):
         users = pd.read_csv(users_path)
 
         query = ""
-        if location and uuid:
+        if location and uuid and user_level:
+            query = f"?Location={location}&uuid={uuid}&user_level={user_level}"
+        elif location and uuid:
             query = f"?Location={location}&uuid={uuid}"
         elif location:
             query = f"?Location={location}"
@@ -168,7 +173,14 @@ def update_nav_links(url_params):
     try:
         location = url_params.get('Location', [None])[0] if url_params else None
         uuid = url_params.get('uuid', [None])[0] if url_params else None
-        query = f"?Location={location}&uuid={uuid}" if location and uuid else f"?Location={location}" if location else f"?uuid={uuid}" if uuid else ""
+        user_level = url_params.get('user_level', [None])[0] if url_params else None
+        # print(f"Updating nav links with Location: {location}, UUID: {uuid}, User Level: {user_level}")
+        # query = f"?Location={location}&uuid={uuid}" if location and uuid else f"?Location={location}" if location else f"?uuid={uuid}" if uuid else ""
+        query = f"?Location={location}&uuid={uuid}&user_level={user_level}" if location and uuid and user_level else \
+                f"?Location={location}&uuid={uuid}" if location and uuid else \
+                f"?Location={location}&user_level={user_level}" if location and user_level else \
+                f"?uuid={uuid}&user_level={user_level}" if uuid and user_level else \
+                f"?Location={location}" if location else f"?uuid={uuid}" if uuid else f"?user_level={user_level}" if user_level else ""
         path = os.getcwd()
         json_path = os.path.join(path, 'data','TimeStamp.csv')
         last_updated = pd.read_csv(json_path)['saving_time'].to_list()[0]

@@ -1,0 +1,564 @@
+/* Modern Dashboard Layout - Two Column */
+.dashboard-layout-modern {
+    display: flex;
+    min-height: 100vh;
+    background: #f8f9fa;
+}
+
+/* Left Sidebar */
+.dashboard-sidebar {
+    width: 286px;
+    background: #ffffff;
+    border-right: 1px solid #edf2f7;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    box-shadow: 1px 0 8px rgba(15, 23, 42, 0.03);
+}
+
+/* Sidebar Header */
+.sidebar-header-modern {
+    padding: 24px 20px;
+    text-align: center;
+    border-bottom: 1px solid #e9ecef;
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+}
+
+.sidebar-title {
+    color: #006401;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 8px 0;
+}
+
+.sidebar-subtitle {
+    color: #6c757d;
+    font-size: 0.75rem;
+    margin: 0;
+}
+
+/* Menu Section */
+.menu-section {
+    margin-bottom: 32px;
+}
+
+.menu-scroll-container {
+    background: white;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.menu-buttons-wrapper {
+    display: flex;
+    gap: 12px;
+    padding: 4px;
+}
+
+.menu-btn-modern {
+    padding: 10px 24px;
+    background: #f8f9fa;
+    color: #495057;
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.menu-btn-modern:hover {
+    background: #e9ecef;
+    transform: translateY(-2px);
+}
+
+.menu-btn-modern.active {
+    background: linear-gradient(135deg, #006401 0%, #008a02 100%);
+    color: white;
+    border-color: #006401;
+    box-shadow: 0 4px 12px rgba(0, 100, 1, 0.3);
+}
+
+/* Sidebar Filters Section */
+.sidebar-filters-section {
+    flex: 1;
+    padding: 16px 12px 20px;
+    overflow-y: auto;
+}
+
+.filters-card {
+    background: #f8fafc;
+    border: 1px solid #eef2f7;
+    border-radius: 16px;
+    padding: 18px 16px 18px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+}
+
+.filters-title {
+    color: #334155;
+    font-size: 0.98rem;
+    font-weight: 700;
+    margin: 0 0 18px 0;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e6ebf1;
+}
+
+.filters-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.filter-label {
+    color: #4b5563;
+    font-size: 0.71rem;
+    font-weight: 700;
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.modern-dropdown {
+    width: 100%;
+    background: #ffffff;
+    border: 1px solid #dfe6ee;
+    border-radius: 10px;
+    padding: 7px;
+    box-shadow: none;
+}
+
+.modern-dropdown .Select-control {
+    border: 1px solid #e4eaf1;
+    border-radius: 8px;
+    min-height: 34px;
+    background: #ffffff;
+    box-shadow: none;
+}
+
+.modern-dropdown .Select-control:hover {
+    border-color: #dbe3eb;
+}
+
+.modern-dropdown.is-focused {
+    border-color: #d0dae5;
+    box-shadow: none;
+}
+
+.modern-dropdown.is-focused .Select-control {
+    border-color: #d9e2eb;
+    box-shadow: none;
+}
+
+.modern-dropdown .Select-placeholder,
+.modern-dropdown .Select--single > .Select-control .Select-value,
+.modern-dropdown .Select-value-label {
+    color: #475569 !important;
+    font-size: 0.92rem;
+}
+
+.modern-dropdown .Select-input > input {
+    color: #334155;
+}
+
+.modern-dropdown .Select-arrow-zone,
+.modern-dropdown .Select-clear-zone {
+    color: #9aa5b1;
+    border-left: 0 !important;
+}
+
+.modern-dropdown .Select-multi-value-wrapper,
+.modern-dropdown .Select-input,
+.modern-dropdown .Select-placeholder,
+.modern-dropdown .Select-value {
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+.modern-datepicker {
+    width: 100%;
+    background: #ffffff;
+    border: 1px solid #dfe6ee;
+    border-radius: 10px;
+    padding: 7px;
+    box-shadow: none;
+}
+
+.modern-datepicker:hover,
+.modern-datepicker:focus,
+.modern-datepicker:focus-within {
+    border-color: #d0dae5;
+    box-shadow: none;
+    outline: none;
+}
+
+.modern-datepicker .DateRangePicker,
+.modern-datepicker .DateInput,
+.modern-datepicker .DateInput_input {
+    width: 100%;
+}
+
+.modern-datepicker .DateRangePickerInput {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border: 1px solid #e4eaf1;
+    border-radius: 8px;
+    background: #ffffff;
+    padding: 5px 10px;
+    box-shadow: none;
+}
+
+.modern-datepicker .DateInput {
+    flex: 1 1 0;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+.modern-datepicker .DateInput_input {
+    border: 0 !important;
+    background: transparent;
+    color: #475569;
+    font-size: 0.92rem;
+    padding: 7px 4px;
+    box-shadow: none !important;
+}
+
+.modern-datepicker .DateRangePickerInput_arrow,
+.modern-datepicker .DateRangePickerInput_arrow_svg {
+    border: 0 !important;
+    fill: #94a3b8;
+}
+
+.modern-datepicker .DateInput_input__focused,
+.modern-datepicker .DateRangePickerInput__focused {
+    border-color: #e4eaf1 !important;
+    box-shadow: none !important;
+}
+
+/* Filter Actions */
+.filter-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid #e6ebf1;
+}
+
+.btn-apply-modern {
+    flex: 1;
+    background: #007a0c;
+    color: white;
+    border: none;
+    padding: 11px 12px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.18s ease;
+}
+
+.btn-apply-modern:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 100, 1, 0.3);
+}
+
+.btn-reset-modern {
+    flex: 1;
+    background: #ffffff;
+    color: #94a3b8;
+    border: 1px solid #dbe4ee;
+    padding: 11px 12px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.18s ease;
+}
+
+.btn-reset-modern:hover {
+    background: #f8f9fa;
+    border-color: #006401;
+    color: #006401;
+    transform: translateY(-2px);
+}
+
+/* Sidebar Footer */
+.sidebar-footer-modern {
+    padding: 20px;
+    border-top: 1px solid #e9ecef;
+    background: #f8f9fa;
+}
+
+.footer-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #e9ecef, transparent);
+    margin-bottom: 12px;
+}
+
+.footer-text {
+    color: #6c757d;
+    font-size: 0.7rem;
+    text-align: center;
+    margin: 0 0 4px 0;
+}
+
+.footer-date {
+    color: #006401;
+    font-size: 0.7rem;
+    text-align: center;
+    margin: 0;
+    font-weight: 500;
+}
+
+/* Right Main Content */
+.dashboard-main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+}
+
+.dashboard-content-modern {
+    animation: fadeIn 0.5s ease-out;
+}
+
+/* Card Container Updates */
+.card-container-5 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    margin-bottom: 32px;
+}
+
+/* Metric Cards */
+.metric-card {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    text-align: center;
+    transition: all 0.3s ease;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.metric-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    border-color: #006401;
+}
+
+.metric-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #006401;
+    margin: 12px 0;
+}
+
+.metric-title {
+    color: #6c757d;
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin: 0;
+}
+
+/* Chart Cards */
+.chart-card {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 24px;
+    border: 1px solid #e9ecef;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.chart-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-color: #006401;
+}
+
+.chart-title {
+    color: #2c3e50;
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 16px 0;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #e9ecef;
+}
+
+/* Scrollbar Styling */
+.dashboard-sidebar::-webkit-scrollbar,
+.dashboard-main::-webkit-scrollbar {
+    width: 6px;
+}
+
+.dashboard-sidebar::-webkit-scrollbar-track,
+.dashboard-main::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.dashboard-sidebar::-webkit-scrollbar-thumb,
+.dashboard-main::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.dashboard-sidebar::-webkit-scrollbar-thumb:hover,
+.dashboard-main::-webkit-scrollbar-thumb:hover {
+    background: #006401;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .dashboard-layout-modern {
+        flex-direction: column;
+    }
+    
+    .dashboard-sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+        border-right: none;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .dashboard-main {
+        padding: 16px;
+    }
+    
+    .menu-buttons-wrapper {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    
+    .menu-btn-modern {
+        width: auto;
+        white-space: normal;
+    }
+    
+    .card-container-5 {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Active filter indicator */
+.filter-group.active-filter {
+    border-left: 3px solid #006401;
+    padding-left: 12px;
+    transition: all 0.2s ease;
+}
+
+.filters-card .Select-placeholder,
+.filters-card .Select--single > .Select-control .Select-value,
+.filters-card .Select-value-label {
+    color: #475569 !important;
+    font-size: 0.93rem;
+}
+
+.filters-card .Select-input > input {
+    color: #334155;
+}
+
+.filters-card .Select-arrow-zone {
+    color: #9aa5b1;
+}
+
+.filters-card .DateRangePicker,
+.filters-card .DateInput,
+.filters-card .DateInput_input {
+    width: 100%;
+}
+
+.filters-card .DateRangePickerInput {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border: 1px solid #e5ebf2;
+    border-radius: 8px;
+    background: #ffffff;
+    padding: 6px 10px;
+    box-shadow: none;
+}
+
+.filters-card .DateInput {
+    flex: 1 1 0;
+}
+
+.filters-card .DateInput_input {
+    border: 0;
+    background: transparent;
+    color: #475569;
+    font-size: 0.92rem;
+    padding: 7px 4px;
+}
+
+.filters-card .DateRangePickerInput_arrow_svg {
+    fill: #94a3b8;
+}
+
+.filters-card .DateInput_input__focused,
+.filters-card .DateRangePickerInput__focused {
+    border-color: #d1dbe6 !important;
+    box-shadow: none !important;
+}
+
+
+.filters-card .Select-input,
+.filters-card .Select-placeholder,
+.filters-card .Select-value,
+.filters-card .Select-value-label,
+.filters-card .Select-arrow-zone,
+.filters-card .Select-clear-zone,
+.filters-card .Select-menu-outer,
+.filters-card .DateInput,
+.filters-card .DateInput_input,
+.filters-card .DateRangePickerInput__withBorder {
+    box-shadow: none !important;
+}
+
+.filters-card .Select-control .Select-multi-value-wrapper,
+.filters-card .Select-control .Select-input,
+.filters-card .Select-control .Select-placeholder,
+.filters-card .Select-control .Select-value {
+    border: 0 !important;
+}
+
+.filters-card .Select-arrow-zone,
+.filters-card .Select-clear-zone {
+    border-left: 0 !important;
+}
+
+.filters-card .DateInput,
+.filters-card .DateInput_input {
+    border: 0 !important;
+    outline: 0 !important;
+}
+
+.filters-card .DateRangePickerInput_arrow {
+    border: 0 !important;
+}

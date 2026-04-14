@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from config import QERY,USE_LOCALHOST, DATA_FILE_NAME_
+import config as cfg
 from db_services import DataFetcher
 from datetime import datetime
 import logging
@@ -9,6 +9,12 @@ import duckdb
 from functools import lru_cache
 
 logging.basicConfig(level=logging.DEBUG)
+
+QERY = cfg.QERY
+USE_LOCALHOST = cfg.USE_LOCALHOST
+DATA_FILE_NAME_ = cfg.DATA_FILE_NAME_
+CONCEPTS = getattr(cfg, "CONCEPTS", None)
+
 
 class DataStorage:
     def __init__(self, query=QERY, data_dir="data", filename=DATA_FILE_NAME_):
@@ -28,7 +34,7 @@ class DataStorage:
             self.query,
             filename=self.filepath,
             date_column='Date',
-            batch_size=50000,
+            batch_size=10000,
         )
         if df is not None and not df.empty:
             df.to_parquet(self.filepath, index=False)
@@ -63,7 +69,11 @@ class DataStorage:
         df = pd.read_parquet(self.filepath)
         dropdown_json = {"programs":sorted(df.Program.dropna().unique().tolist()),
                          "encounters":sorted(df.Encounter.dropna().unique().tolist()),
-                         "concepts":sorted(df.concept_name.dropna().unique().tolist())
+                         "concepts":sorted(df.concept_name.dropna().unique().tolist()),
+                         "concept_answers":sorted(df.obs_value_coded.dropna().unique().tolist()),
+                         "gender":sorted(df.Gender.dropna().unique().tolist()),
+                         "age_group":sorted(df.Age_Group.dropna().unique().tolist()),
+                         "DrugName":sorted(df.DrugName.dropna().unique().tolist())
                          }
         with open(self.dropdown_filepath, 'w') as r:
             json.dump(dropdown_json, r, indent=2)
@@ -95,3 +105,7 @@ if __name__ == "__main__":
     users = DataStorage(query="SELECT u.uuid as user_id, ur.role as role FROM users u JOIN user_role ur ON u.user_id = ur.user_id", 
                         filename="users_data.csv")
     users.fetch_and_save_single_table()
+
+    if CONCEPTS:
+        concepts = DataStorage(query=CONCEPTS, filename="concepts_data.csv")
+        concepts.fetch_and_save_single_table()

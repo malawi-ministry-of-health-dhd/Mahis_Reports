@@ -11,6 +11,8 @@ openpyxl
 gunicorn
 pyarrow
 dash-bootstrap-components
+dash-mantine-components
+dash-iconify
 typing_extensions
 reportlab
 duckdb

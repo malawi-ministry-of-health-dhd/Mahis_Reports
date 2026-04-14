@@ -1,5 +1,5 @@
 import dash
-from dash import html, dcc, Input, Output, callback
+from dash import html, dcc, Input, Output, State, callback
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
@@ -9,7 +9,7 @@ import os
 import json
 from isoweek import Week
 from dash.exceptions import PreventUpdate
-from reports_class import ReportTableBuilder
+from helpers.reports_class import ReportTableBuilder
 from reportlab.lib.pagesizes import letter, A4, portrait
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -30,6 +30,12 @@ relative_week = [str(week) for week in range(1, 53)]  # Can extend to 53 if need
 relative_month = ['January', 'February', 'March', 'April', 'May', 'June','July', 'August', 'September', 'October', 'November', 'December',]
 relative_quarter = ["Q1 Jan-Mar", "Q2 Apr-June", "Q3 Jul-Sep", "Q4 Oct-Dec"]
 relative_year = [str(year) for year in range(2024, 2051)]
+
+path = os.getcwd()
+dropdowns_json_path = os.path.join(path, 'data', 'dcc_dropdown_json', 'dropdowns.json')
+with open(dropdowns_json_path) as x:
+            dropdowns = json.load(x)
+prog_options = dropdowns['programs'] + ['General Reports']
 
 def get_week_start_end(week_num, year):
     """Returns (start_date, end_date) for a given week number and year"""
@@ -101,18 +107,18 @@ def get_quarter_start_end(quarter, year):
     
     return start_date, end_date
 
-def load_report_options():
+def load_report_options(program=None):
     """Load reports from JSON and return concatenated options for dropdown"""
     try:
         with open('data/hmis_reports.json', 'r') as f:
             data = json.load(f)
-        
         # Create concatenated options: "ID - Report Name"
         options = [
             {'label': f"{report['report_id']} - {report['report_name']}", 
              'value': report['report_id']}
             for report in data['reports'] 
             if report.get('archived', 'False').lower() == 'false'
+            and (program is None or program in report.get('programs', []))
         ]
         return options
     except FileNotFoundError:
@@ -126,117 +132,163 @@ def load_report_options():
         return []
 
 
-layout = html.Div(className="container", children=[
-    html.H4("Select Report Parameters",style={'textAlign': 'center',"color":"#006401",}),
-    html.Div([
-            html.Div(className="filter-container", children=[
-                html.Div([
-                    html.Label("Report Name"),
-                    dcc.Dropdown(
-                        id='report_name',
-                        options=[
-                            {'label': hf, 'value': hf}
-                            for hf in []
-                        ],
-                        value=None,
-                        clearable=True
-                    )
-                ], className="filter-input"),
-                html.Div([
-                    html.Label("Period Type"),
-                    dcc.Dropdown(
-                        id='period_type-filter',
-                        options=[
-                            {'label': period, 'value': period}
-                            for period in ['Weekly','Monthly','Quarterly']
-                        ],
-                        value='Monthly',
-                        clearable=True
-                    )
-                ], className="filter-input"),
-                html.Div([
-                    html.Label("Year"),
-                    dcc.Dropdown(
-                        id='year-filter',
-                        options=[
-                            {'label': period, 'value': period}
-                            for period in relative_year
-                        ],
-                        value=dt.now().strftime("%Y"),
-                        clearable=True
-                    )
-                ], className="filter-input"),
-
-                html.Div([
-                    html.Label("Week/Month/Quarter"),
-                    dcc.Dropdown(
-                        id='month-filter',
-                        options=[
-                            {'label': period, 'value': period}
-                            for period in relative_month
-                        ],
-                        value=dt.now().strftime("%B"),
-                        clearable=True
-                    )
-                ], className="filter-input"),
-                html.Div([
-                    html.Label("Program (some reports may not need program filter)"),
-                    dcc.Dropdown(
-                        id='program_filter',
-                        options=[
-                            {'label': item, 'value': item}
-                            for item in ["OPD","IPD"]
-                        ],
-                        value=dt.now().strftime("%B"),
-                        clearable=True
-                    )
-                ], className="filter-input"),
-            html.Div(
-                    id='report-downloads-menu',
-                    style={"display": "flex","alignItems": "center","width": "100%"
-                    },
+layout = html.Div(
+    className="reports-modern-container",
+    children=[
+        dcc.Location(id='url', refresh=False),
+    
+        # Parameters Card
+        html.Div(
+            className="parameters-card",
+            children=[
+                html.H3("HMIS Dataset Reports: Generate and download standardized health facility reports", className="parameters-title"),
+                
+                # Filters Grid
+                html.Div(
+                    className="parameters-grid",
                     children=[
-
-                        # LEFT SIDE
+                        # Program Filter
                         html.Div(
+                            className="parameter-group",
                             children=[
-                                html.Button("Generate Report",id="generate-btn",n_clicks=0,
-                                    style={
-                                        "backgroundColor": "#297952",
-                                        "color": "white",
-                                        "border": "none",
-                                        "padding": "8px 12px",
-                                        "borderRadius": "6px",
-                                        "cursor": "pointer",
-                                        "fontSize": "16px"
-                                    }
+                                html.Label("Program", className="parameter-label"),
+                                dcc.Dropdown(
+                                    id='program_filter',
+                                    options=[
+                                        {'label': item, 'value': item}
+                                        for item in []
+                                    ],
+                                    value='General Reports',
+                                    clearable=True,
+                                    className="modern-dropdown"
                                 )
-                            ],
-                            style={"display": "flex","gap": "10px"}
+                            ]
                         ),
-
-                        # RIGHT SIDE
+                        
+                        # Report Name Filter
                         html.Div(
+                            className="parameter-group",
                             children=[
-                                html.Button("CSV", id="report-btn-csv", n_clicks=0, className="btn btn-outline-secondary"),
-                                html.Button("JSON", id="report-btn-json", n_clicks=0, className="btn btn-outline-secondary"),
-                                html.Button("PDF", id="report-btn-pdf", n_clicks=0, className="btn btn-outline-secondary"),
-                                html.Span(id="report-run-status", className="run-status")
-                            ],
-                            style={"display": "flex","gap": "10px","marginLeft": "auto"
-                            }
+                                html.Label("Report Name", className="parameter-label"),
+                                dcc.Dropdown(
+                                    id='report_name',
+                                    options=[
+                                        {'label': hf, 'value': hf}
+                                        for hf in []
+                                    ],
+                                    value=None,
+                                    clearable=True,
+                                    className="modern-dropdown"
+                                )
+                            ]
+                        ),
+                        
+                        # Period Type Filter
+                        html.Div(
+                            className="parameter-group",
+                            children=[
+                                html.Label("Period Type", className="parameter-label"),
+                                dcc.Dropdown(
+                                    id='period_type-filter',
+                                    options=[
+                                        {'label': period, 'value': period}
+                                        for period in ['Weekly', 'Monthly', 'Quarterly']
+                                    ],
+                                    value='Monthly',
+                                    clearable=True,
+                                    className="modern-dropdown"
+                                )
+                            ]
+                        ),
+                        
+                        # Year Filter
+                        html.Div(
+                            className="parameter-group",
+                            children=[
+                                html.Label("Year", className="parameter-label"),
+                                dcc.Dropdown(
+                                    id='year-filter',
+                                    options=[
+                                        {'label': period, 'value': period}
+                                        for period in relative_year
+                                    ],
+                                    value=dt.now().strftime("%Y"),
+                                    clearable=True,
+                                    className="modern-dropdown"
+                                )
+                            ]
+                        ),
+                        
+                        # Week/Month/Quarter Filter
+                        html.Div(
+                            className="parameter-group",
+                            children=[
+                                html.Label("Week/Month/Quarter", className="parameter-label"),
+                                dcc.Dropdown(
+                                    id='month-filter',
+                                    options=[
+                                        {'label': period, 'value': period}
+                                        for period in relative_month
+                                    ],
+                                    value=dt.now().strftime("%B"),
+                                    clearable=True,
+                                    className="modern-dropdown"
+                                )
+                            ]
+                        ),
+                    ]
+                ),
+                
+                # Action Buttons
+                html.Div(
+                    className="parameters-actions",
+                    children=[
+                        html.Button(
+                            "Generate Report",
+                            id="generate-btn",
+                            n_clicks=0,
+                            className="btn-generate-modern"
+                        ),
+                        html.Div(
+                            className="download-buttons",
+                            children=[
+                                html.Button(
+                                    "CSV",
+                                    id="report-btn-csv",
+                                    n_clicks=0,
+                                    className="btn-download-csv"
+                                ),
+                                html.Button(
+                                    "JSON",
+                                    id="report-btn-json",
+                                    n_clicks=0,
+                                    className="btn-download-json"
+                                ),
+                                html.Button(
+                                    "PDF",
+                                    id="report-btn-pdf",
+                                    n_clicks=0,
+                                    className="btn-download-pdf"
+                                ),
+                                html.Span(id="report-run-status", className="run-status-modern")
+                            ]
                         )
                     ]
                 )
+            ]
+        ),
         
-        ]),
+        # Report Output Container
+        html.Div(
+            id='standard-reports-table-container',
+            className="report-output-container"
+        ),
         
-    ]),
-    dcc.Download(id="download-report-blob"),
-
-    dcc.Store(id="report-data-store"),
-    html.Div(id='standard-reports-table-container')  
-])
+        # Hidden Components
+        dcc.Download(id="download-report-blob"),
+        dcc.Store(id="report-data-store"),
+    ]
+)
 
 @callback(
     Output('month-filter', 'options'),
@@ -252,11 +304,16 @@ def update_month_options(period_type):
         return relative_quarter
     
 @callback(
-        Output('report_name', 'options'),
-        Input('url-params-store', 'data'),
+        [Output('program_filter', 'options'),
+         Output('report_name', 'options')],
+        [Input('url-params-store', 'data'),
+        Input('program_filter','value')]
 )
-def update_report_dropdown(urlparams):
-    return load_report_options()
+def update_report_dropdown(urlparams, program):
+    with open(dropdowns_json_path) as x:
+            dropdowns = json.load(x)
+    prog_options = ['General Reports'] + dropdowns['programs']
+    return prog_options, load_report_options(program)
 
 @callback(
     [Output('standard-reports-table-container', 'children'),
@@ -280,7 +337,7 @@ def update_table(clicks,
     
     ctx = dash.callback_context
     if not ctx.triggered:
-        return dash.no_update
+        return dash.no_update, 0, None
     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
     if clicks is None or clicks == 0:
@@ -288,8 +345,7 @@ def update_table(clicks,
     # Handle missing inputs to prevent errors
     if not urlparams or not period_type or not year_filter or not month_filter or not report_filter:
         return html.Div("Missing Report Parameters"), 0, None
-    
-    path = os.getcwd()
+
     reports_json = os.path.join(path, 'data', 'hmis_reports.json')
     with open(reports_json, "r") as f:
         json_data = json.load(f)
@@ -323,7 +379,10 @@ def update_table(clicks,
             'Ensure that the config file has correct database credentials.'
             ,style={'color':'red'}), 0, None # Empty DataFrame with expected columns
     
-    data[GENDER_] = data[GENDER_].replace({"M":"Male","F":"Female"})
+    data[GENDER_] = data[GENDER_].replace({"M":"Male",
+                                               "F":"Female",
+                                               '{"label"=>"Male", "value"=>"M"}':"Male",
+                                               '{"label"=>"Female", "value"=>"F"}':"Female"})
     data["DateValue"] = pd.to_datetime(data[DATE_]).dt.date
     today = dt.today().date()
     data["months"] = data["DateValue"].apply(lambda d: (today - d).days // 30)
@@ -414,6 +473,7 @@ def update_table(clicks,
     except ValueError as e:
         print(f"Error: {e}")
         return html.Div(f"Error: {str(e)}"),0, None
+
     
 @callback(
         Output('download-report-blob', 'data'),

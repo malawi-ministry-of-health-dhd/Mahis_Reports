@@ -134,212 +134,31 @@ actual_keys_in_data = ['person_id', 'encounter_id',
                                        'Village', 'visit_days', 'obs_value_coded','concept_name', 'Value',"",
                                        'ValueN', 'DrugName', 'Value_name', 'new_revisit','count','count_set','sum','Order_Name']
 
-
-# TEST CONNECTION
-#!/usr/bin/env python3
+CONCEPTS = """
+SELECT 
+    q.concept_id AS question_concept_id,
+    qn.name AS question_name,
+    a.concept_id AS answer_concept_id,
+    an.name AS obs_value_coded,
+    ca.sort_weight AS display_order
+    
+FROM concept q  -- q = question concept
+INNER JOIN concept_answer ca ON ca.concept_id = q.concept_id
+INNER JOIN concept a ON a.concept_id = ca.answer_concept  -- a = answer concept
+INNER JOIN concept_name qn ON qn.concept_id = q.concept_id 
+    AND qn.locale = 'en' 
+    AND qn.concept_name_type = 'FULLY_SPECIFIED'
+    AND qn.voided = 0
+INNER JOIN concept_name an ON an.concept_id = a.concept_id 
+    AND an.locale = 'en' 
+    AND an.concept_name_type = 'FULLY_SPECIFIED'
+    AND an.voided = 0
+WHERE q.datatype_id = (
+    SELECT concept_datatype_id 
+    FROM concept_datatype 
+    WHERE name = 'Coded'  -- Only Coded type questions have dropdown answers
+)
+AND q.retired = 0
+AND a.retired = 0
+ORDER BY q.concept_id, ca.sort_weight
 """
-Database Connection Tester for Config
-"""
-
-import pymysql
-import paramiko
-from sshtunnel import SSHTunnelForwarder
-import socket
-import sys
-
-def test_local_connection():
-    """Test local database connection"""
-    try:
-        connection = pymysql.connect(
-            host=DB_CONFIG_LOCAL['host'],
-            user=DB_CONFIG_LOCAL['user'],
-            password=DB_CONFIG_LOCAL['password'],
-            database=DB_CONFIG_LOCAL['database'],
-            port=DB_CONFIG_LOCAL['port'],
-            connect_timeout=5
-        )
-        connection.close()
-        return True, "Localhost connection successful"
-    except pymysql.Error as e:
-        return False, f"Localhost connection failed: {str(e)}"
-    except Exception as e:
-        return False, f"Localhost connection error: {str(e)}"
-
-def test_direct_connection():
-    """Test direct database connection"""
-    try:
-        connection = pymysql.connect(
-            host=DB_CONFIG['host'],
-            user=DB_CONFIG['user'],
-            password=DB_CONFIG['password'],
-            database=DB_CONFIG['database'],
-            port=DB_CONFIG['port'],
-            connect_timeout=5
-        )
-        connection.close()
-        return True, "Direct database connection successful"
-    except pymysql.Error as e:
-        return False, f"Direct connection failed: {str(e)}"
-    except Exception as e:
-        return False, f"Direct connection error: {str(e)}"
-
-def test_ssh_connection():
-    """Test SSH tunnel and database connection"""
-    try:
-        # First test SSH connection
-        ssh_config = SSH_CONFIG.copy()
-        
-        # Prepare SSH connection arguments
-        ssh_args = {
-            'ssh_address_or_host': (ssh_config['ssh_host'], ssh_config['ssh_port']),
-            'ssh_username': ssh_config['ssh_user'],
-            'remote_bind_address': ssh_config['remote_bind_address']
-        }
-        
-        # Add either password or private key
-        if 'ssh_password' in ssh_config and ssh_config['ssh_password']:
-            ssh_args['ssh_password'] = ssh_config['ssh_password']
-        elif 'ssh_pkey' in ssh_config and ssh_config['ssh_pkey']:
-            # Look for key file in ssh directory relative to script location
-            key_path = os.path.join(os.path.dirname(__file__), 'ssh', ssh_config['ssh_pkey'])
-            if os.path.exists(key_path):
-                ssh_args['ssh_pkey'] = key_path
-            else:
-                ssh_args['ssh_pkey'] = ssh_config['ssh_pkey']
-        else:
-            return False, "SSH configuration missing authentication method"
-        
-        # Create tunnel
-        with SSHTunnelForwarder(**ssh_args) as tunnel:
-            tunnel.start()
-            
-            # Test database connection through tunnel
-            connection = pymysql.connect(
-                host='127.0.0.1',
-                user=DB_CONFIG['user'],
-                password=DB_CONFIG['password'],
-                database=DB_CONFIG['database'],
-                port=tunnel.local_bind_port,
-                connect_timeout=5
-            )
-            connection.close()
-            tunnel.stop()
-            
-            return True, "SSH tunnel and database connection successful"
-            
-    except paramiko.ssh_exception.AuthenticationException:
-        return False, "SSH authentication failed - check username, password or key"
-    except paramiko.ssh_exception.SSHException as e:
-        return False, f"SSH connection failed: {str(e)}"
-    except socket.error as e:
-        return False, f"Network error: {str(e)}"
-    except pymysql.Error as e:
-        return False, f"Database connection through SSH failed: {str(e)}"
-    except Exception as e:
-        return False, f"SSH tunnel error: {str(e)}"
-
-def test_query_execution(connection_params):
-    """Test if a simple query can be executed"""
-    try:
-        connection = pymysql.connect(**connection_params)
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT 1")
-            result = cursor.fetchone()
-        connection.close()
-        return True, "Query execution successful"
-    except Exception as e:
-        return False, f"Query execution failed: {str(e)}"
-
-def main():
-    print("=" * 60)
-    print("DATABASE CONFIGURATION TESTER")
-    print("=" * 60)
-    
-    print(f"\nConfiguration Settings:")
-    print(f"USE_LOCALHOST: {USE_LOCALHOST}")
-    print(f"START_DATE: {START_DATE}")
-    print(f"PREFIX_NAME: {PREFIX_NAME}")
-    print("-" * 60)
-    
-    if USE_LOCALHOST:
-        print("\nTesting Localhost Configuration...")
-        success, message = test_local_connection()
-        
-        if success:
-            print(f"{message}")
-            # Test query execution
-            conn_params = {
-                'host': DB_CONFIG_LOCAL['host'],
-                'user': DB_CONFIG_LOCAL['user'],
-                'password': DB_CONFIG_LOCAL['password'],
-                'database': DB_CONFIG_LOCAL['database'],
-                'port': DB_CONFIG_LOCAL['port']
-            }
-            query_success, query_message = test_query_execution(conn_params)
-            if query_success:
-                print(f"{query_message}")
-                print("\n🎉 Configurations for Localhost are safe to use!")
-            else:
-                print(f"{query_message}")
-                print("\nConnection works but query execution failed - check database permissions")
-        else:
-            print(f"{message}")
-            print("\nDatabase connection failed, check credentials")
-            
-    else:
-        print("\nTesting Production Configuration...")
-        
-        # Test direct connection first
-        direct_success, direct_message = test_direct_connection()
-        
-        if direct_success:
-            print(f"{direct_message}")
-            # Test query execution
-            conn_params = {
-                'host': DB_CONFIG['host'],
-                'user': DB_CONFIG['user'],
-                'password': DB_CONFIG['password'],
-                'database': DB_CONFIG['database'],
-                'port': DB_CONFIG['port']
-            }
-            query_success, query_message = test_query_execution(conn_params)
-            if query_success:
-                print(f"{query_message}")
-                print("\nConfigurations for Production are safe to use!")
-            else:
-                print(f"{query_message}")
-                print("\nDirect connection works but query execution failed - check database permissions")
-        
-        else:
-            print(f"{direct_message}")
-            print("\nAttempting SSH Tunnel Connection...")
-            
-            # Test SSH connection
-            ssh_success, ssh_message = test_ssh_connection()
-            
-            if ssh_success:
-                print(f"{ssh_message}")
-                print("\n🎉 Configurations for Production with SSH are safe to use!")
-            else:
-                print(f"{ssh_message}")
-                print("\n Database connection failed, check credentials")
-    
-    print("\n" + "=" * 60)
-
-if __name__ == "__main__":
-    # Check if required modules are installed
-    required_modules = ['pymysql', 'paramiko', 'sshtunnel']
-    missing_modules = []
-    
-    for module in required_modules:
-        try:
-            __import__(module)
-        except ImportError:
-            missing_modules.append(module)
-    
-    if missing_modules:
-        print("Missing required modules. Please install:")
-        print(f"pip install {' '.join(missing_modules)}")
-        sys.exit(1)
-    
-    main()
