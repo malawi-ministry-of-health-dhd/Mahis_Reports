@@ -778,6 +778,172 @@ def _service_table_fig(section: dict) -> go.Figure:
     return fig
 
 
+def _monthly_concept_rate(df, concept, positive_values=None, title='', target=None,
+                          color='#2563EB', target_col='obs_value_coded'):
+    if df is None or df.empty or 'Date' not in df.columns or 'concept_name' not in df.columns:
+        return None
+    sub = df[df['concept_name'].fillna('').astype(str) == concept].copy()
+    if sub.empty:
+        return None
+    col = target_col if target_col in sub.columns else ('obs_value_coded' if 'obs_value_coded' in sub.columns else None)
+    if not col:
+        return None
+
+    sub['_m'] = pd.to_datetime(sub['Date']).dt.to_period('M')
+    months = sorted(sub['_m'].dropna().unique())[-12:]
+    if not months:
+        return None
+
+    xs = [pd.Period(m, 'M').to_timestamp().to_pydatetime() for m in months]
+    ys = []
+    for m in months:
+        month_df = sub[sub['_m'] == m].copy()
+        den = month_df['person_id'].dropna().astype(str).nunique() if 'person_id' in month_df.columns else len(month_df)
+        if den <= 0:
+            ys.append(None)
+            continue
+        if positive_values is None:
+            num = den
+        else:
+            wanted = {str(v).strip().lower() for v in positive_values}
+            series = month_df[col].fillna('').astype(str).str.strip().str.lower()
+            num = month_df[series.isin(wanted)]['person_id'].dropna().astype(str).nunique() if 'person_id' in month_df.columns else int(series.isin(wanted).sum())
+        ys.append(round((num / den) * 100, 1) if den else None)
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=xs, y=ys,
+        mode='lines+markers',
+        line=dict(color=color, width=2.2, shape='spline'),
+        marker=dict(size=5, color=color, line=dict(color='#fff', width=1)),
+        connectgaps=False,
+        hovertemplate='%{x|%b %Y}<br>%{y:.0f}%<extra></extra>',
+        showlegend=False,
+    ))
+    if target is not None:
+        fig.add_trace(go.Scatter(
+            x=xs, y=[target] * len(xs),
+            mode='lines',
+            line=dict(color='#A1A1AA', width=1.5, dash='dash'),
+            hovertemplate='Target: %{y:.0f}%<extra></extra>',
+            showlegend=False,
+        ))
+    fig.update_layout(
+        paper_bgcolor='#FFFFFF',
+        plot_bgcolor='#FFFFFF',
+        font=dict(family=FONT, color=TEXT, size=11),
+        margin=dict(l=12, r=8, t=28, b=26),
+        height=210,
+        title=dict(text=title, x=0, xanchor='left', font=dict(size=12, color='#444441', family=FONT)),
+        xaxis=dict(showgrid=False, zeroline=False, showline=False, tickformat='%b %y',
+                   tickfont=dict(size=9, color=MUTED)),
+        yaxis=dict(range=[0, 100], showgrid=True, gridcolor=GRID_C, zeroline=False, showline=False,
+                   tickfont=dict(size=9, color=MUTED), ticksuffix='%',
+                   title=dict(text='Coverage', font=dict(size=9, color=MUTED))),
+    )
+    return fig
+
+
+def _monthly_concept_mix_fig(df, concept, categories, title, target_col='obs_value_coded'):
+    if df is None or df.empty or 'Date' not in df.columns or 'concept_name' not in df.columns:
+        return None
+    sub = df[df['concept_name'].fillna('').astype(str) == concept].copy()
+    if sub.empty:
+        return None
+    col = target_col if target_col in sub.columns else ('obs_value_coded' if 'obs_value_coded' in sub.columns else None)
+    if not col:
+        return None
+
+    sub['_m'] = pd.to_datetime(sub['Date']).dt.to_period('M')
+    months = sorted(sub['_m'].dropna().unique())[-12:]
+    if not months:
+        return None
+
+    fig = go.Figure()
+    for label, values, color in categories:
+        vals = []
+        wanted = {str(v).strip().lower() for v in values}
+        for m in months:
+            month_df = sub[sub['_m'] == m].copy()
+            den = month_df['person_id'].dropna().astype(str).nunique() if 'person_id' in month_df.columns else len(month_df)
+            if den <= 0:
+                vals.append(0)
+                continue
+            series = month_df[col].fillna('').astype(str).str.strip().str.lower()
+            num = month_df[series.isin(wanted)]['person_id'].dropna().astype(str).nunique() if 'person_id' in month_df.columns else int(series.isin(wanted).sum())
+            vals.append(round((num / den) * 100, 1))
+        fig.add_trace(go.Bar(
+            x=[pd.Period(m, 'M').to_timestamp().to_pydatetime() for m in months],
+            y=vals,
+            name=label,
+            marker=dict(color=color),
+            hovertemplate='%{x|%b %Y}<br>' + label + ': %{y:.0f}%<extra></extra>',
+        ))
+    fig.update_layout(
+        paper_bgcolor='#FFFFFF',
+        plot_bgcolor='#FFFFFF',
+        font=dict(family=FONT, color=TEXT, size=11),
+        margin=dict(l=12, r=8, t=30, b=28),
+        height=240,
+        title=dict(text=title, x=0, xanchor='left', font=dict(size=12, color='#444441', family=FONT)),
+        barmode='stack',
+        legend=dict(orientation='h', x=0, y=1.14, xanchor='left', font=dict(size=9, color=DIM)),
+        xaxis=dict(showgrid=False, zeroline=False, showline=False, tickformat='%b %y',
+                   tickfont=dict(size=9, color=MUTED)),
+        yaxis=dict(range=[0, 100], showgrid=True, gridcolor=GRID_C, zeroline=False, showline=False,
+                   tickfont=dict(size=9, color=MUTED), ticksuffix='%',
+                   title=dict(text='Share of babies', font=dict(size=9, color=MUTED))),
+    )
+    return fig
+
+
+def _concept_rate(df, concept, positive_values=None, target_col='obs_value_coded'):
+    if df is None or df.empty or 'concept_name' not in df.columns:
+        return 0, 0, 0.0
+    sub = df[df['concept_name'].fillna('').astype(str) == concept].copy()
+    if sub.empty:
+        return 0, 0, 0.0
+    den = sub['person_id'].dropna().astype(str).nunique() if 'person_id' in sub.columns else len(sub)
+    if den <= 0:
+        return 0, 0, 0.0
+    if positive_values is None:
+        return den, den, 100.0
+    col = target_col if target_col in sub.columns else ('obs_value_coded' if 'obs_value_coded' in sub.columns else None)
+    if not col:
+        return 0, den, 0.0
+    wanted = {str(v).strip().lower() for v in positive_values}
+    series = sub[col].fillna('').astype(str).str.strip().str.lower()
+    num = sub[series.isin(wanted)]['person_id'].dropna().astype(str).nunique() if 'person_id' in sub.columns else int(series.isin(wanted).sum())
+    pct = round((num / den) * 100, 1) if den else 0.0
+    return num, den, pct
+
+
+def _newborn_summary_card(label, num, den, pct, accent, note):
+    return html.Div(className='mnid-newborn-metric', style={'--nb-accent': accent}, children=[
+        html.Div(label, className='mnid-newborn-metric-label'),
+        html.Div([
+            html.Span(f'{_display_pct(pct):.0f}%', className='mnid-newborn-metric-value'),
+            html.Span(f'{num}/{den}', className='mnid-newborn-metric-meta'),
+        ], className='mnid-newborn-metric-top'),
+        html.Div(note, className='mnid-newborn-metric-note'),
+    ])
+
+
+def _newborn_section_card(title, subtitle, tone, children):
+    return html.Div(className=f'mnid-chart-card mnid-newborn-section mnid-newborn-{tone}',
+                    style={'gridColumn': '1 / -1'},
+                    children=[
+                        html.Div(className='mnid-newborn-section-head', children=[
+                            html.Div([
+                                html.Div(title, className='mnid-card-title'),
+                                html.Div(subtitle, className='mnid-newborn-section-subtitle'),
+                            ]),
+                            html.Span(tone.upper(), className='mnid-newborn-section-tag'),
+                        ]),
+                        children,
+                    ])
+
+
 def _service_stack_fig(section: dict, chart_id: str | None = None) -> go.Figure:
     rows = section.get('rows', [])
     chart_specs = section.get('chart_specs', []) or []
@@ -3173,7 +3339,97 @@ def _newborn_charts(df):
     charts = []
     monthly = _monthly_visits(df, 'NEONATAL CARE')
     fig = _line(monthly, 'Neonatal Care Admissions', color=_TREND_ACCENT['Newborn'], y_label='Babies')
-    if fig: charts.append(_chart_card('', fig))
+    admission_card = _chart_card('', fig) if fig else None
+
+    thermal_num, thermal_den, thermal_pct = _concept_rate(df, 'Thermal status on admission', ['Not hypothermic'])
+    resus_num, resus_den, resus_pct = _concept_rate(df, 'Neonatal resuscitation provided', ['Yes', 'Stimulation only', 'Bag and mask'])
+    kmc_num, kmc_den, kmc_pct = _concept_rate(df, 'iKMC initiated', ['Yes'])
+    support_num, support_den, support_pct = _concept_rate(df, 'CPAP support', ['Bubble CPAP', 'Nasal oxygen'])
+
+    summary_cards = [
+        _newborn_summary_card('Thermal Stability', thermal_num, thermal_den, thermal_pct, '#0F766E',
+                              'Babies arriving normothermic'),
+        _newborn_summary_card('Resuscitation Response', resus_num, resus_den, resus_pct, '#2563EB',
+                              'Babies receiving any resuscitation action'),
+        _newborn_summary_card('iKMC Initiation', kmc_num, kmc_den, kmc_pct, '#7C3AED',
+                              'Eligible babies initiated on KMC'),
+        _newborn_summary_card('Respiratory Support', support_num, support_den, support_pct, '#0891B2',
+                              'Bubble CPAP or nasal oxygen recorded'),
+    ]
+    overview_children = [html.Div(className='mnid-newborn-metric-grid', children=summary_cards)]
+    if admission_card:
+        overview_children.append(html.Div(className='mnid-newborn-subgrid mnid-newborn-subgrid-2',
+                                          children=[admission_card]))
+    charts.append(_newborn_section_card(
+        'NEWBORN CARE PATHWAY',
+        'Overview of admissions, stabilization, respiratory support, and KMC activity.',
+        'pathway',
+        html.Div(children=overview_children),
+    ))
+
+    run_specs = [
+        ('Thermal status on admission', ['Not hypothermic'], 'Thermal Stability', 85, '#0F766E'),
+        ('Neonatal resuscitation provided', ['Yes', 'Stimulation only', 'Bag and mask'], 'Resuscitation Response', 80, '#2563EB'),
+        ('iKMC initiated', ['Yes'], 'iKMC Initiation', 75, '#7C3AED'),
+        ('Phototherapy given', ['Yes'], 'Phototherapy Use', 70, '#C2410C'),
+        ('Parenteral antibiotics given', ['Yes'], 'Antibiotics Given', 85, '#DB2777'),
+        ('CPAP support', ['Bubble CPAP'], 'Bubble CPAP Use', 60, '#0891B2'),
+    ]
+    run_cards = []
+    for concept, values, title, target, color in run_specs:
+        run_fig = _monthly_concept_rate(df, concept, positive_values=values, title=title, target=target, color=color)
+        if run_fig:
+            run_cards.append(html.Div(className='mnid-chart-card', children=[
+                dcc.Graph(
+                    figure=run_fig,
+                    config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
+                    style={'height': '210px'},
+                ),
+            ]))
+
+    if run_cards:
+        charts.append(_newborn_section_card(
+            'INTERVENTION RUN CHARTS',
+            'Monthly indicator performance with target reference lines.',
+            'interventions',
+            html.Div(className='mnid-newborn-subgrid mnid-newborn-subgrid-3', children=run_cards),
+        ))
+
+    mix_fig = _monthly_concept_mix_fig(
+        df,
+        'Thermal status on admission',
+        [
+            ('Not hypothermic', ['Not hypothermic'], '#2563EB'),
+            ('Mild hypothermia', ['Mild hypothermia'], '#0F766E'),
+            ('Moderate/Severe', ['Moderate hypothermia', 'Severe hypothermia'], '#DB2777'),
+        ],
+        'Thermal Status Mix Over Time',
+    )
+    if mix_fig:
+        charts.append(_chart_card('', mix_fig))
+
+    resp_mix_fig = _monthly_concept_mix_fig(
+        df,
+        'CPAP support',
+        [
+            ('Bubble CPAP', ['Bubble CPAP'], '#7C3AED'),
+            ('Nasal oxygen', ['Nasal oxygen'], '#0891B2'),
+            ('No advanced support', ['None', 'No'], '#CBD5E1'),
+        ],
+        'Respiratory Support Mix Over Time',
+    )
+    support_mix_cards = []
+    if mix_fig:
+        support_mix_cards.append(_chart_card('', mix_fig))
+    if resp_mix_fig:
+        support_mix_cards.append(_chart_card('', resp_mix_fig))
+    if support_mix_cards:
+        charts.append(_newborn_section_card(
+            'STABILIZATION MIX',
+            'Monthly composition of thermal status and respiratory support patterns.',
+            'stabilization',
+            html.Div(className='mnid-newborn-subgrid mnid-newborn-subgrid-2', children=support_mix_cards),
+        ))
 
     vc = _value_counts(df, 'Thermal status on admission')
     fig = _donut(vc, 'Thermal Status on Admission', color_map={
@@ -3182,42 +3438,51 @@ def _newborn_charts(df):
         'Moderate hypothermia': '#C2410C',
         'Severe hypothermia': '#DB2777',
     })
-    if fig: charts.append(_chart_card('', fig))
+    outcome_cards = []
+    if fig: outcome_cards.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'Neonatal resuscitation provided')
     fig = _donut(vc, 'Neonatal Resuscitation', color_map={
         'Yes': '#2563EB', 'Stimulation only': '#0F766E',
         'Bag and mask': '#7C3AED', 'No': '#94A3B8', 'Not required': '#CBD5E1',
     })
-    if fig: charts.append(_chart_card('', fig))
+    if fig: outcome_cards.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'iKMC initiated')
     fig = _donut(vc, 'iKMC Initiated', color_map={
         'Yes': '#2563EB', 'No': '#94A3B8', 'Not eligible': '#CBD5E1',
     })
-    if fig: charts.append(_chart_card('', fig))
+    if fig: outcome_cards.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'CPAP support')
     fig = _donut(vc, 'CPAP Support Type', color_map={
         'Bubble CPAP': '#2563EB', 'Nasal oxygen': '#0F766E', 'None': '#94A3B8',
     })
-    if fig: charts.append(_chart_card('', fig))
+    if fig: outcome_cards.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'Phototherapy given')
     fig = _donut(vc, 'Phototherapy Given', color_map={
         'Yes': '#2563EB', 'No': '#94A3B8',
     })
-    if fig: charts.append(_chart_card('', fig))
+    if fig: outcome_cards.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'Parenteral antibiotics given')
     fig = _donut(vc, 'Parenteral Antibiotics', color_map={
         'Yes': '#2563EB', 'No': '#94A3B8',
     })
-    if fig: charts.append(_chart_card('', fig))
+    if fig: outcome_cards.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'Newborn baby complications')
     fig = _hbar(vc, 'Newborn Complications')
-    if fig: charts.append(_chart_card('', fig))
+    if fig: outcome_cards.append(_chart_card('', fig))
+
+    if outcome_cards:
+        charts.append(_newborn_section_card(
+            'OUTCOMES AND COMPLICATIONS',
+            'Distribution charts keep the detailed newborn outcomes visible after the higher-level intervention trends.',
+            'outcomes',
+            html.Div(className='mnid-newborn-subgrid mnid-newborn-subgrid-3', children=outcome_cards),
+        ))
 
     return charts
 
@@ -3860,7 +4125,8 @@ def _pph_cascade(df):
 # MNID header, alert, KPI, and section navigation components
 
 def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=None,
-            title='Maternal and Child Health Indicators', subtitle='Clean view of performance, comparison, coverage, and readiness.'):
+            title='Maternal and Child Health Indicators', subtitle='Clean view of performance, comparison, coverage, and readiness.',
+            theme='default'):
     facility_name = _FACILITY_NAMES.get(facility, facility or 'Network view')
     district = _FACILITY_DISTRICT.get(facility, 'All districts')
 
@@ -3888,11 +4154,31 @@ def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=N
         if requested:
             selected_program = requested
 
-    return html.Div(className='mnid-topbar', children=[
+    topbar_label = 'N-NID Dashboard' if theme == 'newborn' else 'M-NID Dashboard'
+    newborn_focus = None
+    if theme == 'newborn':
+        newborn_focus = html.Div(className='mnid-topbar-highlight', children=[
+            html.Div(className='mnid-topbar-highlight-copy', children=[
+                html.Div('Neonatal service overview', className='mnid-topbar-highlight-title'),
+                html.Div('View stabilization, respiratory support, KMC uptake, and facility performance in one place.',
+                         className='mnid-topbar-highlight-subtitle'),
+            ]),
+            html.Div(className='mnid-topbar-highlight-chips', children=[
+                html.Span('Stabilize', className='mnid-topbar-chip'),
+                html.Span('Support', className='mnid-topbar-chip'),
+                html.Span('Monitor', className='mnid-topbar-chip'),
+                html.Span('Benchmark', className='mnid-topbar-chip'),
+                html.Span(f'{n_tracked} tracked', className='mnid-topbar-chip strong'),
+                html.Span(f'{n_await} pending', className='mnid-topbar-chip subtle'),
+            ]),
+        ])
+
+    return html.Div(className=f'mnid-topbar{" mnid-topbar-newborn" if theme == "newborn" else ""}', children=[
         html.Div(className='mnid-topbar-copy', children=[
-            html.Div('M-NID Dashboard', className='mnid-topbar-label'),
+            html.Div(topbar_label, className='mnid-topbar-label'),
             html.H1(title),
             html.P(subtitle),
+            newborn_focus,
         ]),
         html.Div(className='mnid-info-pills', children=[
             html.Div(className='mnid-info-pill', children=[
@@ -3926,18 +4212,31 @@ def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=N
     ])
 
 
-def _sidebar(facility_code: str) -> html.Div:
-    nav_items = [
-        ('Overview', '#mnid-summary'),
-        ('Data Tables', '#mnid-data-tables'),
-        ('Trend', '#mnid-trends'),
-        ('Performance', '#mnid-performance'),
-        ('Map View', '#mnid-heatmap'),
-        ('Indicators', '#mnid-coverage'),
-        ('Comparison', '#mnid-comparative'),
-        ('Analysis', '#mnid-analysis'),
-        ('Readiness', '#mnid-readiness'),
-    ]
+def _sidebar(facility_code: str, theme: str = 'default') -> html.Div:
+    if theme == 'newborn':
+        nav_items = [
+            ('Overview', '#mnid-summary'),
+            ('Service Snapshot', '#mnid-data-tables'),
+            ('Run Trends', '#mnid-trends'),
+            ('District Performance', '#mnid-performance'),
+            ('Coverage Map', '#mnid-heatmap'),
+            ('Indicator Status', '#mnid-coverage'),
+            ('Benchmarking', '#mnid-comparative'),
+            ('Clinical Layers', '#mnid-analysis'),
+            ('Readiness', '#mnid-readiness'),
+        ]
+    else:
+        nav_items = [
+            ('Overview', '#mnid-summary'),
+            ('Data Tables', '#mnid-data-tables'),
+            ('Trend', '#mnid-trends'),
+            ('Performance', '#mnid-performance'),
+            ('Map View', '#mnid-heatmap'),
+            ('Indicators', '#mnid-coverage'),
+            ('Comparison', '#mnid-comparative'),
+            ('Analysis', '#mnid-analysis'),
+            ('Readiness', '#mnid-readiness'),
+        ]
     return html.Div(className='mnid-nav', children=[
         html.A(href=href, className='mnid-nav-btn', children=label)
         for label, href in nav_items
@@ -4087,12 +4386,15 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     if category_order == ['Newborn']:
         dashboard_title = 'Newborn Indicators'
         dashboard_subtitle = 'Focused newborn care performance, comparison, coverage, and readiness.'
+        dashboard_theme = 'newborn'
     elif set(category_order) == {'ANC', 'Labour', 'PNC'}:
         dashboard_title = 'Maternal Health Indicators'
         dashboard_subtitle = 'ANC, labour, and postnatal performance, comparison, coverage, and readiness.'
+        dashboard_theme = 'default'
     else:
         dashboard_title = f"{config.get('report_name', 'Maternal and Child Health')} Indicators"
         dashboard_subtitle = 'Clean view of performance, comparison, coverage, and readiness.'
+        dashboard_theme = 'default'
     hero_title = f'KEY {_CAT_LABELS.get(default_cat, str(default_cat or "Program")).upper()} INDICATORS'
 
     computed = []
@@ -4129,10 +4431,12 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     service_table_div = _service_table_switcher(facility_df, category_order, default_cat, scope_meta)
     comparative_div  = _comparative_analysis_section(all_inds, facility_code, network_df)
 
-    def _sec_header(title, count=None, desc=None):
-        return html.Div(className='mnid-section-header', children=[
+    def _sec_header(title, count=None, desc=None, eyebrow=None):
+        return html.Div(className=f'mnid-section-header{" mnid-section-header-newborn" if dashboard_theme == "newborn" else ""}', children=[
             html.Div([
+                html.Div(eyebrow, className='mnid-section-header-eyebrow') if eyebrow else None,
                 html.Span(title, className='mnid-section-header-title'),
+                html.Div(desc, className='mnid-section-header-desc') if desc else None,
             ]),
             html.Span(f'{count} charts' if count else '',
                       className='mnid-section-header-count'),
@@ -4147,46 +4451,60 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
         ] if cat in category_order
     )
 
-    main_content = html.Div(className='mnid-main', children=[
+    main_content = html.Div(className=f'mnid-main{" mnid-main-newborn" if dashboard_theme == "newborn" else ""}', children=[
 
-        _topbar(facility_code, period, len(tracked), len(awaiting), facility_df=facility_df, network_df=network_df, title=dashboard_title, subtitle=dashboard_subtitle),
-        _sidebar(facility_code),
+        _topbar(facility_code, period, len(tracked), len(awaiting), facility_df=facility_df, network_df=network_df, title=dashboard_title, subtitle=dashboard_subtitle, theme=dashboard_theme),
+        _sidebar(facility_code, theme=dashboard_theme),
         _alert_banner(below, strong),
 
         _section_anchor('mnid-summary'),
-        _sec_header('Overview', desc=f'{len(tracked)} tracked - {len(awaiting)} awaiting'),
+        _sec_header('Overview',
+                    desc='Newborn program snapshot, priority indicator posture, and facility context.' if dashboard_theme == 'newborn' else f'{len(tracked)} tracked - {len(awaiting)} awaiting',
+                    eyebrow='Overview' if dashboard_theme == 'newborn' else None),
         _kpi_row(computed),
         _hero_donut_row(computed, preferred_cat=default_cat, section_title=hero_title),
         _priority_table(computed),
 
         _section_anchor('mnid-data-tables'),
-        _sec_header('Data Tables', desc='Key service counts and outcomes'),
+        _sec_header('Service Snapshot' if dashboard_theme == 'newborn' else 'Data Tables',
+                    desc='Structured counts for admissions, stabilization, thermal status, respiratory support, and newborn outcomes.' if dashboard_theme == 'newborn' else 'Key service counts and outcomes',
+                    eyebrow='Service Summary' if dashboard_theme == 'newborn' else None),
         service_table_div,
 
         _section_anchor('mnid-trends'),
-        _sec_header('Coverage Trends', desc='12-month rolling - dotted line = target'),
+        _sec_header('Run Trends' if dashboard_theme == 'newborn' else 'Coverage Trends',
+                    desc='Monthly newborn indicator run charts with a target reference for monitoring change over time.' if dashboard_theme == 'newborn' else '12-month rolling - dotted line = target',
+                    eyebrow='Trends' if dashboard_theme == 'newborn' else None),
         _trend_switcher(facility_df, all_inds, scope_meta=scope_meta),
 
         _section_anchor('mnid-performance'),
-        _sec_header('Facility Performance', desc='District comparison heatmap for key performance indicators'),
+        _sec_header('District Performance' if dashboard_theme == 'newborn' else 'Facility Performance',
+                    desc='How this newborn service compares across district and facility peers.' if dashboard_theme == 'newborn' else 'District comparison heatmap for key performance indicators',
+                    eyebrow='Performance' if dashboard_theme == 'newborn' else None),
         performance_div,
 
         _section_anchor('mnid-heatmap'),
-        _sec_header('Map View', desc='Geographic coverage map and district/facility context'),
+        _sec_header('Coverage Map' if dashboard_theme == 'newborn' else 'Map View',
+                    desc='Geographic context for neonatal care performance and service reach.' if dashboard_theme == 'newborn' else 'Geographic coverage map and district/facility context',
+                    eyebrow='Map' if dashboard_theme == 'newborn' else None),
         heatmap_div,
 
         _section_anchor('mnid-coverage'),
-        _sec_header('Coverage Indicators', sum(len(v) for v in by_cat.values()),
-                    desc='Coverage % vs target - target threshold shown per chart'),
+        _sec_header('Indicator Status' if dashboard_theme == 'newborn' else 'Coverage Indicators', sum(len(v) for v in by_cat.values()),
+                    desc='Coverage against target across the newborn pathway, from stabilization to follow-up.' if dashboard_theme == 'newborn' else 'Coverage % vs target - target threshold shown per chart',
+                    eyebrow='Indicators' if dashboard_theme == 'newborn' else None),
         coverage_charts,
 
         _section_anchor('mnid-comparative'),
-        _sec_header('Facility & District Comparison',
-                    desc='Cross-facility and district indicator benchmarking'),
+        _sec_header('Benchmarking' if dashboard_theme == 'newborn' else 'Facility & District Comparison',
+                    desc='Facility and district comparison for newborn indicators.' if dashboard_theme == 'newborn' else 'Cross-facility and district indicator benchmarking',
+                    eyebrow='Comparison' if dashboard_theme == 'newborn' else None),
         comparative_div,
 
         _section_anchor('mnid-analysis'),
-        _sec_header('Clinical Analysis', total_analysis, desc='Care-phase deep-dives'),
+        _sec_header('Clinical Layers' if dashboard_theme == 'newborn' else 'Clinical Analysis', total_analysis,
+                    desc='Newborn pathway, intervention, stabilization, and outcome views.' if dashboard_theme == 'newborn' else 'Care-phase deep-dives',
+                    eyebrow='Clinical View' if dashboard_theme == 'newborn' else None),
         dmc.Accordion(
             multiple=True,
             value=[a.value for a in analysis_acc],
@@ -4203,13 +4521,14 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
 
         _section_anchor('mnid-readiness'),
         _sec_header('Operational Readiness',
-                    desc='Equipment - workforce competency - data quality'),
+                    desc='Devices, staffing, and data quality conditions that shape neonatal care delivery.' if dashboard_theme == 'newborn' else 'Equipment - workforce competency - data quality',
+                    eyebrow='Readiness' if dashboard_theme == 'newborn' else None),
         _system_readiness(facility_df, supply_inds, wf_inds, dq_inds),
     ])
 
-    return html.Div(className='mnid-bg', children=[
+    return html.Div(className=f'mnid-bg{" mnid-theme-newborn" if dashboard_theme == "newborn" else ""}', children=[
         # Hidden components used by the MNID scroll spy callback
         dcc.Interval(id='mnid-scrollspy-tick', interval=800, max_intervals=1),
         dcc.Store(id='mnid-scrollspy-out'),
-        html.Div(className='mnid-shell', children=[main_content]),
+        html.Div(className=f'mnid-shell{" mnid-shell-newborn" if dashboard_theme == "newborn" else ""}', children=[main_content]),
     ])
