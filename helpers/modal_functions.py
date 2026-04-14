@@ -104,6 +104,23 @@ def validate_dashboard_json(contents):
     try:
         data = json.loads(contents)
 
+        def _flatten_values(value):
+            if isinstance(value, list):
+                return [v for v in value if v not in (None, "")]
+            if value in (None, ""):
+                return []
+            return [value]
+
+        def _invalid_columns(filters, keys_to_check):
+            invalid = []
+            for key in keys_to_check:
+                if key not in filters:
+                    continue
+                for value in _flatten_values(filters.get(key)):
+                    if value not in actual_keys_in_data:
+                        invalid.append(str(value))
+            return invalid
+
         if not isinstance(data, list) or len(data) == 0:
             return False, "JSON must be a non-empty list of dashboard objects."
 
@@ -118,10 +135,13 @@ def validate_dashboard_json(contents):
                 return False, "'visualization_types' must be an object."
 
             counts = vis.get("counts", [])
-            charts = vis.get("charts", [])
-            if len(counts) == 0 and len(charts) == 0:
+            charts = vis.get("charts", {})
+            sections = charts.get("sections", []) if isinstance(charts, dict) else []
+            priority_indicators = item.get("priority_indicators", []) or vis.get("priority_indicators", [])
+
+            if len(counts) == 0 and len(sections) == 0 and len(priority_indicators) == 0:
                 return False, (
-                    "Each dashboard must contain at least one item under 'counts' or 'charts'."
+                    "Each dashboard must contain counts, chart sections, or MNID priority indicators."
                 )
             for c in counts:
                 if not isinstance(c, dict):
@@ -133,23 +153,15 @@ def validate_dashboard_json(contents):
                     )
                 if not isinstance(c["filters"], dict):
                     return False, "'filters' in counts must be a dict."
-                
-                # check if the values (data columns) are matching. I have indicated the list of known columns above
-                target_keys = ["measure","unique","variable1","variable2","variable3","variable4","variable5","variable6"]
-                
-                selected_values = []
-                for key in target_keys:
-                    if key in c["filters"]:
-                       if c["filters"][key] not in actual_keys_in_data:
-                           if isinstance(c["filters"][key], list):
-                                for v in c["filters"][key]:
-                                    if v not in actual_keys_in_data:
-                                        selected_values.append(v)
-                                else:
-                                    selected_values.append(c["filters"][key])
-                if len(selected_values)>0:
+
+                selected_values = _invalid_columns(
+                    c["filters"],
+                    ["unique", "variable1", "variable2", "variable3", "variable4", "variable5", "variable6", "variable7", "variable8"]
+                )
+                if len(selected_values) > 0:
                     return False, f"The following filter values in counts are invalid data columns: {', '.join(selected_values)}"
-            for chart in charts['sections']:
+
+            for chart in sections:
                 for ch in chart['items']:
                     if not isinstance(ch, dict):
                         return False, "Each item in 'charts' must be an object."
@@ -160,22 +172,38 @@ def validate_dashboard_json(contents):
                         )
                     if not isinstance(ch["filters"], dict):
                         return False, "'filters' in charts must be a dict."
-                    # check if the values (data columns) are matching. I have indicated the list of known columns above
-                    target_keys = ["date_col","y_col","label_col","value_col",
-                                "names_col","values_col","x_col","index_col1","columns",
-                                "values_col","unique_column","filter_col1","filter_col2","filter_col3"]
-                    selected_values = []
-                    for key in target_keys:
-                        if key in ch["filters"]:
-                            if ch["filters"][key] not in actual_keys_in_data:
-                                if isinstance(ch["filters"][key], list):
-                                    for v in ch["filters"][key]:
-                                        if v not in actual_keys_in_data:
-                                            selected_values.append(v)
-                                else:
-                                    selected_values.append(ch["filters"][key])
-                    if len(selected_values)>0:
+
+                    selected_values = _invalid_columns(
+                        ch["filters"],
+                        [
+                            "date_col", "y_col", "label_col", "value_col", "names_col",
+                            "values_col", "x_col", "index_col1", "columns", "unique_column",
+                            "filter_col1", "filter_col2", "filter_col3", "filter_col4", "filter_col5",
+                            "age_col", "gender_col"
+                        ]
+                    )
+                    if len(selected_values) > 0:
                         return False, f"The following filter values in charts are invalid data columns: {', '.join(selected_values)}"
+
+            for indicator in priority_indicators:
+                if not isinstance(indicator, dict):
+                    return False, "Each MNID indicator must be an object."
+                required_indicator_keys = ["id", "label", "status"]
+                if not all(k in indicator for k in required_indicator_keys):
+                    return False, "Each MNID indicator must contain 'id', 'label', and 'status'."
+
+                for filter_key in ["numerator_filters", "denominator_filters"]:
+                    filter_value = indicator.get(filter_key)
+                    if filter_value is None:
+                        continue
+                    if not isinstance(filter_value, dict):
+                        return False, f"'{filter_key}' in MNID indicators must be a dict."
+                    invalid_columns = _invalid_columns(
+                        filter_value,
+                        ["unique", "variable1", "variable2", "variable3", "variable4", "variable5", "variable6", "variable7", "variable8"]
+                    )
+                    if invalid_columns:
+                        return False, f"The following MNID filter values are invalid data columns: {', '.join(invalid_columns)}"
         return True, "Dry run successful! JSON structure is valid."
 
     except Exception as e:
@@ -932,6 +960,141 @@ def create_section(section_data=None, index=None):
                     className="charts-container",
                     children=initial_charts),
         ]),
+    ])
+
+def _create_mnid_filter_group(filters, index, scope):
+    scope_key = scope.lower()
+    variable_options = [{'label': item, 'value': item} for item in actual_keys_in_data]
+
+    rows = []
+    for position in range(1, 5):
+        variable_key = f"variable{position}"
+        value_key = f"value{position}"
+        rows.append(
+            html.Div(style={"display": "flex", "gap": "8px", "marginBottom": "8px"}, children=[
+                html.Div(style={"flex": "0.45"}, children=[
+                    html.Label(f"{scope} Variable {position}", className="form-label"),
+                    dcc.Dropdown(
+                        id={"type": f"mnid-{scope_key}-var{position}", "index": index},
+                        options=variable_options,
+                        value=filters.get(variable_key),
+                        placeholder="Select data column",
+                        className="form-input",
+                        clearable=True,
+                    )
+                ]),
+                html.Div(style={"flex": "0.55"}, children=[
+                    html.Label(f"{scope} Value {position}", className="form-label"),
+                    dcc.Input(
+                        id={"type": f"mnid-{scope_key}-val{position}", "index": index},
+                        value=json.dumps(filters.get(value_key)) if isinstance(filters.get(value_key), (list, dict)) else (filters.get(value_key, "") or ""),
+                        placeholder='Value or JSON array e.g. ["Yes","No"]',
+                        className="form-input"
+                    )
+                ]),
+            ])
+        )
+    return rows
+
+def create_mnid_indicator_item(indicator_data=None, index=None):
+    indicator_data = indicator_data or {}
+    numerator_filters = indicator_data.get("numerator_filters", {})
+    denominator_filters = indicator_data.get("denominator_filters", {})
+
+    return html.Div(className="count-item", children=[
+        html.Div(style={"display": "flex", "gap": "8px"}, children=[
+            html.Div(className="count-col", style={"display": "none"}, children=[
+                html.Label("Indicator ID", className="form-label-disabled"),
+                dcc.Input(
+                    id={"type": "mnid-indicator-id", "index": index},
+                    value=indicator_data.get("id", f"mnid_{uuid.uuid4().hex[:8]}"),
+                    disabled=True,
+                    className="form-input",
+                ),
+            ]),
+            html.Div(className="count-col", children=[
+                html.Label("Indicator Label *", className="form-label"),
+                dcc.Input(
+                    id={"type": "mnid-indicator-label", "index": index},
+                    value=indicator_data.get("label", ""),
+                    placeholder="Indicator title",
+                    className="form-input",
+                ),
+            ]),
+            html.Div(className="count-col", children=[
+                html.Label("Category", className="form-label"),
+                dcc.Dropdown(
+                    id={"type": "mnid-indicator-category", "index": index},
+                    options=[{"label": item, "value": item} for item in ["ANC", "Labour", "PNC", "Newborn"]],
+                    value=indicator_data.get("category"),
+                    clearable=True,
+                    className="form-input",
+                ),
+            ]),
+            html.Div(className="count-col", children=[
+                html.Label("Target", className="form-label"),
+                dcc.Input(
+                    id={"type": "mnid-indicator-target", "index": index},
+                    type="number",
+                    value=indicator_data.get("target", 80),
+                    className="form-input",
+                ),
+            ]),
+            html.Div(className="count-col", children=[
+                html.Label("Status", className="form-label"),
+                dcc.Dropdown(
+                    id={"type": "mnid-indicator-status", "index": index},
+                    options=[{"label": item.replace("_", " ").title(), "value": item} for item in ["tracked", "awaiting_baseline"]],
+                    value=indicator_data.get("status", "tracked"),
+                    clearable=False,
+                    className="form-input",
+                ),
+            ]),
+            html.Div(className="count-col", children=[
+                html.Label("Unique Field", className="form-label"),
+                dcc.Dropdown(
+                    id={"type": "mnid-indicator-unique", "index": index},
+                    options=[{"label": item, "value": item} for item in ["person_id", "encounter_id"]],
+                    value=numerator_filters.get("unique", denominator_filters.get("unique", "person_id")),
+                    clearable=False,
+                    className="form-input",
+                ),
+            ]),
+            html.Div(className="count-col", children=[
+                html.Label("Actions", className="form-label"),
+                html.Button(
+                    "Save",
+                    id={"type": "save-mnid-indicator", "index": index},
+                    n_clicks=0,
+                    className="btn-save btn-small"
+                ),
+                html.Button(
+                    "Delete",
+                    id={"type": "remove-mnid-indicator", "index": index},
+                    n_clicks=0,
+                    className="btn-danger btn-small"
+                )
+            ]),
+        ]),
+        html.Div(style={"display": "flex", "gap": "20px", "marginTop": "10px"}, children=[
+            html.Div(style={"flex": "1"}, children=[
+                html.Label("Numerator Filters", className="form-label"),
+                *_create_mnid_filter_group(numerator_filters, index, "Numerator")
+            ]),
+            html.Div(style={"flex": "1"}, children=[
+                html.Label("Denominator Filters", className="form-label"),
+                *_create_mnid_filter_group(denominator_filters, index, "Denominator")
+            ]),
+        ]),
+        html.Div(style={"marginTop": "10px"}, children=[
+            html.Label("Notes", className="form-label"),
+            dcc.Textarea(
+                id={"type": "mnid-indicator-note", "index": index},
+                value=indicator_data.get("note", ""),
+                className="form-input",
+                style={"width": "100%", "minHeight": "72px", "resize": "vertical"}
+            )
+        ])
     ])
 
 CHART_TEMPLATES = {
