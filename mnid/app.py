@@ -944,6 +944,24 @@ def _newborn_section_card(title, subtitle, tone, children):
                     ])
 
 
+def _first_available_value_counts(df: pd.DataFrame, concepts: list[str], col: str = 'obs_value_coded'):
+    for concept in concepts:
+        vc = _value_counts(df, concept, col=col)
+        if len(vc):
+            return vc, concept
+    return pd.DataFrame(columns=['label', 'n']), None
+
+
+def _newborn_tab_content(desc: str, children: list):
+    cards = [child for child in children if child is not None]
+    if not cards:
+        cards = [_no_data_card('No data available for this module.')]
+    return html.Div(className='mnid-newborn-tab-panel', children=[
+        html.Div(desc, className='mnid-newborn-tab-desc'),
+        html.Div(className='mnid-newborn-subgrid mnid-newborn-subgrid-3', children=cards),
+    ])
+
+
 def _service_stack_fig(section: dict, chart_id: str | None = None) -> go.Figure:
     rows = section.get('rows', [])
     chart_specs = section.get('chart_specs', []) or []
@@ -3336,7 +3354,6 @@ def _pnc_charts(df):
 
 
 def _newborn_charts(df):
-    charts = []
     monthly = _monthly_visits(df, 'NEONATAL CARE')
     fig = _line(monthly, 'Neonatal Care Admissions', color=_TREND_ACCENT['Newborn'], y_label='Babies')
     admission_card = _chart_card('', fig) if fig else None
@@ -3356,16 +3373,9 @@ def _newborn_charts(df):
         _newborn_summary_card('Respiratory Support', support_num, support_den, support_pct, '#0891B2',
                               'Bubble CPAP or nasal oxygen recorded'),
     ]
-    overview_children = [html.Div(className='mnid-newborn-metric-grid', children=summary_cards)]
-    if admission_card:
-        overview_children.append(html.Div(className='mnid-newborn-subgrid mnid-newborn-subgrid-2',
-                                          children=[admission_card]))
-    charts.append(_newborn_section_card(
-        'NEWBORN CARE PATHWAY',
-        'Overview of admissions, stabilization, respiratory support, and KMC activity.',
-        'pathway',
-        html.Div(children=overview_children),
-    ))
+    overview_card = html.Div(className='mnid-chart-card', children=[
+        html.Div(className='mnid-newborn-metric-grid', children=summary_cards)
+    ])
 
     run_specs = [
         ('Thermal status on admission', ['Not hypothermic'], 'Thermal Stability', 85, '#0F766E'),
@@ -3375,25 +3385,17 @@ def _newborn_charts(df):
         ('Parenteral antibiotics given', ['Yes'], 'Antibiotics Given', 85, '#DB2777'),
         ('CPAP support', ['Bubble CPAP'], 'Bubble CPAP Use', 60, '#0891B2'),
     ]
-    run_cards = []
+    run_cards = {}
     for concept, values, title, target, color in run_specs:
         run_fig = _monthly_concept_rate(df, concept, positive_values=values, title=title, target=target, color=color)
         if run_fig:
-            run_cards.append(html.Div(className='mnid-chart-card', children=[
+            run_cards[title] = html.Div(className='mnid-chart-card', children=[
                 dcc.Graph(
                     figure=run_fig,
                     config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
                     style={'height': '210px'},
                 ),
-            ]))
-
-    if run_cards:
-        charts.append(_newborn_section_card(
-            'INTERVENTION RUN CHARTS',
-            'Monthly indicator performance with target reference lines.',
-            'interventions',
-            html.Div(className='mnid-newborn-subgrid mnid-newborn-subgrid-3', children=run_cards),
-        ))
+            ])
 
     mix_fig = _monthly_concept_mix_fig(
         df,
@@ -3405,8 +3407,7 @@ def _newborn_charts(df):
         ],
         'Thermal Status Mix Over Time',
     )
-    if mix_fig:
-        charts.append(_chart_card('', mix_fig))
+    thermal_mix_card = _chart_card('', mix_fig) if mix_fig else None
 
     resp_mix_fig = _monthly_concept_mix_fig(
         df,
@@ -3418,18 +3419,7 @@ def _newborn_charts(df):
         ],
         'Respiratory Support Mix Over Time',
     )
-    support_mix_cards = []
-    if mix_fig:
-        support_mix_cards.append(_chart_card('', mix_fig))
-    if resp_mix_fig:
-        support_mix_cards.append(_chart_card('', resp_mix_fig))
-    if support_mix_cards:
-        charts.append(_newborn_section_card(
-            'STABILIZATION MIX',
-            'Monthly composition of thermal status and respiratory support patterns.',
-            'stabilization',
-            html.Div(className='mnid-newborn-subgrid mnid-newborn-subgrid-2', children=support_mix_cards),
-        ))
+    respiratory_mix_card = _chart_card('', resp_mix_fig) if resp_mix_fig else None
 
     vc = _value_counts(df, 'Thermal status on admission')
     fig = _donut(vc, 'Thermal Status on Admission', color_map={
@@ -3438,53 +3428,107 @@ def _newborn_charts(df):
         'Moderate hypothermia': '#C2410C',
         'Severe hypothermia': '#DB2777',
     })
-    outcome_cards = []
-    if fig: outcome_cards.append(_chart_card('', fig))
+    thermal_donut = _chart_card('', fig) if fig else None
 
     vc = _value_counts(df, 'Neonatal resuscitation provided')
     fig = _donut(vc, 'Neonatal Resuscitation', color_map={
         'Yes': '#2563EB', 'Stimulation only': '#0F766E',
         'Bag and mask': '#7C3AED', 'No': '#94A3B8', 'Not required': '#CBD5E1',
     })
-    if fig: outcome_cards.append(_chart_card('', fig))
+    resuscitation_donut = _chart_card('', fig) if fig else None
 
     vc = _value_counts(df, 'iKMC initiated')
     fig = _donut(vc, 'iKMC Initiated', color_map={
         'Yes': '#2563EB', 'No': '#94A3B8', 'Not eligible': '#CBD5E1',
     })
-    if fig: outcome_cards.append(_chart_card('', fig))
+    kmc_donut = _chart_card('', fig) if fig else None
 
     vc = _value_counts(df, 'CPAP support')
     fig = _donut(vc, 'CPAP Support Type', color_map={
         'Bubble CPAP': '#2563EB', 'Nasal oxygen': '#0F766E', 'None': '#94A3B8',
     })
-    if fig: outcome_cards.append(_chart_card('', fig))
+    cpap_donut = _chart_card('', fig) if fig else None
 
     vc = _value_counts(df, 'Phototherapy given')
     fig = _donut(vc, 'Phototherapy Given', color_map={
         'Yes': '#2563EB', 'No': '#94A3B8',
     })
-    if fig: outcome_cards.append(_chart_card('', fig))
+    phototherapy_donut = _chart_card('', fig) if fig else None
 
     vc = _value_counts(df, 'Parenteral antibiotics given')
     fig = _donut(vc, 'Parenteral Antibiotics', color_map={
         'Yes': '#2563EB', 'No': '#94A3B8',
     })
-    if fig: outcome_cards.append(_chart_card('', fig))
+    antibiotics_donut = _chart_card('', fig) if fig else None
 
     vc = _value_counts(df, 'Newborn baby complications')
     fig = _hbar(vc, 'Newborn Complications')
-    if fig: outcome_cards.append(_chart_card('', fig))
+    complications_bar = _chart_card('', fig) if fig else None
 
-    if outcome_cards:
-        charts.append(_newborn_section_card(
-            'OUTCOMES AND COMPLICATIONS',
-            'Distribution charts keep the detailed newborn outcomes visible after the higher-level intervention trends.',
-            'outcomes',
-            html.Div(className='mnid-newborn-subgrid mnid-newborn-subgrid-3', children=outcome_cards),
-        ))
+    birthweight_vc, birthweight_concept = _first_available_value_counts(
+        df,
+        ['Birthweight category', 'Birth weight category', 'Birthweight', 'Birth weight'],
+        col='obs_value_coded',
+    )
+    birthweight_chart = None
+    if len(birthweight_vc):
+        birthweight_fig = _hbar(birthweight_vc, 'Birthweight Distribution', color='#7C3AED')
+        if birthweight_fig:
+            birthweight_chart = _chart_card('', birthweight_fig)
 
-    return charts
+    mortality_vc, mortality_concept = _first_available_value_counts(
+        df,
+        ['Status of baby', 'Baby Final Status', 'Outcome of the delivery'],
+        col='obs_value_coded',
+    )
+    mortality_chart = None
+    if len(mortality_vc):
+        mortality_fig = _donut(mortality_vc, 'Outcome Status', color_map={
+            'Stable': '#2563EB', 'Alive': '#2563EB', 'Live births': '#2563EB',
+            'Referred': '#C2410C', 'Died': '#DB2777', 'Death': '#DB2777',
+            'Fresh stillbirth': '#DB2777', 'Macerated stillbirth': '#7C3AED',
+        })
+        if mortality_fig:
+            mortality_chart = _chart_card('', mortality_fig)
+
+    diagnosis_chart = complications_bar
+    quality_cards = [card for card in [phototherapy_donut, antibiotics_donut, thermal_donut] if card is not None]
+
+    tab_specs = [
+        ('Admissions', 'Admissions volume and core neonatal service activity.', [overview_card, admission_card]),
+        ('Mortality', 'Outcome trends and mortality-related newborn status views.', [mortality_chart, complications_bar]),
+        ('Birthweight', 'Birthweight-related distribution views for neonatal review.', [birthweight_chart]),
+        ('Thermal Care', 'Thermal stability monitoring and thermal status composition.', [run_cards.get('Thermal Stability'), thermal_mix_card, thermal_donut]),
+        ('Respiratory Support', 'Respiratory support and resuscitation monitoring.', [run_cards.get('Resuscitation Response'), run_cards.get('Bubble CPAP Use'), respiratory_mix_card, resuscitation_donut, cpap_donut]),
+        ('KMC', 'KMC uptake and related newborn care monitoring.', [run_cards.get('iKMC Initiation'), kmc_donut]),
+        ('Infections', 'Infection-related treatment and complication monitoring.', [run_cards.get('Antibiotics Given'), antibiotics_donut, diagnosis_chart]),
+        ('Quality of Care', 'Selected intervention and support measures used to review care delivery.', quality_cards),
+    ]
+    tabs = []
+    for label, desc, cards in tab_specs:
+        usable_cards = [card for card in cards if card is not None]
+        if usable_cards:
+            tabs.append((label, desc, usable_cards))
+
+    return [html.Div(className='mnid-chart-card mnid-newborn-workspace', style={'gridColumn': '1 / -1'}, children=[
+        html.Div('NEONATAL CLINICAL MODULES', className='mnid-card-title'),
+        html.Div('Select a module to view the relevant neonatal charts and indicators.',
+                 className='mnid-newborn-section-subtitle', style={'marginBottom': '12px'}),
+        dcc.Tabs(
+            value=(tabs[0][0] if tabs else 'Admissions'),
+            className='mnid-newborn-tabs',
+            children=[
+                dcc.Tab(
+                    label=label,
+                    value=label,
+                    className='mnid-newborn-tab',
+                    selected_className='mnid-newborn-tab--selected',
+                    children=_newborn_tab_content(desc, cards),
+                )
+                for label, desc, cards in tabs
+            ],
+        ),
+    ])]
 
 
 # system readiness
@@ -4148,10 +4192,10 @@ def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=N
                 if not dists.empty:
                     district = dists.mode().iloc[0]
 
-    selected_program = 'All'
+    selected_program = 'Neonatal Care' if theme == 'newborn' else 'All'
     if facility_df is not None and len(facility_df):
         requested = getattr(facility_df, 'attrs', {}).get('mnid_program')
-        if requested:
+        if requested and theme != 'newborn':
             selected_program = requested
 
     topbar_label = 'N-NID Dashboard' if theme == 'newborn' else 'M-NID Dashboard'
@@ -4216,14 +4260,14 @@ def _sidebar(facility_code: str, theme: str = 'default') -> html.Div:
     if theme == 'newborn':
         nav_items = [
             ('Overview', '#mnid-summary'),
-            ('Service Snapshot', '#mnid-data-tables'),
-            ('Run Trends', '#mnid-trends'),
+            ('Service Delivery', '#mnid-data-tables'),
+            ('Patient Trends & Outcomes', '#mnid-trends'),
             ('District Performance', '#mnid-performance'),
-            ('Coverage Map', '#mnid-heatmap'),
-            ('Indicator Status', '#mnid-coverage'),
-            ('Benchmarking', '#mnid-comparative'),
-            ('Clinical Layers', '#mnid-analysis'),
-            ('Readiness', '#mnid-readiness'),
+            ('Geographic Coverage', '#mnid-heatmap'),
+            ('Coverage & Quality', '#mnid-coverage'),
+            ('Facility Comparison', '#mnid-comparative'),
+            ('Clinical Interventions', '#mnid-analysis'),
+            ('Operational Readiness', '#mnid-readiness'),
         ]
     else:
         nav_items = [
@@ -4384,8 +4428,8 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     default_cat = category_order[0] if category_order else 'ANC'
 
     if category_order == ['Newborn']:
-        dashboard_title = 'Newborn Indicators'
-        dashboard_subtitle = 'Focused newborn care performance, comparison, coverage, and readiness.'
+        dashboard_title = 'Neonatal Care Dashboard'
+        dashboard_subtitle = 'Program monitoring for admissions, outcomes, clinical interventions, coverage, and readiness.'
         dashboard_theme = 'newborn'
     elif set(category_order) == {'ANC', 'Labour', 'PNC'}:
         dashboard_title = 'Maternal Health Indicators'
@@ -4395,7 +4439,7 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
         dashboard_title = f"{config.get('report_name', 'Maternal and Child Health')} Indicators"
         dashboard_subtitle = 'Clean view of performance, comparison, coverage, and readiness.'
         dashboard_theme = 'default'
-    hero_title = f'KEY {_CAT_LABELS.get(default_cat, str(default_cat or "Program")).upper()} INDICATORS'
+    hero_title = 'KEY NEONATAL INDICATORS' if dashboard_theme == 'newborn' else f'KEY {_CAT_LABELS.get(default_cat, str(default_cat or "Program")).upper()} INDICATORS'
 
     computed = []
     for ind in tracked:
@@ -4459,21 +4503,21 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
 
         _section_anchor('mnid-summary'),
         _sec_header('Overview',
-                    desc='Newborn program snapshot, priority indicator posture, and facility context.' if dashboard_theme == 'newborn' else f'{len(tracked)} tracked - {len(awaiting)} awaiting',
+                    desc='Neonatal program snapshot, priority indicator posture, and facility context.' if dashboard_theme == 'newborn' else f'{len(tracked)} tracked - {len(awaiting)} awaiting',
                     eyebrow='Overview' if dashboard_theme == 'newborn' else None),
         _kpi_row(computed),
         _hero_donut_row(computed, preferred_cat=default_cat, section_title=hero_title),
         _priority_table(computed),
 
         _section_anchor('mnid-data-tables'),
-        _sec_header('Service Snapshot' if dashboard_theme == 'newborn' else 'Data Tables',
-                    desc='Structured counts for admissions, stabilization, thermal status, respiratory support, and newborn outcomes.' if dashboard_theme == 'newborn' else 'Key service counts and outcomes',
+        _sec_header('Service Delivery' if dashboard_theme == 'newborn' else 'Data Tables',
+                    desc='Structured service counts for admissions, thermal care, respiratory support, KMC, and newborn outcomes.' if dashboard_theme == 'newborn' else 'Key service counts and outcomes',
                     eyebrow='Service Summary' if dashboard_theme == 'newborn' else None),
         service_table_div,
 
         _section_anchor('mnid-trends'),
-        _sec_header('Run Trends' if dashboard_theme == 'newborn' else 'Coverage Trends',
-                    desc='Monthly newborn indicator run charts with a target reference for monitoring change over time.' if dashboard_theme == 'newborn' else '12-month rolling - dotted line = target',
+        _sec_header('Patient Trends & Outcomes' if dashboard_theme == 'newborn' else 'Coverage Trends',
+                    desc='Monthly trends for neonatal admissions and outcome-related indicators, with target references where applicable.' if dashboard_theme == 'newborn' else '12-month rolling - dotted line = target',
                     eyebrow='Trends' if dashboard_theme == 'newborn' else None),
         _trend_switcher(facility_df, all_inds, scope_meta=scope_meta),
 
@@ -4484,26 +4528,26 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
         performance_div,
 
         _section_anchor('mnid-heatmap'),
-        _sec_header('Coverage Map' if dashboard_theme == 'newborn' else 'Map View',
-                    desc='Geographic context for neonatal care performance and service reach.' if dashboard_theme == 'newborn' else 'Geographic coverage map and district/facility context',
+        _sec_header('Geographic Coverage' if dashboard_theme == 'newborn' else 'Map View',
+                    desc='Geographic context for neonatal service delivery and district-level performance.' if dashboard_theme == 'newborn' else 'Geographic coverage map and district/facility context',
                     eyebrow='Map' if dashboard_theme == 'newborn' else None),
         heatmap_div,
 
         _section_anchor('mnid-coverage'),
-        _sec_header('Indicator Status' if dashboard_theme == 'newborn' else 'Coverage Indicators', sum(len(v) for v in by_cat.values()),
-                    desc='Coverage against target across the newborn pathway, from stabilization to follow-up.' if dashboard_theme == 'newborn' else 'Coverage % vs target - target threshold shown per chart',
+        _sec_header('Coverage & Quality' if dashboard_theme == 'newborn' else 'Coverage Indicators', sum(len(v) for v in by_cat.values()),
+                    desc='Coverage against target across the neonatal care pathway, from stabilization to follow-up.' if dashboard_theme == 'newborn' else 'Coverage % vs target - target threshold shown per chart',
                     eyebrow='Indicators' if dashboard_theme == 'newborn' else None),
         coverage_charts,
 
         _section_anchor('mnid-comparative'),
-        _sec_header('Benchmarking' if dashboard_theme == 'newborn' else 'Facility & District Comparison',
-                    desc='Facility and district comparison for newborn indicators.' if dashboard_theme == 'newborn' else 'Cross-facility and district indicator benchmarking',
+        _sec_header('Facility Comparison' if dashboard_theme == 'newborn' else 'Facility & District Comparison',
+                    desc='Facility and district comparison for neonatal indicators.' if dashboard_theme == 'newborn' else 'Cross-facility and district indicator benchmarking',
                     eyebrow='Comparison' if dashboard_theme == 'newborn' else None),
         comparative_div,
 
         _section_anchor('mnid-analysis'),
-        _sec_header('Clinical Layers' if dashboard_theme == 'newborn' else 'Clinical Analysis', total_analysis,
-                    desc='Newborn pathway, intervention, stabilization, and outcome views.' if dashboard_theme == 'newborn' else 'Care-phase deep-dives',
+        _sec_header('Clinical Interventions' if dashboard_theme == 'newborn' else 'Clinical Analysis', total_analysis,
+                    desc='Clinical intervention, thermal support, respiratory support, and complication views.' if dashboard_theme == 'newborn' else 'Care-phase deep-dives',
                     eyebrow='Clinical View' if dashboard_theme == 'newborn' else None),
         dmc.Accordion(
             multiple=True,
@@ -4521,7 +4565,7 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
 
         _section_anchor('mnid-readiness'),
         _sec_header('Operational Readiness',
-                    desc='Devices, staffing, and data quality conditions that shape neonatal care delivery.' if dashboard_theme == 'newborn' else 'Equipment - workforce competency - data quality',
+                    desc='Devices, staffing, and data quality conditions that support neonatal care delivery.' if dashboard_theme == 'newborn' else 'Equipment - workforce competency - data quality',
                     eyebrow='Readiness' if dashboard_theme == 'newborn' else None),
         _system_readiness(facility_df, supply_inds, wf_inds, dq_inds),
     ])
