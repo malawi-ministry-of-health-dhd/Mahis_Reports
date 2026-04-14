@@ -225,7 +225,8 @@ layout = html.Div(
 )
 
 @callback(
-         Output("report-selector", "options"),
+         [Output("report-selector", "options"),
+          Output("report-selector", "value")],
          Input("program-selector","value")
 )
 
@@ -235,20 +236,22 @@ def update_filters(selected_program):
     filtered_reports_list = [r for r in program_reports_data["reports"] if r.get("program") == selected_program or selected_program in (r.get("programs") or [])]
     filtered_object = {"reports":filtered_reports_list}
     program_reports = [x['report_name'] for x in filtered_object['reports']]
-    return program_reports 
+    default_report = program_reports[0] if program_reports else None
+    return program_reports, default_report 
 
 @callback(
     [Output('program-reports-container', 'children'),
      Output('prog-hf-filter', 'options'),
      Output("program-selector", "options")],
     [Input("btn-generate-report", "n_clicks"),
-     Input('url-params-store', 'data')], # Only these trigger the update
+     Input('url-params-store', 'data'),
+     Input("report-selector", "value")], # Only these trigger the update
     [State("report-selector", "value"),
      State('prog-date-range-picker', 'start_date'),
      State('prog-date-range-picker', 'end_date'),
      State('prog-hf-filter', 'value')] # These are read only when Input triggers
 )
-def generate_chart(n_clicks, urlparams, report_name, start_date, end_date, hf):
+def generate_chart(n_clicks, urlparams, selected_report, report_name, start_date, end_date, hf):
     user_data_path = os.path.join(path, 'data', 'users_data.csv')
     if not os.path.exists(user_data_path):
         user_data = pd.DataFrame(columns=['user_id', 'role'])
@@ -315,6 +318,8 @@ def generate_chart(n_clicks, urlparams, report_name, start_date, end_date, hf):
         prog_options = dropdowns['programs'] + ["+ Create a Report"]
 
         #Chart Generation Logic (Only if Button clicked or specific report selected)
+        report_name = report_name or selected_report
+
         if not report_name:
              return html.Div("Please select a report name and click Generate."), hf_options, prog_options
 

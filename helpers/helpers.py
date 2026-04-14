@@ -142,7 +142,7 @@ def build_section_items(filtered, data_opd, delta_days, items_config):
     
     return html.Div(items)
 
-def build_single_chart(filtered, data_opd, delta_days, item_config,user_role=None, style = "card-2"):
+def build_single_chart(filtered, data_opd, delta_days, item_config,user_role=None, style = "card-2", theme_name=None):
     """Build a single chart based on configuration"""
     chart_type = item_config["type"]
     filters = item_config["filters"]
@@ -168,6 +168,7 @@ def build_single_chart(filtered, data_opd, delta_days, item_config,user_role=Non
     else:
         # Default empty figure for unknown chart types
         figure = create_empty_figure()
+    figure = apply_figure_theme(figure, chart_type, theme_name)
     if chart_type in ["Line","Pie","Column","Bar","Histogram","PivotTable"]:
         return dcc.Graph(
             id=item_config["filters"]["unique"],
@@ -176,6 +177,78 @@ def build_single_chart(filtered, data_opd, delta_days, item_config,user_role=Non
         )
     else:
         return figure
+
+
+def apply_figure_theme(figure, chart_type, theme_name=None):
+    if theme_name != "premium_mch" or not hasattr(figure, "update_layout"):
+        return figure
+
+    palette = ["#1976d2", "#22a7b8", "#79c9d5", "#ffb347", "#7f8ea3", "#2f6d8d"]
+    figure.update_layout(
+        template="plotly_white",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#ffffff",
+        colorway=palette,
+        font=dict(family="Segoe UI, Tahoma, sans-serif", color="#16354f", size=13),
+        margin=dict(l=28, r=18, t=58, b=28),
+        title=dict(
+            x=0.02,
+            xanchor="left",
+            font=dict(size=18, family="Segoe UI, Tahoma, sans-serif", color="#12344d"),
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
+            x=0,
+            bgcolor="rgba(255,255,255,0.7)",
+            bordercolor="#dde8ee",
+            borderwidth=1,
+        ),
+    )
+
+    if hasattr(figure, "update_xaxes"):
+        figure.update_xaxes(
+            showgrid=False,
+            linecolor="#d8e4ea",
+            tickfont=dict(color="#537086"),
+            title_font=dict(color="#12344d"),
+        )
+    if hasattr(figure, "update_yaxes"):
+        figure.update_yaxes(
+            gridcolor="#e8f0f4",
+            zeroline=False,
+            tickfont=dict(color="#537086"),
+            title_font=dict(color="#12344d"),
+        )
+
+    if chart_type in ["Column", "Bar", "Histogram"]:
+        figure.update_traces(
+            marker_line_color="#ffffff",
+            marker_line_width=1.5,
+            selector=lambda trace: getattr(trace, "type", None) in ["bar", "histogram"],
+        )
+    elif chart_type == "Line":
+        figure.update_traces(
+            line=dict(width=3),
+            marker=dict(size=8, line=dict(width=2, color="#ffffff")),
+            selector=lambda trace: getattr(trace, "type", None) == "scatter",
+        )
+    elif chart_type == "Pie":
+        figure.update_traces(
+            hole=0.58,
+            marker=dict(line=dict(color="#ffffff", width=2)),
+            textfont=dict(color="#16354f", family="Segoe UI, Tahoma, sans-serif"),
+        )
+    elif chart_type == "PivotTable":
+        figure.update_traces(
+            header=dict(fill_color="#0f6b9a", font=dict(color="#ffffff", size=12)),
+            cells=dict(fill_color="#ffffff", font=dict(color="#16354f", size=11)),
+            selector=dict(type="table"),
+        )
+
+    return figure
 
 
 def create_line_chart_from_config(data_opd, delta_days, filters):

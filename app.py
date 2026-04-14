@@ -33,6 +33,17 @@ from data_storage import DataStorage
 import os
 
 external_stylesheets = ['https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css']
+DEMO_LOCATION = "LL040033"
+DEMO_UUID = "m3his@dhd"
+
+
+def normalize_url_params(params):
+    normalized = dict(params) if params else {}
+    if not normalized.get("Location"):
+        normalized["Location"] = [DEMO_LOCATION]
+    if not normalized.get("uuid"):
+        normalized["uuid"] = [DEMO_UUID]
+    return normalized
 
 # print(list(load_stored_data())) # Load the data to ensure it's available
 # Initialize the Dash app
@@ -62,6 +73,7 @@ app.layout = dmc.MantineProvider(
 )
 def render_nav(url_params):
     try:
+        url_params = normalize_url_params(url_params)
         location = url_params.get('Location', [None])[0] if url_params else None
         uuid = url_params.get('uuid', [None])[0] if url_params else None
         user_level = url_params.get('user_level', [None])[0] if url_params else None
@@ -135,8 +147,8 @@ def store_url_params(href):
         raise PreventUpdate
     parsed_url = urllib.parse.urlparse(href)
     params = urllib.parse.parse_qs(parsed_url.query)
-    
-    return params
+
+    return normalize_url_params(params)
 
 @app.callback(
     Output('url', 'pathname'),
