@@ -574,7 +574,7 @@ def create_linelist_from_config(filtered, filters,user_role=None, **kwargs):
         message = message,
         merge_methods=merge_methods,
         rename=rename,
-        custom_fields = custom_fields
+        custom_fields = custom_fields,
         **group_kwargs
     )
 
