@@ -603,7 +603,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         if level == "National":
             facilities_pool = base_data
         elif level == "District" and district_col and not districts:
-            facilities_pool = base_data.iloc[0:0]
+            facilities_pool = base_data
         elif district_col and districts:
             facilities_pool = base_data[base_data[district_col].isin(districts)]
         else:
