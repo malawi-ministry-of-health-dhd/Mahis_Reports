@@ -75,7 +75,7 @@ PREMIUM_DASHBOARD_REPORTS = {"Maternal and Child Health"}
 
 
 def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json, filter_summary=None,
-                           start_date=None, end_date=None, facility_code=None):
+                           start_date=None, end_date=None, facility_code=None, scope_meta=None):
     config = dashboards_json
 
     # Route MNID dashboard configs to the dedicated MNID renderer.
@@ -88,6 +88,7 @@ def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json, filt
             facility_code=facility_code or 'Unknown',
             start_date=str(start_date)[:10] if start_date else '',
             end_date=str(end_date)[:10] if end_date else '',
+            scope_meta=scope_meta,
         )
 
     # Render all non-MNID dashboards with the generic chart builder.
@@ -212,6 +213,7 @@ layout = html.Div(
 
                                         # District Filter
                                         html.Div(
+                                            id="dashboard-district-filter-group",
                                             className="filter-group",
                                             children=[
                                                 html.Label("District", className="filter-label"),
@@ -303,9 +305,31 @@ layout = html.Div(
                                                 )
                                             ]
                                         ),
+
+                                        # Program Category Filter (MNID)
+                                        html.Div(
+                                            id="dashboard-category-filter-group",
+                                            className="filter-group",
+                                            children=[
+                                                html.Label("Program Category", className="filter-label"),
+                                                dcc.Dropdown(
+                                                    id='dashboard-category-filter',
+                                                    options=[
+                                                        {"label": "All", "value": "All"},
+                                                        {"label": "ANC", "value": "ANC"},
+                                                        {"label": "Labour & Delivery", "value": "Labour"},
+                                                        {"label": "PNC", "value": "PNC"},
+                                                    ],
+                                                    value="All",
+                                                    clearable=False,
+                                                    className="modern-dropdown",
+                                                )
+                                            ]
+                                        ),
                                         
                                         # Age Group Filter
                                         html.Div(
+                                            id="dashboard-age-filter-group",
                                             className="filter-group",
                                             children=[
                                                 html.Label("Age Group", className="filter-label"),
@@ -373,9 +397,39 @@ layout = html.Div(
                     ]
                 ),
                 # Dashboard Content
-                html.Div(
-                    id='dashboard-container',
-                    className="dashboard-content-modern"
+                dcc.Loading(
+                    id="dashboard-loading",
+                    parent_style={
+                        "position": "relative",
+                        "minHeight": "220px",
+                    },
+                    style={
+                        "position": "absolute",
+                        "inset": 0,
+                        "display": "flex",
+                        "alignItems": "center",
+                        "justifyContent": "center",
+                    },
+                    custom_spinner=html.Div(
+                        className="home-loading-spinner",
+                        role="status",
+                        children=html.Span(
+                            "Loading...",
+                            className="home-visually-hidden",
+                        ),
+                    ),
+                    overlay_style={
+                        "visibility": "visible",
+                        "opacity": 0.45,
+                        "backgroundColor": "rgba(255,255,255,0.82)",
+                        "borderRadius": "16px",
+                        "zIndex": 10,
+                    },
+                    delay_show=150,
+                    children=html.Div(
+                        id='dashboard-container',
+                        className="dashboard-content-modern"
+                    )
                 ),
             ]
         ),
@@ -411,6 +465,7 @@ def update_menu(interval, color):
 @callback(
     [Output('dashboard-container', 'children'),
      Output('dashboard-level-filter', 'value'),
+     Output('dashboard-district-filter-group', 'style'),
      Output('dashboard-district-filter', 'options'),
      Output('dashboard-district-filter', 'value'),
      Output('dashboard-district-filter', 'disabled'),
@@ -427,6 +482,7 @@ def update_menu(interval, color):
         Input('dashboard-district-filter', 'value'),
         Input('dashboard-facility-filter', 'value'),
         Input('dashboard-overview-filter', 'value'),
+        Input('dashboard-category-filter', 'value'),
         Input({"type": "menu-button", "name": ALL}, "n_clicks"),
     ],
     [
@@ -435,7 +491,7 @@ def update_menu(interval, color):
         State('active-button-store', 'data')
     ]
 )
-def update_dashboard(gen, interval, start_date, end_date, level, districts, facilities, overview, menu_clicks, urlparams, age, current_active):
+def update_dashboard(gen, interval, start_date, end_date, level, districts, facilities, overview, category, menu_clicks, urlparams, age, current_active):
     try:
         ctx = callback_context
         triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else None
@@ -501,9 +557,21 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         except Exception as e:
             import traceback
             traceback.print_exc()
-            return html.Div('Missing Data. ' \
-            'Ensure that the config file has correct database credentials'
-            ,style={'color':'red'}), [], '', ''  # Empty DataFrame with expected columns
+            return (
+                html.Div(
+                    'Missing Data. Ensure that the config file has correct database credentials',
+                    style={'color': 'red'}
+                ),
+                level or dash.no_update,
+                dash.no_update,
+                [],
+                [],
+                True,
+                "",
+                [],
+                [],
+                current_active or dash.no_update,
+            )
 
         data[DATE_] = pd.to_datetime(data[DATE_], format='mixed')
         data[GENDER_] = data[GENDER_].replace({"M":"Male",
@@ -531,6 +599,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             return (
                 html.Div("Unauthorized User. Please contact system administrator."),
                 level,
+                {'display': 'none'} if level in ['National', 'Facility'] else {},
                 [],
                 [],
                 False,
@@ -540,10 +609,18 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                 clicked_name
             )
 
-        # Base filters (age)
+        # Base filters (age + MNID program category)
         base_mask = pd.Series(True, index=data.index)
         if age:
             base_mask &= (data[AGE_GROUP_] == age)
+        category = category or "All"
+        if category != "All" and "Encounter" in data.columns:
+            if category == "ANC":
+                base_mask &= data["Encounter"].fillna('').astype(str).str.contains('ANC', case=False, na=False)
+            elif category == "Labour":
+                base_mask &= data["Encounter"].fillna('').astype(str).str.contains('LABOUR|DELIVERY|BIRTH', case=False, na=False)
+            elif category == "PNC":
+                base_mask &= data["Encounter"].fillna('').astype(str).str.contains('PNC|POSTNATAL|POST.NATAL', case=False, na=False)
         base_data = data[base_mask].copy()
 
         district_col = "District" if "District" in base_data.columns else (HOME_DISTRICT_ if HOME_DISTRICT_ in base_data.columns else None)
@@ -555,7 +632,6 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         districts = districts or []
         facilities = facilities or []
         overview = overview or []
-
         if level == 'National':
             districts = []
             facilities = []
@@ -572,7 +648,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         if level == "National":
             facilities_pool = base_data
         elif level == "District" and district_col and not districts:
-            facilities_pool = base_data
+            facilities_pool = base_data.iloc[0:0]
         elif district_col and districts:
             facilities_pool = base_data[base_data[district_col].isin(districts)]
         else:
@@ -582,28 +658,15 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             if FACILITY_ in facilities_pool.columns else []
         )
 
-        # Enforce facility -> district constraint
-        if district_col and facilities:
-            facility_districts = (
-                base_data[base_data[FACILITY_].isin(facilities)][district_col]
-                .dropna()
-                .unique()
-                .tolist()
-            )
-        else:
-            facility_districts = []
-
-        district_disabled = level == "Facility"
+        show_district_filter = level == "District"
+        district_group_style = {} if show_district_filter else {"display": "none"}
+        district_disabled = not show_district_filter
         district_note = ""
-        if district_disabled:
-            district_note = "Not applicable: district is derived from selected facilities (each facility belongs to exactly one district)."
-            if facility_districts:
-                districts = sorted(set(facility_districts))
-            else:
-                districts = []
+        if not show_district_filter:
+            districts = []
 
         # Keep selected facilities consistent with selected districts
-        if district_col and districts:
+        if level == "District" and district_col and districts:
             allowed_facilities = set(
                 base_data[base_data[district_col].isin(districts)][FACILITY_]
                 .dropna()
@@ -665,11 +728,36 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                 else:
                     facility_code_display = mnid_location or location
 
+            if level == 'Facility' and facilities:
+                scope_label = 'Facility' if len(facilities) == 1 else 'Facilities'
+                scope_value = facilities[0] if len(facilities) == 1 else f'{len(facilities)} selected facilities'
+            elif level == 'District' and facilities:
+                scope_label = 'Facility' if len(facilities) == 1 else 'Facilities'
+                scope_value = facilities[0] if len(facilities) == 1 else f'{len(facilities)} selected facilities'
+            elif level == 'District' and districts:
+                scope_label = 'District' if len(districts) == 1 else 'Districts'
+                scope_value = ', '.join(districts)
+            else:
+                scope_label = 'Districts'
+                scope_value = 'All districts'
+
+            mnid_categories = None
+            if category and category != "All":
+                mnid_categories = [category]
+
             section = build_charts_from_json(
                 filtered_data_date, network_data, delta_days, dashboard_json,
                 start_date=adj_start_dt,
                 end_date=adj_end_dt,
                 facility_code=facility_code_display,
+                scope_meta={
+                    'label': scope_label,
+                    'value': scope_value,
+                    'mnid_categories': mnid_categories,
+                    'level': level,
+                    'selected_facilities': facilities,
+                    'selected_districts': districts,
+                },
             )
             rendered.append(html.Div([
                 html.H2(report_name, style={"marginTop": "10px"}),
@@ -681,6 +769,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         return (
             dashboard_content,
             level,
+            district_group_style,
             [{'label': d, 'value': d} for d in all_districts],
             districts,
             district_disabled,
@@ -689,32 +778,6 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             facilities,
             clicked_name
         )
-        # mask &= (data[AGE_GROUP_] == age)
-            
-        # filtered_data = data[mask].copy()
-
-        # # Apply Date Mask
-        # filtered_data_date = filtered_data[
-        #     (filtered_data[DATE_] >= start_dt) & 
-        #     (filtered_data[DATE_] <= end_dt)
-        # ]
-
-        # # Get JSON config for the report
-        # with open(json_path, 'r') as f:
-        #     menu_json = json.load(f)
-        # dashboard_json = next((d for d in menu_json if d['report_name'] == clicked_name), menu_json[0])
-
-        # delta_days = (end_dt - start_dt).days
-        # hf_options = filtered_data[FACILITY_].sort_values().unique().tolist() + ["This Facility"]
-
-        # filter_summary = {
-        #     "Facility Code": location,
-        #     "Facility": hf or "This facility",
-        #     "Age Group": age or "All ages",
-        #     "Period": f"{start_dt.date()} to {end_dt.date()}",
-        # }
-
-        # return build_charts_from_json(filtered_data_date, filtered_data, delta_days, dashboard_json, filter_summary=filter_summary), hf_options, hf_options[0],  clicked_name
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -723,6 +786,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                 html.P("Dashboard render failed.", style={"color": "#475569", "fontWeight": "600"}),
                 html.P(str(e), style={"color": "#94A3B8", "fontSize": "12px"}),
             ]),
+            dash.no_update,
             dash.no_update,
             dash.no_update,
             dash.no_update,
@@ -761,13 +825,14 @@ def sync_picker_with_logic(period_type, n):
      Output('dashboard-district-filter', 'value', allow_duplicate=True),
      Output('dashboard-facility-filter', 'value', allow_duplicate=True),
      Output('dashboard-overview-filter', 'value', allow_duplicate=True),
+     Output('dashboard-category-filter', 'value', allow_duplicate=True),
      Output('dashboard-age-filter', 'value', allow_duplicate=True)],
     Input('dashboard-btn-reset', 'n_clicks'),
     prevent_initial_call=True
 )
 def reset_ui_controls(n_clicks):
     # Setting period to "Today" triggers the callback in Step 1
-    return 'Today', None, [], [], [], None
+    return 'Today', None, [], [], [], "All", None
 
 @callback(
     [Output('dashboard-period-type-filter', 'style'),
@@ -776,6 +841,7 @@ def reset_ui_controls(n_clicks):
      Output('dashboard-district-filter', 'style'),
      Output('dashboard-facility-filter', 'style'),
      Output('dashboard-overview-filter', 'style'),
+     Output('dashboard-category-filter', 'style'),
      Output('dashboard-age-filter', 'style')],
     [Input('dashboard-btn-reset', 'n_clicks'),
      Input('dashboard-btn-generate', 'n_clicks')],
@@ -793,7 +859,39 @@ def change_style(generate, reset):
                     "border": "3px solid green",
                     "borderRadius": "8px"
                     }
-        return style_active, style_active, style_active, style_active, style_active, style_active, style_active
+        return style_active, style_active, style_active, style_active, style_active, style_active, style_active, style_active
     else:
         style_default = {}
-        return style_default, style_default, style_default, style_default, style_default, style_default, style_default
+        return style_default, style_default, style_default, style_default, style_default, style_default, style_default, style_default
+
+
+@callback(
+    Output('dashboard-age-filter-group', 'style'),
+    Output('dashboard-category-filter-group', 'style'),
+    Input({"type": "menu-button", "name": ALL}, "n_clicks"),
+    State('active-button-store', 'data'),
+)
+def toggle_age_group_visibility(menu_clicks, active_report):
+    report = str(active_report or '').strip().lower()
+    ctx = callback_context
+    if ctx.triggered:
+        trigger = ctx.triggered[0].get('prop_id', '')
+        if trigger.startswith('{') and '"type":"menu-button"' in trigger:
+            try:
+                report = str(json.loads(trigger.split('.')[0]).get('name', report)).strip().lower()
+            except Exception:
+                report = str(active_report or '').strip().lower()
+
+    hide_for = {'maternal health', 'newborn', 'neonatal program'}
+    show_program_for = {'maternal health'}
+    if report in hide_for:
+        age_style = {'display': 'none'}
+    else:
+        age_style = {}
+
+    if report in show_program_for:
+        program_style = {}
+    else:
+        program_style = {'display': 'none'}
+
+    return age_style, program_style

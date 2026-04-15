@@ -11,7 +11,7 @@ import io
 from helpers.modal_functions import (validate_excel_file, load_reports_data, save_reports_data, 
                         check_existing_report, get_next_report_id, update_or_create_report,load_excel_file,
                         save_excel_file, update_report_metadata, archive_report, load_preview_data,
-                        create_count_item,create_chart_item, create_section,create_chart_fields,validate_dashboard_json,
+                        create_count_item,create_chart_item, create_section,create_chart_fields, create_mnid_indicator_item, validate_dashboard_json,
                         upload_dashboard_json,validate_prog_reports_json,upload_prog_reports_json,CHART_TEMPLATES)
 from config import actual_keys_in_data
 
@@ -29,6 +29,83 @@ def load_dashboards_from_file():
             return data if isinstance(data, list) else [data]
     except (FileNotFoundError, json.JSONDecodeError):
         return []
+
+def save_dashboards_to_file(data):
+    with open(dashboards_json_path, 'w') as f:
+        json.dump(data, f, indent=2)
+
+def _coerce_list(value):
+    if value in (None, "", []):
+        return []
+    if isinstance(value, list):
+        return [v for v in value if v not in (None, "")]
+    return [value]
+
+def _normalize_filter_value(value):
+    if isinstance(value, list):
+        cleaned = [v for v in value if v not in (None, "")]
+        if not cleaned:
+            return []
+        return cleaned
+    if value in (None, ""):
+        return ""
+    return value
+
+def _safe_json_loads(raw_value, default):
+    if raw_value in (None, "", []):
+        return default
+    if isinstance(raw_value, (dict, list)):
+        return raw_value
+    try:
+        return json.loads(raw_value)
+    except (TypeError, json.JSONDecodeError):
+        return default
+
+def _empty_dashboard_structure(report_id, report_name, date_created):
+    return {
+        "report_id": report_id or f"report_{uuid.uuid4().hex[:8]}",
+        "report_name": report_name or "New Dashboard",
+        "date_created": date_created or datetime.now().strftime("%Y-%m-%d"),
+        "visualization_types": {
+            "counts": [],
+            "charts": {
+                "sections": []
+            }
+        }
+    }
+
+def _find_dashboard_index(dashboards_data, selector_value=None, report_id=None):
+    if isinstance(selector_value, int) and 0 <= selector_value < len(dashboards_data):
+        return selector_value
+    if report_id:
+        for idx, dashboard in enumerate(dashboards_data):
+            if dashboard.get("report_id") == report_id:
+                return idx
+    return None
+
+def _ensure_dashboard_for_edit(selector_value, report_id, report_name, date_created):
+    dashboards_data = load_dashboards_from_file()
+    dashboard_index = _find_dashboard_index(dashboards_data, selector_value, report_id)
+
+    if dashboard_index is None:
+        dashboard = _empty_dashboard_structure(report_id, report_name, date_created)
+        dashboards_data.append(dashboard)
+        dashboard_index = len(dashboards_data) - 1
+        save_dashboards_to_file(dashboards_data)
+    else:
+        dashboard = dashboards_data[dashboard_index]
+        dashboard.setdefault("visualization_types", {})
+        dashboard["visualization_types"].setdefault("counts", [])
+        dashboard["visualization_types"].setdefault("charts", {})
+        dashboard["visualization_types"]["charts"].setdefault("sections", [])
+
+    return dashboards_data, dashboards_data[dashboard_index], dashboard_index
+
+def _dashboard_selector_options(dashboards_data):
+    return [{"label": f"📋 {d.get('report_name', 'Unnamed')}", "value": i}
+            for i, d in enumerate(dashboards_data)] + [
+                {"label": "➕ Create New Dashboard", "value": "new"}
+            ]
 dashboards_data = load_dashboards_from_file()
 
 
@@ -701,8 +778,9 @@ def generate_dashboard_items_list(dashboard):
     """Generate the HTML for dashboard items list"""
     counts = dashboard.get('visualization_types', {}).get('counts', [])
     sections = dashboard.get('visualization_types', {}).get('charts', {}).get('sections', [])
+    priority_indicators = dashboard.get('priority_indicators', [])
     
-    if not counts and not sections:
+    if not counts and not sections and not priority_indicators:
         return html.Div(
             className="empty-items",
             children=[
@@ -715,6 +793,30 @@ def generate_dashboard_items_list(dashboard):
         )
     
     items_list = []
+
+    for idx, indicator in enumerate(priority_indicators):
+        items_list.append(
+            html.Div(
+                className="list-item",
+                key=f"mnid-indicator-{idx}",
+                children=[
+                    html.Div(className="list-item-icon", children=[html.I(className="fas fa-bullseye")]),
+                    html.Div(className="list-item-content", children=[
+                        html.Div(className="list-title", children=indicator.get("label", f"MNID Indicator {idx + 1}")),
+                        html.Div(indicator.get("category", "MNID"), style={"fontSize": "12px", "color": "#6b7280"}),
+                    ]),
+                ],
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "padding": "12px",
+                    "marginBottom": "8px",
+                    "backgroundColor": "#f4f8ff",
+                    "borderRadius": "6px",
+                    "border": "1px solid #dbeafe"
+                }
+            )
+        )
     
     # Add counts to the list
     for idx, count in enumerate(counts):
@@ -934,6 +1036,57 @@ def create_edit_modal():
                                                             className="modern-input-disabled"
                                                         ),
                                                     ]),
+                                                ]),
+                                                html.Div(className="form-group", children=[
+                                                    html.Label("Dashboard Type", className="form-label"),
+                                                    dcc.Dropdown(
+                                                        id="dashboard-type-selector",
+                                                        options=[
+                                                            {"label": "Standard", "value": "standard"},
+                                                            {"label": "MNID Outlook", "value": "mnid"},
+                                                        ],
+                                                        value="standard",
+                                                        clearable=False,
+                                                        className="modern-dropdown",
+                                                    ),
+                                                ]),
+                                                html.Div(className="form-group", children=[
+                                                    html.Label("MNID Categories", className="form-label"),
+                                                    dcc.Dropdown(
+                                                        id="mnid-categories-selector",
+                                                        options=[
+                                                            {"label": item, "value": item}
+                                                            for item in ["ANC", "Labour", "PNC", "Newborn"]
+                                                        ],
+                                                        value=[],
+                                                        multi=True,
+                                                        placeholder="Select MNID program areas",
+                                                        className="modern-dropdown",
+                                                    ),
+                                                ]),
+                                                html.Div(className="form-group", children=[
+                                                    html.Label("MNID Indicators JSON", className="form-label"),
+                                                    html.Div(style={"display": "flex", "justifyContent": "space-between", "alignItems": "center", "marginBottom": "8px"}, children=[
+                                                        html.Span("Build MNID indicators visually, then review the generated JSON below.", style={"fontSize": "12px", "color": "#6b7280"}),
+                                                        html.Button(
+                                                            "➕ Add MNID Indicator",
+                                                            id="add-mnid-indicator-btn",
+                                                            n_clicks=0,
+                                                            className="btn-primary-modern"
+                                                        )
+                                                    ]),
+                                                    html.Div(
+                                                        id="mnid-indicators-container",
+                                                        className="dashboard-card-body",
+                                                        style={"maxHeight": "340px", "overflowY": "auto", "marginBottom": "10px", "padding": "8px", "border": "1px solid #e5e7eb", "borderRadius": "8px", "background": "#fafafa"}
+                                                    ),
+                                                    dcc.Textarea(
+                                                        id="mnid-indicators-input",
+                                                        value="",
+                                                        placeholder='[{"id":"mnid_x_001","label":"Indicator name","category":"ANC","target":80,"status":"tracked","numerator_filters":{"unique":"person_id"},"denominator_filters":{"unique":"person_id"}}]',
+                                                        className="modern-input",
+                                                        style={"minHeight": "160px", "resize": "vertical"},
+                                                    ),
                                                 ]),
                                             ]),
                                         ]),
@@ -1221,6 +1374,14 @@ def update_dashboard_items(selected_dashboard, refresh):
         html.H4("Dashboard Items", style={"font-weight": "bold"}),
         generate_dashboard_items_list(dashboard)
     ]
+
+@callback(
+    Output("current-dashboard-index", "data", allow_duplicate=True),
+    Input("dashboard-selector", "value"),
+    prevent_initial_call=True
+)
+def sync_current_dashboard_index(selector_value):
+    return selector_value if isinstance(selector_value, int) else -1
 # validate admins
 @callback(
         [Output('sidebar', 'children'),
@@ -2037,6 +2198,10 @@ def toggle_preview_popup(preview_clicks, close_clicks):
      Output("report-id-input", "value", allow_duplicate=True),
      Output("report-name-input", "value", allow_duplicate=True),
      Output("date-created-input", "value", allow_duplicate=True),
+     Output("dashboard-type-selector", "value", allow_duplicate=True),
+     Output("mnid-categories-selector", "value", allow_duplicate=True),
+     Output("mnid-indicators-container", "children", allow_duplicate=True),
+     Output("mnid-indicators-input", "value", allow_duplicate=True),
      Output("counts-container", "children", allow_duplicate=True),
      Output("sections-container", "children", allow_duplicate=True)],
     [Input("add-dashboard", "n_clicks"),
@@ -2080,17 +2245,21 @@ def toggle_modal(open_clicks, cancel_clicks, save_clicks, n_intervals):
             f"report_{uuid.uuid4().hex[:8]}",  # Auto-generate ID
             "New Dashboard",  # Default name
             datetime.now().strftime("%Y-%m-%d"),  # Current date
+            "standard",
+            [],
+            [],
+            "",
             [],  # Empty counts
             []   # Empty sections
         )
     
     elif trigger == "cancel-btn":
         # Just close the modal
-        return {"display": "none"}, {"display": "none"}, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update,dash.no_update
+        return {"display": "none"}, {"display": "none"}, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
     
     elif trigger == "save-btn":
         # Just close the modal
-        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update,dash.no_update
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
     
     return dash.no_update
 
@@ -2099,6 +2268,10 @@ def toggle_modal(open_clicks, cancel_clicks, save_clicks, n_intervals):
     [Output("report-id-input", "value", allow_duplicate=True),
      Output("report-name-input", "value", allow_duplicate=True),
      Output("date-created-input", "value", allow_duplicate=True),
+     Output("dashboard-type-selector", "value", allow_duplicate=True),
+     Output("mnid-categories-selector", "value", allow_duplicate=True),
+     Output("mnid-indicators-container", "children", allow_duplicate=True),
+     Output("mnid-indicators-input", "value", allow_duplicate=True),
      Output("counts-container", "children", allow_duplicate=True),
      Output("sections-container", "children", allow_duplicate=True)],
     [Input("dashboard-selector", "value"),
@@ -2132,20 +2305,30 @@ def load_dashboard(selector_value, count_clicks, section_clicks, chart_clicks):
                 f"report_{uuid.uuid4().hex[:8]}",
                 "New Dashboard",
                 datetime.now().strftime("%Y-%m-%d"),
+                "standard",
+                [],
+                [],
+                "",
                 [],
                 [],
             )
         dashboards_data = load_dashboards_from_file()
         if isinstance(selector_value, int) and 0 <= selector_value < len(dashboards_data):
             dashboard = dashboards_data[selector_value]
+            priority_indicators = dashboard.get("priority_indicators", [])
             return (
                 dashboard.get("report_id", ""),
                 dashboard.get("report_name", ""),
                 dashboard.get("date_created", ""),
+                dashboard.get("dashboard_type", "standard"),
+                dashboard.get("mnid_categories", []),
+                [create_mnid_indicator_item(ind, i) for i, ind in enumerate(priority_indicators)],
+                json.dumps(priority_indicators, indent=2) if priority_indicators else "",
                 [],  # clear containers on dashboard switch
                 [],
             )
-        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+        return (dash.no_update, dash.no_update, dash.no_update, dash.no_update,
+                dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update)
 
     # ── 2. An edit button was clicked ────────────────────────────────────────
     dashboards_data = load_dashboards_from_file()
@@ -2160,6 +2343,10 @@ def load_dashboard(selector_value, count_clicks, section_clicks, chart_clicks):
         dashboard.get("report_id", ""),
         dashboard.get("report_name", ""),
         dashboard.get("date_created", ""),
+        dashboard.get("dashboard_type", "standard"),
+        dashboard.get("mnid_categories", []),
+        [create_mnid_indicator_item(ind, i) for i, ind in enumerate(dashboard.get("priority_indicators", []))],
+        json.dumps(dashboard.get("priority_indicators", []), indent=2) if dashboard.get("priority_indicators") else "",
     )
 
     # ── count-edit ────────────────────────────────────────────────────────────
@@ -2205,6 +2392,9 @@ def load_dashboard(selector_value, count_clicks, section_clicks, chart_clicks):
      Input({"type": "save-count",   "index": dash.ALL}, "n_clicks"),
      Input({"type": "remove-count", "index": dash.ALL}, "n_clicks")],
     [State("dashboard-selector", "value"),
+     State("report-id-input", "value"),
+     State("report-name-input", "value"),
+     State("date-created-input", "value"),
      State({"type": "count-id",     "index": dash.ALL}, "value"),
      State({"type": "count-name",   "index": dash.ALL}, "value"),
      State({"type": "count-aggregations","index": dash.ALL}, "value"),
@@ -2229,7 +2419,7 @@ def load_dashboard(selector_value, count_clicks, section_clicks, chart_clicks):
     prevent_initial_call=True
 )
 def manage_counts(add_clicks, save_clicks, remove_clicks,
-                  selector_value,
+                  selector_value, report_id, report_name, date_created,
                   count_ids, count_names,count_aggr, count_uniques,
                   vars1, vals1, vars2, vals2, vars3, vals3,
                   vars4, vals4, vars5, vals5, vars6, vals6,
@@ -2237,28 +2427,6 @@ def manage_counts(add_clicks, save_clicks, remove_clicks,
                   current_counts):
     if not ctx.triggered:
         raise PreventUpdate
-    def load_dashboards_from_file():
-        try:
-            with open(dashboards_json_path, 'r') as f:
-                data = json.load(f)
-                return data if isinstance(data, list) else [data]
-        except (FileNotFoundError, json.JSONDecodeError):
-            return []
-    def _load_dashboard(selector_value):
-        """Return (dashboards_data, dashboard, counts, sections) for the selected index."""
-        data = load_dashboards_from_file()
-        if not (isinstance(selector_value, int) and 0 <= selector_value < len(data)):
-            return None, None, [], []
-        db = data[selector_value]
-        counts   = db.get("visualization_types", {}).get("counts", [])
-        sections = db.get("visualization_types", {}).get("charts", {}).get("sections", [])
-        return data, db, counts, sections
-    def save_dashboards_to_file(data):
-        with open(dashboards_json_path, 'w') as f:
-            json.dump(data, f, indent=2)
-
-    def _save_dashboards(data):
-        save_dashboards_to_file(data)
 
     triggered_id = ctx.triggered_id
     current_counts = current_counts or []
@@ -2267,21 +2435,18 @@ def manage_counts(add_clicks, save_clicks, remove_clicks,
     if triggered_id == "add-count-btn":
         if add_clicks and add_clicks > 0:
             new_count = create_count_item(index=len(current_counts))
-            # if isinstance(current_counts, dict):
-            #     return [new_count]
-            return [new_count]
+            return current_counts + [new_count]
         raise PreventUpdate
 
     # ── Save count: update the JSON file by count id ──────────────────────────
     if isinstance(triggered_id, dict) and triggered_id.get("type") == "save-count":
         if not any(c for c in (save_clicks or []) if c and c > 0):
             raise PreventUpdate
-        # ui_index = triggered_id["index"]          # position in the current UI list
-        ui_index = 0 
-        dashboards_data, dashboard, counts, sections = _load_dashboard(selector_value)
-        if dashboard is None:
-            raise PreventUpdate
-        # Build updated count from form state at ui_index
+        ui_index = triggered_id["index"]
+        dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
+            selector_value, report_id, report_name, date_created
+        )
+        counts = dashboard.get("visualization_types", {}).get("counts", [])
         count_id = count_ids[ui_index] if ui_index < len(count_ids) else f"count_{uuid.uuid4().hex[:8]}"
         updated = {
             "id":   count_id,
@@ -2290,21 +2455,21 @@ def manage_counts(add_clicks, save_clicks, remove_clicks,
                 "measure":  count_aggr[ui_index] if ui_index < len(count_aggr) else "count",
                 "unique":    count_uniques[ui_index] if ui_index < len(count_uniques) else "person_id",
                 "variable1": vars1[ui_index] if ui_index < len(vars1) else "Program",
-                "value1":    vals1[ui_index] if ui_index < len(vals1) else [],
+                "value1":    _normalize_filter_value(vals1[ui_index] if ui_index < len(vals1) else []),
                 "variable2": vars2[ui_index] if ui_index < len(vars2) else "Encounter",
-                "value2":    vals2[ui_index] if ui_index < len(vals2) else [],
+                "value2":    _normalize_filter_value(vals2[ui_index] if ui_index < len(vals2) else []),
                 "variable3": vars3[ui_index] if ui_index < len(vars3) else "concept_name",
-                "value3":    vals3[ui_index] if ui_index < len(vals3) else [],
+                "value3":    _normalize_filter_value(vals3[ui_index] if ui_index < len(vals3) else []),
                 "variable4": vars4[ui_index] if ui_index < len(vars4) else "obs_value_coded",
-                "value4":    vals4[ui_index] if ui_index < len(vals4) else "",
+                "value4":    _normalize_filter_value(vals4[ui_index] if ui_index < len(vals4) else ""),
                 "variable5": vars5[ui_index] if ui_index < len(vars5) else "ValueN",
-                "value5":    vals5[ui_index] if ui_index < len(vals5) else "",
+                "value5":    _normalize_filter_value(vals5[ui_index] if ui_index < len(vals5) else ""),
                 "variable6": vars6[ui_index] if ui_index < len(vars6) else "Value",
-                "value6":    vals6[ui_index] if ui_index < len(vals6) else "",
+                "value6":    _normalize_filter_value(vals6[ui_index] if ui_index < len(vals6) else ""),
                 "variable7": vars7[ui_index] if ui_index < len(vars7) else "Gender",
-                "value7":    vals7[ui_index] if ui_index < len(vals7) else "",
+                "value7":    _normalize_filter_value(vals7[ui_index] if ui_index < len(vals7) else ""),
                 "variable8": vars8[ui_index] if ui_index < len(vars8) else "Age",
-                "value8":    vals8[ui_index] if ui_index < len(vals8) else "",
+                "value8":    _normalize_filter_value(vals8[ui_index] if ui_index < len(vals8) else ""),
             }
         }
 
@@ -2320,21 +2485,19 @@ def manage_counts(add_clicks, save_clicks, remove_clicks,
                 counts.append(updated)
 
         dashboard["visualization_types"]["counts"] = counts
-        dashboards_data[selector_value] = dashboard
-        _save_dashboards(dashboards_data)
-
-        # Refresh the container from the saved data
-        # return [create_count_item(c, i) for i, c in enumerate(counts)]
-        return []
+        dashboards_data[dashboard_index] = dashboard
+        save_dashboards_to_file(dashboards_data)
+        return [create_count_item(c, i) for i, c in enumerate(counts)]
 
     # ── Delete count: remove from JSON by count id ────────────────────────────
     if isinstance(triggered_id, dict) and triggered_id.get("type") == "remove-count":
         if not any(c for c in (remove_clicks or []) if c and c > 0):
             raise PreventUpdate
         ui_index = triggered_id["index"]
-        dashboards_data, dashboard, counts, sections = _load_dashboard(selector_value)
-        if dashboard is None:
-            raise PreventUpdate
+        dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
+            selector_value, report_id, report_name, date_created
+        )
+        counts = dashboard.get("visualization_types", {}).get("counts", [])
 
         count_id = count_ids[ui_index] if ui_index < len(count_ids) else None
         if count_id:
@@ -2344,10 +2507,155 @@ def manage_counts(add_clicks, save_clicks, remove_clicks,
             counts = [c for i, c in enumerate(counts) if i != ui_index]
 
         dashboard["visualization_types"]["counts"] = counts
-        dashboards_data[selector_value] = dashboard
-        _save_dashboards(dashboards_data)
+        dashboards_data[dashboard_index] = dashboard
+        save_dashboards_to_file(dashboards_data)
 
         return [create_count_item(c, i) for i, c in enumerate(counts)]
+
+    raise PreventUpdate
+
+@callback(
+    [Output("mnid-indicators-container", "children", allow_duplicate=True),
+     Output("mnid-indicators-input", "value", allow_duplicate=True)],
+    [Input("add-mnid-indicator-btn", "n_clicks"),
+     Input({"type": "save-mnid-indicator", "index": dash.ALL}, "n_clicks"),
+     Input({"type": "remove-mnid-indicator", "index": dash.ALL}, "n_clicks")],
+    [State("dashboard-selector", "value"),
+     State("report-id-input", "value"),
+     State("report-name-input", "value"),
+     State("date-created-input", "value"),
+     State({"type": "mnid-indicator-id", "index": dash.ALL}, "value"),
+     State({"type": "mnid-indicator-label", "index": dash.ALL}, "value"),
+     State({"type": "mnid-indicator-category", "index": dash.ALL}, "value"),
+     State({"type": "mnid-indicator-target", "index": dash.ALL}, "value"),
+     State({"type": "mnid-indicator-status", "index": dash.ALL}, "value"),
+     State({"type": "mnid-indicator-unique", "index": dash.ALL}, "value"),
+     State({"type": "mnid-indicator-note", "index": dash.ALL}, "value"),
+     State({"type": "mnid-numerator-var1", "index": dash.ALL}, "value"),
+     State({"type": "mnid-numerator-val1", "index": dash.ALL}, "value"),
+     State({"type": "mnid-numerator-var2", "index": dash.ALL}, "value"),
+     State({"type": "mnid-numerator-val2", "index": dash.ALL}, "value"),
+     State({"type": "mnid-numerator-var3", "index": dash.ALL}, "value"),
+     State({"type": "mnid-numerator-val3", "index": dash.ALL}, "value"),
+     State({"type": "mnid-numerator-var4", "index": dash.ALL}, "value"),
+     State({"type": "mnid-numerator-val4", "index": dash.ALL}, "value"),
+     State({"type": "mnid-denominator-var1", "index": dash.ALL}, "value"),
+     State({"type": "mnid-denominator-val1", "index": dash.ALL}, "value"),
+     State({"type": "mnid-denominator-var2", "index": dash.ALL}, "value"),
+     State({"type": "mnid-denominator-val2", "index": dash.ALL}, "value"),
+     State({"type": "mnid-denominator-var3", "index": dash.ALL}, "value"),
+     State({"type": "mnid-denominator-val3", "index": dash.ALL}, "value"),
+     State({"type": "mnid-denominator-var4", "index": dash.ALL}, "value"),
+     State({"type": "mnid-denominator-val4", "index": dash.ALL}, "value"),
+     State("mnid-indicators-container", "children")],
+    prevent_initial_call=True
+)
+def manage_mnid_indicators(add_clicks, save_clicks, remove_clicks,
+                           selector_value, report_id, report_name, date_created,
+                           indicator_ids, labels, categories, targets, statuses, uniques, notes,
+                           n_var1, n_val1, n_var2, n_val2, n_var3, n_val3, n_var4, n_val4,
+                           d_var1, d_val1, d_var2, d_val2, d_var3, d_val3, d_var4, d_val4,
+                           current_children):
+    if not ctx.triggered:
+        raise PreventUpdate
+
+    def parse_indicator_value(raw_value):
+        if raw_value in (None, ""):
+            return ""
+        if isinstance(raw_value, (list, dict, int, float)):
+            return raw_value
+        raw_text = str(raw_value).strip()
+        if not raw_text:
+            return ""
+        if raw_text.startswith("[") or raw_text.startswith("{"):
+            try:
+                return json.loads(raw_text)
+            except json.JSONDecodeError:
+                return raw_text
+        return raw_text
+
+    def build_filter_block(unique_value, var_values, val_values):
+        filters = {"unique": unique_value or "person_id"}
+        for pos, (var_list, val_list) in enumerate(zip(var_values, val_values), start=1):
+            variable = var_list[ui_index] if ui_index < len(var_list) else None
+            value = parse_indicator_value(val_list[ui_index] if ui_index < len(val_list) else "")
+            if variable:
+                filters[f"variable{pos}"] = variable
+                if value not in ("", [], {}):
+                    filters[f"value{pos}"] = value
+        return filters
+
+    def render(indicators):
+        return [create_mnid_indicator_item(ind, i) for i, ind in enumerate(indicators)]
+
+    triggered_id = ctx.triggered_id
+    current_children = current_children or []
+
+    if triggered_id == "add-mnid-indicator-btn":
+        if add_clicks and add_clicks > 0:
+            return current_children + [create_mnid_indicator_item(index=len(current_children))], dash.no_update
+        raise PreventUpdate
+
+    dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
+        selector_value, report_id, report_name, date_created
+    )
+    indicators = list(dashboard.get("priority_indicators", []))
+
+    if isinstance(triggered_id, dict) and triggered_id.get("type") == "save-mnid-indicator":
+        if not any(c for c in (save_clicks or []) if c and c > 0):
+            raise PreventUpdate
+        ui_index = triggered_id["index"]
+        indicator_id = indicator_ids[ui_index] if ui_index < len(indicator_ids) else f"mnid_{uuid.uuid4().hex[:8]}"
+        updated = {
+            "id": indicator_id,
+            "label": labels[ui_index] if ui_index < len(labels) else "",
+            "category": categories[ui_index] if ui_index < len(categories) else "",
+            "target": targets[ui_index] if ui_index < len(targets) and targets[ui_index] not in (None, "") else 80,
+            "status": statuses[ui_index] if ui_index < len(statuses) else "tracked",
+            "numerator_filters": build_filter_block(
+                uniques[ui_index] if ui_index < len(uniques) else "person_id",
+                [n_var1, n_var2, n_var3, n_var4],
+                [n_val1, n_val2, n_val3, n_val4],
+            ),
+            "denominator_filters": build_filter_block(
+                uniques[ui_index] if ui_index < len(uniques) else "person_id",
+                [d_var1, d_var2, d_var3, d_var4],
+                [d_val1, d_val2, d_val3, d_val4],
+            ),
+        }
+        note_value = notes[ui_index] if ui_index < len(notes) else ""
+        if note_value:
+            updated["note"] = note_value
+
+        matched = False
+        for i, indicator in enumerate(indicators):
+            if indicator.get("id") == indicator_id:
+                indicators[i] = updated
+                matched = True
+                break
+        if not matched and updated["label"]:
+            indicators.append(updated)
+
+        dashboard["dashboard_type"] = "mnid"
+        dashboard["priority_indicators"] = indicators
+        dashboards_data[dashboard_index] = dashboard
+        save_dashboards_to_file(dashboards_data)
+        return render(indicators), json.dumps(indicators, indent=2)
+
+    if isinstance(triggered_id, dict) and triggered_id.get("type") == "remove-mnid-indicator":
+        if not any(c for c in (remove_clicks or []) if c and c > 0):
+            raise PreventUpdate
+        ui_index = triggered_id["index"]
+        indicator_id = indicator_ids[ui_index] if ui_index < len(indicator_ids) else None
+        if indicator_id:
+            indicators = [item for item in indicators if item.get("id") != indicator_id]
+        else:
+            indicators = [item for i, item in enumerate(indicators) if i != ui_index]
+
+        dashboard["priority_indicators"] = indicators
+        dashboards_data[dashboard_index] = dashboard
+        save_dashboards_to_file(dashboards_data)
+        return render(indicators), json.dumps(indicators, indent=2) if indicators else ""
 
     raise PreventUpdate
 
@@ -2359,6 +2667,9 @@ def manage_counts(add_clicks, save_clicks, remove_clicks,
      Input({"type": "save-chart",   "section": dash.ALL, "index": dash.ALL}, "n_clicks"),
      Input({"type": "remove-chart", "section": dash.ALL, "index": dash.ALL}, "n_clicks")],
     [State("dashboard-selector", "value"),
+     State("report-id-input", "value"),
+     State("report-name-input", "value"),
+     State("date-created-input", "value"),
      State({"type": "section-name",  "index": dash.ALL}, "value"),
      # Chart form states - using index-based identification
      State({"type": "chart-id",      "section": dash.ALL, "index": dash.ALL}, "value"),
@@ -2401,7 +2712,7 @@ def manage_counts(add_clicks, save_clicks, remove_clicks,
 )
 def manage_sections(add_section_clicks, remove_section_clicks,
                     add_chart_clicks, save_chart_clicks, remove_chart_clicks,
-                    selector_value, section_names,
+                    selector_value, report_id, report_name, date_created, section_names,
                     chart_ids, chart_names, chart_types, 
                     # chart_titles,
                     chart_date_cols, chart_y_cols, chart_x_cols,
@@ -2421,27 +2732,6 @@ def manage_sections(add_section_clicks, remove_section_clicks,
     
     if not ctx.triggered:
         raise PreventUpdate
- 
-    def load_dashboards_from_file():
-        try:
-            with open(dashboards_json_path, 'r') as f:
-                data = json.load(f)
-                return data if isinstance(data, list) else [data]
-        except (FileNotFoundError, json.JSONDecodeError):
-            return []
-    
-    def _load_dashboard(selector_value):
-        data = load_dashboards_from_file()
-        if not (isinstance(selector_value, int) and 0 <= selector_value < len(data)):
-            return None, None, [], []
-        db = data[selector_value]
-        counts = db.get("visualization_types", {}).get("counts", [])
-        sections = db.get("visualization_types", {}).get("charts", {}).get("sections", [])
-        return data, db, counts, sections
-    
-    def save_dashboards_to_file(data):
-        with open(dashboards_json_path, 'w') as f:
-            json.dump(data, f, indent=2)
  
     triggered_id = ctx.triggered_id
  
@@ -2469,16 +2759,16 @@ def manage_sections(add_section_clicks, remove_section_clicks,
             "title": get(chart_names, flat_idx, ""),
             "unique_column": get(chart_unique_columns, flat_idx, "person_id"),
             # Filters
-            "filter_col1": get(chart_filter_col1s, flat_idx, []),
-            "filter_val1": get(chart_filter_val1s, flat_idx, ""),
-            "filter_col2": get(chart_filter_col2s, flat_idx, []),
-            "filter_val2": get(chart_filter_val2s, flat_idx, ""),
-            "filter_col3": get(chart_filter_col3s, flat_idx, []),
-            "filter_val3": get(chart_filter_val3s, flat_idx, ""),
-            "filter_col4": get(chart_filter_col4s, flat_idx, []),
-            "filter_val4": get(chart_filter_val4s, flat_idx, ""),
-            "filter_col5": get(chart_filter_col5s, flat_idx, []),
-            "filter_val5": get(chart_filter_val5s, flat_idx, ""),
+            "filter_col1": _normalize_filter_value(get(chart_filter_col1s, flat_idx, [])),
+            "filter_val1": _normalize_filter_value(get(chart_filter_val1s, flat_idx, "")),
+            "filter_col2": _normalize_filter_value(get(chart_filter_col2s, flat_idx, [])),
+            "filter_val2": _normalize_filter_value(get(chart_filter_val2s, flat_idx, "")),
+            "filter_col3": _normalize_filter_value(get(chart_filter_col3s, flat_idx, [])),
+            "filter_val3": _normalize_filter_value(get(chart_filter_val3s, flat_idx, "")),
+            "filter_col4": _normalize_filter_value(get(chart_filter_col4s, flat_idx, [])),
+            "filter_val4": _normalize_filter_value(get(chart_filter_val4s, flat_idx, "")),
+            "filter_col5": _normalize_filter_value(get(chart_filter_col5s, flat_idx, [])),
+            "filter_val5": _normalize_filter_value(get(chart_filter_val5s, flat_idx, "")),
         }
 
         # Add chart type specific fields
@@ -2503,7 +2793,7 @@ def manage_sections(add_section_clicks, remove_section_clicks,
             filters.update({
                 "names_col": get(chart_names_cols, flat_idx, ""),
                 "values_col": get(chart_values_cols, flat_idx, ""),
-                "colormap": get(chart_colormaps, flat_idx, {})
+                "colormap": _safe_json_loads(get(chart_colormaps, flat_idx, {}), {})
             })
         elif chart_type == "Column":
             filters.update({
@@ -2523,8 +2813,8 @@ def manage_sections(add_section_clicks, remove_section_clicks,
             })
         elif chart_type == "PivotTable":
             filters.update({
-                "index_col1": get(chart_index_col1s, flat_idx, ""),
-                "columns": get(chart_columns, flat_idx, ""),
+                "index_col1": _normalize_filter_value(get(chart_index_col1s, flat_idx, "")),
+                "columns": _normalize_filter_value(get(chart_columns, flat_idx, "")),
                 "aggfunc": get(chart_aggfuncs, flat_idx, "count"),
                 "values_col": get(chart_values_cols, flat_idx, ""),
             })
@@ -2542,9 +2832,10 @@ def manage_sections(add_section_clicks, remove_section_clicks,
     # Handle triggers
     if triggered_id == "add-section-btn":
         if add_section_clicks and add_section_clicks > 0:
-            dashboards_data, dashboard, counts, sections = _load_dashboard(selector_value)
-            if dashboard is None:
-                raise PreventUpdate
+            dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
+                selector_value, report_id, report_name, date_created
+            )
+            sections = dashboard.get("visualization_types", {}).get("charts", {}).get("sections", [])
             
             new_section_index = len(sections)
             new_section = {
@@ -2561,7 +2852,7 @@ def manage_sections(add_section_clicks, remove_section_clicks,
             
             sections.append(new_section)
             dashboard["visualization_types"]["charts"]["sections"] = sections
-            dashboards_data[selector_value] = dashboard
+            dashboards_data[dashboard_index] = dashboard
             save_dashboards_to_file(dashboards_data)
             return render_sections(sections)
         raise PreventUpdate
@@ -2571,14 +2862,15 @@ def manage_sections(add_section_clicks, remove_section_clicks,
             raise PreventUpdate
         
         section_ui_idx = triggered_id["index"]
-        dashboards_data, dashboard, counts, sections = _load_dashboard(selector_value)
-        if dashboard is None:
-            raise PreventUpdate
+        dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
+            selector_value, report_id, report_name, date_created
+        )
+        sections = dashboard.get("visualization_types", {}).get("charts", {}).get("sections", [])
         
         if 0 <= section_ui_idx < len(sections):
             sections.pop(section_ui_idx)
             dashboard["visualization_types"]["charts"]["sections"] = sections
-            dashboards_data[selector_value] = dashboard
+            dashboards_data[dashboard_index] = dashboard
             save_dashboards_to_file(dashboards_data)
         
         return render_sections(sections)
@@ -2588,9 +2880,10 @@ def manage_sections(add_section_clicks, remove_section_clicks,
             raise PreventUpdate
         
         section_ui_idx = triggered_id["index"]
-        dashboards_data, dashboard, counts, sections = _load_dashboard(selector_value)
-        if dashboard is None:
-            raise PreventUpdate
+        dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
+            selector_value, report_id, report_name, date_created
+        )
+        sections = dashboard.get("visualization_types", {}).get("charts", {}).get("sections", [])
         
         if 0 <= section_ui_idx < len(sections):
             new_chart = {
@@ -2601,7 +2894,7 @@ def manage_sections(add_section_clicks, remove_section_clicks,
             }
             sections[section_ui_idx].setdefault("items", []).append(new_chart)
             dashboard["visualization_types"]["charts"]["sections"] = sections
-            dashboards_data[selector_value] = dashboard
+            dashboards_data[dashboard_index] = dashboard
             save_dashboards_to_file(dashboards_data)
         
         return render_sections(sections)
@@ -2613,9 +2906,10 @@ def manage_sections(add_section_clicks, remove_section_clicks,
         section_ui_idx = triggered_id["section"]
         chart_ui_idx = triggered_id["index"]
         
-        dashboards_data, dashboard, counts, sections = _load_dashboard(selector_value)
-        if dashboard is None:
-            raise PreventUpdate
+        dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
+            selector_value, report_id, report_name, date_created
+        )
+        sections = dashboard.get("visualization_types", {}).get("charts", {}).get("sections", [])
         
         # Validate section and chart
         if section_ui_idx >= len(sections):
@@ -2645,7 +2939,7 @@ def manage_sections(add_section_clicks, remove_section_clicks,
             items[chart_ui_idx] = updated_chart
             sections[section_ui_idx]["items"] = items
             dashboard["visualization_types"]["charts"]["sections"] = sections
-            dashboards_data[selector_value] = dashboard
+            dashboards_data[dashboard_index] = dashboard
             save_dashboards_to_file(dashboards_data)
         
         return render_sections(sections)
@@ -2657,9 +2951,10 @@ def manage_sections(add_section_clicks, remove_section_clicks,
         section_ui_idx = triggered_id["section"]
         chart_ui_idx = triggered_id["index"]
         
-        dashboards_data, dashboard, counts, sections = _load_dashboard(selector_value)
-        if dashboard is None:
-            raise PreventUpdate
+        dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
+            selector_value, report_id, report_name, date_created
+        )
+        sections = dashboard.get("visualization_types", {}).get("charts", {}).get("sections", [])
         
         if section_ui_idx < len(sections):
             items = sections[section_ui_idx].get("items", [])
@@ -2672,7 +2967,7 @@ def manage_sections(add_section_clicks, remove_section_clicks,
                 sections[section_ui_idx]["items"] = items
             
             dashboard["visualization_types"]["charts"]["sections"] = sections
-            dashboards_data[selector_value] = dashboard
+            dashboards_data[dashboard_index] = dashboard
             save_dashboards_to_file(dashboards_data)
         
         return render_sections(sections)
@@ -2682,9 +2977,11 @@ def manage_sections(add_section_clicks, remove_section_clicks,
 @callback(
     Output({"type": "chart-fields", "section": dash.MATCH, "index": dash.MATCH}, "children"),
     [Input({"type": "chart-type", "section": dash.MATCH, "index": dash.MATCH}, "value")],
+    [State("dashboard-selector", "value"),
+     State("report-id-input", "value")],
     prevent_initial_call=True
 )
-def update_chart_fields(chart_type):
+def update_chart_fields(chart_type, selector_value, report_id):
     if not chart_type:
         return dash.no_update
     
@@ -2695,11 +2992,9 @@ def update_chart_fields(chart_type):
     # Load existing chart data to preserve values
     try:
         dashboards_data = load_dashboards_from_file()
-        if dashboards_data and len(dashboards_data) > 0:
-            # Find the current dashboard (you may need to track which dashboard is active)
-            # For now, we'll assume the first dashboard or you need to pass the selector value
-            current_dashboard = dashboards_data[0]  # This needs to be dynamic
-            
+        dashboard_index = _find_dashboard_index(dashboards_data, selector_value, report_id)
+        if dashboard_index is not None and dashboard_index < len(dashboards_data):
+            current_dashboard = dashboards_data[dashboard_index]
             sections = current_dashboard.get("visualization_types", {}).get("charts", {}).get("sections", [])
             if section_index < len(sections):
                 items = sections[section_index].get("items", [])
@@ -3112,20 +3407,154 @@ def update_chart_fields(chart_type):
 
 @callback(
     [Output("dashboard-selector", "options", allow_duplicate=True),
+     Output("dashboard-selector", "value", allow_duplicate=True),
+     Output("current-dashboard-index", "data", allow_duplicate=True),
+     Output("modal-backdrop", "style", allow_duplicate=True),
+     Output("modal-content", "style", allow_duplicate=True)],
+    Input("save-btn", "n_clicks"),
+    [State("dashboard-selector", "value"),
+     State("report-id-input", "value"),
+     State("report-name-input", "value"),
+     State("date-created-input", "value"),
+     State("dashboard-type-selector", "value"),
+     State("mnid-categories-selector", "value"),
+     State("mnid-indicators-input", "value"),
+     State({"type": "mnid-indicator-id", "index": dash.ALL}, "value"),
+     State({"type": "mnid-indicator-label", "index": dash.ALL}, "value"),
+     State({"type": "mnid-indicator-category", "index": dash.ALL}, "value"),
+     State({"type": "mnid-indicator-target", "index": dash.ALL}, "value"),
+     State({"type": "mnid-indicator-status", "index": dash.ALL}, "value"),
+     State({"type": "mnid-indicator-unique", "index": dash.ALL}, "value"),
+     State({"type": "mnid-indicator-note", "index": dash.ALL}, "value"),
+     State({"type": "mnid-numerator-var1", "index": dash.ALL}, "value"),
+     State({"type": "mnid-numerator-val1", "index": dash.ALL}, "value"),
+     State({"type": "mnid-numerator-var2", "index": dash.ALL}, "value"),
+     State({"type": "mnid-numerator-val2", "index": dash.ALL}, "value"),
+     State({"type": "mnid-numerator-var3", "index": dash.ALL}, "value"),
+     State({"type": "mnid-numerator-val3", "index": dash.ALL}, "value"),
+     State({"type": "mnid-numerator-var4", "index": dash.ALL}, "value"),
+     State({"type": "mnid-numerator-val4", "index": dash.ALL}, "value"),
+     State({"type": "mnid-denominator-var1", "index": dash.ALL}, "value"),
+     State({"type": "mnid-denominator-val1", "index": dash.ALL}, "value"),
+     State({"type": "mnid-denominator-var2", "index": dash.ALL}, "value"),
+     State({"type": "mnid-denominator-val2", "index": dash.ALL}, "value"),
+     State({"type": "mnid-denominator-var3", "index": dash.ALL}, "value"),
+     State({"type": "mnid-denominator-val3", "index": dash.ALL}, "value"),
+     State({"type": "mnid-denominator-var4", "index": dash.ALL}, "value"),
+     State({"type": "mnid-denominator-val4", "index": dash.ALL}, "value")],
+    prevent_initial_call=True
+)
+def save_dashboard_config(save_clicks, selector_value, report_id, report_name, date_created,
+                          dashboard_type, mnid_categories, mnid_indicators_raw,
+                          indicator_ids, indicator_labels, indicator_categories, indicator_targets,
+                          indicator_statuses, indicator_uniques, indicator_notes,
+                          n_var1, n_val1, n_var2, n_val2, n_var3, n_val3, n_var4, n_val4,
+                          d_var1, d_val1, d_var2, d_val2, d_var3, d_val3, d_var4, d_val4):
+    if not save_clicks:
+        raise PreventUpdate
+
+    def parse_indicator_value(raw_value):
+        if raw_value in (None, ""):
+            return ""
+        if isinstance(raw_value, (list, dict, int, float)):
+            return raw_value
+        raw_text = str(raw_value).strip()
+        if not raw_text:
+            return ""
+        if raw_text.startswith("[") or raw_text.startswith("{"):
+            try:
+                return json.loads(raw_text)
+            except json.JSONDecodeError:
+                return raw_text
+        return raw_text
+
+    def build_indicator_filters(unique_value, index, var_groups, val_groups):
+        filters = {"unique": unique_value or "person_id"}
+        for pos, (var_group, val_group) in enumerate(zip(var_groups, val_groups), start=1):
+            variable = var_group[index] if index < len(var_group) else None
+            value = parse_indicator_value(val_group[index] if index < len(val_group) else "")
+            if variable:
+                filters[f"variable{pos}"] = variable
+                if value not in ("", [], {}):
+                    filters[f"value{pos}"] = value
+        return filters
+
+    dashboards_data = load_dashboards_from_file()
+    dashboard_index = _find_dashboard_index(dashboards_data, selector_value, report_id)
+
+    if dashboard_index is None:
+        dashboard = _empty_dashboard_structure(report_id, report_name, date_created)
+        dashboards_data.append(dashboard)
+        dashboard_index = len(dashboards_data) - 1
+    else:
+        dashboard = dashboards_data[dashboard_index]
+
+    dashboard["report_id"] = report_id or dashboard.get("report_id") or f"report_{uuid.uuid4().hex[:8]}"
+    dashboard["report_name"] = report_name or dashboard.get("report_name") or "New Dashboard"
+    dashboard["date_created"] = date_created or dashboard.get("date_created") or datetime.now().strftime("%Y-%m-%d")
+    dashboard.setdefault("visualization_types", {})
+    dashboard["visualization_types"].setdefault("counts", [])
+    dashboard["visualization_types"].setdefault("charts", {})
+    dashboard["visualization_types"]["charts"].setdefault("sections", [])
+
+    if dashboard_type == "mnid":
+        built_indicators = []
+        for i, label in enumerate(indicator_labels or []):
+            if not label:
+                continue
+            indicator = {
+                "id": indicator_ids[i] if i < len(indicator_ids) and indicator_ids[i] else f"mnid_{uuid.uuid4().hex[:8]}",
+                "label": label,
+                "category": indicator_categories[i] if i < len(indicator_categories) else "",
+                "target": indicator_targets[i] if i < len(indicator_targets) and indicator_targets[i] not in (None, "") else 80,
+                "status": indicator_statuses[i] if i < len(indicator_statuses) and indicator_statuses[i] else "tracked",
+                "numerator_filters": build_indicator_filters(
+                    indicator_uniques[i] if i < len(indicator_uniques) else "person_id",
+                    i,
+                    [n_var1, n_var2, n_var3, n_var4],
+                    [n_val1, n_val2, n_val3, n_val4],
+                ),
+                "denominator_filters": build_indicator_filters(
+                    indicator_uniques[i] if i < len(indicator_uniques) else "person_id",
+                    i,
+                    [d_var1, d_var2, d_var3, d_var4],
+                    [d_val1, d_val2, d_val3, d_val4],
+                ),
+            }
+            if i < len(indicator_notes) and indicator_notes[i]:
+                indicator["note"] = indicator_notes[i]
+            built_indicators.append(indicator)
+
+        dashboard["dashboard_type"] = "mnid"
+        dashboard["mnid_categories"] = _coerce_list(mnid_categories)
+        dashboard["priority_indicators"] = built_indicators or _safe_json_loads(mnid_indicators_raw, [])
+    else:
+        dashboard.pop("dashboard_type", None)
+        dashboard.pop("mnid_categories", None)
+        dashboard.pop("priority_indicators", None)
+
+    dashboards_data[dashboard_index] = dashboard
+    save_dashboards_to_file(dashboards_data)
+
+    return (
+        _dashboard_selector_options(dashboards_data),
+        dashboard_index,
+        dashboard_index,
+        {"display": "none"},
+        {"display": "none"},
+    )
+
+@callback(
+    [Output("dashboard-selector", "options", allow_duplicate=True),
      Output("modal-backdrop", "style", allow_duplicate=True),
      Output("modal-content", "style", allow_duplicate=True)],
     [Input("delete-btn", "n_clicks")],
-    [State("current-dashboard-index", "data")],  # Use current index instead of selector value
+    [State("current-dashboard-index", "data"),
+     State("dashboard-selector", "value"),
+     State("report-id-input", "value")],
     prevent_initial_call=True
 )
-def delete_dashboard(delete_clicks, current_index):
-    def load_dashboards_from_file():
-        try:
-            with open(dashboards_json_path, 'r') as f:
-                data = json.load(f)
-                return data if isinstance(data, list) else [data]
-        except (FileNotFoundError, json.JSONDecodeError):
-            return []
+def delete_dashboard(delete_clicks, current_index, selector_value, report_id):
     dashboards_data = load_dashboards_from_file()
     if delete_clicks and delete_clicks > 0:
         # Check if we have a valid dashboard to delete

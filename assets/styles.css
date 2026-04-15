@@ -1277,18 +1277,52 @@ body {
     color: #ffffff;
 }
 
-.premium-theme-mch .premium-stage-card,
-.premium-theme-mch .premium-metric-card,
-.premium-theme-mch .premium-hero,
-.premium-theme-mch .premium-section-block,
-.premium-theme-mch .premium-overview-copy {
-    animation: premium-card-rise 0.35s ease-out;
+.premium-theme-mch .premium-hero {
+    animation: premium-card-rise 0.4s ease-out both;
 }
+
+.premium-theme-mch .premium-overview-copy {
+    animation: premium-card-rise 0.4s ease-out both;
+    animation-delay: 0.05s;
+}
+
+/* Staggered metric card entrance */
+.premium-theme-mch .premium-metric-card {
+    animation: premium-card-rise 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.premium-metric-grid > .premium-metric-card:nth-child(1) { animation-delay: 0.06s; }
+.premium-metric-grid > .premium-metric-card:nth-child(2) { animation-delay: 0.12s; }
+.premium-metric-grid > .premium-metric-card:nth-child(3) { animation-delay: 0.18s; }
+.premium-metric-grid > .premium-metric-card:nth-child(4) { animation-delay: 0.24s; }
+.premium-metric-grid > .premium-metric-card:nth-child(5) { animation-delay: 0.30s; }
+.premium-metric-grid > .premium-metric-card:nth-child(6) { animation-delay: 0.36s; }
+.premium-metric-grid > .premium-metric-card:nth-child(7) { animation-delay: 0.42s; }
+.premium-metric-grid > .premium-metric-card:nth-child(8) { animation-delay: 0.48s; }
+
+/* Staggered section block entrance */
+.premium-theme-mch .premium-section-block {
+    animation: premium-card-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.premium-sections > .premium-section-block:nth-child(1) { animation-delay: 0.1s; }
+.premium-sections > .premium-section-block:nth-child(2) { animation-delay: 0.2s; }
+.premium-sections > .premium-section-block:nth-child(3) { animation-delay: 0.3s; }
+.premium-sections > .premium-section-block:nth-child(4) { animation-delay: 0.4s; }
+.premium-sections > .premium-section-block:nth-child(5) { animation-delay: 0.5s; }
+.premium-sections > .premium-section-block:nth-child(6) { animation-delay: 0.6s; }
+
+/* Staggered chart card entrance within sections */
+.premium-theme-mch .premium-stage-card {
+    animation: premium-card-rise 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.premium-stage-grid > .premium-stage-card:nth-child(1) { animation-delay: 0.08s; }
+.premium-stage-grid > .premium-stage-card:nth-child(2) { animation-delay: 0.16s; }
+.premium-stage-grid > .premium-stage-card:nth-child(3) { animation-delay: 0.24s; }
+.premium-stage-grid > .premium-stage-card:nth-child(4) { animation-delay: 0.32s; }
 
 @keyframes premium-card-rise {
     from {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(14px);
     }
     to {
         opacity: 1;
