@@ -397,9 +397,39 @@ layout = html.Div(
                     ]
                 ),
                 # Dashboard Content
-                html.Div(
-                    id='dashboard-container',
-                    className="dashboard-content-modern"
+                dcc.Loading(
+                    id="dashboard-loading",
+                    parent_style={
+                        "position": "relative",
+                        "minHeight": "220px",
+                    },
+                    style={
+                        "position": "absolute",
+                        "inset": 0,
+                        "display": "flex",
+                        "alignItems": "center",
+                        "justifyContent": "center",
+                    },
+                    custom_spinner=html.Div(
+                        className="home-loading-spinner",
+                        role="status",
+                        children=html.Span(
+                            "Loading...",
+                            className="home-visually-hidden",
+                        ),
+                    ),
+                    overlay_style={
+                        "visibility": "visible",
+                        "opacity": 0.45,
+                        "backgroundColor": "rgba(255,255,255,0.82)",
+                        "borderRadius": "16px",
+                        "zIndex": 10,
+                    },
+                    delay_show=150,
+                    children=html.Div(
+                        id='dashboard-container',
+                        className="dashboard-content-modern"
+                    )
                 ),
             ]
         ),

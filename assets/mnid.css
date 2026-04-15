@@ -7,13 +7,31 @@ html { scroll-behavior: smooth; }
 
 /* MNID entry animation */
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.mnid-kpi       { animation: fadeInUp 0.35s ease both; }
-.mnid-chart-card{ animation: fadeInUp 0.4s ease both; }
-.mnid-card      { animation: fadeInUp 0.38s ease both; }
-.mnid-topbar    { animation: fadeInUp 0.25s ease both; }
+.mnid-topbar    { animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.mnid-kpi       { animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.mnid-chart-card{ animation: fadeInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.mnid-card      { animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Staggered KPI card entrance */
+.mnid-kpi-row > .mnid-kpi:nth-child(1) { animation-delay: 0.05s; }
+.mnid-kpi-row > .mnid-kpi:nth-child(2) { animation-delay: 0.10s; }
+.mnid-kpi-row > .mnid-kpi:nth-child(3) { animation-delay: 0.15s; }
+.mnid-kpi-row > .mnid-kpi:nth-child(4) { animation-delay: 0.20s; }
+.mnid-kpi-row > .mnid-kpi:nth-child(5) { animation-delay: 0.25s; }
+.mnid-kpi-row > .mnid-kpi:nth-child(6) { animation-delay: 0.30s; }
+.mnid-kpi-row > .mnid-kpi:nth-child(7) { animation-delay: 0.35s; }
+.mnid-kpi-row > .mnid-kpi:nth-child(8) { animation-delay: 0.40s; }
+
+/* Staggered chart card entrance */
+.mnid-chart-grid > .mnid-chart-card:nth-child(1) { animation-delay: 0.07s; }
+.mnid-chart-grid > .mnid-chart-card:nth-child(2) { animation-delay: 0.14s; }
+.mnid-chart-grid > .mnid-chart-card:nth-child(3) { animation-delay: 0.21s; }
+.mnid-chart-grid > .mnid-chart-card:nth-child(4) { animation-delay: 0.28s; }
+.mnid-chart-grid > .mnid-chart-card:nth-child(5) { animation-delay: 0.35s; }
+.mnid-chart-grid > .mnid-chart-card:nth-child(6) { animation-delay: 0.42s; }
 
 /* MNID shell layout */
 .mnid-bg {
