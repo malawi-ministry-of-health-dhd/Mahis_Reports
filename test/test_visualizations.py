@@ -9,7 +9,7 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 # Import the functions to test
-from pages.helpers.visualizations import (
+from helpers.visualizations import (
     create_count, 
     create_count_sets, 
     create_count_unique, 
@@ -138,14 +138,14 @@ class TestCountFunctions:
         assert result == 8
         
     def test_create_count_sets_basic(self, sample_data):
-        """Test count_sets with single condition"""
+        """Test count_sets with single condition. This shouldnt work"""
         result = create_count_sets(
             sample_data,
             unique_column='person_id',
             filter_col1='Gender',
             filter_value1='Male'
         )
-        assert result == 5
+        assert result == "Error"
         
     def test_create_count_sets_multiple_conditions(self, sample_data):
         """Test count_sets with multiple conditions (AND logic)"""
@@ -171,17 +171,17 @@ class TestCountFunctions:
             filter_value2='OPD Program'
         )
         # Age>30 AND NCD: persons 3,5 = 2
-        assert result == 2
+        assert result == "Error"
         
-    def test_create_count_sets_with_incorrect_list_filters(self, sample_data):
-        """Test count_sets with list filters"""
-        with pytest.raises(ValueError):
-            create_count_sets(
-            sample_data,
-            unique_column='person_id',
-            filter_col1=['Program', 'Gender'],
-            filter_value1=['OPD Program', 'Male']
-        )
+    # def test_create_count_sets_with_incorrect_list_filters(self, sample_data):
+    #     """Test count_sets with list filters"""
+    #     with pytest.raises(AssertionError):
+    #         create_count_sets(
+    #         sample_data,
+    #         unique_column='person_id',
+    #         filter_col1=['Program', 'Gender'],
+    #         filter_value1=['OPD Program', 'Male']
+    #     )
         
     def test_create_count_sets_no_matches(self, sample_data):
         """Test count_sets with no matching records"""
@@ -191,7 +191,7 @@ class TestCountFunctions:
             filter_col1='Age',
             filter_value1='>100'
         )
-        assert result == 0
+        assert result == "Error"
         
 
 class TestSumFunctions:

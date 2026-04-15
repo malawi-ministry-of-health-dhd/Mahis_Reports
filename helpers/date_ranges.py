@@ -25,6 +25,8 @@ _QUARTER_MAP = {
     "Q4OCT-DEC": (10, 12),
 }
 
+RELATIVE_BIANNUAL = ["Jan-June", "July-Dec"]
+
 
 def get_week_start_end(week_num, year):
     """Return (start_date, end_date) for a week number and year."""
@@ -75,4 +77,30 @@ def get_quarter_start_end(quarter, year):
         end_date = datetime.date(year, 12, 31)
     else:
         end_date = datetime.date(year, end_month + 1, 1) - datetime.timedelta(days=1)
+    return start_date, end_date
+
+def get_biannual_start_end(period, year):
+    # Validate inputs
+    if period is None or year is None:
+        raise ValueError("Enter Year and Period")
+    if period not in RELATIVE_BIANNUAL:
+        raise ValueError(f"Invalid period: {period}. Must be one of {RELATIVE_BIANNUAL}")
+    try:
+        year = int(year)  # Ensure year is an integer
+    except (ValueError, TypeError):
+        raise ValueError(f"Invalid year: {year}. Must be a valid integer (e.g., 2023)")
+    
+    # Map quarters to start and end months
+    map = {
+        "Jan-June": (1, 6),
+        "July-Dec": (7, 12),
+    }
+    start_month, end_month = map[period]
+    start_date = datetime.date(year, start_month, 1)
+    # Last day of end_month
+    if end_month == 12:
+        end_date = datetime.date(year, 12, 31)
+    else:
+        end_date = datetime.date(year, end_month + 1, 1) - datetime.timedelta(days=1)
+    
     return start_date, end_date

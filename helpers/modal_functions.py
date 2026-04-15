@@ -34,7 +34,8 @@ with open(path_dcc_json) as r:
 drop_down_programs = dcc_json['programs']
 drop_down_encounters = dcc_json['encounters']
 drop_down_concepts = dcc_json['concepts']
-aggregations = ["nunique", "sum", "count", "mean", "min", "max"]
+aggregations = ["nunique", "sum", "count", "mean", "min", "max","time_diff_mins","time_diff_hour","std","var","list"]
+user_levels = ['national', 'district', 'facility']
 
 # DATASET
 def validate_excel_file(contents):
@@ -448,8 +449,8 @@ def create_chart_fields(chart_type, chart_data=None, section_index=None, chart_i
     #     return html.Div("Invalid chart type")
 
     template = CHART_TEMPLATES["Chart"]
-    dropdown_options = ['Date','person_id', 'encounter_id', 'Gender', 'Program', 'Encounter', 
-                        'obs_value_coded', 'concept_name', 'Value', 'ValueN', 'DrugName', 'Value_name']
+    dropdown_options = ['Date','person_id', 'encounter_id', 'Gender', 'Program', 'Encounter',
+                        'obs_value_coded', 'concept_name', 'Value', 'ValueN', 'DrugName', 'Value_name','User']
     
     # Define which fields are relevant for each chart type
     chart_type_fields = {
@@ -463,7 +464,8 @@ def create_chart_fields(chart_type, chart_data=None, section_index=None, chart_i
     
     # Common fields for all chart types
     common_fields = ["title", "duration_default", "filter_col1", "filter_val1", "filter_col2", "filter_val2", 
-                     "filter_col3", "filter_val3", "filter_col4", "filter_val4", "filter_col5", "filter_val5"]
+                     "filter_col3", "filter_val3", "filter_col4", "filter_val4", "filter_col5", "filter_val5",
+                     "custom_fields"]
     
     # Combine all fields that should be visible for this chart type
     visible_fields = set(chart_type_fields.get(chart_type, []) + common_fields)
@@ -475,7 +477,7 @@ def create_chart_fields(chart_type, chart_data=None, section_index=None, chart_i
         "x_title", "y_title", "legend_title", "color", "top_n", "bin_size", "colormap",
         "unique_column", "title", "duration_default",
         "filter_col1", "filter_val1", "filter_col2", "filter_val2", "filter_col3", "filter_val3",
-        "filter_col4", "filter_val4", "filter_col5", "filter_val5"
+        "filter_col4", "filter_val4", "filter_col5", "filter_val5","custom_fields"
     ]
     
     FIELD_CONFIG = {
@@ -502,6 +504,7 @@ def create_chart_fields(chart_type, chart_data=None, section_index=None, chart_i
         "filter_val3": {"type": "", "options": None},
         "filter_val4": {"type": "", "options": None},
         "filter_val5": {"type": "", "options": None},
+        "custom_fields": {"type": "", "options": None},
         "duration_default": {"type": "single", "options": ["any", "7days", "30days", "90days"]},
         "top_n": {"type": "single", "options": None},
         "colormap": {"type": "textarea", "options": None},
@@ -1138,7 +1141,8 @@ CHART_TEMPLATES = {
         "filter_col4": "",
         "filter_val4": "",
         "filter_col5": "",
-        "filter_val5": ""
+        "filter_val5": "",
+        "custom_fields": ""
     }
 }
 

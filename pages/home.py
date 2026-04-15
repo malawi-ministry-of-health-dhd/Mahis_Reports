@@ -549,6 +549,9 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                                                '{"label"=>"Male", "value"=>"M"}':"Male",
                                                '{"label"=>"Female", "value"=>"F"}':"Female"})
         data["DateValue"] = pd.to_datetime(data[DATE_]).dt.date
+        data['datetime'] = data[DATE_]
+        # data[DATE_] = pd.to_datetime(data[DATE_]).dt.date
+
         today = dt.today().date()
         data["months"] = data["DateValue"].apply(lambda d: (today - d).days // 30)
 
