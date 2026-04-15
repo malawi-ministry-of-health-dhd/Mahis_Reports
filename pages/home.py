@@ -554,7 +554,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             return (
                 html.Div("Unauthorized User. Please contact system administrator."),
                 level,
-                {'display': 'none'} if level in ['National', 'Facility'] else {},
+                dash.no_update,
                 [],
                 [],
                 False,
@@ -624,12 +624,14 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         else:
             facility_districts = []
 
-        show_district_filter = level == "District"
-        district_group_style = {} if show_district_filter else {"display": "none"}
-        district_disabled = not show_district_filter
+        district_disabled = level == "Facility"
         district_note = ""
-        if not show_district_filter:
-            districts = []
+        if district_disabled:
+            district_note = "Not applicable: district is derived from selected facilities (each facility belongs to exactly one district)."
+            if facility_districts:
+                districts = sorted(set(facility_districts))
+            else:
+                districts = []
 
         # Keep selected facilities consistent with selected districts
         if district_col and districts:
@@ -735,7 +737,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         return (
             dashboard_content,
             level,
-            district_group_style,
+            dash.no_update,
             [{'label': d, 'value': d} for d in all_districts],
             districts,
             district_disabled,
