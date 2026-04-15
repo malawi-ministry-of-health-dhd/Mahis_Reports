@@ -327,6 +327,7 @@ layout = html.Div(
                                         
                                         # Age Group Filter
                                         html.Div(
+                                            id="dashboard-age-filter-group",
                                             className="filter-group",
                                             children=[
                                                 html.Label("Age Group", className="filter-label"),
@@ -824,3 +825,15 @@ def change_style(generate, reset):
     else:
         style_default = {}
         return style_default, style_default, style_default, style_default, style_default, style_default, style_default, style_default
+
+
+@callback(
+    Output('dashboard-age-filter-group', 'style'),
+    Input('active-button-store', 'data'),
+)
+def toggle_age_group_visibility(active_report):
+    report = str(active_report or '').strip().lower()
+    hide_for = {'maternal health', 'newborn', 'neonatal program'}
+    if report in hide_for:
+        return {'display': 'none'}
+    return {}
