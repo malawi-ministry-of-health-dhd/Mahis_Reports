@@ -307,6 +307,7 @@ layout = html.Div(
 
                                         # Program Category Filter (MNID)
                                         html.Div(
+                                            id="dashboard-category-filter-group",
                                             className="filter-group",
                                             children=[
                                                 html.Label("Program Category", className="filter-label"),
@@ -829,11 +830,31 @@ def change_style(generate, reset):
 
 @callback(
     Output('dashboard-age-filter-group', 'style'),
-    Input('active-button-store', 'data'),
+    Output('dashboard-category-filter-group', 'style'),
+    Input({"type": "menu-button", "name": ALL}, "n_clicks"),
+    State('active-button-store', 'data'),
 )
-def toggle_age_group_visibility(active_report):
+def toggle_age_group_visibility(menu_clicks, active_report):
     report = str(active_report or '').strip().lower()
+    ctx = callback_context
+    if ctx.triggered:
+        trigger = ctx.triggered[0].get('prop_id', '')
+        if trigger.startswith('{') and '"type":"menu-button"' in trigger:
+            try:
+                report = str(json.loads(trigger.split('.')[0]).get('name', report)).strip().lower()
+            except Exception:
+                report = str(active_report or '').strip().lower()
+
     hide_for = {'maternal health', 'newborn', 'neonatal program'}
+    show_program_for = {'maternal health'}
     if report in hide_for:
-        return {'display': 'none'}
-    return {}
+        age_style = {'display': 'none'}
+    else:
+        age_style = {}
+
+    if report in show_program_for:
+        program_style = {}
+    else:
+        program_style = {'display': 'none'}
+
+    return age_style, program_style
