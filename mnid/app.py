@@ -6,6 +6,7 @@ calculates configured indicator coverage, and renders the main dashboard
 sections such as trends, comparison views, heatmaps, and readiness panels.
 """
 from dash import html, dcc, clientside_callback, callback, callback_context, Input, Output, State, ALL
+from dash.exceptions import PreventUpdate
 import dash_mantine_components as dmc
 from helpers.helpers import create_count_from_config
 import pandas as pd
