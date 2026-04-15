@@ -453,11 +453,12 @@ def update_table(clicks,
         filtered["end_date"] = end_date
 
         original_data = original_data[original_dates <= pd.to_datetime(end_date)].copy()
-        original_data["days_before_visit_date"] = original_data["DateValue"].apply(
-            lambda d: (start_date - d).days
-        )
         original_data["start_date"] = start_date
         original_data["end_date"] = end_date
+        
+        original_data["days_before_visit_date"] = original_data["start_date"].apply(
+            lambda d: (start_date - d).days
+        )
 
 
         spec_path = f"data/uploads/{report['page_name']}.xlsx"

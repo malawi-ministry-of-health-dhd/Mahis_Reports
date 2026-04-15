@@ -174,6 +174,12 @@ class ReportTableBuilder:
             for fcol, fval in spec["pairs"]:
                 args_cohort.extend([fcol, fval])
             result = create_count(*args_cohort)
+        elif measure == "count_defaulter":
+            args.append("defaulter_count")
+            args.append(spec["unique_column"])
+            for fcol, fval in spec["pairs"]:
+                args.extend([fcol, fval])
+            result = create_count(*args)
         else:
             result = ""
 
