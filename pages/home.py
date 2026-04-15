@@ -527,9 +527,21 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         except Exception as e:
             import traceback
             traceback.print_exc()
-            return html.Div('Missing Data. ' \
-            'Ensure that the config file has correct database credentials'
-            ,style={'color':'red'}), [], '', ''  # Empty DataFrame with expected columns
+            return (
+                html.Div(
+                    'Missing Data. Ensure that the config file has correct database credentials',
+                    style={'color': 'red'}
+                ),
+                level or dash.no_update,
+                dash.no_update,
+                [],
+                [],
+                True,
+                "",
+                [],
+                [],
+                current_active or dash.no_update,
+            )
 
         data[DATE_] = pd.to_datetime(data[DATE_], format='mixed')
         data[GENDER_] = data[GENDER_].replace({"M":"Male",
@@ -612,17 +624,6 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             facilities_pool[FACILITY_].dropna().sort_values().unique().tolist()
             if FACILITY_ in facilities_pool.columns else []
         )
-
-        # Enforce facility -> district constraint
-        if district_col and facilities:
-            facility_districts = (
-                base_data[base_data[FACILITY_].isin(facilities)][district_col]
-                .dropna()
-                .unique()
-                .tolist()
-            )
-        else:
-            facility_districts = []
 
         show_district_filter = level == "District"
         district_group_style = {} if show_district_filter else {"display": "none"}
