@@ -213,6 +213,7 @@ layout = html.Div(
 
                                         # District Filter
                                         html.Div(
+                                            id="dashboard-district-filter-group",
                                             className="filter-group",
                                             children=[
                                                 html.Label("District", className="filter-label"),
@@ -434,6 +435,7 @@ def update_menu(interval, color):
 @callback(
     [Output('dashboard-container', 'children'),
      Output('dashboard-level-filter', 'value'),
+     Output('dashboard-district-filter-group', 'style'),
      Output('dashboard-district-filter', 'options'),
      Output('dashboard-district-filter', 'value'),
      Output('dashboard-district-filter', 'disabled'),
@@ -525,9 +527,21 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         except Exception as e:
             import traceback
             traceback.print_exc()
-            return html.Div('Missing Data. ' \
-            'Ensure that the config file has correct database credentials'
-            ,style={'color':'red'}), [], '', ''  # Empty DataFrame with expected columns
+            return (
+                html.Div(
+                    'Missing Data. Ensure that the config file has correct database credentials',
+                    style={'color': 'red'}
+                ),
+                level or dash.no_update,
+                dash.no_update,
+                [],
+                [],
+                True,
+                "",
+                [],
+                [],
+                current_active or dash.no_update,
+            )
 
         data[DATE_] = pd.to_datetime(data[DATE_], format='mixed')
         data[GENDER_] = data[GENDER_].replace({"M":"Male",
@@ -552,6 +566,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             return (
                 html.Div("Unauthorized User. Please contact system administrator."),
                 level,
+                {'display': 'none'} if level in ['National', 'Facility'] else {},
                 [],
                 [],
                 False,
@@ -600,7 +615,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         if level == "National":
             facilities_pool = base_data
         elif level == "District" and district_col and not districts:
-            facilities_pool = base_data
+            facilities_pool = base_data.iloc[0:0]
         elif district_col and districts:
             facilities_pool = base_data[base_data[district_col].isin(districts)]
         else:
@@ -610,28 +625,15 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             if FACILITY_ in facilities_pool.columns else []
         )
 
-        # Enforce facility -> district constraint
-        if district_col and facilities:
-            facility_districts = (
-                base_data[base_data[FACILITY_].isin(facilities)][district_col]
-                .dropna()
-                .unique()
-                .tolist()
-            )
-        else:
-            facility_districts = []
-
-        district_disabled = level == "Facility"
+        show_district_filter = level == "District"
+        district_group_style = {} if show_district_filter else {"display": "none"}
+        district_disabled = not show_district_filter
         district_note = ""
-        if district_disabled:
-            district_note = "Not applicable: district is derived from selected facilities (each facility belongs to exactly one district)."
-            if facility_districts:
-                districts = sorted(set(facility_districts))
-            else:
-                districts = []
+        if not show_district_filter:
+            districts = []
 
         # Keep selected facilities consistent with selected districts
-        if district_col and districts:
+        if level == "District" and district_col and districts:
             allowed_facilities = set(
                 base_data[base_data[district_col].isin(districts)][FACILITY_]
                 .dropna()
@@ -734,6 +736,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         return (
             dashboard_content,
             level,
+            district_group_style,
             [{'label': d, 'value': d} for d in all_districts],
             districts,
             district_disabled,
@@ -750,6 +753,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                 html.P("Dashboard render failed.", style={"color": "#475569", "fontWeight": "600"}),
                 html.P(str(e), style={"color": "#94A3B8", "fontSize": "12px"}),
             ]),
+            dash.no_update,
             dash.no_update,
             dash.no_update,
             dash.no_update,
