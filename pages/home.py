@@ -399,10 +399,24 @@ layout = html.Div(
                 # Dashboard Content
                 dcc.Loading(
                     id="dashboard-loading",
+                    parent_style={
+                        "position": "relative",
+                        "minHeight": "220px",
+                    },
+                    style={
+                        "position": "absolute",
+                        "inset": 0,
+                        "display": "flex",
+                        "alignItems": "center",
+                        "justifyContent": "center",
+                    },
                     custom_spinner=html.Div(
-                        className="spinner-border text-success",
+                        className="home-loading-spinner",
                         role="status",
-                        children=html.Span("Loading...", className="visually-hidden"),
+                        children=html.Span(
+                            "Loading...",
+                            className="home-visually-hidden",
+                        ),
                     ),
                     overlay_style={
                         "visibility": "visible",

@@ -564,22 +564,31 @@
 }
 
 /* ── Dashboard loading overlay ───────────────────────────────────── */
-#dashboard-loading {
-    position: relative;
-    min-height: 120px;
+@keyframes homeSpinner {
+    to { transform: rotate(360deg); }
 }
 
-/* Make the custom spinner larger and center it nicely */
-#dashboard-loading .spinner-border {
-    width: 2.5rem;
-    height: 2.5rem;
+/* Single custom spinner fallback styles */
+.home-loading-spinner {
+    width: 2.8rem;
+    height: 2.8rem;
+    border: 0.32em solid rgba(0, 100, 1, 0.2);
+    border-top-color: #006401;
+    border-radius: 50%;
+    animation: homeSpinner 0.75s linear infinite;
+    box-sizing: border-box;
 }
 
-#dashboard-loading [data-dash-spinner] {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 60px 0;
+.home-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 /* Loading pulse on the Apply Filters button while callback runs */
