@@ -3533,7 +3533,7 @@ def _newborn_charts(df):
 
     tab_specs = [
         ('Admissions', 'Admissions volume and core neonatal service activity.', [overview_card, admission_card]),
-        ('Mortality', 'Outcome trends and mortality-related newborn status views.', [mortality_chart, complications_bar]),
+        ('Mortality', 'Outcome trends and mortality-related newborn status views.', [mortality_chart]),
         ('Birthweight', 'Birthweight-related distribution views for neonatal review.', [birthweight_chart]),
         ('Thermal Care', 'Thermal stability monitoring and thermal status composition.', [run_cards.get('Thermal Stability'), thermal_mix_card, thermal_donut]),
         ('Respiratory Support', 'Respiratory support and resuscitation monitoring.', [run_cards.get('Resuscitation Response'), run_cards.get('Bubble CPAP Use'), respiratory_mix_card, resuscitation_donut, cpap_donut]),
@@ -4583,7 +4583,8 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
         comparative_div,
 
         _section_anchor('mnid-analysis'),
-        _sec_header('Clinical Interventions' if dashboard_theme == 'newborn' else 'Clinical Analysis', total_analysis,
+        _sec_header('Clinical Interventions' if dashboard_theme == 'newborn' else 'Clinical Analysis',
+                    None if dashboard_theme == 'newborn' else total_analysis,
                     desc='Clinical intervention, thermal support, respiratory support, and complication views.' if dashboard_theme == 'newborn' else 'Care-phase deep-dives',
                     eyebrow='Clinical View' if dashboard_theme == 'newborn' else None),
         dmc.Accordion(
