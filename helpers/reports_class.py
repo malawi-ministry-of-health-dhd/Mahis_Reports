@@ -130,28 +130,46 @@ class ReportTableBuilder:
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
             result = create_sum(*args)
+
         elif measure == "count_set":
+            args.append("count")
             args.append(spec["unique_column"])
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
             result = create_count_sets(*args)
+
         elif measure == "count":
             args: List[Any] = [self.filtered_df, measure]
             args.append(spec["unique_column"])
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
             result = create_count(*args)
+
         elif measure == "cohort_sum":
             args_cohort.append(spec["num_field"])
             for fcol, fval in spec["pairs"]:
                 args_cohort.extend([fcol, fval])
             result = create_sum(*args_cohort)
         elif measure == "cohort_count_set":
+            args_cohort.append("count")
+            args_cohort.append(spec["unique_column"])
+            for fcol, fval in spec["pairs"]:
+                args_cohort.extend([fcol, fval])
+            result = create_count_sets(*args_cohort)
+        elif measure == "cohort_count_set_defaulter":
+            args_cohort.append("defaulter_count")
             args_cohort.append(spec["unique_column"])
             for fcol, fval in spec["pairs"]:
                 args_cohort.extend([fcol, fval])
             result = create_count_sets(*args_cohort)
         elif measure == "cohort_count":
+            args_cohort.append("count")
+            args_cohort.append(spec["unique_column"])
+            for fcol, fval in spec["pairs"]:
+                args_cohort.extend([fcol, fval])
+            result = create_count(*args_cohort)
+        elif measure == "cohort_count_defaulter":
+            args_cohort.append("defaulter_count")
             args_cohort.append(spec["unique_column"])
             for fcol, fval in spec["pairs"]:
                 args_cohort.extend([fcol, fval])
