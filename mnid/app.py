@@ -3152,7 +3152,7 @@ def _coverage_charts_section(by_cat: dict, df: pd.DataFrame, categories: list | 
                     for i in tracked]
         avg_pct  = round(sum(c[2] for c in computed) / len(computed), 0) if computed else None
 
-        pills = [html.Span(f'{len(tracked)} tracked', className='mnid-pill mnid-pill-green')]
+        pills = [html.Span(f'{len(tracked)} available', className='mnid-pill mnid-pill-green')]
         if awaiting:
             pills.append(html.Span(f'{len(awaiting)} awaiting', className='mnid-pill mnid-pill-amber'))
         if avg_pct is not None:
@@ -3190,7 +3190,7 @@ def _acc_section(sec_id, title, indicators, df, default_open=False):
                 for i in tracked]
     avg_pct  = round(sum(c[2] for c in computed) / len(computed), 0) if computed else None
 
-    pills = [html.Span(f'{len(tracked)} tracked', className='mnid-pill mnid-pill-green')]
+    pills = [html.Span(f'{len(tracked)} available', className='mnid-pill mnid-pill-green')]
     if awaiting:
         pills.append(html.Span(f'{len(awaiting)} awaiting',
                                className='mnid-pill mnid-pill-amber'))
@@ -4212,7 +4212,7 @@ def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=N
                 html.Span('Support', className='mnid-topbar-chip'),
                 html.Span('Monitor', className='mnid-topbar-chip'),
                 html.Span('Benchmark', className='mnid-topbar-chip'),
-                html.Span(f'{n_tracked} tracked', className='mnid-topbar-chip strong'),
+                html.Span(f'{n_tracked} available', className='mnid-topbar-chip strong'),
                 html.Span(f'{n_await} pending', className='mnid-topbar-chip subtle'),
             ]),
         ])
@@ -4248,7 +4248,7 @@ def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=N
             ]),
             html.Div(className='mnid-info-pill', children=[
                 html.Div('Indicators', className='mnid-info-pill-label'),
-                html.Div(f'{n_tracked} tracked / {n_await} pending',
+                html.Div(f'{n_tracked} available / {n_await} pending',
                          style={'fontSize': '11px', 'fontWeight': '700',
                                 'color': TEXT, 'lineHeight': '1.2'}),
             ]),
@@ -4294,7 +4294,7 @@ def _alert_banner(below, strong):
                      children=html.Span('OK', style={'color':'#fff','fontSize':'9px',
                                                      'fontWeight':'700'})),
             html.P([html.Strong('On track. '),
-                    'All tracked indicators are meeting target.']),
+                    'All available indicators are meeting target.']),
         ])
     below_txt = ', '.join(f'{n} ({_display_pct(p):.0f}%)' for n, p in below)
     strong_txt = ', '.join(strong[:3]) or 'None'
@@ -4375,7 +4375,7 @@ def _kpi_row(computed):
     avg  = round(sum(c['pct'] for c in computed) / n, 1) if n else 0.0
     avg_color = _cov_color(avg)
     return html.Div(className='mnid-kpi-row', children=[
-        _kpi('Tracked Indicators', str(n), 'live indicators', 'info',
+        _kpi('Available Indicators', str(n), 'live indicators', 'info',
              bottom_bar=_count_bar(n, n, INFO_C)),
         _kpi('On Target', str(len(on)), 'meeting benchmark', 'ok',
              bottom_bar=_count_bar(len(on), n, OK_C)),
@@ -4383,7 +4383,7 @@ def _kpi_row(computed):
              bottom_bar=_count_bar(len(mon), n, WARN_C)),
         _kpi('Needs Review', str(len(crit)), 'below target', 'danger',
              bottom_bar=_count_bar(len(crit), n, DANGER_C)),
-        _kpi('Average Coverage', '', 'across tracked indicators', 'info',
+        _kpi('Average Coverage', '', 'across available indicators', 'info',
              ring=_avg_ring(avg, avg_color)),
     ])
 
@@ -4482,7 +4482,7 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
                 html.Span(title, className='mnid-section-header-title'),
                 html.Div(desc, className='mnid-section-header-desc') if desc else None,
             ]),
-            html.Span(f'{count} charts' if count else '',
+            html.Span(f'{count} indicators' if count else '',
                       className='mnid-section-header-count'),
         ])
 
@@ -4503,7 +4503,7 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
 
         _section_anchor('mnid-summary'),
         _sec_header('Overview',
-                    desc='Neonatal program snapshot, priority indicator posture, and facility context.' if dashboard_theme == 'newborn' else f'{len(tracked)} tracked - {len(awaiting)} awaiting',
+                    desc='Neonatal program snapshot, priority indicator posture, and facility context.' if dashboard_theme == 'newborn' else f'{len(tracked)} available - {len(awaiting)} awaiting',
                     eyebrow='Overview' if dashboard_theme == 'newborn' else None),
         _kpi_row(computed),
         _hero_donut_row(computed, preferred_cat=default_cat, section_title=hero_title),
