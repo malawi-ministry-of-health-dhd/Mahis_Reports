@@ -213,7 +213,6 @@ layout = html.Div(
 
                                         # District Filter
                                         html.Div(
-                                            id="dashboard-district-filter-group",
                                             className="filter-group",
                                             children=[
                                                 html.Label("District", className="filter-label"),
@@ -435,7 +434,6 @@ def update_menu(interval, color):
 @callback(
     [Output('dashboard-container', 'children'),
      Output('dashboard-level-filter', 'value'),
-     Output('dashboard-district-filter-group', 'style'),
      Output('dashboard-district-filter', 'options'),
      Output('dashboard-district-filter', 'value'),
      Output('dashboard-district-filter', 'disabled'),
@@ -554,7 +552,6 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             return (
                 html.Div("Unauthorized User. Please contact system administrator."),
                 level,
-                dash.no_update,
                 [],
                 [],
                 False,
@@ -737,7 +734,6 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         return (
             dashboard_content,
             level,
-            dash.no_update,
             [{'label': d, 'value': d} for d in all_districts],
             districts,
             district_disabled,
@@ -754,7 +750,6 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                 html.P("Dashboard render failed.", style={"color": "#475569", "fontWeight": "600"}),
                 html.P(str(e), style={"color": "#94A3B8", "fontSize": "12px"}),
             ]),
-            dash.no_update,
             dash.no_update,
             dash.no_update,
             dash.no_update,
