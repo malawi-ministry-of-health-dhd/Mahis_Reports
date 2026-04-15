@@ -632,7 +632,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             districts = []
 
         # Keep selected facilities consistent with selected districts
-        if district_col and districts:
+        if level == "District" and district_col and districts:
             allowed_facilities = set(
                 base_data[base_data[district_col].isin(districts)][FACILITY_]
                 .dropna()
