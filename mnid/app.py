@@ -1959,7 +1959,8 @@ def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
                 if r < len(fac_z) and ci < len(fac_z[r]) and fac_z[r][ci] is not None]
         return round(sum(vals) / len(vals), 1) if vals else None
 
-    focus_dist  = district or current_dist
+    selected_dist = district if district not in (None, '', 'All') else None
+    focus_dist  = selected_dist or current_dist
     geojson = _load_malawi_district_geojson()
     geo_ref = _build_geo_reference(geojson)
     if not geo_ref:
@@ -1990,8 +1991,9 @@ def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
             continue
         cov = district_avgs.get(dist)
         fill = _cov_color(cov) if cov is not None else '#E2E8F0'
-        line_color = '#0F172A' if (view == 'district_facs' and dist == focus_dist) else '#FFFFFF'
-        line_width = 2.8 if (view == 'district_facs' and dist == focus_dist) else 1.4
+        is_focus = (view == 'district_facs' and dist == focus_dist) or (view == 'by_district' and dist == selected_dist)
+        line_color = '#0F172A' if is_focus else '#FFFFFF'
+        line_width = 2.8 if is_focus else 1.4
         for pts in rings:
             path_str = 'M ' + ' L '.join(f'{x:.6f},{y:.6f}' for x, y in pts) + ' Z'
             shapes.append(dict(
@@ -2069,11 +2071,12 @@ def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
 
     x_range = [-0.02, 1.02]
     y_range = [-0.02, y_scale + 0.02]
-    if view == 'district_facs':
+    if view == 'district_facs' or (view == 'by_district' and selected_dist):
+        zoom_dist = focus_dist if view == 'district_facs' else selected_dist
         focus_points = []
-        for pts in district_rings.get(focus_dist, []):
+        for pts in district_rings.get(zoom_dist, []):
             focus_points.extend(pts)
-        if 'fac_positions' in locals():
+        if view == 'district_facs' and 'fac_positions' in locals():
             for fac in [f for f in store_facs if _FACILITY_DISTRICT.get(f) == focus_dist]:
                 pos = fac_positions.get(fac)
                 if pos:
@@ -2102,7 +2105,7 @@ def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
         hoverinfo='skip',
     ))
 
-    title = 'District Coverage Map' if view == 'by_district' else (
+    title = (f'{selected_dist} District Coverage Map' if view == 'by_district' and selected_dist else 'District Coverage Map') if view == 'by_district' else (
         'Facility Coverage Map' if view == 'by_facility' else f'{focus_dist} Facility Coverage Map'
     )
     fig.update_layout(
@@ -2248,11 +2251,14 @@ def _build_malawi_panel(stored: dict, view: str, year: str,
         highlight = current_district
     elif view == 'district_facs':
         highlight = district or current_district
+    elif view == 'by_district' and district not in (None, '', 'All'):
+        highlight = district
     else:
         highlight = None
 
     treemap_fig  = _build_district_treemap(stored, view, year, district, sel_inds)
     malawi_panel = dcc.Graph(
+        id='mnid-malawi-treemap',
         figure=treemap_fig,
         config={'displayModeBar': True, 'responsive': True, 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
         style={'marginBottom': '4px', 'height': '170px'},
@@ -2267,7 +2273,7 @@ def _build_malawi_panel(stored: dict, view: str, year: str,
         view_title = 'All facilities'
     elif view == 'by_district':
         data = stored.get('by_district', {}).get(year, {})
-        view_title = 'All districts'
+        view_title = f'{district} district' if district not in (None, '', 'All') else 'All districts'
     elif view == 'district_facs':
         dist = district or current_district
         data = stored.get('by_district_facs', {}).get(dist, {}).get(year, {})
@@ -2456,8 +2462,39 @@ def update_heatmap_view(view, year, district, sel_inds, stored):
     y = year or 'All years'
     fig   = _build_heatmap_fig(stored, v, y, district, sel_inds)
     panel = _build_malawi_panel(stored, v, y, district, sel_inds)
-    district_style = {'display': 'block'} if v == 'district_facs' else {'display': 'none'}
+    district_style = {'display': 'block'} if v in ('by_district', 'district_facs') else {'display': 'none'}
     return fig, panel, district_style
+
+
+@callback(
+    Output('mnid-heatmap-district', 'value'),
+    Input('mnid-malawi-treemap', 'clickData'),
+    State('mnid-heatmap-store', 'data'),
+    prevent_initial_call=True,
+)
+def sync_district_focus_from_treemap(click_data, stored):
+    if not click_data or not click_data.get('points'):
+        raise PreventUpdate
+
+    point = click_data['points'][0]
+    label = str(point.get('label', '')).strip()
+    parent = str(point.get('parent', '')).strip()
+    districts = set((stored or {}).get('all_districts', []))
+
+    if label in districts:
+        return label
+    if parent in districts:
+        return parent
+
+    # Facility tiles can still be clicked; map facility label back to its district.
+    clean_label = label.rstrip('*').strip()
+    for fac_code, fac_name in _FACILITY_NAMES.items():
+        if str(fac_name).strip() == clean_label:
+            fac_dist = _FACILITY_DISTRICT.get(fac_code, '')
+            if fac_dist in districts:
+                return fac_dist
+
+    raise PreventUpdate
 
 
 @callback(
@@ -2766,7 +2803,7 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
         years.extend(str(y) for y in sorted(mch_full['Date'].dt.year.dropna().astype(int).unique().tolist()))
 
     year_opts     = [{'label': y, 'value': y} for y in years]
-    district_opts = [{'label': d, 'value': d} for d in dyn_districts]
+    district_opts = [{'label': 'All districts', 'value': 'All'}] + [{'label': d, 'value': d} for d in dyn_districts]
     ind_opts      = [{'label': lbl, 'value': lbl} for lbl in all_labels]
     default_perf_inds = all_labels[:8] if len(all_labels) >= 8 else all_labels
 
@@ -2851,7 +2888,7 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
                     dcc.Dropdown(
                         id='mnid-heatmap-district',
                         options=district_opts,
-                        value=cur_dist,
+                        value='All',
                         clearable=False,
                         style=_dd_style,
                     ),
