@@ -1,6 +1,6 @@
 from dash import html
 
-from helpers import build_single_chart, create_count_from_config
+from helpers.helpers import build_single_chart, create_count_from_config
 
 
 def _build_filter_chip(label, value):
