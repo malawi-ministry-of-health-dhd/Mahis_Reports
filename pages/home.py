@@ -397,9 +397,25 @@ layout = html.Div(
                     ]
                 ),
                 # Dashboard Content
-                html.Div(
-                    id='dashboard-container',
-                    className="dashboard-content-modern"
+                dcc.Loading(
+                    id="dashboard-loading",
+                    custom_spinner=html.Div(
+                        className="spinner-border text-success",
+                        role="status",
+                        children=html.Span("Loading...", className="visually-hidden"),
+                    ),
+                    overlay_style={
+                        "visibility": "visible",
+                        "opacity": 0.45,
+                        "backgroundColor": "rgba(255,255,255,0.82)",
+                        "borderRadius": "16px",
+                        "zIndex": 10,
+                    },
+                    delay_show=150,
+                    children=html.Div(
+                        id='dashboard-container',
+                        className="dashboard-content-modern"
+                    )
                 ),
             ]
         ),

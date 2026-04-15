@@ -562,3 +562,49 @@
 .filters-card .DateRangePickerInput_arrow {
     border: 0 !important;
 }
+
+/* ── Dashboard loading overlay ───────────────────────────────────── */
+#dashboard-loading {
+    position: relative;
+    min-height: 120px;
+}
+
+/* Make the custom spinner larger and center it nicely */
+#dashboard-loading .spinner-border {
+    width: 2.5rem;
+    height: 2.5rem;
+}
+
+#dashboard-loading [data-dash-spinner] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 0;
+}
+
+/* Loading pulse on the Apply Filters button while callback runs */
+@keyframes btn-loading-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.55; }
+}
+
+.btn-apply-modern:active {
+    animation: btn-loading-pulse 1.2s ease-in-out infinite;
+    pointer-events: none;
+}
+
+/* Content fade-in after loading completes */
+.dashboard-content-modern {
+    animation: dashContentIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes dashContentIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
