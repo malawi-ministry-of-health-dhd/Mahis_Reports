@@ -411,12 +411,22 @@ layout = html.Div(
                         "justifyContent": "center",
                     },
                     custom_spinner=html.Div(
-                        className="home-loading-spinner",
+                        className="home-loading-shell",
                         role="status",
-                        children=html.Span(
-                            "Loading...",
-                            className="home-visually-hidden",
-                        ),
+                        children=[
+                            html.Div(className="home-loading-spinner"),
+                            html.Div(
+                                className="home-loading-copy",
+                                children=[
+                                    html.Div("Refreshing dashboard", className="home-loading-title"),
+                                    html.Div("Applying the current filters and charts.", className="home-loading-subtitle"),
+                                ],
+                            ),
+                            html.Span(
+                                "Loading...",
+                                className="home-visually-hidden",
+                            ),
+                        ],
                     ),
                     overlay_style={
                         "visibility": "visible",
