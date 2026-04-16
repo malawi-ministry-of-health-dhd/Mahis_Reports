@@ -7,9 +7,17 @@ import datetime
 from datetime import datetime as dt
 import os
 import json
-from isoweek import Week
 from dash.exceptions import PreventUpdate
 from helpers.reports_class import ReportTableBuilder
+from helpers.date_ranges import (
+    RELATIVE_MONTHS,
+    RELATIVE_QUARTERS,
+    RELATIVE_BIANNUAL,
+    get_month_start_end,
+    get_quarter_start_end,
+    get_week_start_end,
+    get_biannual_start_end
+)
 from reportlab.lib.pagesizes import letter, A4, portrait
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -27,8 +35,9 @@ from config import (DATE_, FACILITY_, AGE_GROUP_, GENDER_,
 dash.register_page(__name__, path="/hmis_reports")
 
 relative_week = [str(week) for week in range(1, 53)]  # Can extend to 53 if needed
-relative_month = ['January', 'February', 'March', 'April', 'May', 'June','July', 'August', 'September', 'October', 'November', 'December',]
-relative_quarter = ["Q1 Jan-Mar", "Q2 Apr-June", "Q3 Jul-Sep", "Q4 Oct-Dec"]
+relative_month = RELATIVE_MONTHS
+relative_quarter = RELATIVE_QUARTERS
+relative_biannual = RELATIVE_BIANNUAL
 relative_year = [str(year) for year in range(2024, 2051)]
 
 path = os.getcwd()
@@ -36,76 +45,6 @@ dropdowns_json_path = os.path.join(path, 'data', 'dcc_dropdown_json', 'dropdowns
 with open(dropdowns_json_path) as x:
             dropdowns = json.load(x)
 prog_options = dropdowns['programs'] + ['General Reports']
-
-def get_week_start_end(week_num, year):
-    """Returns (start_date, end_date) for a given week number and year"""
-    # Validate inputs
-    if week_num is None or year is None:
-        raise ValueError("Week and year must be specified")
-    
-    try:
-        week_num = int(week_num)
-        year = int(year)
-    except (ValueError, TypeError):
-        raise ValueError("Week and year must be integers")
-    
-    if week_num < 1 or week_num > 53:
-        raise ValueError(f"Week must be between 1-53 (got {week_num})")
-    
-    # Get start (Monday) and end (Sunday) of week
-    week = Week(year, week_num)
-    start_date = week.monday()    # Monday
-    end_date = start_date + datetime.timedelta(days=6)  # Sunday
-    
-    return start_date, end_date
-
-def get_month_start_end(month, year):
-    # Validate inputs
-    if month is None or year is None:
-        raise ValueError("All parameters are required!")
-    if month not in relative_month:
-        raise ValueError(f"Invalid month: {month}. Must be one of {relative_month}")
-    try:
-        year = int(year)  # Ensure year is an integer
-    except (ValueError, TypeError):
-        raise ValueError(f"Invalid year: {year}. Must be a valid integer (e.g., 2023)")
-    
-    month_index = relative_month.index(month) + 1  # Convert to 1-based index
-    start_date = datetime.date(year, month_index, 1)
-    if month_index == 12:  # December
-        end_date = datetime.date(year + 1, 1, 1) - datetime.timedelta(days=1)
-    else:
-        end_date = datetime.date(year, month_index + 1, 1) - datetime.timedelta(days=1)
-    
-    return start_date, end_date
-
-def get_quarter_start_end(quarter, year):
-    # Validate inputs
-    if quarter is None or year is None:
-        raise ValueError("Enter Year and Quarter")
-    if quarter not in relative_quarter:
-        raise ValueError(f"Invalid quarter: {quarter}. Must be one of {relative_quarter}")
-    try:
-        year = int(year)  # Ensure year is an integer
-    except (ValueError, TypeError):
-        raise ValueError(f"Invalid year: {year}. Must be a valid integer (e.g., 2023)")
-    
-    # Map quarters to start and end months
-    quarter_map = {
-        "Q1 Jan-Mar": (1, 3),   # Jan - Mar
-        "Q2 Apr-June": (4, 6),   # Apr - Jun
-        "Q3 Jul-Sep": (7, 9),   # Jul - Sep
-        "Q4 Oct-Dec": (10, 12)  # Oct - Dec
-    }
-    start_month, end_month = quarter_map[quarter]
-    start_date = datetime.date(year, start_month, 1)
-    # Last day of end_month
-    if end_month == 12:
-        end_date = datetime.date(year, 12, 31)
-    else:
-        end_date = datetime.date(year, end_month + 1, 1) - datetime.timedelta(days=1)
-    
-    return start_date, end_date
 
 def load_report_options(program=None):
     """Load reports from JSON and return concatenated options for dropdown"""
@@ -141,7 +80,7 @@ layout = html.Div(
         html.Div(
             className="parameters-card",
             children=[
-                html.H3("HMIS Dataset Reports: Generate and download standardized health facility reports", className="parameters-title"),
+                # html.H3("HMIS Dataset Reports: Generate and download standardized health facility reports", className="parameters-title"),
                 
                 # Filters Grid
                 html.Div(
@@ -192,7 +131,7 @@ layout = html.Div(
                                     id='period_type-filter',
                                     options=[
                                         {'label': period, 'value': period}
-                                        for period in ['Weekly', 'Monthly', 'Quarterly']
+                                        for period in ['Weekly', 'Monthly', 'Quarterly', 'Bi-Annual']
                                     ],
                                     value='Monthly',
                                     clearable=True,
@@ -295,13 +234,13 @@ layout = html.Div(
     Input('period_type-filter', 'value'),
 )
 def update_month_options(period_type):
-    """Update dropdown options based on period type - always active"""
-    if period_type == 'Weekly':
-        return relative_week
-    elif period_type == 'Monthly':
-        return relative_month
-    else:  # Quarterly
-        return relative_quarter
+    period_map = {
+        'Weekly': relative_week,
+        'Monthly': relative_month,
+        'Quarterly': relative_quarter,
+        'Bi-Annual': relative_biannual
+    }
+    return period_map.get(period_type, relative_quarter)
     
 @callback(
         [Output('program_filter', 'options'),
@@ -397,82 +336,55 @@ def update_table(clicks,
         user_data = pd.read_csv(os.path.join(path, 'data', 'users_data.csv'))
     test_admin = pd.DataFrame(columns=['user_id', 'role'], data=[['m3his@dhd', 'reports_admin']])
     user_data = pd.concat([user_data, test_admin], ignore_index=True)
-
-    if urlparams.get('uuid', [None])[0]:
-        print("User UUID from URL:", urlparams.get('uuid', [None])[0])
-    else:
-        return html.Div("Missing Dashboard Parameters. Reports wont load"), dash.no_update, dash.no_update
     user_info = user_data[user_data['user_id'] == urlparams.get('uuid', [None])[0]]
     if user_info.empty:
         return html.Div("Unauthorized User. Please contact system administrator."), dash.no_update, dash.no_update
  #for cohort analysis this has to be moved forward to the return function
     original_data = data.copy()
     try:
-        if period_type == 'Weekly': 
-            start_date, end_date = get_week_start_end(month_filter, year_filter)
-            filtered = data[
-                (pd.to_datetime(data[DATE_]) >= pd.to_datetime(start_date)) &
-                (pd.to_datetime(data[DATE_]) <= pd.to_datetime(end_date))
-            ]
-            original_data = original_data[original_data[DATE_]<=pd.to_datetime(end_date)]
-            original_data["days_before"] = original_data["DateValue"].apply(lambda d: (start_date - d).days) #filter for relative days before filter
+        period_map = {
+            'Weekly': get_week_start_end,
+            'Monthly': get_month_start_end,
+            'Quarterly': get_quarter_start_end,
+            'Bi-Annual': get_biannual_start_end
+        }
+        start_date, end_date = period_map.get(period_type, get_month_start_end)(
+            month_filter, year_filter
+        )
+        # Convert once (avoid repeated conversions)
+        data_dates = pd.to_datetime(data[DATE_])
+        original_dates = pd.to_datetime(original_data[DATE_])
 
-            spec_path = f"data/uploads/{report['page_name']}.xlsx"
-            if not os.path.exists(spec_path):
-                error_msg = f"Report not found on Server. Request Admin to add report"
-                return html.Div(error_msg), 0, None
-            builder = ReportTableBuilder(spec_path, filtered, original_data)
-            builder.load_spec()
-            components = builder.build_dash_components()
-            return components, 0, None
-            
-        elif period_type == 'Monthly': 
-            start_date, end_date = get_month_start_end(month_filter, year_filter)
-            filtered = data[
-                (pd.to_datetime(data[DATE_]) >= pd.to_datetime(start_date)) &
-                (pd.to_datetime(data[DATE_]) <= pd.to_datetime(end_date))
-            ]
-            original_data = original_data[original_data[DATE_]<=pd.to_datetime(end_date)]
-            original_data["days_before"] = original_data["DateValue"].apply(lambda d: (start_date - d).days)
+        filtered = data[
+            (data_dates >= pd.to_datetime(start_date)) &
+            (data_dates <= pd.to_datetime(end_date))
+        ]
 
-            spec_path = f"data/uploads/{report['page_name']}.xlsx"
-            if not os.path.exists(spec_path):
-                error_msg = f"Report not found on Server. Request Admin to add report"
-                return html.Div(error_msg), 0, None
-            builder = ReportTableBuilder(spec_path, filtered, original_data)
-            builder.load_spec()
-            components = builder.build_dash_components()
-            section_data = builder.build_section_tables()
-            serializable_data = []
-            for section_name, df in section_data:
-                df_json = df.to_json(date_format='iso', orient='split')
-                serializable_data.append({
+        original_data = original_data[original_dates <= pd.to_datetime(end_date)].copy()
+        original_data["days_before"] = original_data["DateValue"].apply(
+            lambda d: (start_date - d).days
+        )
+
+        spec_path = f"data/uploads/{report['page_name']}.xlsx"
+        if not os.path.exists(spec_path):
+            return html.Div("Report not found on Server. Request Admin to add report"), 0, None
+
+        builder = ReportTableBuilder(spec_path, filtered, original_data)
+        builder.load_spec()
+        components = builder.build_dash_components()
+        section_data = builder.build_section_tables()
+        serializable_data = [
+                {
                     'section': section_name,
-                    'data': df_json
-                })
-            return components, 0, serializable_data
-            
-        else:  # Quarterly
-            start_date, end_date = get_quarter_start_end(month_filter, year_filter)
-            filtered = data[
-                (pd.to_datetime(data[DATE_]) >= pd.to_datetime(start_date)) &
-                (pd.to_datetime(data[DATE_]) <= pd.to_datetime(end_date))
-            ]
-            original_data = original_data[original_data[DATE_]<=pd.to_datetime(end_date)]
-            original_data["days_before"] = original_data["DateValue"].copy().apply(lambda d: (start_date - d).days)
-            
-            spec_path = f"data/uploads/{report['page_name']}.xlsx"
-            if not os.path.exists(spec_path):
-                error_msg = f"Report not found on Server. Request Admin to add report"
-                return html.Div(error_msg), 0, None
-            builder = ReportTableBuilder(spec_path, filtered, original_data)
-            builder.load_spec()
-            components = builder.build_dash_components()
-            return components, 0, None
-            
+                    'data': df.to_json(date_format='iso', orient='split')
+                }
+                for section_name, df in section_data
+        ]
+        return components, 0, serializable_data
+
     except ValueError as e:
         print(f"Error: {e}")
-        return html.Div(f"Error: {str(e)}"),0, None
+        return html.Div(f"Error: {str(e)}"), 0, None
 
     
 @callback(
