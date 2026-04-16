@@ -4176,7 +4176,7 @@ def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=N
                     district = dists.mode().iloc[0]
 
     selected_program = 'Neonatal Care' if theme == 'newborn' else 'All'
-    if facility_df is not None and len(facility_df):
+    if facility_df is not None:
         requested = getattr(facility_df, 'attrs', {}).get('mnid_program')
         if requested and theme != 'newborn':
             selected_program = requested
