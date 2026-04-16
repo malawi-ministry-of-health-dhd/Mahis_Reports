@@ -411,12 +411,22 @@ layout = html.Div(
                         "justifyContent": "center",
                     },
                     custom_spinner=html.Div(
-                        className="home-loading-spinner",
+                        className="home-loading-shell",
                         role="status",
-                        children=html.Span(
-                            "Loading...",
-                            className="home-visually-hidden",
-                        ),
+                        children=[
+                            html.Div(className="home-loading-spinner"),
+                            html.Div(
+                                className="home-loading-copy",
+                                children=[
+                                    html.Div("Refreshing dashboard", className="home-loading-title"),
+                                    html.Div("Applying the current filters and charts.", className="home-loading-subtitle"),
+                                ],
+                            ),
+                            html.Span(
+                                "Loading...",
+                                className="home-visually-hidden",
+                            ),
+                        ],
                     ),
                     overlay_style={
                         "visibility": "visible",
@@ -868,19 +878,10 @@ def change_style(generate, reset):
 @callback(
     Output('dashboard-age-filter-group', 'style'),
     Output('dashboard-category-filter-group', 'style'),
-    Input({"type": "menu-button", "name": ALL}, "n_clicks"),
-    State('active-button-store', 'data'),
+    Input('active-button-store', 'data'),
 )
-def toggle_age_group_visibility(menu_clicks, active_report):
+def toggle_age_group_visibility(active_report):
     report = str(active_report or '').strip().lower()
-    ctx = callback_context
-    if ctx.triggered:
-        trigger = ctx.triggered[0].get('prop_id', '')
-        if trigger.startswith('{') and '"type":"menu-button"' in trigger:
-            try:
-                report = str(json.loads(trigger.split('.')[0]).get('name', report)).strip().lower()
-            except Exception:
-                report = str(active_report or '').strip().lower()
 
     hide_for = {'maternal health', 'newborn', 'neonatal program'}
     show_program_for = {'maternal health'}

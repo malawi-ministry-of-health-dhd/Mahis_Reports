@@ -52,6 +52,7 @@ def prepare_mnid_dataframe(df: pd.DataFrame | None) -> pd.DataFrame:
     if df is None:
         return pd.DataFrame()
 
+    source_attrs = dict(getattr(df, 'attrs', {}) or {})
     mch_full = df.copy()
     program_col = 'Reporting_Program' if 'Reporting_Program' in mch_full.columns else 'Program'
     if program_col in mch_full.columns:
@@ -65,6 +66,7 @@ def prepare_mnid_dataframe(df: pd.DataFrame | None) -> pd.DataFrame:
     if 'Date' in mch_full.columns:
         mch_full['Date'] = pd.to_datetime(mch_full['Date'], errors='coerce')
 
+    mch_full.attrs.update(source_attrs)
     register_facility_metadata(mch_full)
     return mch_full
 

@@ -2380,68 +2380,71 @@ def _build_malawi_panel(stored: dict, view: str, year: str,
     ]
 
 
-# MNID scroll spy for section navigation
-# Runs once on load and marks the active section tab while scrolling.
-
 clientside_callback(
     """
-    function(n) {
-        if (window._mnidScrollSpyActive) return '';
-        window._mnidScrollSpyActive = true;
+    function(_tick) {
+        const sections = [
+            '#mnid-summary',
+            '#mnid-data-tables',
+            '#mnid-trends',
+            '#mnid-performance',
+            '#mnid-heatmap',
+            '#mnid-coverage',
+            '#mnid-comparative',
+            '#mnid-analysis',
+            '#mnid-readiness'
+        ];
 
-        var sectionIds = ['mnid-summary','mnid-data-tables','mnid-trends','mnid-performance','mnid-heatmap',
-                          'mnid-coverage','mnid-comparative','mnid-analysis','mnid-readiness'];
+        let active = '#mnid-summary';
+        const activationLine = 124;
+        let bestPassed = null;
+        let nextUpcoming = null;
 
-        function setActive(id) {
-            sectionIds.forEach(function(sid) {
-                document.querySelectorAll('.mnid-nav-btn[href="#' + sid + '"]').forEach(function(a) {
-                    if (sid === id) a.classList.add('active');
-                    else a.classList.remove('active');
-                });
-            });
-        }
-
-        function updateActive() {
-            var threshold = 140;
-            var activeId = sectionIds[0];
-            for (var i = 0; i < sectionIds.length; i++) {
-                var el = document.getElementById(sectionIds[i]);
-                if (el && el.getBoundingClientRect().top <= threshold) {
-                    activeId = sectionIds[i];
-                }
+        for (const selector of sections) {
+            const el = document.querySelector(selector);
+            if (!el) {
+                continue;
             }
-            setActive(activeId);
 
-            var nav = document.querySelector('.mnid-nav');
-            var main = document.querySelector('.mnid-main');
-            var topbar = document.querySelector('.mnid-topbar');
-            if (nav && main) {
-                var shouldFloat = window.scrollY > 220;
-                var target = topbar || main;
-                var rect = target.getBoundingClientRect();
-                nav.style.setProperty('--mnid-nav-left', rect.left + 'px');
-                nav.style.setProperty('--mnid-nav-width', rect.width + 'px');
-                nav.style.setProperty('--mnid-nav-height', nav.offsetHeight + 'px');
-                if (shouldFloat) {
-                    nav.classList.add('mnid-nav-floating');
-                    main.classList.add('mnid-main-nav-floating');
-                } else {
-                    nav.classList.remove('mnid-nav-floating');
-                    main.classList.remove('mnid-main-nav-floating');
+            const rect = el.getBoundingClientRect();
+            const top = rect.top;
+
+            if (top <= activationLine) {
+                if (bestPassed === null || top > bestPassed.top) {
+                    bestPassed = { selector, top };
                 }
+            } else if (nextUpcoming === null || top < nextUpcoming.top) {
+                nextUpcoming = { selector, top };
             }
         }
 
-        window.addEventListener('scroll', updateActive, { passive: true });
-        setTimeout(updateActive, 200);
-        updateActive();
-        return '';
+        if (bestPassed !== null) {
+            active = bestPassed.selector;
+        } else if (nextUpcoming !== null) {
+            active = nextUpcoming.selector;
+        }
+
+        return active;
     }
     """,
     Output('mnid-scrollspy-out', 'data'),
     Input('mnid-scrollspy-tick', 'n_intervals'),
+)
+
+
+@callback(
+    Output({'type': 'mnid-nav-btn', 'index': ALL}, 'className'),
+    Input('mnid-scrollspy-out', 'data'),
+    State({'type': 'mnid-nav-btn', 'index': ALL}, 'id'),
     prevent_initial_call=False,
 )
+def sync_mnid_nav_active_state(active_hash, nav_ids):
+    active_hash = active_hash or '#mnid-summary'
+    classes = []
+    for item in nav_ids or []:
+        target = (item or {}).get('index')
+        classes.append('mnid-nav-btn active' if target == active_hash else 'mnid-nav-btn')
+    return classes
 
 # # MNID module-level callback
 
@@ -2450,17 +2453,16 @@ clientside_callback(
     Output('mnid-heatmap-right', 'children'),
     Output('mnid-heatmap-district-wrap', 'style'),
     Input('mnid-heatmap-view',       'value'),
-    Input('mnid-heatmap-year',       'value'),
     Input('mnid-heatmap-district',   'value'),
     Input('mnid-heatmap-indicators', 'value'),
     State('mnid-heatmap-store',      'data'),
     prevent_initial_call=True,
 )
-def update_heatmap_view(view, year, district, sel_inds, stored):
+def update_heatmap_view(view, district, sel_inds, stored):
     if not stored:
         return go.Figure(), html.Div(), {'display': 'none'}
     v = view or 'by_district'
-    y = year or 'All years'
+    y = 'All years'
     fig   = _build_heatmap_fig(stored, v, y, district, sel_inds)
     panel = _build_malawi_panel(stored, v, y, district, sel_inds)
     district_style = {'display': 'block'} if v in ('by_district', 'district_facs') else {'display': 'none'}
@@ -2874,16 +2876,6 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
                 ),
             ]),
             html.Div(className='mnid-map-filter-grid', children=[
-                html.Div(children=[
-                    html.Div('Year', style=_lbl_style),
-                    dcc.Dropdown(
-                        id='mnid-heatmap-year',
-                        options=year_opts,
-                        value='All years',
-                        clearable=False,
-                        style=_dd_style,
-                    ),
-                ]),
                 html.Div(id='mnid-heatmap-district-wrap', style={'display': 'none'}, children=[
                     html.Div('District Focus', style=_lbl_style),
                     dcc.Dropdown(
@@ -4231,7 +4223,7 @@ def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=N
                     district = dists.mode().iloc[0]
 
     selected_program = 'Neonatal Care' if theme == 'newborn' else 'All'
-    if facility_df is not None and len(facility_df):
+    if facility_df is not None:
         requested = getattr(facility_df, 'attrs', {}).get('mnid_program')
         if requested and theme != 'newborn':
             selected_program = requested
@@ -4320,8 +4312,13 @@ def _sidebar(facility_code: str, theme: str = 'default') -> html.Div:
             ('Readiness', '#mnid-readiness'),
         ]
     return html.Div(className='mnid-nav', children=[
-        html.A(href=href, className='mnid-nav-btn', children=label)
-        for label, href in nav_items
+        html.A(
+            id={'type': 'mnid-nav-btn', 'index': href},
+            href=href,
+            className='mnid-nav-btn active' if index == 0 else 'mnid-nav-btn',
+            children=label,
+        )
+        for index, (label, href) in enumerate(nav_items)
     ])
 
 
@@ -4611,7 +4608,7 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
 
     return html.Div(className=f'mnid-bg{" mnid-theme-newborn" if dashboard_theme == "newborn" else ""}', children=[
         # Hidden components used by the MNID scroll spy callback
-        dcc.Interval(id='mnid-scrollspy-tick', interval=800, max_intervals=1),
+        dcc.Interval(id='mnid-scrollspy-tick', interval=250, max_intervals=-1),
         dcc.Store(id='mnid-scrollspy-out'),
         html.Div(className=f'mnid-shell{" mnid-shell-newborn" if dashboard_theme == "newborn" else ""}', children=[main_content]),
     ])
