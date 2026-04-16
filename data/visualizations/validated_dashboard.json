@@ -297,13 +297,13 @@
               },
               {
                 "id": "chart_3faf4437",
-                "name": "Daily OPD Attendance - Last 7 Days",
+                "name": "Daily Attendance - Last 7 Days",
                 "type": "Line",
                 "filters": {
-                  "measure": "nunique",
+                  "measure": "count",
                   "unique": "any",
                   "duration_default": "7days",
-                  "title": "Daily OPD Attendance - Last 7 Days",
+                  "title": "Daily Attendance - Last 7 Days",
                   "unique_column": "person_id",
                   "filter_col1": [],
                   "filter_val1": "",
