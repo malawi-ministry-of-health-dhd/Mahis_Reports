@@ -2395,17 +2395,16 @@ def initialize_mnid_nav(_):
     Output('mnid-heatmap-right', 'children'),
     Output('mnid-heatmap-district-wrap', 'style'),
     Input('mnid-heatmap-view',       'value'),
-    Input('mnid-heatmap-year',       'value'),
     Input('mnid-heatmap-district',   'value'),
     Input('mnid-heatmap-indicators', 'value'),
     State('mnid-heatmap-store',      'data'),
     prevent_initial_call=True,
 )
-def update_heatmap_view(view, year, district, sel_inds, stored):
+def update_heatmap_view(view, district, sel_inds, stored):
     if not stored:
         return go.Figure(), html.Div(), {'display': 'none'}
     v = view or 'by_district'
-    y = year or 'All years'
+    y = 'All years'
     fig   = _build_heatmap_fig(stored, v, y, district, sel_inds)
     panel = _build_malawi_panel(stored, v, y, district, sel_inds)
     district_style = {'display': 'block'} if v in ('by_district', 'district_facs') else {'display': 'none'}
@@ -2819,16 +2818,6 @@ def _coverage_heatmap_section(indicators: list, facility_code: str,
                 ),
             ]),
             html.Div(className='mnid-map-filter-grid', children=[
-                html.Div(children=[
-                    html.Div('Year', style=_lbl_style),
-                    dcc.Dropdown(
-                        id='mnid-heatmap-year',
-                        options=year_opts,
-                        value='All years',
-                        clearable=False,
-                        style=_dd_style,
-                    ),
-                ]),
                 html.Div(id='mnid-heatmap-district-wrap', style={'display': 'none'}, children=[
                     html.Div('District Focus', style=_lbl_style),
                     dcc.Dropdown(
