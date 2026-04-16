@@ -1737,7 +1737,7 @@ html { scroll-behavior: smooth; }
 
 .mnid-nav {
   position: sticky;
-  top: 12px;
+  top: 0;
   z-index: 40;
   display: flex;
   flex-wrap: nowrap;
@@ -1760,7 +1760,7 @@ html { scroll-behavior: smooth; }
 
 .mnid-nav.mnid-nav-floating {
   position: sticky;
-  top: 12px;
+  top: 0;
   left: auto;
   width: auto;
   margin-bottom: 16px;
