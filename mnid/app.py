@@ -2411,25 +2411,6 @@ clientside_callback(
                 }
             }
             setActive(activeId);
-
-            var nav = document.querySelector('.mnid-nav');
-            var main = document.querySelector('.mnid-main');
-            var topbar = document.querySelector('.mnid-topbar');
-            if (nav && main) {
-                var shouldFloat = window.scrollY > 220;
-                var target = topbar || main;
-                var rect = target.getBoundingClientRect();
-                nav.style.setProperty('--mnid-nav-left', rect.left + 'px');
-                nav.style.setProperty('--mnid-nav-width', rect.width + 'px');
-                nav.style.setProperty('--mnid-nav-height', nav.offsetHeight + 'px');
-                if (shouldFloat) {
-                    nav.classList.add('mnid-nav-floating');
-                    main.classList.add('mnid-main-nav-floating');
-                } else {
-                    nav.classList.remove('mnid-nav-floating');
-                    main.classList.remove('mnid-main-nav-floating');
-                }
-            }
         }
 
         window.addEventListener('scroll', updateActive, { passive: true });
