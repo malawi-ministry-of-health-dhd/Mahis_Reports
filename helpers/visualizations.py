@@ -16,6 +16,42 @@ from config import PERSON_ID_, ENCOUNTER_ID_, DATE_
 MAIN USE CASE OF THIS FILE IS TO PROVIDE VISUALIZATION FUNCTIONS FOR PATIENT DATA
 
 """
+def _prepare_data_for_visualization(df, unique_column, apply_deduplication=True):
+    """
+    Prepare data for visualization by applying consistent deduplication logic.
+    This mirrors the logic used in create_count functions.
+    If a new column name is introduced e.g. for generation of composite key, the system is required to create the column
+    """
+    data = df.copy()
+    if isinstance(unique_column, str) and unique_column not in data.columns:
+        data[unique_column] = data[PERSON_ID_].astype(str) +"_"+ data[DATE_].dt.strftime('%Y-%m-%d')
+        return data
+    if isinstance(unique_column, list):
+        if apply_deduplication and DATE_ in data.columns and all(col in data.columns for col in unique_column):
+            data = data.drop_duplicates(subset=[DATE_] + unique_column)
+        return data
+    else:
+        if apply_deduplication and DATE_ in data.columns and unique_column in data.columns:
+            data = data.drop_duplicates(subset=[unique_column, DATE_])
+            return data
+
+def apply_calculated_fields(df, rules_json):
+    df = df.copy()
+    if not rules_json:
+        return df
+    rules = json.loads(rules_json) if isinstance(rules_json, str) else rules_json
+    for rule in rules:
+        col = rule["column"]
+        expr = rule["expr"]
+        try:
+            # Try eval first (numeric expressions)
+            df[col] = df.eval(expr, engine="python")
+        except Exception:
+            # Fallback for string / datetime logic
+            df[col] = eval(expr, {"df": df, "pd": pd})
+
+    return df
+
 
 def _normalize_filter_value(val):
     """Normalize filter_value into a proper list or string."""
@@ -211,11 +247,12 @@ def _apply_filter(data, filter_col, filter_value):
     return df[df[filter_col] == filter_value]
 
 
-def create_count(df,aggregation='count', unique_column=PERSON_ID_, filter_col1=None, filter_value1=None, filter_col2=None, filter_value2=None, 
-                 filter_col3=None, filter_value3=None, filter_col4=None, filter_value4=None,
-                 filter_col5=None, filter_value5=None, filter_col6=None, filter_value6=None, 
-                 filter_col7=None, filter_value7=None, filter_col8=None, filter_value8=None,
-                 filter_col9=None, filter_value9=None, filter_col10=None, filter_value10=None):
+def create_count(df, aggregation='count', unique_column=PERSON_ID_, filter_col1=None, filter_value1=None, 
+                 filter_col2=None, filter_value2=None, filter_col3=None, filter_value3=None,
+                 filter_col4=None, filter_value4=None, filter_col5=None, filter_value5=None, 
+                 filter_col6=None, filter_value6=None, filter_col7=None, filter_value7=None,
+                 filter_col8=None, filter_value8=None, filter_col9=None, filter_value9=None, 
+                 filter_col10=None, filter_value10=None):
     data = df
     
     # Apply all filters using the helper function
@@ -231,8 +268,8 @@ def create_count(df,aggregation='count', unique_column=PERSON_ID_, filter_col1=N
     data = _apply_filter(data, filter_col10, filter_value10)
     
     # Remove duplicates based on unique_column and DATE_
-    unique_visits = data.drop_duplicates(subset=[unique_column, DATE_])
-    # unique_visits = data
+    unique_visits = _prepare_data_for_visualization(data, unique_column)
+    
     # Handle different aggregation types
     if aggregation == 'count':
         return len(unique_visits[unique_column].dropna())
@@ -240,12 +277,33 @@ def create_count(df,aggregation='count', unique_column=PERSON_ID_, filter_col1=N
         return unique_visits[unique_column].nunique()
     elif aggregation == 'list':
         return unique_visits[unique_column].dropna().unique().tolist()
+    elif aggregation == 'time_diff_mins':
+        # Calculate time difference between min and max datetime for each patient
+        # Note: This assumes there's a 'DATETIME' column in your dataframe
+        if 'datetime' not in unique_visits.columns:
+            raise ValueError("datetime column is required for time_diff aggregation")
+        patient_times = data.groupby([unique_column, DATE_])['datetime'].agg(['min', 'max'])
+        patient_times['time_diff'] = (patient_times['max'] - patient_times['min']).dt.total_seconds() / (60)
+        patient_times = patient_times[patient_times['time_diff'] < 120]
+        mean_val = patient_times['time_diff'].mean()
+        if pd.isna(mean_val):
+            return 0
+        return int(mean_val)
+    elif aggregation == 'time_diff_hour':
+        if 'datetime' not in unique_visits.columns:
+            raise ValueError("datetime column is required for time_diff aggregation")
+        patient_times = data.groupby([unique_column, DATE_])['datetime'].agg(['min', 'max'])
+        patient_times['time_diff'] = (patient_times['max'] - patient_times['min']).dt.total_seconds() / (60 * 60)
+        patient_times = patient_times[patient_times['time_diff'] < 2]
+        mean_val = patient_times['time_diff'].mean()
+        if pd.isna(mean_val):
+            return 0
+        return int(mean_val)
+    
     elif aggregation in ['sum', 'mean', 'min', 'max', 'std', 'var']:
-        # For numeric aggregations
-        return unique_visits[unique_column].agg(aggregation)
+        return int(unique_visits[unique_column].agg(aggregation))
     else:
         # Default to count
-        # unique_visits.to_csv("debug_summary.csv", index=False)
         return len(unique_visits[unique_column].dropna())
 
 def create_count_sets(
@@ -274,64 +332,38 @@ def create_count_sets(
         filter_value1, filter_value2, filter_value3, filter_value4, filter_value5,
         filter_value6, filter_value7, filter_value8, filter_value9, filter_value10
     ]
+    
+    # identify set filters
+    set_vals = []
+    non_set_vals = []
+    for i in filter_vals:
+        val = _normalize_filter_value(i)
+        if isinstance(val, list):
+            set_vals.append(val)
+        else:
+            non_set_vals.append(val)
 
-    if not isinstance(filter_value1, list) or len(filter_value1) <= 1:
-
-        data = _apply_filter(data, filter_col1, filter_value1)
-        data = _apply_filter(data, filter_col2, filter_value2)
-        data = _apply_filter(data, filter_col3, filter_value3)
-        data = _apply_filter(data, filter_col4, filter_value4)
-        data = _apply_filter(data, filter_col5, filter_value5)
-        data = _apply_filter(data, filter_col6, filter_value6)
-        data = _apply_filter(data, filter_col7, filter_value7)
-        data = _apply_filter(data, filter_col8, filter_value8)
-        data = _apply_filter(data, filter_col9, filter_value9)
-        data = _apply_filter(data, filter_col10, filter_value10)
-
-        unique_visits = data.drop_duplicates(subset=[unique_column, DATE_])
-        return len(unique_visits)
-
-    if not isinstance(filter_value2, list):
-        raise ValueError(
-            "filter_value2 must be a list when filter_value1 is a list"
-        )
-
-    if len(filter_value1) != len(filter_value2):
-        raise ValueError(
-            "filter_value1 and filter_value2 must have equal lengths"
-        )
-
-    set_length = len(filter_value1)
-
-    # Validate remaining list filters
-    for v in filter_vals[2:]:
-        if isinstance(v, list) and len(v) != set_length:
-            raise ValueError(
-                "All list filter values must have equal lengths"
-            )
+    # lets start with set function for identification
+    if len(set_vals) < 2:
+        return "Error" #Error
+    else: #validate lengths
+        start_length = len(set_vals[0])
+        for l in set_vals:
+            if len(l) != start_length:
+                return "Error"
+    set_length = len(set_vals[0])
 
     sets = []
-
     for i in range(set_length):
-
         df_f = data.copy()
-
         for col, val in zip(filter_cols, filter_vals):
-
-            if col is None or val is None:
-                continue
-
-            if isinstance(val, list):
-
-                # list filters participate in set construction
-                df_f = _apply_filter(df_f, col, val[i])
-
-        ids = set(
-            df_f[[unique_column, DATE_]]
-            .drop_duplicates()
-            .apply(tuple, axis=1)
-        )
-
+            values = _normalize_filter_value(val)
+            if val in set_vals:
+                df_f = _apply_filter(df_f, col, values[i])
+                
+        ids = set(df_f[[unique_column, DATE_]]
+                .drop_duplicates()
+                .apply(tuple, axis=1))
         sets.append(ids)
 
     # intersection
@@ -345,17 +377,11 @@ def create_count_sets(
         .apply(tuple, axis=1)
         .isin(final_set)
     ]
-
+    df_filtered = pd.DataFrame()
     for col, val in zip(filter_cols, filter_vals):
-
-        if col is None or val is None:
-            continue
-
-        if not isinstance(val, list):
-            remaining_df = _apply_filter(remaining_df, col, val)
-
-    unique_visits = remaining_df.drop_duplicates(subset=[unique_column, DATE_])
-
+        if val in non_set_vals:
+            df_filtered = _apply_filter(remaining_df, col, val)
+    unique_visits = _prepare_data_for_visualization(df_filtered, unique_column)
     return len(unique_visits)
 
 def create_count_unique(df, unique_column=PERSON_ID_, filter_col1=None, filter_value1=None, filter_col2=None, filter_value2=None, 
@@ -415,27 +441,11 @@ def create_sum_sets(df, filter_col1, filter_value1, filter_col2, filter_value2, 
 
     return filtered[num_field].sum()
 
-def _prepare_data_for_visualization(df, unique_column, apply_deduplication=True):
-    """
-    Prepare data for visualization by applying consistent deduplication logic.
-    This mirrors the logic used in create_count functions.
-    """
-    data = df.copy()
-    
-    if isinstance(unique_column, list):
-        if apply_deduplication and DATE_ in data.columns and all(col in data.columns for col in unique_column):
-            data = data.drop_duplicates(subset=[DATE_] + unique_column)
-        return data
-    else:
-        if apply_deduplication and DATE_ in data.columns and unique_column in data.columns:
-            data = data.drop_duplicates(subset=[unique_column, DATE_])
-        return data
-
 def create_column_chart(df, x_col, y_col, title, x_title, y_title,
                         unique_column=PERSON_ID_, legend_title=None,
                         color=None, filter_col1=None, filter_value1=None,
                         filter_col2=None, filter_value2=None,
-                        filter_col3=None, filter_value3=None, aggregation='count'):
+                        filter_col3=None, filter_value3=None, aggregation='count', custom_fields=None):
     """
     Create a column chart using Plotly Express with legend support.
     """
@@ -448,6 +458,7 @@ def create_column_chart(df, x_col, y_col, title, x_title, y_title,
     
     # Apply consistent deduplication
     data = _prepare_data_for_visualization(data, unique_column)
+    data = apply_calculated_fields(data, custom_fields)
     
     # if data.empty:
     #     return go.Figure().update_layout(title=f"No data available for {title}")
@@ -511,7 +522,7 @@ def create_line_chart(df, date_col, y_col, title, x_title,
                       legend_title=None, color=None, filter_col1=None, 
                       filter_value1=None, filter_col2=None, 
                       filter_value2=None, filter_col3=None, 
-                      filter_value3=None, aggregation='count'):
+                      filter_value3=None, aggregation='count',custom_fields=None):
     """
     Create a time series chart using Plotly Express.
     """
@@ -524,6 +535,7 @@ def create_line_chart(df, date_col, y_col, title, x_title,
     
     # Apply consistent deduplication
     data = _prepare_data_for_visualization(data, unique_column)
+    data = apply_calculated_fields(data, custom_fields)
     
     # if data.empty:
     #     return go.Figure().update_layout(title=f"{title}")
@@ -549,25 +561,56 @@ def create_line_chart(df, date_col, y_col, title, x_title,
         else:
             summary = data.groupby('date_only')[y_col].agg(aggregation).reset_index(name='count')
     
-    summary = summary.sort_values('date_only')
     
+    summary = summary.sort_values('date_only').reset_index(drop=True)
+
+    # Identify key points
+    try:
+        summary = summary.sort_values('date_only').reset_index(drop=True)
+
+        idx_start = 0
+        idx_end = len(summary) - 1
+        idx_max = (
+            summary['count'].idxmax()
+            if 'count' in summary and summary['count'].notna().any()
+            else None
+        )
+        key_indices = {idx_start, idx_end}
+        if idx_max is not None:
+            key_indices.add(idx_max)
+
+        key_points = summary.loc[list(key_indices)]
+
+    except Exception:
+        key_points = pd.DataFrame(columns=summary.columns)
+
     fig = px.line(
         summary,
         x='date_only',
         y='count',
         color=color if color else None,
         color_discrete_sequence=px.colors.qualitative.Dark2,
-        title=title,
-        markers=True,
-        text='count'
+        title=title
     )
-    
+
     fig.update_traces(
-        mode='lines+markers+text',
-        textposition='top center',
-        hovertemplate="<b>Date:</b> %{x|%b %d}<br>" +
-                     "<b>Count:</b> %{y}<br>"
+        mode='lines',
+        hovertemplate="<b>Date:</b> %{x|%Y-%m-%d}<br><b>Count:</b> %{y}<extra></extra>"
     )
+
+    fig.add_scatter(
+        x=key_points['date_only'],
+        y=key_points['count'],
+        mode='markers+text',
+        text=key_points['count'],
+        textposition='top center',
+        marker=dict(size=10, color='black'),
+        showlegend=False,
+        hovertemplate="<b>Date:</b> %{x|%Y-%m-%d}<br><b>Count:</b> %{y}<extra></extra>"
+    )
+
+
+
     
     if not summary.empty:
         avg_val = summary['count'].mean()
@@ -592,7 +635,7 @@ def create_pie_chart(df, names_col, values_col, title,
                      unique_column=PERSON_ID_, filter_col1=None, 
                      filter_value1=None, filter_col2=None, 
                      filter_value2=None, filter_col3=None, 
-                     filter_value3=None, colormap=None, aggregation='count'):
+                     filter_value3=None, colormap=None, aggregation='count',custom_fields=None):
     """
     Create a pie chart using Plotly Express.
     """
@@ -605,6 +648,7 @@ def create_pie_chart(df, names_col, values_col, title,
     
     # Apply consistent deduplication
     data = _prepare_data_for_visualization(data, unique_column)
+    data = apply_calculated_fields(data, custom_fields)
     
     # if data.empty:
     #     return go.Figure().update_layout(title=f"No data available for {title}")
@@ -654,7 +698,7 @@ def create_pivot_table(df, index_col, columns_col, values_col, title, unique_col
                      filter_col2=None, filter_value2=None,
                      filter_col3=None, filter_value3=None,
                      aggregation='count',
-                     rename={}, replace={}):
+                     rename={}, replace={}, custom_fields=None):
     """
     Create a pivot table from the DataFrame.
     """
@@ -667,6 +711,7 @@ def create_pivot_table(df, index_col, columns_col, values_col, title, unique_col
     
     # Apply consistent deduplication
     data = _prepare_data_for_visualization(data, unique_column)
+    data = apply_calculated_fields(data, custom_fields)
 
     
     # Determine the actual aggregation function
@@ -684,7 +729,7 @@ def create_pivot_table(df, index_col, columns_col, values_col, title, unique_col
     # Build pivot
     pivot = data.pivot_table(
         index=index_col,
-        columns=columns_col,
+        columns=columns_col if columns_col != "" else None,
         values=values_col,
         aggfunc=actual_aggfunc,
         fill_value=0
@@ -730,7 +775,7 @@ def create_pivot_table(df, index_col, columns_col, values_col, title, unique_col
             font=dict(size=18, color='black'),
         ),
         'margin': dict(l=20, r=20, b=20, t=90),
-        'height': dynamic_height + 40
+        'height': dynamic_height + 300
     }
     
     fig.update_layout(**layout_updates)
@@ -748,7 +793,7 @@ def create_crosstab_table(
     filter_col1=None, filter_value1=None,
     filter_col2=None, filter_value2=None,
     filter_col3=None, filter_value3=None,
-    rename={}, replace={}
+    rename={}, replace={},custom_fields=None
 ):
     """
     Create a crosstab table with multilayer column headers using Dash DataTable.
@@ -762,8 +807,8 @@ def create_crosstab_table(
     data = _apply_filter(data, filter_col3, filter_value3)
 
     # Deduplicate by person + date
-    if DATE_ in data.columns:
-        data = data.drop_duplicates(subset=[unique_column, DATE_])
+    data = _prepare_data_for_visualization(data, unique_column)
+    data = apply_calculated_fields(data, custom_fields)
 
     # Helper: support multi-axis for crosstab
     def _axis_arg(arg):
@@ -903,7 +948,7 @@ def create_line_list(
     rename: Optional[dict] = None,
     cols_order: Optional[List[str]] = None,
     merge_methods: Optional[List[str]] = None,
-    message = None,
+    message = None,custom_fields=None,
     **kwargs
 ) -> pd.DataFrame:
     """
@@ -920,6 +965,7 @@ def create_line_list(
         raise ValueError("unique_col must specify at least one column.")
     
     df_base = df.copy()
+    df_base = apply_calculated_fields(df_base, custom_fields)
     
     group_dfs = []
     
@@ -1076,7 +1122,7 @@ def create_age_gender_histogram(
     filter_col1=None, filter_value1=None,
     filter_col2=None, filter_value2=None,
     filter_col3=None, filter_value3=None,
-    aggregation='count'
+    aggregation='count',custom_fields=None
 ):
     """
     Create an age–gender histogram with labeled bins and data labels.
@@ -1090,6 +1136,7 @@ def create_age_gender_histogram(
     
     # Apply consistent deduplication
     data = _prepare_data_for_visualization(data, PERSON_ID_)
+    data = apply_calculated_fields(data, custom_fields)
     
     # if data.empty:
     #     return go.Figure().update_layout(title=f"No data available for {title}")
@@ -1147,7 +1194,7 @@ def create_age_gender_histogram(
 
 def create_horizontal_bar_chart(df, label_col, value_col, title, x_title, y_title, top_n=10,
                                  filter_col1=None, filter_value1=None, filter_col2=None, filter_value2=None,
-                                 filter_col3=None, filter_value3=None, aggregation='count'):
+                                 filter_col3=None, filter_value3=None, aggregation='count',custom_fields=None):
     """
     Create a horizontal bar chart showing the top N items by value.
     """
@@ -1160,6 +1207,7 @@ def create_horizontal_bar_chart(df, label_col, value_col, title, x_title, y_titl
     
     # Apply consistent deduplication
     data = _prepare_data_for_visualization(data, PERSON_ID_)
+    data = apply_calculated_fields(data, custom_fields)
     
     # if data.empty:
     #     return go.Figure().update_layout(title=f"No data available for {title}")
@@ -1379,7 +1427,7 @@ def create_scatter_plot(df, x_col, y_col, title, x_title, y_title,
     data = _apply_filter(data, filter_col2, filter_value2)
     
     # Deduplicate
-    data = data.drop_duplicates(subset=[unique_column, DATE_])
+    data = _prepare_data_for_visualization(data, unique_column)
     
     fig = px.scatter(
         data,
@@ -1458,7 +1506,7 @@ def create_treemap(df, path_cols, values_col, title,
     data = _apply_filter(data, filter_col2, filter_value2)
     
     # Deduplicate
-    data = data.drop_duplicates(subset=[unique_column, DATE_])
+    data = _prepare_data_for_visualization(data, unique_column)
     
     # Aggregate values
     summary = data.groupby(path_cols)[values_col].nunique().reset_index()
@@ -1496,7 +1544,7 @@ def create_sunburst_chart(df, path_cols, values_col, title,
     data = _apply_filter(data, filter_col2, filter_value2)
     
     # Deduplicate
-    data = data.drop_duplicates(subset=[unique_column, DATE_])
+    data = _prepare_data_for_visualization(data, unique_column)
     
     # Aggregate values
     summary = data.groupby(path_cols)[values_col].nunique().reset_index()
@@ -1705,7 +1753,7 @@ def create_3d_scatter(df, x_col, y_col, z_col, color_col, title,
     data = _apply_filter(data, filter_col2, filter_value2)
     
     # Deduplicate
-    data = data.drop_duplicates(subset=[unique_column, DATE_])
+    data = _prepare_data_for_visualization(data, unique_column)
     
     fig = px.scatter_3d(
         data,
