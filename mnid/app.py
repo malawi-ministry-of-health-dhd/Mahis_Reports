@@ -5,7 +5,7 @@ This module builds the Maternal and Child Health dashboard layout,
 calculates configured indicator coverage, and renders the main dashboard
 sections such as trends, comparison views, heatmaps, and readiness panels.
 """
-from dash import html, dcc, callback, callback_context, Input, Output, State, ALL
+from dash import html, dcc, clientside_callback, callback, callback_context, Input, Output, State, ALL
 from dash.exceptions import PreventUpdate
 import dash_mantine_components as dmc
 from helpers.helpers import create_count_from_config
@@ -2380,13 +2380,71 @@ def _build_malawi_panel(stored: dict, view: str, year: str,
     ]
 
 
-@callback(
+clientside_callback(
+    """
+    function(_tick) {
+        const sections = [
+            '#mnid-summary',
+            '#mnid-data-tables',
+            '#mnid-trends',
+            '#mnid-performance',
+            '#mnid-heatmap',
+            '#mnid-coverage',
+            '#mnid-comparative',
+            '#mnid-analysis',
+            '#mnid-readiness'
+        ];
+
+        let active = '#mnid-summary';
+        const activationLine = 124;
+        let bestPassed = null;
+        let nextUpcoming = null;
+
+        for (const selector of sections) {
+            const el = document.querySelector(selector);
+            if (!el) {
+                continue;
+            }
+
+            const rect = el.getBoundingClientRect();
+            const top = rect.top;
+
+            if (top <= activationLine) {
+                if (bestPassed === null || top > bestPassed.top) {
+                    bestPassed = { selector, top };
+                }
+            } else if (nextUpcoming === null || top < nextUpcoming.top) {
+                nextUpcoming = { selector, top };
+            }
+        }
+
+        if (bestPassed !== null) {
+            active = bestPassed.selector;
+        } else if (nextUpcoming !== null) {
+            active = nextUpcoming.selector;
+        }
+
+        return active;
+    }
+    """,
     Output('mnid-scrollspy-out', 'data'),
     Input('mnid-scrollspy-tick', 'n_intervals'),
+)
+
+
+@callback(
+    Output({'type': 'mnid-nav-btn', 'index': ALL}, 'className'),
+    Input('mnid-scrollspy-out', 'data'),
+    State({'type': 'mnid-nav-btn', 'index': ALL}, 'id'),
     prevent_initial_call=False,
 )
-def initialize_mnid_nav(_):
-    return ''
+def sync_mnid_nav_active_state(active_hash, nav_ids):
+    active_hash = active_hash or '#mnid-summary'
+    classes = []
+    for item in nav_ids or []:
+        target = (item or {}).get('index')
+        classes.append('mnid-nav-btn active' if target == active_hash else 'mnid-nav-btn')
+    return classes
 
 # # MNID module-level callback
 
@@ -4255,6 +4313,7 @@ def _sidebar(facility_code: str, theme: str = 'default') -> html.Div:
         ]
     return html.Div(className='mnid-nav', children=[
         html.A(
+            id={'type': 'mnid-nav-btn', 'index': href},
             href=href,
             className='mnid-nav-btn active' if index == 0 else 'mnid-nav-btn',
             children=label,
@@ -4549,7 +4608,7 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
 
     return html.Div(className=f'mnid-bg{" mnid-theme-newborn" if dashboard_theme == "newborn" else ""}', children=[
         # Hidden components used by the MNID scroll spy callback
-        dcc.Interval(id='mnid-scrollspy-tick', interval=800, max_intervals=1),
+        dcc.Interval(id='mnid-scrollspy-tick', interval=250, max_intervals=-1),
         dcc.Store(id='mnid-scrollspy-out'),
         html.Div(className=f'mnid-shell{" mnid-shell-newborn" if dashboard_theme == "newborn" else ""}', children=[main_content]),
     ])
