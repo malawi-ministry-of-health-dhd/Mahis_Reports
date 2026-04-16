@@ -5,7 +5,7 @@ This module builds the Maternal and Child Health dashboard layout,
 calculates configured indicator coverage, and renders the main dashboard
 sections such as trends, comparison views, heatmaps, and readiness panels.
 """
-from dash import html, dcc, clientside_callback, callback, callback_context, Input, Output, State, ALL
+from dash import html, dcc, callback, callback_context, Input, Output, State, ALL
 from dash.exceptions import PreventUpdate
 import dash_mantine_components as dmc
 from helpers.helpers import create_count_from_config
@@ -2380,49 +2380,13 @@ def _build_malawi_panel(stored: dict, view: str, year: str,
     ]
 
 
-# MNID scroll spy for section navigation
-# Runs once on load and marks the active section tab while scrolling.
-
-clientside_callback(
-    """
-    function(n) {
-        if (window._mnidScrollSpyActive) return '';
-        window._mnidScrollSpyActive = true;
-
-        var sectionIds = ['mnid-summary','mnid-data-tables','mnid-trends','mnid-performance','mnid-heatmap',
-                          'mnid-coverage','mnid-comparative','mnid-analysis','mnid-readiness'];
-
-        function setActive(id) {
-            sectionIds.forEach(function(sid) {
-                document.querySelectorAll('.mnid-nav-btn[href="#' + sid + '"]').forEach(function(a) {
-                    if (sid === id) a.classList.add('active');
-                    else a.classList.remove('active');
-                });
-            });
-        }
-
-        function updateActive() {
-            var threshold = 140;
-            var activeId = sectionIds[0];
-            for (var i = 0; i < sectionIds.length; i++) {
-                var el = document.getElementById(sectionIds[i]);
-                if (el && el.getBoundingClientRect().top <= threshold) {
-                    activeId = sectionIds[i];
-                }
-            }
-            setActive(activeId);
-        }
-
-        window.addEventListener('scroll', updateActive, { passive: true });
-        setTimeout(updateActive, 200);
-        updateActive();
-        return '';
-    }
-    """,
+@callback(
     Output('mnid-scrollspy-out', 'data'),
     Input('mnid-scrollspy-tick', 'n_intervals'),
     prevent_initial_call=False,
 )
+def initialize_mnid_nav(_):
+    return ''
 
 # # MNID module-level callback
 
@@ -4301,8 +4265,12 @@ def _sidebar(facility_code: str, theme: str = 'default') -> html.Div:
             ('Readiness', '#mnid-readiness'),
         ]
     return html.Div(className='mnid-nav', children=[
-        html.A(href=href, className='mnid-nav-btn', children=label)
-        for label, href in nav_items
+        html.A(
+            href=href,
+            className='mnid-nav-btn active' if index == 0 else 'mnid-nav-btn',
+            children=label,
+        )
+        for index, (label, href) in enumerate(nav_items)
     ])
 
 
