@@ -624,14 +624,19 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         if age:
             base_mask &= (data[AGE_GROUP_] == age)
         category = category or "All"
+        # MNID dashboards derive Service_Area internally and handle program scoping via scope_meta.
+        # We keep the Encounter-based pre-filter only for non-MNID use (dropdowns, non-MNID charts).
+        # base_data_mnid skips the Encounter filter so all relevant observations reach the MNID renderer.
+        base_data_mnid = data[base_mask].copy()
+        encounter_mask = pd.Series(True, index=data.index)
         if category != "All" and "Encounter" in data.columns:
             if category == "ANC":
-                base_mask &= data["Encounter"].fillna('').astype(str).str.contains('ANC', case=False, na=False)
+                encounter_mask = data["Encounter"].fillna('').astype(str).str.contains('ANC', case=False, na=False)
             elif category == "Labour":
-                base_mask &= data["Encounter"].fillna('').astype(str).str.contains('LABOUR|DELIVERY|BIRTH', case=False, na=False)
+                encounter_mask = data["Encounter"].fillna('').astype(str).str.contains('LABOUR|DELIVERY|BIRTH', case=False, na=False)
             elif category == "PNC":
-                base_mask &= data["Encounter"].fillna('').astype(str).str.contains('PNC|POSTNATAL|POST.NATAL', case=False, na=False)
-        base_data = data[base_mask].copy()
+                encounter_mask = data["Encounter"].fillna('').astype(str).str.contains('PNC|POSTNATAL|POST.NATAL', case=False, na=False)
+        base_data = data[base_mask & encounter_mask].copy()
 
         district_col = "District" if "District" in base_data.columns else (HOME_DISTRICT_ if HOME_DISTRICT_ in base_data.columns else None)
         all_districts = (
@@ -699,6 +704,19 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         if filtered_data.empty and len(network_data):
             filtered_data = network_data.copy()
 
+        # MNID-specific data paths: no Encounter pre-filter so all program observations are present.
+        # The MNID renderer uses Service_Area (derived from Program/Encounter) for internal scoping.
+        network_data_mnid = base_data_mnid.copy()
+        if level != 'National' and district_col and districts:
+            network_data_mnid = network_data_mnid[network_data_mnid[district_col].isin(districts)]
+        filtered_data_mnid = network_data_mnid.copy()
+        if level == 'Facility' and facilities:
+            filtered_data_mnid = filtered_data_mnid[filtered_data_mnid[FACILITY_].isin(facilities)]
+        elif level == 'District' and facilities:
+            filtered_data_mnid = filtered_data_mnid[filtered_data_mnid[FACILITY_].isin(facilities)]
+        if filtered_data_mnid.empty and len(network_data_mnid):
+            filtered_data_mnid = network_data_mnid.copy()
+
         # Determine report selection
         menu_json = load_dashboard_menu()
         if overview:
@@ -714,21 +732,25 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                 continue
             is_mnid = dashboard_json.get('dashboard_type') == 'mnid'
 
-            filtered_data_date = filtered_data[
-                (filtered_data[DATE_] >= start_dt) &
-                (filtered_data[DATE_] <= end_dt)
+            # MNID uses unfiltered data paths; non-MNID uses Encounter-pre-filtered paths.
+            _fdata = filtered_data_mnid if is_mnid else filtered_data
+            _ndata = network_data_mnid if is_mnid else network_data
+
+            filtered_data_date = _fdata[
+                (_fdata[DATE_] >= start_dt) &
+                (_fdata[DATE_] <= end_dt)
             ]
             adj_start_dt, adj_end_dt = start_dt, end_dt
-            if is_mnid and filtered_data_date.empty and len(filtered_data):
-                adj_start_dt = filtered_data[DATE_].min()
-                adj_end_dt = filtered_data[DATE_].max()
-                filtered_data_date = filtered_data.copy()
+            if is_mnid and filtered_data_date.empty and len(_fdata):
+                adj_start_dt = _fdata[DATE_].min()
+                adj_end_dt = _fdata[DATE_].max()
+                filtered_data_date = _fdata.copy()
 
             delta_days = (adj_end_dt - adj_start_dt).days
             facility_code_display = location
             if is_mnid:
-                if len(facilities) == 1 and FACILITY_ in base_data.columns and FACILITY_CODE_ in base_data.columns:
-                    fac_match = base_data[base_data[FACILITY_].astype(str) == str(facilities[0])]
+                if len(facilities) == 1 and FACILITY_ in base_data_mnid.columns and FACILITY_CODE_ in base_data_mnid.columns:
+                    fac_match = base_data_mnid[base_data_mnid[FACILITY_].astype(str) == str(facilities[0])]
                     if len(fac_match):
                         facility_code_display = str(fac_match[FACILITY_CODE_].dropna().astype(str).iloc[0])
                     else:
@@ -756,7 +778,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                 mnid_categories = [category]
 
             section = build_charts_from_json(
-                filtered_data_date, network_data, delta_days, dashboard_json,
+                filtered_data_date, _ndata, delta_days, dashboard_json,
                 start_date=adj_start_dt,
                 end_date=adj_end_dt,
                 facility_code=facility_code_display,

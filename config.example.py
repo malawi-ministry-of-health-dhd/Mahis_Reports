@@ -114,11 +114,20 @@ SELECT
         FROM encounter
         GROUP BY patient_id
     ) AS v ON v.patient_id = p.person_id
-    LEFT JOIN obs o ON o.encounter_id = e.encounter_id
-    LEFT JOIN concept_name cn ON o.value_coded = cn.concept_id AND cn.locale = 'en' AND cn.concept_name_type = 'FULLY_SPECIFIED'
+    LEFT JOIN obs o ON o.encounter_id = e.encounter_id AND o.voided = 0
+    LEFT JOIN concept_name cn ON o.value_coded = cn.concept_id
+        AND cn.locale = 'en'
+        AND cn.concept_name_type = 'FULLY_SPECIFIED'
+        AND cn.voided = 0
     LEFT JOIN concept_name c ON o.concept_id = c.concept_id
+        AND c.locale = 'en'
+        AND c.concept_name_type = 'FULLY_SPECIFIED'
+        AND c.voided = 0
     LEFT JOIN concept co ON o.value_text = co.uuid
     LEFT JOIN concept_name cnn ON co.concept_id = cnn.concept_id
+        AND cnn.locale = 'en'
+        AND cnn.concept_name_type = 'FULLY_SPECIFIED'
+        AND cnn.voided = 0
     LEFT JOIN drug as d on o.value_drug = d.drug_id
     WHERE p.voided = 0
     {date_filter}

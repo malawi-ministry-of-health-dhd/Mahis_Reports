@@ -3401,7 +3401,7 @@
         },
         {
           "id": "mnid_anc_004",
-          "label": "HIV-tested + screened for anaemia + high BP",
+          "label": "HIV-tested and screened for anaemia and high blood pressure",
           "category": "ANC",
           "target": 80,
           "status": "awaiting_baseline",
@@ -3409,7 +3409,7 @@
         },
         {
           "id": "mnid_anc_005",
-          "label": "POCUS with gestational age recorded",
+          "label": "POCUS with gestational age",
           "category": "ANC",
           "target": 50,
           "status": "tracked",
@@ -3451,7 +3451,7 @@
         },
         {
           "id": "mnid_lab_001",
-          "label": "Quality intrapartum care per guidelines",
+          "label": "Quality intrapartum care and management of complications according to guidelines",
           "category": "Labour",
           "target": 80,
           "status": "awaiting_baseline",
@@ -3459,7 +3459,7 @@
         },
         {
           "id": "mnid_lab_002",
-          "label": "Digital intrapartum monitoring",
+          "label": "Digital intrapartum monitoring in labour",
           "category": "Labour",
           "target": 70,
           "status": "tracked",
@@ -3478,7 +3478,7 @@
         },
         {
           "id": "mnid_lab_003",
-          "label": "Antenatal corticosteroids (pre-term labour)",
+          "label": "Eligible women with pre-term labour who received antenatal corticosteroids",
           "category": "Labour",
           "target": 70,
           "status": "tracked",
@@ -3502,7 +3502,7 @@
         },
         {
           "id": "mnid_lab_004",
-          "label": "Prophylactic azithromycin in labour",
+          "label": "Women in labour who received prophylactic azithromycin",
           "category": "Labour",
           "target": 50,
           "status": "tracked",
@@ -3521,7 +3521,7 @@
         },
         {
           "id": "mnid_lab_005",
-          "label": "PPH early detection + WHO treatment bundle",
+          "label": "Women with early-detected PPH who received the WHO treatment bundle",
           "category": "Labour",
           "target": 70,
           "status": "tracked",
@@ -4291,7 +4291,7 @@
         },
         {
           "id": "mnid_nb_002",
-          "label": "iKMC (preterm / low birth-weight babies)",
+          "label": "Eligible preterm and low birth-weight babies who receive iKMC",
           "category": "Newborn",
           "target": 80,
           "status": "tracked",
@@ -4315,7 +4315,7 @@
         },
         {
           "id": "mnid_nb_003",
-          "label": "Prophylactic CPAP (1000-1499g babies)",
+          "label": "Babies between 1000-1499g who receive prophylactic CPAP",
           "category": "Newborn",
           "target": 80,
           "status": "tracked",
@@ -4337,7 +4337,7 @@
         },
         {
           "id": "mnid_nb_004",
-          "label": "CPAP for eligible babies (1500-1999g)",
+          "label": "Eligible babies between 1500 and 1999g who receive CPAP",
           "category": "Newborn",
           "target": 80,
           "status": "awaiting_baseline",
@@ -4345,7 +4345,7 @@
         },
         {
           "id": "mnid_nb_005",
-          "label": "Phototherapy for jaundice",
+          "label": "Babies with clinical jaundice who receive phototherapy",
           "category": "Newborn",
           "target": 80,
           "status": "tracked",
@@ -4364,7 +4364,7 @@
         },
         {
           "id": "mnid_nb_006",
-          "label": "Parenteral antibiotics for sepsis",
+          "label": "Babies with suspected sepsis who receive parenteral antibiotics",
           "category": "Newborn",
           "target": 80,
           "status": "tracked",
@@ -4383,7 +4383,7 @@
         },
         {
           "id": "mnid_nb_007",
-          "label": "Not hypothermic on NNU admission",
+          "label": "Babies not hypothermic on admission to the neonatal unit",
           "category": "Newborn",
           "target": 80,
           "status": "tracked",
@@ -4402,7 +4402,7 @@
         },
         {
           "id": "mnid_nb_008",
-          "label": "Not hypothermic at any time (NNU stay)",
+          "label": "Babies not hypothermic at any time in the neonatal unit",
           "category": "Newborn",
           "target": 80,
           "status": "awaiting_baseline",

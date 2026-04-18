@@ -532,9 +532,245 @@ def _program_based_priority_indicators(categories: list[str] | None = None) -> l
     return indicators
 
 
+def _program_based_overlay_fallbacks(categories: list[str] | None = None) -> list[dict]:
+    wanted = set(categories or _CAT_ORDER)
+    indicators = []
+
+    if 'ANC' in wanted:
+        indicators.extend([
+            {
+                'id': 'mnid_anc_pdf_001',
+                'label': 'ANC screened for anaemia',
+                'category': 'ANC',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_anc_hb_screened', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
+                'note': 'Tracked from ANC haemoglobin screening concepts in MAHIS, including Hb(g/dL) and equivalent haemoglobin-result fields.',
+            },
+            {
+                'id': 'mnid_anc_pdf_002',
+                'label': 'ANC screened for infection',
+                'category': 'ANC',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_anc_infection_screened', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
+                'note': 'Tracked with an ANC infection-screening proxy built from HIV, syphilis, and malaria test fields already present in MAHIS.',
+            },
+            {
+                'id': 'mnid_anc_pdf_003',
+                'label': 'ANC screened for high blood pressure',
+                'category': 'ANC',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {
+                    'unique': 'person_id',
+                    'variable1': 'Service_Area', 'value1': 'ANC',
+                    'variable2': 'concept_name', 'value2': ['Systolic blood pressure', 'Diastolic blood pressure'],
+                },
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
+                'note': 'Tracked using ANC clients with blood-pressure vitals recorded in the current parquet.',
+            },
+            {
+                'id': 'mnid_anc_pdf_004',
+                'label': 'HIV-tested and screened for anaemia and high blood pressure',
+                'category': 'ANC',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_anc_hiv_anaemia_bp_screened', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
+                'note': 'Tracked as a combined ANC coverage indicator using person-level HIV test, haemoglobin screening, and blood-pressure screening flags.',
+            },
+            {
+                'id': 'mnid_anc_pdf_005',
+                'label': 'POCUS with gestational age',
+                'category': 'ANC',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {
+                    'unique': 'person_id',
+                    'variable1': 'Service_Area', 'value1': 'ANC',
+                    'variable2': 'concept_name', 'value2': 'Gestational age recorded',
+                    'variable3': 'obs_value_coded', 'value3': 'GA by ultrasound',
+                },
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
+                'note': 'Tracked with a proxy numerator for gestational age recorded by ultrasound in ANC.',
+            },
+        ])
+
+    if 'Labour' in wanted:
+        indicators.extend([
+            {
+                'id': 'mnid_lab_pdf_001',
+                'label': 'Quality intrapartum care and management of complications according to guidelines',
+                'category': 'Labour',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_partograph_used', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
+                'note': 'Tracked with a labour-management proxy using documented partograph use until a fuller guideline bundle is exposed in reports data.',
+            },
+            {
+                'id': 'mnid_lab_pdf_002',
+                'label': 'Digital intrapartum monitoring in labour',
+                'category': 'Labour',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_partograph_used', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
+                'note': 'Tracked with a partograph-use proxy from labour summary observations in MAHIS.',
+            },
+            {
+                'id': 'mnid_lab_pdf_003',
+                'label': 'Eligible women with pre-term labour who received antenatal corticosteroids',
+                'category': 'Labour',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_preterm_corticosteroids', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_preterm', 'value1': 'Yes'},
+                'note': 'Tracked using a person-level proxy for preterm labour plus antenatal corticosteroids already captured in MAHIS labour care.',
+            },
+            {
+                'id': 'mnid_lab_pdf_004',
+                'label': 'Women in labour who received prophylactic azithromycin',
+                'category': 'Labour',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_azithromycin', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
+                'note': 'Tracked if azithromycin-specific labour prophylaxis observations are present in the reports extract.',
+            },
+            {
+                'id': 'mnid_lab_pdf_005',
+                'label': 'Women with early-detected PPH who received the WHO treatment bundle',
+                'category': 'Labour',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_pph_bundle_received', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_pph', 'value1': 'Yes'},
+                'note': 'Tracked with a treatment-bundle proxy combining documented PPH plus multiple uterotonic/TXA care components already modeled in MAHIS.',
+            },
+        ])
+
+    if 'Newborn' in wanted:
+        indicators.extend([
+            {
+                'id': 'mnid_nb_pdf_001',
+                'label': 'Eligible babies who received neonatal resuscitation',
+                'category': 'Newborn',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {
+                    'unique': 'person_id',
+                    'variable1': 'concept_name', 'value1': 'Neonatal resuscitation provided',
+                    'variable2': 'obs_value_coded', 'value2': ['Stimulation only', 'Bag and mask', 'Yes'],
+                },
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Neonatal resuscitation provided'},
+                'note': 'Tracked with the available resuscitation-method denominator pending an eligibility-specific source field.',
+            },
+            {
+                'id': 'mnid_nb_pdf_002',
+                'label': 'Eligible preterm and low birth-weight babies who receive iKMC',
+                'category': 'Newborn',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_kmc_eligible', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_birth_weight_band', 'value1': ['1000-1499g', '1500-1999g']},
+                'note': 'Tracked as an eligibility proxy using low-birth-weight bands plus KMC-related newborn care concepts already modeled in MAHIS.',
+            },
+            {
+                'id': 'mnid_nb_pdf_003',
+                'label': 'Babies between 1000-1499g who receive prophylactic CPAP',
+                'category': 'Newborn',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_cpap_1000_1499', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_birth_weight_band', 'value1': '1000-1499g'},
+                'note': 'Tracked using person-level birth-weight bands and CPAP treatment observations from newborn care.',
+            },
+            {
+                'id': 'mnid_nb_pdf_004',
+                'label': 'Eligible babies between 1500 and 1999g who receive CPAP',
+                'category': 'Newborn',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_cpap_1500_1999', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_birth_weight_band', 'value1': '1500-1999g'},
+                'note': 'Tracked using person-level birth-weight bands and CPAP treatment observations from newborn care.',
+            },
+            {
+                'id': 'mnid_nb_pdf_005',
+                'label': 'Babies with clinical jaundice who receive phototherapy',
+                'category': 'Newborn',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_jaundice_phototherapy', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_jaundice', 'value1': 'Yes'},
+                'note': 'Tracked using newborn jaundice observations plus phototherapy treatment observations when they land in the reports extract.',
+            },
+            {
+                'id': 'mnid_nb_pdf_006',
+                'label': 'Babies with suspected sepsis who receive parenteral antibiotics',
+                'category': 'Newborn',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_sepsis_antibiotics', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_sepsis', 'value1': 'Yes'},
+                'note': 'Tracked using newborn sepsis diagnosis concepts plus parenteral-antibiotic treatment observations.',
+            },
+            {
+                'id': 'mnid_nb_pdf_007',
+                'label': 'Babies not hypothermic on admission to the neonatal unit',
+                'category': 'Newborn',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_not_hypothermic_admission', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn'},
+                'note': 'Tracked when the neonatal thermal-status-on-admission concept is available in the reports extract.',
+            },
+            {
+                'id': 'mnid_nb_pdf_008',
+                'label': 'Babies not hypothermic at any time in the neonatal unit',
+                'category': 'Newborn',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_not_hypothermic_anytime', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn'},
+                'note': 'Tracked when thermal-status observations in neonatal care are available across the admission period.',
+            },
+        ])
+
+    return indicators
+
+
 def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str] | None = None) -> list[dict]:
     wanted = set(categories or _CAT_ORDER)
     overlays = {
+        'ANC screened for anaemia': {
+            'status': 'tracked',
+            'numerator_filters': {
+                'unique': 'person_id',
+                'variable1': 'mnid_anc_hb_screened', 'value1': 'Yes',
+            },
+            'denominator_filters': {
+                'unique': 'person_id',
+                'variable1': 'Service_Area', 'value1': 'ANC',
+            },
+            'note': 'Tracked from ANC haemoglobin screening concepts in MAHIS, including Hb(g/dL) and equivalent haemoglobin-result fields.',
+        },
+        'ANC screened for infection': {
+            'status': 'tracked',
+            'numerator_filters': {
+                'unique': 'person_id',
+                'variable1': 'mnid_anc_infection_screened', 'value1': 'Yes',
+            },
+            'denominator_filters': {
+                'unique': 'person_id',
+                'variable1': 'Service_Area', 'value1': 'ANC',
+            },
+            'note': 'Tracked with an ANC infection-screening proxy built from HIV, syphilis, and malaria test fields already present in MAHIS.',
+        },
         'ANC screened for high blood pressure': {
             'status': 'tracked',
             'numerator_filters': {
@@ -561,6 +797,18 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
                 'variable1': 'Service_Area', 'value1': 'ANC',
             },
             'note': 'Tracked with a proxy numerator for gestational age recorded by ultrasound in ANC.',
+        },
+        'HIV-tested and screened for anaemia and high blood pressure': {
+            'status': 'tracked',
+            'numerator_filters': {
+                'unique': 'person_id',
+                'variable1': 'mnid_anc_hiv_anaemia_bp_screened', 'value1': 'Yes',
+            },
+            'denominator_filters': {
+                'unique': 'person_id',
+                'variable1': 'Service_Area', 'value1': 'ANC',
+            },
+            'note': 'Tracked as a combined ANC coverage indicator using person-level HIV test, haemoglobin screening, and blood-pressure screening flags.',
         },
         'Eligible babies who received neonatal resuscitation': {
             'status': 'tracked',
@@ -621,6 +869,66 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
                 'unique': 'person_id',
                 'variable1': 'Service_Area', 'value1': 'Labour',
             },
+        },
+        'Quality intrapartum care and management of complications according to guidelines': {
+            'status': 'tracked',
+            'numerator_filters': {
+                'unique': 'person_id',
+                'variable1': 'mnid_labour_partograph_used', 'value1': 'Yes',
+            },
+            'denominator_filters': {
+                'unique': 'person_id',
+                'variable1': 'Service_Area', 'value1': 'Labour',
+            },
+            'note': 'Tracked with a labour-management proxy using documented partograph use until a fuller guideline bundle is exposed in reports data.',
+        },
+        'Digital intrapartum monitoring in labour': {
+            'status': 'tracked',
+            'numerator_filters': {
+                'unique': 'person_id',
+                'variable1': 'mnid_labour_partograph_used', 'value1': 'Yes',
+            },
+            'denominator_filters': {
+                'unique': 'person_id',
+                'variable1': 'Service_Area', 'value1': 'Labour',
+            },
+            'note': 'Tracked with a partograph-use proxy from labour summary observations in MAHIS.',
+        },
+        'Eligible women with pre-term labour who received antenatal corticosteroids': {
+            'status': 'tracked',
+            'numerator_filters': {
+                'unique': 'person_id',
+                'variable1': 'mnid_labour_preterm_corticosteroids', 'value1': 'Yes',
+            },
+            'denominator_filters': {
+                'unique': 'person_id',
+                'variable1': 'mnid_labour_preterm', 'value1': 'Yes',
+            },
+            'note': 'Tracked using a person-level proxy for preterm labour plus antenatal corticosteroids already captured in MAHIS labour care.',
+        },
+        'Women in labour who received prophylactic azithromycin': {
+            'status': 'tracked',
+            'numerator_filters': {
+                'unique': 'person_id',
+                'variable1': 'mnid_labour_azithromycin', 'value1': 'Yes',
+            },
+            'denominator_filters': {
+                'unique': 'person_id',
+                'variable1': 'Service_Area', 'value1': 'Labour',
+            },
+            'note': 'Tracked if azithromycin-specific labour prophylaxis observations are present in the reports extract.',
+        },
+        'Women with early-detected PPH who received the WHO treatment bundle': {
+            'status': 'tracked',
+            'numerator_filters': {
+                'unique': 'person_id',
+                'variable1': 'mnid_labour_pph_bundle_received', 'value1': 'Yes',
+            },
+            'denominator_filters': {
+                'unique': 'person_id',
+                'variable1': 'mnid_labour_pph', 'value1': 'Yes',
+            },
+            'note': 'Tracked with a treatment-bundle proxy combining documented PPH plus multiple uterotonic/TXA care components already modeled in MAHIS.',
         },
         'Vitamin K given at birth': {
             'status': 'tracked',
@@ -744,14 +1052,85 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
             'status': 'tracked',
             'numerator_filters': {
                 'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': ['Management given to newborn', 'Prematurity/Kangaroo'],
-                'variable2': 'obs_value_coded', 'value2': ['Kangaroo mother care', 'Yes'],
+                'variable1': 'mnid_newborn_kmc_eligible', 'value1': 'Yes',
             },
             'denominator_filters': {
                 'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': ['Management given to newborn', 'Prematurity/Kangaroo'],
+                'variable1': 'mnid_birth_weight_band', 'value1': ['1000-1499g', '1500-1999g'],
             },
-            'note': 'Tracked as a KMC-related proxy using the current MAHIS concepts pending a dedicated eligibility field in reports data.',
+            'note': 'Tracked as an eligibility proxy using low-birth-weight bands plus KMC-related newborn care concepts already modeled in MAHIS.',
+        },
+        'Babies between 1000-1499g who receive prophylactic CPAP': {
+            'status': 'tracked',
+            'numerator_filters': {
+                'unique': 'person_id',
+                'variable1': 'mnid_newborn_cpap_1000_1499', 'value1': 'Yes',
+            },
+            'denominator_filters': {
+                'unique': 'person_id',
+                'variable1': 'mnid_birth_weight_band', 'value1': '1000-1499g',
+            },
+            'note': 'Tracked using person-level birth-weight bands and CPAP treatment observations from newborn care.',
+        },
+        'Eligible babies between 1500 and 1999g who receive CPAP': {
+            'status': 'tracked',
+            'numerator_filters': {
+                'unique': 'person_id',
+                'variable1': 'mnid_newborn_cpap_1500_1999', 'value1': 'Yes',
+            },
+            'denominator_filters': {
+                'unique': 'person_id',
+                'variable1': 'mnid_birth_weight_band', 'value1': '1500-1999g',
+            },
+            'note': 'Tracked using person-level birth-weight bands and CPAP treatment observations from newborn care.',
+        },
+        'Babies with clinical jaundice who receive phototherapy': {
+            'status': 'tracked',
+            'numerator_filters': {
+                'unique': 'person_id',
+                'variable1': 'mnid_newborn_jaundice_phototherapy', 'value1': 'Yes',
+            },
+            'denominator_filters': {
+                'unique': 'person_id',
+                'variable1': 'mnid_newborn_jaundice', 'value1': 'Yes',
+            },
+            'note': 'Tracked using newborn jaundice observations plus phototherapy treatment observations when they land in the reports extract.',
+        },
+        'Babies with suspected sepsis who receive parenteral antibiotics': {
+            'status': 'tracked',
+            'numerator_filters': {
+                'unique': 'person_id',
+                'variable1': 'mnid_newborn_sepsis_antibiotics', 'value1': 'Yes',
+            },
+            'denominator_filters': {
+                'unique': 'person_id',
+                'variable1': 'mnid_newborn_sepsis', 'value1': 'Yes',
+            },
+            'note': 'Tracked using newborn sepsis diagnosis concepts plus parenteral-antibiotic treatment observations.',
+        },
+        'Babies not hypothermic on admission to the neonatal unit': {
+            'status': 'tracked',
+            'numerator_filters': {
+                'unique': 'person_id',
+                'variable1': 'mnid_newborn_not_hypothermic_admission', 'value1': 'Yes',
+            },
+            'denominator_filters': {
+                'unique': 'person_id',
+                'variable1': 'Service_Area', 'value1': 'Newborn',
+            },
+            'note': 'Tracked when the neonatal thermal-status-on-admission concept is available in the reports extract.',
+        },
+        'Babies not hypothermic at any time in the neonatal unit': {
+            'status': 'tracked',
+            'numerator_filters': {
+                'unique': 'person_id',
+                'variable1': 'mnid_newborn_not_hypothermic_anytime', 'value1': 'Yes',
+            },
+            'denominator_filters': {
+                'unique': 'person_id',
+                'variable1': 'Service_Area', 'value1': 'Newborn',
+            },
+            'note': 'Tracked when thermal-status observations in neonatal care are available across the admission period.',
         },
     }
 
@@ -770,6 +1149,14 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
 
     # Keep source-of-truth indicators from JSON, but append calculable operational priorities if they are missing.
     for fallback in _program_based_priority_indicators(categories):
+        if fallback.get('label') in seen_labels:
+            continue
+        if wanted and fallback.get('category') not in wanted:
+            continue
+        enriched.append(fallback)
+        seen_labels.add(fallback.get('label'))
+
+    for fallback in _program_based_overlay_fallbacks(categories):
         if fallback.get('label') in seen_labels:
             continue
         if wanted and fallback.get('category') not in wanted:
@@ -1076,7 +1463,7 @@ def _service_table_payload(df: pd.DataFrame, scope_meta: dict | None = None) -> 
                 ('Obstetric history recorded', lambda x: _count_entities(x[x['Encounter_Source'].fillna('').astype(str) == 'OBSTETRIC HISTORY'] if 'Encounter_Source' in x.columns else x, 'encounter_id')),
                 ('Gestational age method recorded', lambda x: _concept_count(x, 'Gestational age recorded', any_value=True)),
                 ('Pregnancy planned responses', lambda x: _concept_count(x, 'Pregnancy planned', any_value=True)),
-                ('Pregnancy planned = Yes', lambda x: _concept_count(x, 'Pregnancy planned', ['Yes'])),
+                ('Planned pregnancies', lambda x: _concept_count(x, 'Pregnancy planned', ['Yes'])),
                 ('Danger signs captured', lambda x: _concept_count(x, 'Danger signs present', any_value=True)),
                 ('Tetanus dose status recorded', lambda x: _concept_count(x, 'Number of tetanus doses', any_value=True)),
                 ('2+ tetanus doses recorded', lambda x: _concept_count(x, 'Number of tetanus doses', ['two doses', 'three doses', 'four doses'], col='obs_value_coded')),
@@ -1088,7 +1475,7 @@ def _service_table_payload(df: pd.DataFrame, scope_meta: dict | None = None) -> 
                     'title': 'Pregnancy Planned Responses',
                     'total_metric': 'Pregnancy planned responses',
                     'segments': [
-                        {'label': 'Yes', 'metric': 'Pregnancy planned = Yes', 'color': '#0F766E'},
+                        {'label': 'Planned pregnancies', 'metric': 'Planned pregnancies', 'color': '#0F766E'},
                     ],
                     'remainder_label': 'No / other response',
                     'remainder_color': '#94A3B8',
