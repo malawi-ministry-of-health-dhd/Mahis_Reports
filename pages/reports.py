@@ -9,6 +9,7 @@ import os
 import json
 from dash.exceptions import PreventUpdate
 from helpers.reports_class import ReportTableBuilder
+from mnid.data_utils import prepare_mnid_dataframe
 from helpers.date_ranges import (
     RELATIVE_MONTHS,
     RELATIVE_QUARTERS,
@@ -340,6 +341,15 @@ def update_table(clicks,
     if user_info.empty:
         return html.Div("Unauthorized User. Please contact system administrator."), dash.no_update, dash.no_update
  #for cohort analysis this has to be moved forward to the return function
+    mnh_report_pages = {
+        "anc_fixed",
+        "labour_and_delivery_fixed_v2",
+        "pnc_fixed_v2",
+        "sick_neonate",
+    }
+    if report.get("page_name") in mnh_report_pages:
+        data = prepare_mnid_dataframe(data)
+
     original_data = data.copy()
     try:
         period_map = {

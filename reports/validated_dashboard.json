@@ -101,173 +101,13 @@
             "variable8": "Age_Group",
             "value8": "Over 5"
           }
-        },
-        {
-          "id": "count_2cbb623e",
-          "name": "Active Health Facilities",
-          "level": "facility",
-          "filters": {
-            "measure": "nunique",
-            "unique": "Facility_CODE",
-            "variable1": "Program",
-            "value1": [],
-            "variable2": "Encounter",
-            "value2": [],
-            "variable3": "concept_name",
-            "value3": [],
-            "variable4": "obs_value_coded",
-            "value4": "",
-            "variable5": "ValueN",
-            "value5": "",
-            "variable6": "Value",
-            "value6": "",
-            "variable7": "Gender",
-            "value7": "",
-            "variable8": "Age",
-            "value8": ""
-          }
-        },
-        {
-          "id": "count_aade5941",
-          "name": "Active Programs",
-          "level": "facility",
-          "filters": {
-            "measure": "nunique",
-            "unique": "Program",
-            "variable1": "Program",
-            "value1": [],
-            "variable2": "Encounter",
-            "value2": [],
-            "variable3": "concept_name",
-            "value3": [],
-            "variable4": "obs_value_coded",
-            "value4": "",
-            "variable5": "ValueN",
-            "value5": "",
-            "variable6": "Value",
-            "value6": "",
-            "variable7": "Gender",
-            "value7": "",
-            "variable8": "Age",
-            "value8": ""
-          }
-        },
-        {
-          "id": "count_94807bef",
-          "name": "Active Users",
-          "level": "facility",
-          "filters": {
-            "measure": "nunique",
-            "unique": "User",
-            "variable1": "Program",
-            "value1": [],
-            "variable2": "Encounter",
-            "value2": [],
-            "variable3": "concept_name",
-            "value3": [],
-            "variable4": "obs_value_coded",
-            "value4": "",
-            "variable5": "ValueN",
-            "value5": "",
-            "variable6": "Value",
-            "value6": "",
-            "variable7": "Gender",
-            "value7": "",
-            "variable8": "Age",
-            "value8": ""
-          }
-        },
-        {
-          "id": "count_f9c74c60",
-          "name": "Avg Registration Time (Mins)",
-          "level": "facility",
-          "filters": {
-            "measure": "time_diff_mins",
-            "unique": "person_id",
-            "variable1": "Program",
-            "value1": [],
-            "variable2": "Encounter",
-            "value2": [
-              "PATIENT REGISTRATION",
-              "REGISTRATION",
-              "VITALS"
-            ],
-            "variable3": "concept_name",
-            "value3": [],
-            "variable4": "obs_value_coded",
-            "value4": "",
-            "variable5": "ValueN",
-            "value5": "",
-            "variable6": "Value",
-            "value6": "",
-            "variable7": "Gender",
-            "value7": "",
-            "variable8": "Age",
-            "value8": ""
-          }
-        },
-        {
-          "id": "count_c02cf51a",
-          "name": "Avg Patient Duration > Exit(Mins)",
-          "level": "facility",
-          "filters": {
-            "measure": "time_diff_mins",
-            "unique": "person_id",
-            "variable1": "Program",
-            "value1": [],
-            "variable2": "Encounter",
-            "value2": [],
-            "variable3": "concept_name",
-            "value3": [],
-            "variable4": "obs_value_coded",
-            "value4": "",
-            "variable5": "ValueN",
-            "value5": "",
-            "variable6": "Value",
-            "value6": "",
-            "variable7": "Gender",
-            "value7": "",
-            "variable8": "Age",
-            "value8": ""
-          }
         }
       ],
       "charts": {
         "sections": [
           {
-            "section_name": "Facility Summary",
+            "section_name": "Summary Visuals of Facility",
             "items": [
-              {
-                "id": "chart_pivot_summary",
-                "name": "Locations",
-                "type": "PivotTable",
-                "level": "facility",
-                "filters": {
-                  "measure": "nunique",
-                  "unique": "any",
-                  "duration_default": "any",
-                  "index_col1": [
-                    "District",
-                    "Facility"
-                  ],
-                  "columns": "",
-                  "values_col": "person_id_key",
-                  "title": "Attendance by Health Facility",
-                  "unique_column": "person_id_key",
-                  "aggfunc": "count",
-                  "filter_col1": "",
-                  "filter_val1": "",
-                  "filter_col2": "",
-                  "filter_val2": "",
-                  "filter_col3": "",
-                  "filter_val3": "",
-                  "x_title": "",
-                  "y_title": "",
-                  "rename": {
-                    "person_id": "Number of Patients"
-                  }
-                }
-              },
               {
                 "id": "chart_10b29018",
                 "name": "Attendance By Program",
@@ -304,28 +144,29 @@
                 "id": "chart_3faf4437",
                 "name": "Daily OPD Attendance - Last 7 Days",
                 "type": "Line",
+                "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
-                  "duration_default": "7days",
+                  "duration_default": "any",
                   "title": "Daily OPD Attendance - Last 7 Days",
-                  "unique_column": "person_id",
-                  "filter_col1": [],
-                  "filter_val1": "",
-                  "filter_col2": [],
-                  "filter_val2": "",
-                  "filter_col3": [],
-                  "filter_val3": "",
-                  "filter_col4": [],
-                  "filter_val4": "",
-                  "filter_col5": [],
-                  "filter_val5": "",
                   "date_col": "Date",
                   "y_col": "person_id",
                   "x_title": "Date",
                   "y_title": "Number of Patients",
+                  "unique_column": "person_id",
                   "legend_title": "Legend",
-                  "color": ""
+                  "color": "",
+                  "filter_col1": "",
+                  "filter_val1": "",
+                  "filter_col2": "",
+                  "filter_val2": "",
+                  "filter_col3": "",
+                  "filter_val3": "",
+                  "filter_col4": "",
+                  "filter_val4": "",
+                  "filter_col5": "",
+                  "filter_val5": ""
                 }
               },
               {
@@ -407,12 +248,7 @@
                   "filter_col5": "",
                   "filter_val5": ""
                 }
-              }
-            ]
-          },
-          {
-            "section_name": "User Analytics",
-            "items": [
+              },
               {
                 "id": "chart_79405336",
                 "name": "Active Users",
@@ -422,11 +258,11 @@
                   "measure": "nunique",
                   "unique": "any",
                   "duration_default": "any",
-                  "title": "Active Users - Top 10",
+                  "title": "Active Users - All patient encounters",
                   "label_col": "User",
                   "value_col": "person_id",
-                  "x_title": "Number of patients created",
-                  "y_title": "User",
+                  "x_title": "Program",
+                  "y_title": "Number of patients",
                   "unique_column": "person_id",
                   "top_n": "10",
                   "filter_col1": "",
@@ -439,35 +275,6 @@
                   "filter_val4": "",
                   "filter_col5": "",
                   "filter_val5": ""
-                }
-              },
-              {
-                "id": "chart_0ca3eb77",
-                "name": "Daily Active Users -Last 7 Days",
-                "type": "Line",
-                "level": "facility",
-                "filters": {
-                  "measure": "nunique",
-                  "unique": "any",
-                  "duration_default": "7days",
-                  "title": "Daily Active Users -Last 7 Days",
-                  "unique_column": "person_id",
-                  "filter_col1": [],
-                  "filter_val1": "",
-                  "filter_col2": [],
-                  "filter_val2": "",
-                  "filter_col3": [],
-                  "filter_val3": "",
-                  "filter_col4": [],
-                  "filter_val4": "",
-                  "filter_col5": [],
-                  "filter_val5": "",
-                  "date_col": "Date",
-                  "y_col": "User",
-                  "x_title": "Date",
-                  "y_title": "Number of Patients",
-                  "legend_title": "Legend",
-                  "color": ""
                 }
               }
             ]
@@ -1237,7 +1044,7 @@
                   "filter_col1": "Program",
                   "filter_val1": "NCD PROGRAM",
                   "filter_col2": "concept_name",
-                  "filter_val2": "Does the patient drink alcohol-",
+                  "filter_val2": "Does the patient drink alcohol?",
                   "filter_col3": "",
                   "filter_val3": "",
                   "colormap": {
@@ -2732,7 +2539,7 @@
   },
   {
     "report_id": "report_0a89c762",
-    "report_name": "Maternal Health",
+    "report_name": "Maternal and Child Health",
     "date_created": "2026-03-19",
     "visualization_types": {
       "counts": [
@@ -3590,6 +3397,151 @@
           "note": "Calculated from delivery staff cadre recorded in labour encounter. Current data only captures skilled cadres."
         },
         {
+          "id": "mnid_nb_001",
+          "label": "Neonatal resuscitation (eligible babies)",
+          "category": "Newborn",
+          "target": 80,
+          "status": "awaiting_baseline",
+          "numerator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "Neonatal resuscitation provided",
+            "variable2": "obs_value_coded",
+            "value2": [
+              "Yes",
+              "Stimulation only",
+              "Bag and mask"
+            ]
+          },
+          "denominator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "Eligible for neonatal resuscitation",
+            "variable2": "obs_value_coded",
+            "value2": "Yes"
+          },
+          "note": "Eligibility and intervention concepts do not align reliably in current neonatal data; numerator exceeds denominator. Needs source-data linkage cleanup before tracking."
+        },
+        {
+          "id": "mnid_nb_002",
+          "label": "iKMC (preterm / low birth-weight babies)",
+          "category": "Newborn",
+          "target": 80,
+          "status": "tracked",
+          "numerator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "iKMC initiated",
+            "variable2": "obs_value_coded",
+            "value2": "Yes"
+          },
+          "denominator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "iKMC initiated",
+            "variable2": "obs_value_coded",
+            "value2": [
+              "Yes",
+              "No"
+            ]
+          }
+        },
+        {
+          "id": "mnid_nb_003",
+          "label": "Prophylactic CPAP (1000\u20131499g babies)",
+          "category": "Newborn",
+          "target": 80,
+          "status": "tracked",
+          "numerator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "CPAP support",
+            "variable2": "obs_value_coded",
+            "value2": [
+              "Bubble CPAP",
+              "Nasal oxygen"
+            ]
+          },
+          "denominator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "CPAP support"
+          }
+        },
+        {
+          "id": "mnid_nb_004",
+          "label": "CPAP for eligible babies (1500\u20131999g)",
+          "category": "Newborn",
+          "target": 80,
+          "status": "awaiting_baseline",
+          "note": "Requires birth weight field to separate 1500\u20131999g cohort from 1000\u20131499g. Birth weight not yet captured as a distinct filterable concept."
+        },
+        {
+          "id": "mnid_nb_005",
+          "label": "Phototherapy for jaundice",
+          "category": "Newborn",
+          "target": 80,
+          "status": "tracked",
+          "numerator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "Phototherapy given",
+            "variable2": "obs_value_coded",
+            "value2": "Yes"
+          },
+          "denominator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "Phototherapy given"
+          }
+        },
+        {
+          "id": "mnid_nb_006",
+          "label": "Parenteral antibiotics for sepsis",
+          "category": "Newborn",
+          "target": 80,
+          "status": "tracked",
+          "numerator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "Parenteral antibiotics given",
+            "variable2": "obs_value_coded",
+            "value2": "Yes"
+          },
+          "denominator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "Parenteral antibiotics given"
+          }
+        },
+        {
+          "id": "mnid_nb_007",
+          "label": "Not hypothermic on NNU admission",
+          "category": "Newborn",
+          "target": 80,
+          "status": "tracked",
+          "numerator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "Thermal status on admission",
+            "variable2": "obs_value_coded",
+            "value2": "Not hypothermic"
+          },
+          "denominator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "Thermal status on admission"
+          }
+        },
+        {
+          "id": "mnid_nb_008",
+          "label": "Not hypothermic at any time (NNU stay)",
+          "category": "Newborn",
+          "target": 80,
+          "status": "awaiting_baseline",
+          "note": "Longitudinal: requires all temperature readings within NNU stay to be in normal range. Needs time-series logic not yet supported."
+        },
+        {
           "id": "mnid_pnc_001",
           "label": "PNC mothers within 48 hours",
           "category": "PNC",
@@ -3806,6 +3758,50 @@
           ]
         },
         {
+          "title": "Newborn Outcomes",
+          "color": "orange",
+          "metrics": [
+            {
+              "label": "Vitamin K at Birth",
+              "target": 90,
+              "numerator_filters": {
+                "unique": "person_id",
+                "variable1": "concept_name",
+                "value1": "Vitamin K given",
+                "variable2": "obs_value_coded",
+                "value2": [
+                  "Yes",
+                  "yes"
+                ]
+              },
+              "denominator_filters": {
+                "unique": "person_id",
+                "variable1": "concept_name",
+                "value1": "Vitamin K given"
+              }
+            },
+            {
+              "label": "Exclusive Breastfeeding",
+              "target": 80,
+              "numerator_filters": {
+                "unique": "person_id",
+                "variable1": "concept_name",
+                "value1": "Breast feeding",
+                "variable2": "obs_value_coded",
+                "value2": [
+                  "Exclusive",
+                  "exclusive breastfeeding"
+                ]
+              },
+              "denominator_filters": {
+                "unique": "person_id",
+                "variable1": "concept_name",
+                "value1": "Breast feeding"
+              }
+            }
+          ]
+        },
+        {
           "title": "Maternal Outcomes",
           "color": "lime",
           "metrics": [
@@ -3869,593 +3865,7 @@
             "variable1": "concept_name",
             "value1": "EmONC competency assessed"
           }
-        }
-      ],
-      "supply_indicators": [
-        {
-          "id": "mnid_sc_001",
-          "label": "Essential medicine availability",
-          "status": "tracked",
-          "target_value": "All available",
-          "numerator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Essential medicine availability",
-            "variable2": "obs_value_coded",
-            "value2": "All available"
-          },
-          "denominator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Essential medicine availability"
-          }
-        }
-      ],
-      "data_quality_indicators": [
-        {
-          "id": "mnid_dq_001",
-          "label": "Record completeness",
-          "target_pct": 95,
-          "status": "tracked",
-          "numerator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Record completeness",
-            "variable2": "obs_value_coded",
-            "value2": "Complete"
-          },
-          "denominator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Record completeness"
-          }
         },
-        {
-          "id": "mnid_dq_002",
-          "label": "Data entered within 7 days",
-          "target_pct": 90,
-          "status": "tracked",
-          "numerator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Data entered within 7 days",
-            "variable2": "obs_value_coded",
-            "value2": "Yes"
-          },
-          "denominator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Data entered within 7 days"
-          }
-        }
-      ]
-    },
-    "dashboard_type": "mnid",
-    "priority_indicators": [
-      {
-        "id": "mnid_anc_001",
-        "label": "ANC screened for anaemia",
-        "category": "ANC",
-        "target": 80,
-        "status": "awaiting_baseline",
-        "note": "Official MNID indicator from the Malawi pathway document. Current parquet does not yet expose the anaemia screening concept required for calculation."
-      },
-      {
-        "id": "mnid_anc_002",
-        "label": "ANC screened for infection",
-        "category": "ANC",
-        "target": 80,
-        "status": "awaiting_baseline",
-        "note": "Official MNID indicator. Infection screening concept is not yet available in the current parquet in a directly calculable form."
-      },
-      {
-        "id": "mnid_anc_003",
-        "label": "ANC screened for high blood pressure",
-        "category": "ANC",
-        "target": 80,
-        "status": "tracked",
-        "note": "Tracked from ANC clients with blood-pressure vitals recorded in the current parquet.",
-        "numerator_filters": {
-          "unique": "person_id",
-          "variable1": "Service_Area",
-          "value1": "ANC",
-          "variable2": "concept_name",
-          "value2": [
-            "Systolic blood pressure",
-            "Diastolic blood pressure"
-          ]
-        },
-        "denominator_filters": {
-          "unique": "person_id",
-          "variable1": "Service_Area",
-          "value1": "ANC"
-        }
-      },
-      {
-        "id": "mnid_anc_004",
-        "label": "HIV-tested and screened for anaemia and high blood pressure",
-        "category": "ANC",
-        "target": 80,
-        "status": "awaiting_baseline",
-        "note": "Composite official indicator. Requires ANC-linked HIV testing plus anaemia and blood-pressure screening concepts in the same care flow."
-      },
-      {
-        "id": "mnid_anc_005",
-        "label": "POCUS with gestational age",
-        "category": "ANC",
-        "target": 80,
-        "status": "tracked",
-        "note": "Tracked with a proxy numerator for gestational age recorded by ultrasound in ANC.",
-        "numerator_filters": {
-          "unique": "person_id",
-          "variable1": "Service_Area",
-          "value1": "ANC",
-          "variable2": "concept_name",
-          "value2": "Gestational age recorded",
-          "variable3": "obs_value_coded",
-          "value3": "GA by ultrasound"
-        },
-        "denominator_filters": {
-          "unique": "person_id",
-          "variable1": "Service_Area",
-          "value1": "ANC"
-        }
-      },
-      {
-        "id": "mnid_lab_001",
-        "label": "Quality intrapartum care and management of complications according to guidelines",
-        "category": "Labour",
-        "target": 80,
-        "status": "awaiting_baseline",
-        "note": "Official MNID indicator. Requires guideline-based composite logic across PPH, sepsis, PET/ET and obstructed labour management."
-      },
-      {
-        "id": "mnid_lab_002",
-        "label": "Digital intrapartum monitoring in labour",
-        "category": "Labour",
-        "target": 80,
-        "status": "awaiting_baseline",
-        "note": "Official MNID indicator. Digital intrapartum monitoring concept is not yet available in the current parquet."
-      },
-      {
-        "id": "mnid_lab_003",
-        "label": "Eligible women with pre-term labour who received antenatal corticosteroids",
-        "category": "Labour",
-        "target": 80,
-        "status": "awaiting_baseline",
-        "note": "Official MNID indicator. Eligibility and corticosteroid administration concepts are not yet available as stable report filters."
-      },
-      {
-        "id": "mnid_lab_004",
-        "label": "Women in labour who received prophylactic azithromycin",
-        "category": "Labour",
-        "target": 80,
-        "status": "awaiting_baseline",
-        "note": "Official MNID indicator. Azithromycin administration is not yet represented as a labour-specific prophylaxis concept in the parquet."
-      },
-      {
-        "id": "mnid_lab_005",
-        "label": "Women with early-detected PPH who received the WHO treatment bundle",
-        "category": "Labour",
-        "target": 80,
-        "status": "awaiting_baseline",
-        "note": "Official MNID indicator. Early detection and treatment-bundle concepts for PPH are not yet available in a calculable form."
-      },
-      {
-        "id": "mnid_pnc_001",
-        "label": "PNC mothers within 48 hours",
-        "category": "PNC",
-        "target": 80,
-        "status": "tracked",
-        "numerator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Postnatal check period",
-          "variable2": "obs_value_coded",
-          "value2": "Up to 48 hrs or before discharge"
-        },
-        "denominator_filters": {
-          "unique": "person_id",
-          "variable1": "Service_Area",
-          "value1": "PNC"
-        },
-        "note": "Operational PNC indicator retained so PNC remains visible in current Malawi MNID reporting."
-      },
-      {
-        "id": "mnid_pnc_002",
-        "label": "Mother alive at PNC review",
-        "category": "PNC",
-        "target": 95,
-        "status": "tracked",
-        "numerator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Status of the mother",
-          "variable2": "obs_value_coded",
-          "value2": "Alive"
-        },
-        "denominator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Status of the mother"
-        },
-        "note": "Operational PNC status indicator available in the new parquet."
-      },
-      {
-        "id": "mnid_pnc_003",
-        "label": "Baby alive at PNC review",
-        "category": "PNC",
-        "target": 95,
-        "status": "tracked",
-        "numerator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Status of baby",
-          "variable2": "obs_value_coded",
-          "value2": "Alive"
-        },
-        "denominator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Status of baby"
-        },
-        "note": "Operational PNC newborn outcome indicator available in the new parquet."
-      },
-      {
-        "id": "mnid_pnc_004",
-        "label": "BCG vaccination coverage",
-        "category": "PNC",
-        "target": 80,
-        "status": "tracked",
-        "numerator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Immunisation given",
-          "variable2": "obs_value_coded",
-          "value2": "BCG"
-        },
-        "denominator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Immunisation given"
-        },
-        "note": "Operational PNC immunisation indicator available in the new parquet."
-      },
-      {
-        "id": "mnid_anc_extra_001",
-        "label": "ANC 2+ tetanus doses",
-        "category": "ANC",
-        "target": 80,
-        "status": "tracked",
-        "numerator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Number of tetanus doses",
-          "variable2": "obs_value_coded",
-          "value2": [
-            "two doses",
-            "three doses",
-            "four doses"
-          ]
-        },
-        "denominator_filters": {
-          "unique": "person_id",
-          "variable1": "Service_Area",
-          "value1": "ANC"
-        },
-        "note": "Operational ANC priority retained from MNH report indicators."
-      },
-      {
-        "id": "mnid_anc_extra_002",
-        "label": "Pregnancy planned",
-        "category": "ANC",
-        "target": 80,
-        "status": "tracked",
-        "numerator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Pregnancy planned",
-          "variable2": "obs_value_coded",
-          "value2": "Yes"
-        },
-        "denominator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Pregnancy planned"
-        },
-        "note": "Operational ANC priority retained from refactored report indicators."
-      },
-      {
-        "id": "mnid_anc_extra_003",
-        "label": "Danger signs assessed",
-        "category": "ANC",
-        "target": 80,
-        "status": "tracked",
-        "numerator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Danger signs present"
-        },
-        "denominator_filters": {
-          "unique": "person_id",
-          "variable1": "Service_Area",
-          "value1": "ANC"
-        },
-        "note": "Operational ANC priority retained from refactored report indicators."
-      },
-      {
-        "id": "mnid_lab_extra_001",
-        "label": "Facility deliveries",
-        "category": "Labour",
-        "target": 80,
-        "status": "tracked",
-        "numerator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Place of delivery",
-          "variable2": "obs_value_coded",
-          "value2": [
-            "This facility",
-            "this facility"
-          ]
-        },
-        "denominator_filters": {
-          "unique": "person_id",
-          "variable1": "Service_Area",
-          "value1": "Labour"
-        },
-        "note": "Operational labour priority retained from MNH report indicators."
-      },
-      {
-        "id": "mnid_lab_extra_002",
-        "label": "Vitamin K given at birth",
-        "category": "Labour",
-        "target": 80,
-        "status": "tracked",
-        "numerator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Vitamin K given",
-          "variable2": "obs_value_coded",
-          "value2": "Yes"
-        },
-        "denominator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Vitamin K given"
-        },
-        "note": "Operational labour priority retained from refactored report indicators."
-      },
-      {
-        "id": "mnid_lab_extra_003",
-        "label": "Breastfeeding in first hour",
-        "category": "Labour",
-        "target": 80,
-        "status": "tracked",
-        "numerator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Breast feeding",
-          "variable2": "obs_value_coded",
-          "value2": "Yes"
-        },
-        "denominator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Breast feeding"
-        },
-        "note": "Operational labour/newborn transition indicator retained from refactored report indicators."
-      }
-    ],
-    "mnid_categories": [
-      "ANC",
-      "Labour",
-      "PNC"
-    ]
-  },
-  {
-    "report_id": "report_c2348473",
-    "report_name": "Newborn",
-    "date_created": "2026-03-19",
-    "visualization_types": {
-      "counts": [],
-      "charts": {
-        "sections": []
-      },
-      "priority_indicators": [
-        {
-          "id": "mnid_nb_001",
-          "label": "Neonatal resuscitation (eligible babies)",
-          "category": "Newborn",
-          "target": 80,
-          "status": "awaiting_baseline",
-          "numerator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Neonatal resuscitation provided",
-            "variable2": "obs_value_coded",
-            "value2": [
-              "Yes",
-              "Stimulation only",
-              "Bag and mask"
-            ]
-          },
-          "denominator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Eligible for neonatal resuscitation",
-            "variable2": "obs_value_coded",
-            "value2": "Yes"
-          },
-          "note": "Eligibility and intervention concepts do not align reliably in current neonatal data; numerator exceeds denominator. Needs source-data linkage cleanup before tracking."
-        },
-        {
-          "id": "mnid_nb_002",
-          "label": "iKMC (preterm / low birth-weight babies)",
-          "category": "Newborn",
-          "target": 80,
-          "status": "tracked",
-          "numerator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "iKMC initiated",
-            "variable2": "obs_value_coded",
-            "value2": "Yes"
-          },
-          "denominator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "iKMC initiated",
-            "variable2": "obs_value_coded",
-            "value2": [
-              "Yes",
-              "No"
-            ]
-          }
-        },
-        {
-          "id": "mnid_nb_003",
-          "label": "Prophylactic CPAP (1000-1499g babies)",
-          "category": "Newborn",
-          "target": 80,
-          "status": "tracked",
-          "numerator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "CPAP support",
-            "variable2": "obs_value_coded",
-            "value2": [
-              "Bubble CPAP",
-              "Nasal oxygen"
-            ]
-          },
-          "denominator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "CPAP support"
-          }
-        },
-        {
-          "id": "mnid_nb_004",
-          "label": "CPAP for eligible babies (1500-1999g)",
-          "category": "Newborn",
-          "target": 80,
-          "status": "awaiting_baseline",
-          "note": "Requires birth weight field to separate 1500-1999g cohort from 1000-1499g. Birth weight not yet captured as a distinct filterable concept."
-        },
-        {
-          "id": "mnid_nb_005",
-          "label": "Phototherapy for jaundice",
-          "category": "Newborn",
-          "target": 80,
-          "status": "tracked",
-          "numerator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Phototherapy given",
-            "variable2": "obs_value_coded",
-            "value2": "Yes"
-          },
-          "denominator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Phototherapy given"
-          }
-        },
-        {
-          "id": "mnid_nb_006",
-          "label": "Parenteral antibiotics for sepsis",
-          "category": "Newborn",
-          "target": 80,
-          "status": "tracked",
-          "numerator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Parenteral antibiotics given",
-            "variable2": "obs_value_coded",
-            "value2": "Yes"
-          },
-          "denominator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Parenteral antibiotics given"
-          }
-        },
-        {
-          "id": "mnid_nb_007",
-          "label": "Not hypothermic on NNU admission",
-          "category": "Newborn",
-          "target": 80,
-          "status": "tracked",
-          "numerator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Thermal status on admission",
-            "variable2": "obs_value_coded",
-            "value2": "Not hypothermic"
-          },
-          "denominator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Thermal status on admission"
-          }
-        },
-        {
-          "id": "mnid_nb_008",
-          "label": "Not hypothermic at any time (NNU stay)",
-          "category": "Newborn",
-          "target": 80,
-          "status": "awaiting_baseline",
-          "note": "Longitudinal: requires all temperature readings within NNU stay to be in normal range. Needs time-series logic not yet supported."
-        }
-      ],
-      "care_phases": [
-        {
-          "title": "Newborn Outcomes",
-          "color": "orange",
-          "metrics": [
-            {
-              "label": "Vitamin K at Birth",
-              "target": 90,
-              "numerator_filters": {
-                "unique": "person_id",
-                "variable1": "concept_name",
-                "value1": "Vitamin K given",
-                "variable2": "obs_value_coded",
-                "value2": [
-                  "Yes",
-                  "yes"
-                ]
-              },
-              "denominator_filters": {
-                "unique": "person_id",
-                "variable1": "concept_name",
-                "value1": "Vitamin K given"
-              }
-            },
-            {
-              "label": "Exclusive Breastfeeding",
-              "target": 80,
-              "numerator_filters": {
-                "unique": "person_id",
-                "variable1": "concept_name",
-                "value1": "Breast feeding",
-                "variable2": "obs_value_coded",
-                "value2": [
-                  "Exclusive",
-                  "exclusive breastfeeding"
-                ]
-              },
-              "denominator_filters": {
-                "unique": "person_id",
-                "variable1": "concept_name",
-                "value1": "Breast feeding"
-              }
-            }
-          ]
-        }
-      ],
-      "workforce_indicators": [
         {
           "id": "mnid_wf_002",
           "label": "SSNC competency assessed",
@@ -4477,6 +3887,24 @@
         }
       ],
       "supply_indicators": [
+        {
+          "id": "mnid_sc_001",
+          "label": "Essential medicine availability",
+          "status": "tracked",
+          "target_value": "All available",
+          "numerator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "Essential medicine availability",
+            "variable2": "obs_value_coded",
+            "value2": "All available"
+          },
+          "denominator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "Essential medicine availability"
+          }
+        },
         {
           "id": "mnid_sc_002",
           "label": "CPAP equipment available",
@@ -4568,165 +3996,6 @@
         }
       ]
     },
-    "dashboard_type": "mnid",
-    "priority_indicators": [
-      {
-        "id": "mnid_nb_001",
-        "label": "Eligible babies who received neonatal resuscitation",
-        "category": "Newborn",
-        "target": 80,
-        "status": "tracked",
-        "note": "Tracked with the available resuscitation-method denominator pending an eligibility-specific source field.",
-        "numerator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Neonatal resuscitation provided",
-          "variable2": "obs_value_coded",
-          "value2": [
-            "Stimulation only",
-            "Bag and mask",
-            "Yes"
-          ]
-        },
-        "denominator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Neonatal resuscitation provided"
-        }
-      },
-      {
-        "id": "mnid_nb_002",
-        "label": "Eligible preterm and low birth-weight babies who receive iKMC",
-        "category": "Newborn",
-        "target": 80,
-        "status": "awaiting_baseline",
-        "note": "Official MNID indicator. iKMC initiation concept is not yet available in the current parquet."
-      },
-      {
-        "id": "mnid_nb_003",
-        "label": "Babies between 1000-1499g who receive prophylactic CPAP",
-        "category": "Newborn",
-        "target": 80,
-        "status": "awaiting_baseline",
-        "note": "Official MNID indicator. Birth weight exists, but CPAP support concept is not available in the current parquet."
-      },
-      {
-        "id": "mnid_nb_004",
-        "label": "Eligible babies between 1500 and 1999g who receive CPAP",
-        "category": "Newborn",
-        "target": 80,
-        "status": "awaiting_baseline",
-        "note": "Official MNID indicator. Requires both weight-band eligibility and CPAP support concepts, which are not yet available together."
-      },
-      {
-        "id": "mnid_nb_005",
-        "label": "Babies with clinical jaundice who receive phototherapy",
-        "category": "Newborn",
-        "target": 80,
-        "status": "awaiting_baseline",
-        "note": "Official MNID indicator. Clinical jaundice and phototherapy concepts are not yet available as stable report filters."
-      },
-      {
-        "id": "mnid_nb_006",
-        "label": "Babies with suspected sepsis who receive parenteral antibiotics",
-        "category": "Newborn",
-        "target": 80,
-        "status": "awaiting_baseline",
-        "note": "Official MNID indicator. Sepsis suspicion and parenteral-antibiotic treatment concepts are not yet represented in a calculable way."
-      },
-      {
-        "id": "mnid_nb_007",
-        "label": "Babies not hypothermic on admission to the neonatal unit",
-        "category": "Newborn",
-        "target": 80,
-        "status": "awaiting_baseline",
-        "note": "Official MNID indicator. Thermal-status-on-admission concept is not yet present in the current parquet."
-      },
-      {
-        "id": "mnid_nb_008",
-        "label": "Babies not hypothermic at any time in the neonatal unit",
-        "category": "Newborn",
-        "target": 80,
-        "status": "awaiting_baseline",
-        "note": "Official MNID longitudinal indicator. Requires repeated in-stay temperature capture and episode logic."
-      },
-      {
-        "id": "mnid_nb_extra_001",
-        "label": "Birth weight recorded",
-        "category": "Newborn",
-        "target": 80,
-        "status": "tracked",
-        "numerator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Birth weight"
-        },
-        "denominator_filters": {
-          "unique": "person_id",
-          "variable1": "Service_Area",
-          "value1": "Newborn"
-        },
-        "note": "Operational newborn priority retained from refactored report indicators."
-      },
-      {
-        "id": "mnid_nb_extra_002",
-        "label": "Gestation weeks recorded",
-        "category": "Newborn",
-        "target": 80,
-        "status": "tracked",
-        "numerator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Gestation in weeks"
-        },
-        "denominator_filters": {
-          "unique": "person_id",
-          "variable1": "Service_Area",
-          "value1": "Newborn"
-        },
-        "note": "Operational newborn priority retained from refactored report indicators."
-      },
-      {
-        "id": "mnid_nb_extra_003",
-        "label": "Vitamin K given",
-        "category": "Newborn",
-        "target": 80,
-        "status": "tracked",
-        "numerator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Vitamin K given",
-          "variable2": "obs_value_coded",
-          "value2": "Yes"
-        },
-        "denominator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Vitamin K given"
-        },
-        "note": "Operational newborn priority retained from refactored report indicators."
-      },
-      {
-        "id": "mnid_nb_extra_004",
-        "label": "Thermal care recorded",
-        "category": "Newborn",
-        "target": 80,
-        "status": "tracked",
-        "numerator_filters": {
-          "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "thermal care"
-        },
-        "denominator_filters": {
-          "unique": "person_id",
-          "variable1": "Service_Area",
-          "value1": "Newborn"
-        },
-        "note": "Operational newborn priority retained from refactored report indicators."
-      }
-    ],
-    "mnid_categories": [
-      "Newborn"
-    ]
+    "dashboard_type": "mnid"
   }
 ]
