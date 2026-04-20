@@ -127,6 +127,15 @@ def _birth_weight_band(weight_g: float | None) -> str:
     return '>=2500g'
 
 
+def _normalize_birth_weight_g(weight: float | None) -> float | None:
+    if weight is None:
+        return None
+    # Neonatal birth weight in the parquet is often stored as kilograms in ValueN.
+    if 0 < weight <= 10:
+        return weight * 1000
+    return weight
+
+
 def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
     if out.empty or 'person_id' not in out.columns:
         return out
@@ -246,7 +255,7 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
 
     _assign_flag(
         'mnid_newborn_kmc',
-        newborn_mask & (
+        (
             concept.isin(['iKMC initiated', 'Prematurity/Kangaroo', 'Management given to newborn'])
             | concept_lower.str.contains('kmc|kangaroo', regex=True, na=False)
             | combined_lower.str.contains('kangaroo mother care|continuous kmc|intermittent kmc|admit to kmc', regex=True, na=False)
@@ -345,7 +354,7 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
     birth_weight_rows = out.loc[concept.eq('Birth weight'), ['person_id']].copy()
     value_numeric = out['ValueN'] if 'ValueN' in out.columns else pd.Series([None] * len(out), index=out.index)
     birth_weight_rows['mnid_birth_weight_g'] = [
-        _first_numeric(pd.Series([vn, ov, vv]))
+        _normalize_birth_weight_g(_first_numeric(pd.Series([vn, ov, vv])))
         for vn, ov, vv in zip(value_numeric.loc[birth_weight_rows.index], obs.loc[birth_weight_rows.index], value.loc[birth_weight_rows.index])
     ]
     birth_weight_map = (

@@ -3859,16 +3859,15 @@
           "status": "tracked",
           "numerator_filters": {
             "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "EmONC competency assessed",
-            "variable2": "obs_value_coded",
-            "value2": "Assessed"
+            "variable1": "mnid_anc_bp_screened",
+            "value1": "Yes"
           },
           "denominator_filters": {
             "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "EmONC competency assessed"
-          }
+            "variable1": "Service_Area",
+            "value1": "ANC"
+          },
+          "note": "Proxy readiness indicator derived from ANC clients with blood-pressure monitoring documented."
         }
       ],
       "supply_indicators": [
@@ -3876,19 +3875,17 @@
           "id": "mnid_sc_001",
           "label": "Essential medicine availability",
           "status": "tracked",
-          "target_value": "All available",
           "numerator_filters": {
             "unique": "person_id",
             "variable1": "concept_name",
-            "value1": "Essential medicine availability",
-            "variable2": "obs_value_coded",
-            "value2": "All available"
+            "value1": "Fetal heart rate"
           },
           "denominator_filters": {
             "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Essential medicine availability"
-          }
+            "variable1": "Service_Area",
+            "value1": "Labour"
+          },
+          "note": "Proxy readiness indicator derived from labour records with fetal-heart monitoring documented."
         }
       ],
       "data_quality_indicators": [
@@ -3900,15 +3897,14 @@
           "numerator_filters": {
             "unique": "person_id",
             "variable1": "concept_name",
-            "value1": "Record completeness",
-            "variable2": "obs_value_coded",
-            "value2": "Complete"
+            "value1": "Postnatal check period"
           },
           "denominator_filters": {
             "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Record completeness"
-          }
+            "variable1": "Service_Area",
+            "value1": "PNC"
+          },
+          "note": "Proxy documentation/readiness indicator derived from PNC records with postnatal timing captured."
         },
         {
           "id": "mnid_dq_002",
@@ -3918,15 +3914,14 @@
           "numerator_filters": {
             "unique": "person_id",
             "variable1": "concept_name",
-            "value1": "Data entered within 7 days",
-            "variable2": "obs_value_coded",
-            "value2": "Yes"
+            "value1": "Status of the mother"
           },
           "denominator_filters": {
             "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Data entered within 7 days"
-          }
+            "variable1": "Service_Area",
+            "value1": "PNC"
+          },
+          "note": "Proxy documentation indicator derived from PNC records with maternal outcome status captured."
         }
       ]
     },
@@ -4455,118 +4450,9 @@
           ]
         }
       ],
-      "workforce_indicators": [
-        {
-          "id": "mnid_wf_002",
-          "label": "SSNC competency assessed",
-          "target_count": 200,
-          "target_pct": 80,
-          "status": "tracked",
-          "numerator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "SSNC competency assessed",
-            "variable2": "obs_value_coded",
-            "value2": "Assessed"
-          },
-          "denominator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "SSNC competency assessed"
-          }
-        }
-      ],
-      "supply_indicators": [
-        {
-          "id": "mnid_sc_002",
-          "label": "CPAP equipment available",
-          "status": "tracked",
-          "numerator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "CPAP equipment status",
-            "variable2": "obs_value_coded",
-            "value2": "Available"
-          },
-          "denominator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "CPAP equipment status"
-          }
-        },
-        {
-          "id": "mnid_sc_003",
-          "label": "Phototherapy unit available",
-          "status": "tracked",
-          "numerator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Phototherapy unit status",
-            "variable2": "obs_value_coded",
-            "value2": "Available"
-          },
-          "denominator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Phototherapy unit status"
-          }
-        },
-        {
-          "id": "mnid_sc_004",
-          "label": "Neonatal resuscitation equipment available",
-          "status": "tracked",
-          "numerator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Newborn resuscitation equipment status",
-            "variable2": "obs_value_coded",
-            "value2": "Available"
-          },
-          "denominator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Newborn resuscitation equipment status"
-          }
-        }
-      ],
-      "data_quality_indicators": [
-        {
-          "id": "mnid_dq_001",
-          "label": "Record completeness",
-          "target_pct": 95,
-          "status": "tracked",
-          "numerator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Record completeness",
-            "variable2": "obs_value_coded",
-            "value2": "Complete"
-          },
-          "denominator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Record completeness"
-          }
-        },
-        {
-          "id": "mnid_dq_002",
-          "label": "Data entered within 7 days",
-          "target_pct": 90,
-          "status": "tracked",
-          "numerator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Data entered within 7 days",
-            "variable2": "obs_value_coded",
-            "value2": "Yes"
-          },
-          "denominator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "Data entered within 7 days"
-          }
-        }
-      ]
+      "workforce_indicators": [],
+      "supply_indicators": [],
+      "data_quality_indicators": []
     },
     "dashboard_type": "mnid",
     "priority_indicators": [

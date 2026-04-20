@@ -1061,7 +1061,7 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
             'note': 'Tracked as an eligibility proxy using low-birth-weight bands plus KMC-related newborn care concepts already modeled in MAHIS.',
         },
         'Babies between 1000-1499g who receive prophylactic CPAP': {
-            'status': 'tracked',
+            'status': 'awaiting_baseline',
             'numerator_filters': {
                 'unique': 'person_id',
                 'variable1': 'mnid_newborn_cpap_1000_1499', 'value1': 'Yes',
@@ -1070,10 +1070,10 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
                 'unique': 'person_id',
                 'variable1': 'mnid_birth_weight_band', 'value1': '1000-1499g',
             },
-            'note': 'Tracked using person-level birth-weight bands and CPAP treatment observations from newborn care.',
+            'note': 'The current parquet exposes low-birth-weight bands, but no reliable neonatal CPAP treatment observations yet. Keep visible pending an improved extract.',
         },
         'Eligible babies between 1500 and 1999g who receive CPAP': {
-            'status': 'tracked',
+            'status': 'awaiting_baseline',
             'numerator_filters': {
                 'unique': 'person_id',
                 'variable1': 'mnid_newborn_cpap_1500_1999', 'value1': 'Yes',
@@ -1082,10 +1082,10 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
                 'unique': 'person_id',
                 'variable1': 'mnid_birth_weight_band', 'value1': '1500-1999g',
             },
-            'note': 'Tracked using person-level birth-weight bands and CPAP treatment observations from newborn care.',
+            'note': 'The current parquet exposes the 1500-1999g denominator cohort, but not reliable neonatal CPAP treatment observations yet.',
         },
         'Babies with clinical jaundice who receive phototherapy': {
-            'status': 'tracked',
+            'status': 'awaiting_baseline',
             'numerator_filters': {
                 'unique': 'person_id',
                 'variable1': 'mnid_newborn_jaundice_phototherapy', 'value1': 'Yes',
@@ -1094,10 +1094,10 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
                 'unique': 'person_id',
                 'variable1': 'mnid_newborn_jaundice', 'value1': 'Yes',
             },
-            'note': 'Tracked using newborn jaundice observations plus phototherapy treatment observations when they land in the reports extract.',
+            'note': 'Clinical jaundice is present, but phototherapy treatment is not yet arriving in a reliable report concept in the current parquet.',
         },
         'Babies with suspected sepsis who receive parenteral antibiotics': {
-            'status': 'tracked',
+            'status': 'awaiting_baseline',
             'numerator_filters': {
                 'unique': 'person_id',
                 'variable1': 'mnid_newborn_sepsis_antibiotics', 'value1': 'Yes',
@@ -1106,10 +1106,10 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
                 'unique': 'person_id',
                 'variable1': 'mnid_newborn_sepsis', 'value1': 'Yes',
             },
-            'note': 'Tracked using newborn sepsis diagnosis concepts plus parenteral-antibiotic treatment observations.',
+            'note': 'Sepsis-like diagnosis concepts are present, but parenteral-antibiotic treatment is not yet exposed cleanly enough in the current parquet.',
         },
         'Babies not hypothermic on admission to the neonatal unit': {
-            'status': 'tracked',
+            'status': 'awaiting_baseline',
             'numerator_filters': {
                 'unique': 'person_id',
                 'variable1': 'mnid_newborn_not_hypothermic_admission', 'value1': 'Yes',
@@ -1118,10 +1118,10 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
                 'unique': 'person_id',
                 'variable1': 'Service_Area', 'value1': 'Newborn',
             },
-            'note': 'Tracked when the neonatal thermal-status-on-admission concept is available in the reports extract.',
+            'note': 'Thermal care is present in neonatal workflows, but the specific thermal-status-on-admission concept is not yet exposed in the parquet.',
         },
         'Babies not hypothermic at any time in the neonatal unit': {
-            'status': 'tracked',
+            'status': 'awaiting_baseline',
             'numerator_filters': {
                 'unique': 'person_id',
                 'variable1': 'mnid_newborn_not_hypothermic_anytime', 'value1': 'Yes',
@@ -1130,7 +1130,7 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
                 'unique': 'person_id',
                 'variable1': 'Service_Area', 'value1': 'Newborn',
             },
-            'note': 'Tracked when thermal-status observations in neonatal care are available across the admission period.',
+            'note': 'This needs longitudinal neonatal thermal-status observations, which are not yet exposed in the current parquet.',
         },
     }
 
@@ -5400,6 +5400,56 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
         dashboard_title = f"{config.get('report_name', 'Maternal and Child Health')} Indicators"
         dashboard_subtitle = 'Clean view of performance, comparison, coverage, and readiness.'
         dashboard_theme = 'default'
+
+    if dashboard_theme == 'newborn' and not (supply_inds or wf_inds or dq_inds):
+        zero_filters = {
+            'unique': 'person_id',
+            'variable1': 'concept_name',
+            'value1': '__mnid_unavailable__',
+        }
+        wf_inds = [
+            {
+                'label': 'SSNC competency assessed',
+                'target_pct': 80,
+                'numerator_filters': dict(zero_filters),
+                'denominator_filters': dict(zero_filters),
+            },
+        ]
+        supply_inds = [
+            {
+                'label': 'CPAP equipment available',
+                'target_pct': 80,
+                'numerator_filters': dict(zero_filters),
+                'denominator_filters': dict(zero_filters),
+            },
+            {
+                'label': 'Phototherapy unit available',
+                'target_pct': 80,
+                'numerator_filters': dict(zero_filters),
+                'denominator_filters': dict(zero_filters),
+            },
+            {
+                'label': 'Neonatal resuscitation equipment available',
+                'target_pct': 80,
+                'numerator_filters': dict(zero_filters),
+                'denominator_filters': dict(zero_filters),
+            },
+        ]
+        dq_inds = []
+        dq_inds = [
+            {
+                'label': 'Record completeness',
+                'target_pct': 95,
+                'numerator_filters': dict(zero_filters),
+                'denominator_filters': dict(zero_filters),
+            },
+            {
+                'label': 'Data entered within 7 days',
+                'target_pct': 90,
+                'numerator_filters': dict(zero_filters),
+                'denominator_filters': dict(zero_filters),
+            },
+        ]
     hero_title = 'KEY NEONATAL INDICATORS' if dashboard_theme == 'newborn' else f'KEY {_CAT_LABELS.get(default_cat, str(default_cat or "Program")).upper()} INDICATORS'
 
     computed = []
@@ -5525,6 +5575,9 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
             },
         ),
 
+    ])
+
+    main_content.children.extend([
         _section_anchor('mnid-readiness'),
         _sec_header('Operational Readiness',
                     desc='Devices, staffing, and data quality conditions that support neonatal care delivery.' if dashboard_theme == 'newborn' else 'Equipment - workforce competency - data quality',
