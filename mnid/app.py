@@ -60,7 +60,10 @@ def _cov(df, n_cfg, d_cfg):
     except: num = 0
     try:   den = int(create_count_from_config(df, d_cfg) or 0)
     except: den = 0
-    pct = round(num / den * 100, 1) if den else 0.0
+    if den:
+        pct = round(min(num / den * 100, 100.0), 1)
+    else:
+        pct = 0.0
     return num, den, pct
 
 
@@ -586,16 +589,21 @@ def _program_based_overlay_fallbacks(categories: list[str] | None = None) -> lis
                 'id': 'mnid_anc_pdf_005',
                 'label': 'POCUS with gestational age',
                 'category': 'ANC',
-                'target': 80,
+                'target': 50,
                 'status': 'tracked',
                 'numerator_filters': {
                     'unique': 'person_id',
                     'variable1': 'Service_Area', 'value1': 'ANC',
-                    'variable2': 'concept_name', 'value2': 'Gestational age recorded',
-                    'variable3': 'obs_value_coded', 'value3': 'GA by ultrasound',
+                    'variable2': 'new_revisit', 'value2': 'New',
+                    'variable3': 'concept_name', 'value3': 'Gestational age recorded',
+                    'variable4': 'obs_value_coded', 'value4': 'GA by ultrasound',
                 },
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
-                'note': 'Tracked with a proxy numerator for gestational age recorded by ultrasound in ANC.',
+                'denominator_filters': {
+                    'unique': 'person_id',
+                    'variable1': 'Service_Area', 'value1': 'ANC',
+                    'variable2': 'new_revisit', 'value2': 'New',
+                },
+                'note': 'Restricted to first ANC visits. Numerator: gestational age recorded by ultrasound. Denominator: all first ANC visits.',
             },
         ])
 
@@ -616,10 +624,14 @@ def _program_based_overlay_fallbacks(categories: list[str] | None = None) -> lis
                 'label': 'Digital intrapartum monitoring in labour',
                 'category': 'Labour',
                 'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_partograph_used', 'value1': 'Yes'},
+                'status': 'awaiting_baseline',
+                'numerator_filters': {
+                    'unique': 'person_id',
+                    'variable1': 'concept_name', 'value1': 'Digital intrapartum monitoring',
+                    'variable2': 'obs_value_coded', 'value2': 'Used',
+                },
                 'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
-                'note': 'Tracked with a partograph-use proxy from labour summary observations in MAHIS.',
+                'note': 'Awaiting a dedicated electronic fetal monitoring concept (CTG / Moyo device) in MAHIS. Partograph use is already tracked under quality intrapartum care.',
             },
             {
                 'id': 'mnid_lab_pdf_003',
@@ -663,11 +675,13 @@ def _program_based_overlay_fallbacks(categories: list[str] | None = None) -> lis
                 'status': 'tracked',
                 'numerator_filters': {
                     'unique': 'person_id',
-                    'variable1': 'concept_name', 'value1': 'Neonatal resuscitation provided',
-                    'variable2': 'obs_value_coded', 'value2': ['Stimulation only', 'Bag and mask', 'Yes'],
+                    'variable1': 'mnid_newborn_asphyxia_resuscitated', 'value1': 'Yes',
                 },
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Neonatal resuscitation provided'},
-                'note': 'Tracked with the available resuscitation-method denominator pending an eligibility-specific source field.',
+                'denominator_filters': {
+                    'unique': 'person_id',
+                    'variable1': 'mnid_newborn_birth_asphyxia', 'value1': 'Yes',
+                },
+                'note': 'Numerator: babies with birth asphyxia who received resuscitation. Denominator: all babies with birth asphyxia diagnosis.',
             },
             {
                 'id': 'mnid_nb_pdf_002',
@@ -789,14 +803,16 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
             'numerator_filters': {
                 'unique': 'person_id',
                 'variable1': 'Service_Area', 'value1': 'ANC',
-                'variable2': 'concept_name', 'value2': 'Gestational age recorded',
-                'variable3': 'obs_value_coded', 'value3': 'GA by ultrasound',
+                'variable2': 'new_revisit', 'value2': 'New',
+                'variable3': 'concept_name', 'value3': 'Gestational age recorded',
+                'variable4': 'obs_value_coded', 'value4': 'GA by ultrasound',
             },
             'denominator_filters': {
                 'unique': 'person_id',
                 'variable1': 'Service_Area', 'value1': 'ANC',
+                'variable2': 'new_revisit', 'value2': 'New',
             },
-            'note': 'Tracked with a proxy numerator for gestational age recorded by ultrasound in ANC.',
+            'note': 'Restricted to first ANC visits. Numerator: gestational age recorded by ultrasound. Denominator: all first ANC visits.',
         },
         'HIV-tested and screened for anaemia and high blood pressure': {
             'status': 'tracked',
@@ -814,14 +830,13 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
             'status': 'tracked',
             'numerator_filters': {
                 'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Neonatal resuscitation provided',
-                'variable2': 'obs_value_coded', 'value2': ['Stimulation only', 'Bag and mask', 'Yes'],
+                'variable1': 'mnid_newborn_asphyxia_resuscitated', 'value1': 'Yes',
             },
             'denominator_filters': {
                 'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Neonatal resuscitation provided',
+                'variable1': 'mnid_newborn_birth_asphyxia', 'value1': 'Yes',
             },
-            'note': 'Tracked with the available resuscitation-method denominator pending an eligibility-specific source field.',
+            'note': 'Numerator: babies with birth asphyxia who received resuscitation. Denominator: all babies with birth asphyxia diagnosis.',
         },
         'ANC 2+ tetanus doses': {
             'status': 'tracked',
@@ -883,16 +898,17 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
             'note': 'Tracked with a labour-management proxy using documented partograph use until a fuller guideline bundle is exposed in reports data.',
         },
         'Digital intrapartum monitoring in labour': {
-            'status': 'tracked',
+            'status': 'awaiting_baseline',
             'numerator_filters': {
                 'unique': 'person_id',
-                'variable1': 'mnid_labour_partograph_used', 'value1': 'Yes',
+                'variable1': 'concept_name', 'value1': 'Digital intrapartum monitoring',
+                'variable2': 'obs_value_coded', 'value2': 'Used',
             },
             'denominator_filters': {
                 'unique': 'person_id',
                 'variable1': 'Service_Area', 'value1': 'Labour',
             },
-            'note': 'Tracked with a partograph-use proxy from labour summary observations in MAHIS.',
+            'note': 'Awaiting a dedicated electronic fetal monitoring concept (CTG / Moyo device) in MAHIS. Partograph use is already tracked under quality intrapartum care.',
         },
         'Eligible women with pre-term labour who received antenatal corticosteroids': {
             'status': 'tracked',
@@ -5407,47 +5423,47 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
             'variable1': 'concept_name',
             'value1': '__mnid_unavailable__',
         }
+        _unavail = {'unique': 'person_id', 'variable1': 'concept_name', 'value1': '__mnid_unavailable__'}
         wf_inds = [
             {
                 'label': 'SSNC competency assessed',
                 'target_pct': 80,
-                'numerator_filters': dict(zero_filters),
-                'denominator_filters': dict(zero_filters),
+                'numerator_filters': dict(_unavail),
+                'denominator_filters': dict(_unavail),
             },
         ]
         supply_inds = [
             {
                 'label': 'CPAP equipment available',
                 'target_pct': 80,
-                'numerator_filters': dict(zero_filters),
-                'denominator_filters': dict(zero_filters),
+                'numerator_filters': dict(_unavail),
+                'denominator_filters': dict(_unavail),
             },
             {
                 'label': 'Phototherapy unit available',
                 'target_pct': 80,
-                'numerator_filters': dict(zero_filters),
-                'denominator_filters': dict(zero_filters),
+                'numerator_filters': dict(_unavail),
+                'denominator_filters': dict(_unavail),
             },
             {
                 'label': 'Neonatal resuscitation equipment available',
                 'target_pct': 80,
-                'numerator_filters': dict(zero_filters),
-                'denominator_filters': dict(zero_filters),
+                'numerator_filters': dict(_unavail),
+                'denominator_filters': dict(_unavail),
             },
         ]
-        dq_inds = []
         dq_inds = [
             {
                 'label': 'Record completeness',
                 'target_pct': 95,
-                'numerator_filters': dict(zero_filters),
-                'denominator_filters': dict(zero_filters),
+                'numerator_filters': dict(_unavail),
+                'denominator_filters': dict(_unavail),
             },
             {
                 'label': 'Data entered within 7 days',
                 'target_pct': 90,
-                'numerator_filters': dict(zero_filters),
-                'denominator_filters': dict(zero_filters),
+                'numerator_filters': dict(_unavail),
+                'denominator_filters': dict(_unavail),
             },
         ]
     hero_title = 'KEY NEONATAL INDICATORS' if dashboard_theme == 'newborn' else f'KEY {_CAT_LABELS.get(default_cat, str(default_cat or "Program")).upper()} INDICATORS'

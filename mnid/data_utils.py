@@ -286,6 +286,30 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
         ),
     )
     _assign_flag(
+        'mnid_newborn_birth_asphyxia',
+        newborn_mask & (
+            # Primary signal: explicit asphyxia-suspected concept = Yes
+            (concept.eq('Birth asphyxia suspected') & combined_lower.eq('yes'))
+            # Secondary: other diagnosis concepts containing 'asphyxia' with a non-No value
+            | (concept.isin(['Known medical condition', 'Primary diagnosis', 'Secondary diagnosis',
+                             'Presenting complaint', 'Neonatal admission diagnosis', 'Diagnosis'])
+               & combined_lower.str.contains('asphyxia', na=False)
+               & ~combined_lower.isin(['no', 'none', '']))
+        ),
+    )
+    _assign_flag(
+        'mnid_newborn_resuscitation_given',
+        newborn_mask & (
+            concept.isin(['Neonatal resuscitation provided'])
+            & combined_lower.isin([
+                'yes', 'stimulation only', 'bag and mask',
+                'suctioning', 'oxygen',
+                'cardio pulmonary resuscitation (cpr)',
+            ])
+            & ~combined_lower.isin(['none', 'unknown', ''])
+        ),
+    )
+    _assign_flag(
         'mnid_newborn_sepsis',
         newborn_mask & (
             concept.isin(['Neonatal Sepsis - Early Onset', 'Neonatal Sepsis - Late Onset'])
@@ -341,6 +365,10 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
     person_ctx['mnid_labour_pph_bundle_received'] = (
         _ctx_series('mnid_labour_pph').eq('Yes')
         & _ctx_series('mnid_labour_pph_bundle_proxy').eq('Yes')
+    ).map({True: 'Yes', False: ''})
+    person_ctx['mnid_newborn_asphyxia_resuscitated'] = (
+        _ctx_series('mnid_newborn_birth_asphyxia').eq('Yes')
+        & _ctx_series('mnid_newborn_resuscitation_given').eq('Yes')
     ).map({True: 'Yes', False: ''})
     person_ctx['mnid_newborn_jaundice_phototherapy'] = (
         _ctx_series('mnid_newborn_jaundice').eq('Yes')

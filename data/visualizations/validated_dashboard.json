@@ -3856,36 +3856,54 @@
           "label": "EmONC competency assessed",
           "target_count": 500,
           "target_pct": 80,
-          "status": "tracked",
+          "status": "awaiting_baseline",
           "numerator_filters": {
             "unique": "person_id",
-            "variable1": "mnid_anc_bp_screened",
-            "value1": "Yes"
+            "variable1": "concept_name",
+            "value1": "__mnid_unavailable__"
           },
           "denominator_filters": {
             "unique": "person_id",
-            "variable1": "Service_Area",
-            "value1": "ANC"
+            "variable1": "concept_name",
+            "value1": "__mnid_unavailable__"
           },
-          "note": "Proxy readiness indicator derived from ANC clients with blood-pressure monitoring documented."
+          "note": "Awaiting competency assessment records from MAHIS workforce module."
         }
       ],
       "supply_indicators": [
         {
           "id": "mnid_sc_001",
           "label": "Essential medicine availability",
-          "status": "tracked",
+          "target_pct": 80,
+          "status": "awaiting_baseline",
           "numerator_filters": {
             "unique": "person_id",
             "variable1": "concept_name",
-            "value1": "Fetal heart rate"
+            "value1": "__mnid_unavailable__"
           },
           "denominator_filters": {
             "unique": "person_id",
-            "variable1": "Service_Area",
-            "value1": "Labour"
+            "variable1": "concept_name",
+            "value1": "__mnid_unavailable__"
           },
-          "note": "Proxy readiness indicator derived from labour records with fetal-heart monitoring documented."
+          "note": "Awaiting stock availability records from MAHIS supply chain module."
+        },
+        {
+          "id": "mnid_sc_002",
+          "label": "Pulse oximeter available",
+          "target_pct": 80,
+          "status": "awaiting_baseline",
+          "numerator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "__mnid_unavailable__"
+          },
+          "denominator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "__mnid_unavailable__"
+          },
+          "note": "Awaiting equipment availability records from MAHIS supply chain module."
         }
       ],
       "data_quality_indicators": [
@@ -3893,35 +3911,35 @@
           "id": "mnid_dq_001",
           "label": "Record completeness",
           "target_pct": 95,
-          "status": "tracked",
+          "status": "awaiting_baseline",
           "numerator_filters": {
             "unique": "person_id",
             "variable1": "concept_name",
-            "value1": "Postnatal check period"
+            "value1": "__mnid_unavailable__"
           },
           "denominator_filters": {
             "unique": "person_id",
-            "variable1": "Service_Area",
-            "value1": "PNC"
+            "variable1": "concept_name",
+            "value1": "__mnid_unavailable__"
           },
-          "note": "Proxy documentation/readiness indicator derived from PNC records with postnatal timing captured."
+          "note": "Awaiting a data completeness field in the MAHIS extract."
         },
         {
           "id": "mnid_dq_002",
           "label": "Data entered within 7 days",
           "target_pct": 90,
-          "status": "tracked",
+          "status": "awaiting_baseline",
           "numerator_filters": {
             "unique": "person_id",
             "variable1": "concept_name",
-            "value1": "Status of the mother"
+            "value1": "__mnid_unavailable__"
           },
           "denominator_filters": {
             "unique": "person_id",
-            "variable1": "Service_Area",
-            "value1": "PNC"
+            "variable1": "concept_name",
+            "value1": "__mnid_unavailable__"
           },
-          "note": "Proxy documentation indicator derived from PNC records with maternal outcome status captured."
+          "note": "Awaiting a data-entry timestamp field in the MAHIS extract."
         }
       ]
     },
