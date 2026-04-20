@@ -151,7 +151,10 @@
       "date_updated": "2026-03-20",
       "updated_by": "admin",
       "page_name": "labour_and_delivery_fixed_v2",
-      "archived": "False"
+      "archived": "False",
+      "programs": [
+        "LABOUR AND DELIVERY PROGRAM"
+      ]
     },
     {
       "report_id": 13,
@@ -161,7 +164,10 @@
       "date_updated": "2026-03-20",
       "updated_by": "admin",
       "page_name": "pnc_fixed_v2",
-      "archived": "False"
+      "archived": "False",
+      "programs": [
+        "PNC PROGRAM"
+      ]
     },
     {
       "report_id": 14,
@@ -171,7 +177,10 @@
       "date_updated": "2026-03-20",
       "updated_by": "admin",
       "page_name": "anc_fixed",
-      "archived": "False"
+      "archived": "False",
+      "programs": [
+        "ANC PROGRAM"
+      ]
     },
     {
       "report_id": 12,
