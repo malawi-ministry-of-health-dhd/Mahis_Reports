@@ -38,18 +38,30 @@ class DataStorage:
         )
         if df is not None and not df.empty:
             df.to_parquet(self.filepath, index=False)
+            DataStorage.invalidate_query_cache()
             logging.info(f"Data saved to {self.filepath} (Parquet format)")
         else:
             logging.warning("No data fetched from database.")
 
     @staticmethod
     def query_duckdb(sql: str) -> pd.DataFrame:
-        """
-        Cached DuckDB query.
-        Cache key is the SQL string itself.
-        """
+        return DataStorage._cached_query(sql).copy()
+
+    @staticmethod
+    @lru_cache(maxsize=32)
+    def _cached_query(sql: str) -> pd.DataFrame:
         logging.debug("DuckDB cache miss")
         return duckdb.query(sql).df()
+
+    @staticmethod
+    def invalidate_query_cache():
+        DataStorage._cached_query.cache_clear()
+        try:
+            from pages.home import _mnid_full_data_cache, _mnid_disk_cache
+            _mnid_full_data_cache.clear()
+            _mnid_disk_cache.clear()
+        except Exception:
+            pass
 
     def load_data(self):
         """Load data from Parquet and clean it."""

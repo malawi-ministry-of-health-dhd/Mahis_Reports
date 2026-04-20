@@ -1,3 +1,4 @@
+import diskcache
 import dash
 from dash import html, dcc, Input, Output, callback, State, no_update, ALL, callback_context
 import pandas as pd
@@ -40,6 +41,13 @@ dash.register_page(__name__, path="/home")
 
 path = os.getcwd()
 json_path = os.path.join(path, 'data', 'visualizations', 'validated_dashboard.json')
+
+# Shared cross-process cache for MNID prepared DataFrames.
+# Uses diskcache so data persists across background callback worker processes.
+_mnid_disk_cache = diskcache.Cache('./cache/mnid')
+
+# In-process fallback (used when background=False or within same worker)
+_mnid_full_data_cache: dict = {}
 
 def load_dashboard_menu():
     try:
@@ -484,8 +492,8 @@ def update_menu(interval, color):
     [
         Input('dashboard-btn-generate', 'n_clicks'),
         Input('dashboard-interval-update-today', 'n_intervals'),
-        Input('dashboard-date-range-picker', 'start_date'), # New: Update when dates settle
-        Input('dashboard-date-range-picker', 'end_date'),   # New: Update when dates settle
+        Input('dashboard-date-range-picker', 'start_date'),
+        Input('dashboard-date-range-picker', 'end_date'),
         Input('dashboard-level-filter', 'value'),
         Input('dashboard-district-filter', 'value'),
         Input('dashboard-facility-filter', 'value'),
@@ -497,7 +505,7 @@ def update_menu(interval, color):
         State('url-params-store', 'data'),
         State('dashboard-age-filter', 'value'),
         State('active-button-store', 'data')
-    ]
+    ],
 )
 def update_dashboard(gen, interval, start_date, end_date, level, districts, facilities, overview, category, menu_clicks, urlparams, age, current_active):
     try:
@@ -592,7 +600,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         data[DATE_] = data[DATE_].dt.normalize()
 
         today = dt.today().date()
-        data["months"] = data["DateValue"].apply(lambda d: (today - d).days // 30)
+        data["months"] = ((pd.Timestamp(today) - pd.to_datetime(data["DateValue"])).dt.days // 30).clip(lower=0)
 
         # get user
         user_data_path = os.path.join(path, 'data', 'users_data.csv')
@@ -733,7 +741,41 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
 
             # MNID uses unfiltered data paths; non-MNID uses Encounter-pre-filtered paths.
             _fdata = filtered_data_mnid if is_mnid else filtered_data
-            _ndata = network_data_mnid if is_mnid else network_data
+            if is_mnid:
+                # Use full parquet (no date filter) as the MNID network baseline so that
+                # _prepare_mnid_dataframe is cached once and not re-run on every date change.
+                _mnid_scope_key = (
+                    level,
+                    tuple(sorted(districts or [])),
+                    tuple(sorted(facilities or [])),
+                )
+                _disk_key = f"mnid_full_{'_'.join(str(k) for k in _mnid_scope_key)}"
+                if _mnid_scope_key in _mnid_full_data_cache:
+                    _ndata = _mnid_full_data_cache[_mnid_scope_key]
+                elif _disk_key in _mnid_disk_cache:
+                    _ndata = _mnid_disk_cache[_disk_key]
+                    _mnid_full_data_cache[_mnid_scope_key] = _ndata
+                else:
+                    _mnid_cols = ', '.join([
+                        'person_id', 'encounter_id', 'Date', 'Program', 'Reporting_Program',
+                        'Service_Area', 'Facility', 'Facility_CODE', 'District', 'Encounter',
+                        'obs_value_coded', 'concept_name', 'Value', 'ValueN', 'new_revisit',
+                        'Home_district', 'TA', 'Village', 'Age', 'Age_Group', 'Gender',
+                        'Source_Program',
+                    ])
+                    _sql_full = f"SELECT {_mnid_cols} FROM 'data/{DATA_FILE_NAME_}'"
+                    _full = DataStorage.query_duckdb(_sql_full)
+                    _full[DATE_] = pd.to_datetime(_full[DATE_], errors='coerce')
+                    if level != 'National' and district_col and districts:
+                        _full = _full[_full[district_col].isin(districts)]
+                    if level == 'Facility' and facilities:
+                        _full = _full[_full[FACILITY_].isin(facilities)]
+                    _mnid_full_data_cache.clear()
+                    _mnid_full_data_cache[_mnid_scope_key] = _full
+                    _mnid_disk_cache.set(_disk_key, _full, expire=3600)
+                    _ndata = _full
+            else:
+                _ndata = network_data
 
             filtered_data_date = _fdata[
                 (_fdata[DATE_] >= start_dt) &
