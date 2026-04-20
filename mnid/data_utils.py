@@ -20,15 +20,36 @@ _PROGRAM_SERVICE_AREA_MAP = {
     'NEONATAL PROGRAM': 'Newborn',
 }
 
+_SERVICE_AREA_ALIASES = {
+    'ANC': 'ANC',
+    'ANC PROGRAM': 'ANC',
+    'LABOUR': 'Labour',
+    'LABOUR AND DELIVERY PROGRAM': 'Labour',
+    'PNC': 'PNC',
+    'PNC PROGRAM': 'PNC',
+    'NEONATAL': 'Newborn',
+    'NEONATAL PROGRAM': 'Newborn',
+    'NEWBORN': 'Newborn',
+}
+
 _CONCEPT_ALIASES = {
     'VItamin K Given?': 'Vitamin K given',
     'Vitamin K given?': 'Vitamin K given',
+    'HIV test': 'HIV Test',
+    'MRDT': 'mRDT results',
+    'Hemoglobin': 'Hb(g/dL)',
+    'Mother VDRL/Syphilis result': 'Syphilis Test Result',
+    'Gestation weeks': 'Gestation in weeks',
     'Resuscitation method': 'Neonatal resuscitation provided',
+    'Resuscitation attempt': 'Neonatal resuscitation provided',
     'Resuscitation Type': 'Neonatal resuscitation provided',
     'Type of resuscitation': 'Neonatal resuscitation provided',
     'Breast feeding in the first hour of birth': 'Breast feeding',
     'Gestation age to be used': 'Gestational age recorded',
     'Antenatal corticosteroids': 'Antenatal corticosteroids given',
+    'Jaundice': 'Clinical jaundice',
+    'Is the visit within': 'Postnatal check period',
+    'Date BCG given': 'Immunisation given',
 }
 
 _OBS_VALUE_ALIASES = {
@@ -66,6 +87,9 @@ def _derive_contextual_concepts(out: pd.DataFrame) -> pd.DataFrame:
 
     presenting_jaundice = concept_series.eq('Presenting complaint') & combined_value.str.fullmatch('jaundice', case=False, na=False)
     out.loc[presenting_jaundice, 'concept_name'] = 'Clinical jaundice'
+
+    oxygen_cpap = concept_series.eq('Oxygen Therapy') & combined_value.str.contains('cpap', case=False, na=False)
+    out.loc[oxygen_cpap, 'concept_name'] = 'CPAP support'
 
     return out
 
@@ -136,9 +160,10 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
     _assign_flag(
         'mnid_anc_hiv_test_done',
         anc_mask & (
-            concept.isin(['HIV Test', 'HIV status', 'HIV Positive'])
+            concept.isin(['HIV Test', 'HIV status', 'HIV Positive', 'Mother HIV Status', 'New HIV status'])
             | concept_lower.eq('hiv test')
-        ) & ~combined_lower.isin(['', 'not done', 'unknown']),
+            | concept_lower.str.contains('hiv', na=False)
+        ) & ~combined_lower.isin(['', 'not done', 'unknown', 'negative', 'non-reactive']),
     )
     _assign_flag(
         'mnid_anc_hb_screened',
@@ -168,7 +193,10 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
 
     _assign_flag(
         'mnid_labour_partograph_used',
-        labour_mask & concept.isin(['Was a partograph used', 'Was a partograph used?']) & combined_lower.eq('yes'),
+        labour_mask & (
+            (concept.isin(['Was a partograph used', 'Was a partograph used?']) & combined_lower.eq('yes'))
+            | concept_lower.str.contains('partograph', na=False)
+        ),
     )
     _assign_flag(
         'mnid_labour_preterm',
@@ -262,6 +290,14 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
             | concept_lower.str.contains('antibiotic', na=False)
             | combined_lower.str.contains('antibiotic', na=False)
         ),
+    )
+    _assign_flag(
+        'mnid_newborn_oxygen_available',
+        newborn_mask & concept.eq('Oxygen available at facility') & combined_lower.eq('yes'),
+    )
+    _assign_flag(
+        'mnid_newborn_can_measure_oxygen_saturation',
+        newborn_mask & concept.eq('Can measure oxygen saturation') & combined_lower.eq('yes'),
     )
     _assign_flag(
         'mnid_newborn_not_hypothermic_admission',
@@ -370,6 +406,13 @@ def _normalize_reporting_program(service_area: pd.Series) -> pd.Series:
     }).fillna('')
 
 
+def _canonicalize_service_area(series: pd.Series) -> pd.Series:
+    cleaned = series.fillna('').astype(str).str.strip()
+    upper = cleaned.str.upper()
+    mapped = upper.map(_SERVICE_AREA_ALIASES).fillna('')
+    return mapped.where(mapped.ne(''), cleaned)
+
+
 def _normalize_encounter(row: pd.Series) -> str:
     service_area = str(row.get('Service_Area') or '').strip()
     encounter = str(row.get('Encounter') or '').strip()
@@ -416,15 +459,17 @@ def _normalize_mnid_semantics(df: pd.DataFrame) -> pd.DataFrame:
 
     service_area = out.apply(_derive_service_area, axis=1)
     if 'Service_Area' in out.columns:
-        existing = out['Service_Area'].fillna('').astype(str).str.strip()
-        out['Service_Area'] = existing.where(existing.ne(''), service_area)
+        existing = _canonicalize_service_area(out['Service_Area'])
+        derived = _canonicalize_service_area(service_area)
+        out['Service_Area'] = existing.where(existing.ne(''), derived)
     else:
-        out['Service_Area'] = service_area
+        out['Service_Area'] = _canonicalize_service_area(service_area)
 
     reporting_program = _normalize_reporting_program(out['Service_Area'])
     if 'Reporting_Program' in out.columns:
         existing = out['Reporting_Program'].fillna('').astype(str).str.strip()
-        out['Reporting_Program'] = existing.where(existing.ne(''), reporting_program)
+        existing_norm = _normalize_reporting_program(_canonicalize_service_area(existing))
+        out['Reporting_Program'] = existing_norm.where(existing_norm.ne(''), reporting_program)
     else:
         out['Reporting_Program'] = reporting_program
 
