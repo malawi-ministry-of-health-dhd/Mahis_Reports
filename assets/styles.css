@@ -213,7 +213,7 @@
 
 /* Counts */
 .metric-value {
-    font-size: 1.8rem;
+    font-size: 1.5rem;
     font-weight: bold;
     margin: 5px 0;
     color: #333;
@@ -221,7 +221,7 @@
 }
 
 .metric-title {
-    font-size: 1rem;
+    font-size: 0.8rem;
     color: #666;
     text-align: center;
 }

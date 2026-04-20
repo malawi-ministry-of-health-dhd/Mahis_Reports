@@ -77,6 +77,7 @@ PREMIUM_DASHBOARD_REPORTS = {"Maternal and Child Health"}
 def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json, filter_summary=None,
                            start_date=None, end_date=None, facility_code=None, scope_meta=None):
     config = dashboards_json
+    count_items_per_row = config.get("count_items_per_row") or 5
 
     # Route MNID dashboard configs to the dedicated MNID renderer.
     if config.get('dashboard_type') == 'mnid':
@@ -102,14 +103,11 @@ def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json, filt
 
     # Build metrics from counts section
     metrics = build_metrics_section(filtered, config["visualization_types"]["counts"])
-    charts  = build_charts_section(filtered, data_opd, delta_days,
-                                    config["visualization_types"]["charts"]["sections"])
-
-    # Build charts from sections
     charts = build_charts_section(filtered, data_opd, delta_days, config["visualization_types"]["charts"]["sections"])
 
     return html.Div([
-        html.Div(className="card-container-5", children=metrics),
+        html.Div(style={"display": "grid","gridTemplateColumns": f"repeat({count_items_per_row}, 1fr)",
+                        "gap": "15px", "marginBottom": "30px","overflowX": "auto"}, children=metrics),
         charts
     ])
 
@@ -564,6 +562,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                 """
         try:
             data = DataStorage.query_duckdb(SQL)
+            # data.to_excel("data/archive/hmis.xlsx")
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -590,7 +589,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                                                '{"label"=>"Female", "value"=>"F"}':"Female"})
         data["DateValue"] = pd.to_datetime(data[DATE_]).dt.date
         data['datetime'] = data[DATE_]
-        # data[DATE_] = pd.to_datetime(data[DATE_]).dt.date
+        data[DATE_] = data[DATE_].dt.normalize()
 
         today = dt.today().date()
         data["months"] = data["DateValue"].apply(lambda d: (today - d).days // 30)

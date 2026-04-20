@@ -10,7 +10,7 @@ from typing import List, Optional, Dict, Union, Callable
 import json
 import ast
 
-from config import PERSON_ID_, ENCOUNTER_ID_, DATE_
+from config import PERSON_ID_, ENCOUNTER_ID_, DATE_, CONCEPT_NAME_
 
 """
 MAIN USE CASE OF THIS FILE IS TO PROVIDE VISUALIZATION FUNCTIONS FOR PATIENT DATA
@@ -167,16 +167,18 @@ def _apply_filter(data, filter_col, filter_value):
 
     # Normalize: list, pipe-separated, stringified list...
     filter_value = _normalize_filter_value(filter_value)
+    filter_col = _normalize_filter_value(filter_col)
 
     if isinstance(filter_col, list):
+        if len(filter_col) >= 1:
+            # if not isinstance(filter_value, list) or len(filter_value) != len(filter_col):
+            #     raise ValueError("Multi-column filters require filter_value list same length as filter_col.")
+            if isinstance(filter_value, list):
+                for col, val in zip(filter_col, filter_value):
+                    # print(col, val)
+                    df = _apply_filter(df, col, val)
 
-        if len(filter_col) >= 2:
-            if not isinstance(filter_value, list) or len(filter_value) != len(filter_col):
-                raise ValueError("Multi-column filters require filter_value list same length as filter_col.")
-
-            for col, val in zip(filter_col, filter_value):
-                df = _apply_filter(df, col, val)
-            return df
+                return df
 
         filter_col = filter_col[0]  # reduce to single column
 
@@ -254,18 +256,26 @@ def create_count(df, aggregation='count', unique_column=PERSON_ID_, filter_col1=
                  filter_col8=None, filter_value8=None, filter_col9=None, filter_value9=None, 
                  filter_col10=None, filter_value10=None):
     data = df
+
+    filter_cols = [
+        filter_col1, filter_col2, filter_col3, filter_col4, filter_col5,
+        filter_col6, filter_col7, filter_col8, filter_col9, filter_col10
+    ]
+
+    filter_vals = [
+        filter_value1, filter_value2, filter_value3, filter_value4, filter_value5,
+        filter_value6, filter_value7, filter_value8, filter_value9, filter_value10
+    ]
+
+    data['defaulter_period'] = data[CONCEPT_NAME_] #for defaulters
     
+    data = data.copy()
     # Apply all filters using the helper function
-    data = _apply_filter(data, filter_col1, filter_value1)
-    data = _apply_filter(data, filter_col2, filter_value2)
-    data = _apply_filter(data, filter_col3, filter_value3)
-    data = _apply_filter(data, filter_col4, filter_value4)
-    data = _apply_filter(data, filter_col5, filter_value5)
-    data = _apply_filter(data, filter_col6, filter_value6)
-    data = _apply_filter(data, filter_col7, filter_value7)
-    data = _apply_filter(data, filter_col8, filter_value8)
-    data = _apply_filter(data, filter_col9, filter_value9)
-    data = _apply_filter(data, filter_col10, filter_value10)
+    for col, val in zip(filter_cols, filter_vals):
+        if col == "defaulter_period":
+            continue
+        else:
+            data = _apply_filter(data, col, val)
     
     # Remove duplicates based on unique_column and DATE_
     unique_visits = _prepare_data_for_visualization(data, unique_column)
@@ -299,15 +309,36 @@ def create_count(df, aggregation='count', unique_column=PERSON_ID_, filter_col1=
         if pd.isna(mean_val):
             return 0
         return int(mean_val)
-    
+    elif aggregation == 'defaulter_count':
+        df["start_date"] = pd.to_datetime(df["start_date"],errors='coerce')
+        df['value_datetime'] = pd.to_datetime(df['value_datetime'],errors='coerce')
+        df = df.dropna(subset=[DATE_, 'value_datetime'])
+        df_defaulted_ids = []
+        for col,val in zip(filter_cols, filter_vals):
+            try:
+                if col == "defaulter_period":
+                    default = df[df[col].isin(["Appointment date","Next scheduled visit","Return visit date"])]\
+                        .sort_values(by=[PERSON_ID_,DATE_]) #restart the filter
+                    default['Duration_to_visit'] = (
+                                    default['start_date'] - default["value_datetime"]
+                                ).dt.days
+                    # print(default[["Program","concept_name","value_datetime","Duration_to_visit","start_date"]])
+                    default = default[default['Duration_to_visit']>= val]
+                    ids = default[PERSON_ID_].unique().tolist()
+                    df_defaulted_ids.extend(ids)
+            except Exception as e:
+                print(e)
+                df_defaulted_ids = []
+        return len(df_defaulted_ids)
+
     elif aggregation in ['sum', 'mean', 'min', 'max', 'std', 'var']:
         return int(unique_visits[unique_column].agg(aggregation))
     else:
-        # Default to count
         return len(unique_visits[unique_column].dropna())
 
 def create_count_sets(
     df,
+    aggregation='count',
     unique_column=PERSON_ID_,
     filter_col1=None, filter_value1=None,
     filter_col2=None, filter_value2=None,
@@ -322,6 +353,7 @@ def create_count_sets(
 ):
 
     data = df.copy()
+    data['defaulter_period'] = data[CONCEPT_NAME_]
 
     filter_cols = [
         filter_col1, filter_col2, filter_col3, filter_col4, filter_col5,
@@ -332,57 +364,81 @@ def create_count_sets(
         filter_value1, filter_value2, filter_value3, filter_value4, filter_value5,
         filter_value6, filter_value7, filter_value8, filter_value9, filter_value10
     ]
-    
-    # identify set filters
-    set_vals = []
-    non_set_vals = []
-    for i in filter_vals:
-        val = _normalize_filter_value(i)
-        if isinstance(val, list):
-            set_vals.append(val)
+
+    #Identify set vs non-set filters ---
+    set_filters = []      # [(col_list, val_list)]
+    non_set_filters = []  # [(col, val)]
+
+    for col, val in zip(filter_cols, filter_vals):
+        col_norm = _normalize_filter_value(col)
+        val_norm = _normalize_filter_value(val)
+
+        if isinstance(col_norm, list) and isinstance(val_norm, list):
+            set_filters.append((col_norm, val_norm))
         else:
-            non_set_vals.append(val)
+            non_set_filters.append((col, val))
 
-    # lets start with set function for identification
-    if len(set_vals) < 2:
-        return "Error" #Error
-    else: #validate lengths
-        start_length = len(set_vals[0])
-        for l in set_vals:
-            if len(l) != start_length:
-                return "Error"
-    set_length = len(set_vals[0])
+    #Validate set lengths
+    if len(set_filters) < 1:
+        return "Error"
 
+    set_length = len(set_filters[0][0])
+    for cols, vals in set_filters:
+        if len(cols) != set_length or len(vals) != set_length:
+            return "Error"
+
+    #Build sets using ID-level filtering
     sets = []
-    for i in range(set_length):
-        df_f = data.copy()
-        for col, val in zip(filter_cols, filter_vals):
-            values = _normalize_filter_value(val)
-            if val in set_vals:
-                df_f = _apply_filter(df_f, col, values[i])
-                
-        ids = set(df_f[[unique_column, DATE_]]
-                .drop_duplicates()
-                .apply(tuple, axis=1))
-        sets.append(ids)
 
-    # intersection
+    for i in range(set_length):
+        ids_list = []
+
+        for cols, vals in set_filters:
+            col_i = cols[i]
+            val_i = vals[i]
+
+            temp_df = _apply_filter(data.copy(), col_i, val_i)
+            ids = set(temp_df[unique_column].drop_duplicates())
+
+            ids_list.append(ids)
+
+        # intersect IDs for this "i"
+        if ids_list:
+            combined_ids = set.intersection(*ids_list)
+        else:
+            combined_ids = set()
+
+        sets.append(combined_ids)
+
+    #Final intersection across all sets
     final_set = sets[0]
     for s in sets[1:]:
         final_set = final_set.intersection(s)
 
+    #Apply remaining filters
+    remaining_df = data[data[unique_column].isin(final_set)]
 
-    remaining_df = data[
-        data[[unique_column, DATE_]]
-        .apply(tuple, axis=1)
-        .isin(final_set)
-    ]
-    df_filtered = pd.DataFrame()
-    for col, val in zip(filter_cols, filter_vals):
-        if val in non_set_vals:
-            df_filtered = _apply_filter(remaining_df, col, val)
-    unique_visits = _prepare_data_for_visualization(df_filtered, unique_column)
-    return len(unique_visits)
+    df_filtered = remaining_df.copy()
+    defaulter_col = None
+    defaulter_value = None
+
+    for col, val in non_set_filters:
+        if col == "defaulter_period":
+            defaulter_col = col
+            defaulter_value = val
+        else:
+            df_filtered = _apply_filter(df_filtered, col, val)
+
+    # --- Prepare + aggregate ---
+    data_final = _prepare_data_for_visualization(df_filtered, unique_column)
+
+    return create_count(
+        data_final,
+        aggregation=aggregation,
+        filter_col1=defaulter_col,
+        filter_value1=defaulter_value
+    )
+
 
 def create_count_unique(df, unique_column=PERSON_ID_, filter_col1=None, filter_value1=None, filter_col2=None, filter_value2=None, 
                  filter_col3=None, filter_value3=None, filter_col4=None, filter_value4=None,

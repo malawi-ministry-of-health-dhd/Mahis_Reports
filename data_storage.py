@@ -34,7 +34,7 @@ class DataStorage:
             self.query,
             filename=self.filepath,
             date_column='Date',
-            batch_size=10000,
+            batch_size=50000,
         )
         if df is not None and not df.empty:
             df.to_parquet(self.filepath, index=False)

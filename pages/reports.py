@@ -361,19 +361,27 @@ def update_table(clicks,
         start_date, end_date = period_map.get(period_type, get_month_start_end)(
             month_filter, year_filter
         )
+
         # Convert once (avoid repeated conversions)
         data_dates = pd.to_datetime(data[DATE_])
         original_dates = pd.to_datetime(original_data[DATE_])
+
 
         filtered = data[
             (data_dates >= pd.to_datetime(start_date)) &
             (data_dates <= pd.to_datetime(end_date))
         ]
+        filtered["start_date"] = start_date
+        filtered["end_date"] = end_date
 
         original_data = original_data[original_dates <= pd.to_datetime(end_date)].copy()
-        original_data["days_before"] = original_data["DateValue"].apply(
+        original_data["start_date"] = start_date
+        original_data["end_date"] = end_date
+        
+        original_data["days_before_visit_date"] = original_data["start_date"].apply(
             lambda d: (start_date - d).days
         )
+
 
         spec_path = f"data/uploads/{report['page_name']}.xlsx"
         if not os.path.exists(spec_path):

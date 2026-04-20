@@ -573,7 +573,7 @@ def prepare_mnid_dataframe(df: pd.DataFrame | None) -> pd.DataFrame:
 
     mch_full.attrs.update(source_attrs)
     register_facility_metadata(mch_full)
-    return mch_full
+    return mch_full 
 
 
 def serialize_store_df(df: pd.DataFrame) -> list[dict]:
