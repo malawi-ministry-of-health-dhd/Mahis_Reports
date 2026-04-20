@@ -3,6 +3,7 @@ from dash import html, dcc
 import pandas as pd
 from helpers.visualizations import (create_column_chart, 
                           create_count,
+                          create_count_sets,
                           create_pie_chart,
                           create_line_chart,
                           create_age_gender_histogram,
@@ -35,15 +36,17 @@ def build_metrics_section(filtered, counts_config):
     metrics = []
     
     for count_config in counts_config:
-        metric = html.Div(
+        metric = html.Div(className=f'mnid-kpi', children=[
+        html.Div(style={'display': 'flex', 'justifyContent': 'space-between',
+                        'alignItems': 'flex-start', 'gap': '6px'}, children=[
             html.Div([
-                html.H2(
-                    create_count_from_config(filtered, count_config["filters"]), 
-                    className="metric-value"
-                ),
-                html.H4(count_config["name"], className="metric-title"),
-            ], className="card")
-        )
+                html.Div(count_config["name"], className='kpi-lbl'),
+                html.Div(create_count_from_config(filtered, count_config["filters"]), className='kpi-val'),
+                html.Div("",   className='kpi-sub'),
+            ]),
+            html.Div(),
+        ]),
+        html.Div()])
         metrics.append(metric) 
     
     return metrics
@@ -63,7 +66,7 @@ def parse_filter_value(filter_val):
                 return filter_val
         return filter_val
 
-def create_count_from_config(df, filters):
+def create_count_from_config(df, filters): 
     """Create count based on JSON filter configuration"""
 
     unique_col = filters.get("unique", "")
@@ -109,30 +112,35 @@ def create_count_from_config(df, filters):
     args = []
     for var, val in active_filters:
         args.extend([var, val])
-    return create_count(df,aggregation, unique_col, *args)
+    if aggregation == "count_set":
+        return create_count_sets(df,aggregation, unique_col, *args)
+    else:
+        return create_count(df,aggregation, unique_col, *args)
 
 def build_charts_section(filtered, data_opd, delta_days, sections_config):
     """Build chart sections from JSON configuration"""
     sections = []
     
     for section_config in sections_config:
+        chart_items_per_row = section_config.get('chart_items_per_row') or 3 #default number of charts per section
         section = html.Div([
             html.H2(section_config["section_name"], style={'textAlign': 'left', 'color': 'black'}),
-            build_section_items(filtered, data_opd, delta_days, section_config["items"])
+            build_section_items(filtered, data_opd, delta_days, section_config["items"], chart_items_per_row)
         ])
         sections.append(section)
     
     return html.Div(sections)
 
-def build_section_items(filtered, data_opd, delta_days, items_config):
+def build_section_items(filtered, data_opd, delta_days, items_config, chart_items_per_row):
     """Build individual chart items within a section"""
     items = []
     
     # Group items into pairs for card-container-2
-    for i in range(0, len(items_config), 3):
-        pair_items = items_config[i:i+3]
+    for i in range(0, len(items_config), chart_items_per_row):
+        pair_items = items_config[i:i+chart_items_per_row]
         card_container = html.Div(
-            className="card-container-3",
+            style={"display": "grid","gridTemplateColumns": f"repeat({chart_items_per_row}, 1fr)",
+                        "gap": "15px", "marginBottom": "30px","overflowX": "auto"},
             children=[
                 build_single_chart(filtered, data_opd, delta_days, item_config)
                 for item_config in pair_items

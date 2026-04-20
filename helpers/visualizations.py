@@ -334,7 +334,6 @@ def create_count(df, aggregation='count', unique_column=PERSON_ID_, filter_col1=
     elif aggregation in ['sum', 'mean', 'min', 'max', 'std', 'var']:
         return int(unique_visits[unique_column].agg(aggregation))
     else:
-        # Default to count
         return len(unique_visits[unique_column].dropna())
 
 def create_count_sets(

@@ -51,7 +51,6 @@ def prepare_mnid_dataframe(df: pd.DataFrame | None) -> pd.DataFrame:
     """Normalise the live shared MAHIS dataframe used across MNID sections."""
     if df is None:
         return pd.DataFrame()
-
     mch_full = df.copy()
     program_col = 'Reporting_Program' if 'Reporting_Program' in mch_full.columns else 'Program'
     if program_col in mch_full.columns:
@@ -66,7 +65,7 @@ def prepare_mnid_dataframe(df: pd.DataFrame | None) -> pd.DataFrame:
         mch_full['Date'] = pd.to_datetime(mch_full['Date'], errors='coerce')
 
     register_facility_metadata(mch_full)
-    return mch_full
+    return mch_full 
 
 
 def serialize_store_df(df: pd.DataFrame) -> list[dict]:
