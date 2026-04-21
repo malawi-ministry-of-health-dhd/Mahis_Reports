@@ -2,6 +2,7 @@
 
 import json
 import re
+import numpy as np
 import pandas as pd
 
 from .constants import (
@@ -417,6 +418,26 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
     return merged.merge(person_ctx, on='person_id', how='left')
 
 
+def _derive_service_area_vectorized(df: pd.DataFrame) -> pd.Series:
+    program = df['Program'].fillna('').astype(str).str.strip().str.upper() if 'Program' in df.columns else pd.Series('', index=df.index)
+    encounter = df['Encounter'].fillna('').astype(str).str.strip().str.upper() if 'Encounter' in df.columns else pd.Series('', index=df.index)
+
+    from_program = program.map(_PROGRAM_SERVICE_AREA_MAP).fillna('')
+    enc_newborn = encounter.str.contains('NEONATAL', na=False)
+    enc_pnc     = encounter.str.contains('PNC|POSTNATAL', na=False)
+    enc_labour  = encounter.str.contains('LABOUR|DELIVERY|BIRTH', na=False)
+    enc_anc     = encounter.str.contains('ANC|PREGNANCY|OBSTETRIC', na=False)
+
+    return pd.Series(
+        np.select(
+            [from_program.ne(''), enc_newborn, enc_pnc, enc_labour, enc_anc],
+            [from_program,        'Newborn',   'PNC',   'Labour',   'ANC'],
+            default='',
+        ),
+        index=df.index,
+    )
+
+
 def _derive_service_area(row: pd.Series) -> str:
     program = str(row.get('Program') or '').strip().upper()
     encounter = str(row.get('Encounter') or '').strip().upper()
@@ -448,6 +469,14 @@ def _canonicalize_service_area(series: pd.Series) -> pd.Series:
     upper = cleaned.str.upper()
     mapped = upper.map(_SERVICE_AREA_ALIASES).fillna('')
     return mapped.where(mapped.ne(''), cleaned)
+
+
+_ENCOUNTER_LABEL_MAP = {
+    'ANC': 'ANC VISIT',
+    'Labour': 'LABOUR AND DELIVERY',
+    'PNC': 'POSTNATAL CARE',
+    'Newborn': 'NEONATAL CARE',
+}
 
 
 def _normalize_encounter(row: pd.Series) -> str:
@@ -494,7 +523,7 @@ def _normalize_mnid_semantics(df: pd.DataFrame) -> pd.DataFrame:
 
     out = _derive_contextual_concepts(out)
 
-    service_area = out.apply(_derive_service_area, axis=1)
+    service_area = _derive_service_area_vectorized(out)
     if 'Service_Area' in out.columns:
         existing = _canonicalize_service_area(out['Service_Area'])
         derived = _canonicalize_service_area(service_area)
@@ -512,7 +541,8 @@ def _normalize_mnid_semantics(df: pd.DataFrame) -> pd.DataFrame:
 
     if 'Encounter' in out.columns:
         out['Encounter_Source'] = out['Encounter']
-        out['Encounter'] = out.apply(_normalize_encounter, axis=1)
+        mapped_enc = out['Service_Area'].map(_ENCOUNTER_LABEL_MAP)
+        out['Encounter'] = mapped_enc.where(mapped_enc.notna(), out['Encounter'])
 
     return _derive_person_level_context(out)
 
@@ -522,34 +552,53 @@ def register_facility_metadata(df: pd.DataFrame) -> None:
     if df is None or df.empty:
         return
 
+    def _clean(s: pd.Series) -> pd.Series:
+        return s.fillna('').astype(str).str.strip()
+
     if {'Facility_CODE', 'Facility'}.issubset(df.columns):
         fac_meta = df[['Facility_CODE', 'Facility']].dropna().drop_duplicates()
-        for row in fac_meta.itertuples(index=False):
-            code = str(row.Facility_CODE).strip()
-            name = str(row.Facility).strip()
-            if code and name:
-                FACILITY_NAMES[code] = name
-                if code not in ALL_FACILITIES:
-                    ALL_FACILITIES.append(code)
+        codes = _clean(fac_meta['Facility_CODE'])
+        names = _clean(fac_meta['Facility'])
+        valid = codes.ne('') & names.ne('')
+        new_map = dict(zip(codes[valid], names[valid]))
+        FACILITY_NAMES.update(new_map)
+        for code in new_map:
+            if code not in ALL_FACILITIES:
+                ALL_FACILITIES.append(code)
 
     if {'Facility_CODE', 'District'}.issubset(df.columns):
         dist_meta = df[['Facility_CODE', 'District']].dropna().drop_duplicates()
-        for row in dist_meta.itertuples(index=False):
-            code = str(row.Facility_CODE).strip()
-            district = str(row.District).strip()
-            if code and district:
-                FACILITY_DISTRICT[code] = district
-                if district not in ALL_DISTRICTS:
-                    ALL_DISTRICTS.append(district)
+        codes = _clean(dist_meta['Facility_CODE'])
+        districts = _clean(dist_meta['District'])
+        valid = codes.ne('') & districts.ne('')
+        new_dist = dict(zip(codes[valid], districts[valid]))
+        FACILITY_DISTRICT.update(new_dist)
+        for district in new_dist.values():
+            if district not in ALL_DISTRICTS:
+                ALL_DISTRICTS.append(district)
 
     if {'Facility_CODE', 'Facility', 'District'}.issubset(df.columns):
         combo = df[['Facility_CODE', 'Facility', 'District']].dropna().drop_duplicates()
-        for row in combo.itertuples(index=False):
-            code = str(row.Facility_CODE).strip()
-            name = str(row.Facility).strip()
-            district = str(row.District).strip()
+        codes = _clean(combo['Facility_CODE'])
+        names = _clean(combo['Facility'])
+        dists = _clean(combo['District'])
+        for code, name, district in zip(codes, names, dists):
             if code:
                 FACILITY_COORDS.setdefault(code, (None, None, name or code, district))
+
+
+_MCH_PATTERN = 'Maternal|Child|Neonatal|Newborn'
+_MCH_PROGRAMS = frozenset([
+    'ANC PROGRAM', 'LABOUR AND DELIVERY PROGRAM', 'PNC PROGRAM',
+    'NEONATAL PROGRAM', 'MATERNAL AND CHILD HEALTH',
+])
+_MNID_COLUMNS = [
+    'person_id', 'encounter_id', 'Date', 'Program', 'Reporting_Program',
+    'Service_Area', 'Facility', 'Facility_CODE', 'District', 'Encounter',
+    'obs_value_coded', 'concept_name', 'Value', 'ValueN', 'new_revisit',
+    'Home_district', 'TA', 'Village', 'Age', 'Age_Group', 'Gender',
+    'Source_Program',
+]
 
 
 def prepare_mnid_dataframe(df: pd.DataFrame | None) -> pd.DataFrame:
@@ -558,12 +607,33 @@ def prepare_mnid_dataframe(df: pd.DataFrame | None) -> pd.DataFrame:
         return pd.DataFrame()
 
     source_attrs = dict(getattr(df, 'attrs', {}) or {})
+
+    # Drop columns not used by MNID before the expensive normalization pass.
+    keep = [c for c in _MNID_COLUMNS if c in df.columns]
+    if keep:
+        df = df[keep]
+
+    # Pre-filter to MCH rows *before* running the expensive normalization so
+    # _derive_person_level_context works on ~7k rows instead of 248k.
+    # Use exact program names (from raw parquet) not a text pattern — the pattern
+    # 'Maternal|Child|Neonatal|Newborn' misses 'ANC PROGRAM', 'LABOUR AND DELIVERY PROGRAM' etc.
+    _pc = 'Program' if 'Program' in df.columns else ('Reporting_Program' if 'Reporting_Program' in df.columns else None)
+    if _pc:
+        _mch_mask = df[_pc].fillna('').str.upper().isin(_MCH_PROGRAMS)
+        if _mch_mask.any():
+            df = df[_mch_mask]
+
+    if df.empty:
+        empty = pd.DataFrame()
+        empty.attrs.update(source_attrs)
+        return empty
+
     mch_full = _normalize_mnid_semantics(df)
     program_col = 'Reporting_Program' if 'Reporting_Program' in mch_full.columns else 'Program'
     if program_col in mch_full.columns:
         mch_full = mch_full[
             mch_full[program_col].fillna('').str.contains(
-                'Maternal|Child|Neonatal|Newborn',
+                _MCH_PATTERN,
                 case=False,
                 na=False,
             )
@@ -573,7 +643,7 @@ def prepare_mnid_dataframe(df: pd.DataFrame | None) -> pd.DataFrame:
 
     mch_full.attrs.update(source_attrs)
     register_facility_metadata(mch_full)
-    return mch_full 
+    return mch_full
 
 
 def serialize_store_df(df: pd.DataFrame) -> list[dict]:

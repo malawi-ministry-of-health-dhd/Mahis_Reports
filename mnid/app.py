@@ -70,11 +70,10 @@ def _cov(df, n_cfg, d_cfg):
 def _monthly(df, n_cfg, d_cfg, n=6):
     if 'Date' not in df.columns or not len(df): return []
     try:
-        d2 = df.copy()
-        d2['_m'] = pd.to_datetime(d2['Date']).dt.to_period('M')
-        months = sorted(d2['_m'].unique())[-n:]
+        periods = pd.to_datetime(df['Date'], errors='coerce').dt.to_period('M')
+        months = sorted(periods.dropna().unique())[-n:]
         return [{'x': datetime(m.year, m.month, 1),
-                 'pct': _cov(d2[d2['_m'] == m], n_cfg, d_cfg)[2]}
+                 'pct': _cov(df[periods == m], n_cfg, d_cfg)[2]}
                 for m in months]
     except: return []
 
@@ -5370,13 +5369,45 @@ def _section_anchor(anchor_id):
 
 # MNID dashboard entry point
 
+_network_df_cache: dict = {}
+
+
 def render_mnid_dashboard(filtered, data_opd, delta_days, config,
                           facility_code, start_date, end_date,
                           scope_meta: dict | None = None):
-    facility_df = _prepare_mnid_dataframe(filtered)
-    network_df = _prepare_mnid_dataframe(data_opd)
+    _opd_key = (len(data_opd), tuple(data_opd.columns.tolist()) if not data_opd.empty else ())
+    if _opd_key not in _network_df_cache:
+        _network_df_cache.clear()
+        _network_df_cache[_opd_key] = _prepare_mnid_dataframe(data_opd)
+    network_df = _network_df_cache[_opd_key]
+
+    # Derive facility_df by filtering the already-prepared network_df instead of re-running
+    # the expensive _prepare_mnid_dataframe on every date change.
+    facility_df = network_df
+    if start_date and 'Date' in network_df.columns and not network_df.empty:
+        try:
+            s = pd.to_datetime(start_date)
+            e = pd.to_datetime(end_date) if end_date else network_df['Date'].max()
+            date_mask = (network_df['Date'] >= s) & (network_df['Date'] <= e)
+            facility_df = network_df[date_mask]
+        except Exception:
+            facility_df = network_df
+    selected_facilities = (scope_meta or {}).get('selected_facilities') or []
+    selected_districts  = (scope_meta or {}).get('selected_districts') or []
+    if selected_facilities and 'Facility' in facility_df.columns:
+        fac_filtered = facility_df[facility_df['Facility'].isin(selected_facilities)]
+        if not fac_filtered.empty:
+            facility_df = fac_filtered
+    elif selected_districts and 'District' in facility_df.columns:
+        dist_filtered = facility_df[facility_df['District'].isin(selected_districts)]
+        if not dist_filtered.empty:
+            facility_df = dist_filtered
+    if facility_df.empty and not network_df.empty:
+        facility_df = network_df
+
     selected_program = (scope_meta or {}).get('mnid_categories')
     selected_program = selected_program[0] if selected_program else 'All'
+    facility_df = facility_df.copy()
     facility_df.attrs['mnid_program'] = selected_program
     network_df.attrs['mnid_program'] = selected_program
     if network_df.empty:
@@ -5390,12 +5421,17 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     period      = f'{start_date} to {end_date}'
 
     requested_categories = (scope_meta or {}).get('mnid_categories')
+    config_categories = config.get('mnid_categories')
+    if config_categories:
+        effective_categories = [c for c in (requested_categories or []) if c in config_categories] or config_categories
+    else:
+        effective_categories = requested_categories
     all_inds = _resolve_runtime_mnid_indicators(
         all_inds,
         network_df if len(network_df) else facility_df,
-        requested_categories or config.get('mnid_categories'),
+        effective_categories,
     )
-    category_order = _resolve_category_order(all_inds, requested_categories or config.get('mnid_categories'))
+    category_order = _resolve_category_order(all_inds, effective_categories)
     if category_order:
         allowed = set(category_order)
         all_inds = [i for i in all_inds if i.get('category') in allowed]
