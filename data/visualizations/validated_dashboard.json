@@ -10,7 +10,7 @@
           "name": "All Attendance",
           "level": "facility",
           "filters": {
-            "measure": "countx",
+            "measure": "count",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [],
@@ -308,7 +308,7 @@
                   "measure": "nunique",
                   "unique": "any",
                   "duration_default": "7days",
-                  "title": "Daily OPD Attendance - Last 7 Days",
+                  "title": "Daily Patient Attendance - Last 7 Days",
                   "unique_column": "person_id",
                   "filter_col1": [],
                   "filter_val1": "",
