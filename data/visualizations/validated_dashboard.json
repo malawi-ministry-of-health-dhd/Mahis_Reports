@@ -264,7 +264,7 @@
                   "x_title": "",
                   "y_title": "",
                   "rename": {
-                    "person_id": "Number of Patients"
+                    "person_id_key": "Number of Patients"
                   }
                 }
               },
@@ -3856,54 +3856,39 @@
           "label": "EmONC competency assessed",
           "target_count": 500,
           "target_pct": 80,
-          "status": "awaiting_baseline",
+          "status": "tracked",
           "numerator_filters": {
             "unique": "person_id",
             "variable1": "concept_name",
-            "value1": "__mnid_unavailable__"
+            "value1": "EmONC competency assessed",
+            "variable2": "obs_value_coded",
+            "value2": "Assessed"
           },
           "denominator_filters": {
             "unique": "person_id",
             "variable1": "concept_name",
-            "value1": "__mnid_unavailable__"
-          },
-          "note": "Awaiting competency assessment records from MAHIS workforce module."
+            "value1": "EmONC competency assessed"
+          }
         }
       ],
       "supply_indicators": [
         {
           "id": "mnid_sc_001",
           "label": "Essential medicine availability",
-          "target_pct": 80,
-          "status": "awaiting_baseline",
+          "status": "tracked",
+          "target_value": "All available",
           "numerator_filters": {
             "unique": "person_id",
             "variable1": "concept_name",
-            "value1": "__mnid_unavailable__"
+            "value1": "Essential medicine availability",
+            "variable2": "obs_value_coded",
+            "value2": "All available"
           },
           "denominator_filters": {
             "unique": "person_id",
             "variable1": "concept_name",
-            "value1": "__mnid_unavailable__"
-          },
-          "note": "Awaiting stock availability records from MAHIS supply chain module."
-        },
-        {
-          "id": "mnid_sc_002",
-          "label": "Pulse oximeter available",
-          "target_pct": 80,
-          "status": "awaiting_baseline",
-          "numerator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "__mnid_unavailable__"
-          },
-          "denominator_filters": {
-            "unique": "person_id",
-            "variable1": "concept_name",
-            "value1": "__mnid_unavailable__"
-          },
-          "note": "Awaiting equipment availability records from MAHIS supply chain module."
+            "value1": "Essential medicine availability"
+          }
         }
       ],
       "data_quality_indicators": [
@@ -3911,35 +3896,37 @@
           "id": "mnid_dq_001",
           "label": "Record completeness",
           "target_pct": 95,
-          "status": "awaiting_baseline",
+          "status": "tracked",
           "numerator_filters": {
             "unique": "person_id",
             "variable1": "concept_name",
-            "value1": "__mnid_unavailable__"
+            "value1": "Record completeness",
+            "variable2": "obs_value_coded",
+            "value2": "Complete"
           },
           "denominator_filters": {
             "unique": "person_id",
             "variable1": "concept_name",
-            "value1": "__mnid_unavailable__"
-          },
-          "note": "Awaiting a data completeness field in the MAHIS extract."
+            "value1": "Record completeness"
+          }
         },
         {
           "id": "mnid_dq_002",
           "label": "Data entered within 7 days",
           "target_pct": 90,
-          "status": "awaiting_baseline",
+          "status": "tracked",
           "numerator_filters": {
             "unique": "person_id",
             "variable1": "concept_name",
-            "value1": "__mnid_unavailable__"
+            "value1": "Data entered within 7 days",
+            "variable2": "obs_value_coded",
+            "value2": "Yes"
           },
           "denominator_filters": {
             "unique": "person_id",
             "variable1": "concept_name",
-            "value1": "__mnid_unavailable__"
-          },
-          "note": "Awaiting a data-entry timestamp field in the MAHIS extract."
+            "value1": "Data entered within 7 days"
+          }
         }
       ]
     },
@@ -4468,9 +4455,118 @@
           ]
         }
       ],
-      "workforce_indicators": [],
-      "supply_indicators": [],
-      "data_quality_indicators": []
+      "workforce_indicators": [
+        {
+          "id": "mnid_wf_002",
+          "label": "SSNC competency assessed",
+          "target_count": 200,
+          "target_pct": 80,
+          "status": "tracked",
+          "numerator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "SSNC competency assessed",
+            "variable2": "obs_value_coded",
+            "value2": "Assessed"
+          },
+          "denominator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "SSNC competency assessed"
+          }
+        }
+      ],
+      "supply_indicators": [
+        {
+          "id": "mnid_sc_002",
+          "label": "CPAP equipment available",
+          "status": "tracked",
+          "numerator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "CPAP equipment status",
+            "variable2": "obs_value_coded",
+            "value2": "Available"
+          },
+          "denominator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "CPAP equipment status"
+          }
+        },
+        {
+          "id": "mnid_sc_003",
+          "label": "Phototherapy unit available",
+          "status": "tracked",
+          "numerator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "Phototherapy unit status",
+            "variable2": "obs_value_coded",
+            "value2": "Available"
+          },
+          "denominator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "Phototherapy unit status"
+          }
+        },
+        {
+          "id": "mnid_sc_004",
+          "label": "Neonatal resuscitation equipment available",
+          "status": "tracked",
+          "numerator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "Newborn resuscitation equipment status",
+            "variable2": "obs_value_coded",
+            "value2": "Available"
+          },
+          "denominator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "Newborn resuscitation equipment status"
+          }
+        }
+      ],
+      "data_quality_indicators": [
+        {
+          "id": "mnid_dq_001",
+          "label": "Record completeness",
+          "target_pct": 95,
+          "status": "tracked",
+          "numerator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "Record completeness",
+            "variable2": "obs_value_coded",
+            "value2": "Complete"
+          },
+          "denominator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "Record completeness"
+          }
+        },
+        {
+          "id": "mnid_dq_002",
+          "label": "Data entered within 7 days",
+          "target_pct": 90,
+          "status": "tracked",
+          "numerator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "Data entered within 7 days",
+            "variable2": "obs_value_coded",
+            "value2": "Yes"
+          },
+          "denominator_filters": {
+            "unique": "person_id",
+            "variable1": "concept_name",
+            "value1": "Data entered within 7 days"
+          }
+        }
+      ]
     },
     "dashboard_type": "mnid",
     "priority_indicators": [

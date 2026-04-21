@@ -1,5 +1,6 @@
 import datetime
 from isoweek import Week
+import pandas as pd
 
 RELATIVE_MONTHS = [
     "January",
@@ -104,3 +105,24 @@ def get_biannual_start_end(period, year):
         end_date = datetime.date(year, end_month + 1, 1) - datetime.timedelta(days=1)
     
     return start_date, end_date
+
+def get_dhis2_period(start_date, period_type):
+    dt = pd.to_datetime(start_date)
+
+    if period_type == "Monthly":
+        return dt.strftime("%Y%m")
+
+    elif period_type == "Weekly":
+        year, week, _ = dt.isocalendar()
+        return f"{year}W{int(week):02d}"
+
+    elif period_type == "Quarterly":
+        quarter = (dt.month - 1) // 3 + 1
+        return f"{dt.year}Q{quarter}"
+
+    elif period_type == "Bi-Annual":
+        semester = 1 if dt.month <= 6 else 2
+        return f"{dt.year}S{semester}"
+
+    else:
+        raise ValueError(f"Unsupported period type: {period_type}")

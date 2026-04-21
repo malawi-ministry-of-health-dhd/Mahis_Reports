@@ -37,6 +37,7 @@ class DataStorage:
             batch_size=50000,
         )
         if df is not None and not df.empty:
+
             df.to_parquet(self.filepath, index=False)
             DataStorage.invalidate_query_cache()
             logging.info(f"Data saved to {self.filepath} (Parquet format)")
@@ -107,6 +108,7 @@ class DataStorage:
             logging.info(f"Data saved to {self.filepath} (csv format)")
         else:
             logging.warning("No data fetched from database.")
+
 
 if __name__ == "__main__":
     storage = DataStorage(query=QERY)

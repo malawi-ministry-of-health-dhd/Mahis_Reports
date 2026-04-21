@@ -7,7 +7,7 @@ from datetime import datetime
 from dash import html, dash_table
 
 class ReportTableBuilder:
-    def __init__(self, excel_path: str, filtered_df: pd.DataFrame, original_df: pd.DataFrame):
+    def __init__(self, excel_path: str, filtered_df: pd.DataFrame, original_df: pd.DataFrame, dhis2_period: str):
         self.excel_path = excel_path
         self.filtered_df = filtered_df
         self.original_df = original_df
@@ -18,6 +18,7 @@ class ReportTableBuilder:
         self._value_cache: Dict[str, str] = {}
         self._errors: List[str] = []
         self.report_name: pd.DataFrame | None = None
+        self.dhis2_period = dhis2_period
 
     def load_spec(self) -> None:
         xls = pd.ExcelFile(self.excel_path, engine="openpyxl")
@@ -199,7 +200,7 @@ class ReportTableBuilder:
     def _generate_dhis_params(self) -> Dict:
         params = {
             'dataSet':self.report_name['id'].iloc[0],
-            'period':'202512',
+            'period':self.dhis2_period,
             'orgUnit':'glIscvEdIJz'}
         return params
     

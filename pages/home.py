@@ -83,7 +83,7 @@ PREMIUM_DASHBOARD_REPORTS = {"Maternal and Child Health"}
 
 
 def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json, filter_summary=None,
-                           start_date=None, end_date=None, facility_code=None, scope_meta=None):
+                          start_date=None, end_date=None, facility_code=None, scope_meta=None):
     config = dashboards_json
     count_items_per_row = config.get("count_items_per_row") or 5
 
@@ -104,7 +104,6 @@ def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json, filt
     filtered = filtered.copy()
     filtered['Residence'] = filtered[HOME_DISTRICT_] + ', TA-' + filtered[TA_] + ', ' + filtered[VILLAGE_]
     delta_days = 7 if delta_days <= 0 else delta_days
-
 
     if config.get("report_name") in PREMIUM_DASHBOARD_REPORTS:
         return build_premium_dashboard(filtered, data_opd, delta_days, config, filter_summary=filter_summary)
@@ -561,6 +560,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                 FROM 'data/{DATA_FILE_NAME_}'
                 WHERE Date >= TIMESTAMP '{last_7_days}'
                 """
+            
         else:
             SQL = f"""
                 SELECT *
@@ -736,7 +736,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         for report_name in selected_reports:
             dashboard_json = next((d for d in menu_json if d['report_name'] == report_name), None)
             if not dashboard_json:
-                continue
+                break
             is_mnid = dashboard_json.get('dashboard_type') == 'mnid'
 
             # MNID uses unfiltered data paths; non-MNID uses Encounter-pre-filtered paths.
@@ -781,6 +781,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                 (_fdata[DATE_] >= start_dt) &
                 (_fdata[DATE_] <= end_dt)
             ]
+
             adj_start_dt, adj_end_dt = start_dt, end_dt
             if is_mnid and filtered_data_date.empty and len(_fdata):
                 adj_start_dt = _fdata[DATE_].min()
@@ -838,7 +839,6 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             ]))
 
         dashboard_content = html.Div(rendered) if len(rendered) > 1 else (rendered[0] if rendered else html.Div("No dashboard selected."))
-
         return (
             dashboard_content,
             level,
