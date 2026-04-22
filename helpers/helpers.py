@@ -35,7 +35,7 @@ def build_metrics_section(filtered, counts_config, url_object=None):
     """Build metric cards from counts configuration"""
     metrics = []
     for count_config in counts_config:
-        href = count_config.get("href", "") +"?"+ url_object if count_config.get("href", "") else ""
+        href = count_config.get("href", "") +"?"+ url_object if url_object else ""
         metric = html.Div(className=f'mnid-kpi', children=[
         html.Div(style={'display': 'flex', 'justifyContent': 'space-between',
                         'alignItems': 'flex-start', 'gap': '6px'}, children=[
