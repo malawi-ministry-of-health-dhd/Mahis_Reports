@@ -9,7 +9,7 @@ import pickle
 import logging
 import time
 
-from config import DB_CONFIG, SSH_CONFIG, DB_CONFIG_LOCAL, START_DATE, LOAD_FRESH_DATA, DATA_FILE_NAME_
+from config import DB_CONFIG, SSH_CONFIG, DB_CONFIG_LOCAL, START_DATE, LOAD_FRESH_DATA, DATE_, GENDER_, ENCOUNTER_ID_, DATA_FILE_NAME_
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -20,7 +20,7 @@ if LOAD_FRESH_DATA:
     # drop file latest_data_opd.parquet if exists in data folder
     file_path = os.path.join(os.getcwd(), "data", DATA_FILE_NAME_)
     if os.path.exists(file_path):
-        os.remove(file_path)
+        os.rename(file_path, f"{file_path}.backup")
         logger.info("Removed existing data file for fresh load.")
 
 
@@ -256,8 +256,8 @@ class DataFetcher:
                 pass
 
     # Main process flow
-    def fetch_data(self, query_template, filename=DATA_FILE_NAME_,
-                   date_column='Date', batch_size=5000, force_rebuild=False):
+    def fetch_data(self, query_template, filename='data/latest_data_opd.parquet',
+                   date_column=DATE_, batch_size=5000, force_rebuild=False):
         """
         Robust incremental data fetcher with auto-rebuild capability
 
@@ -422,12 +422,14 @@ class DataFetcher:
                 new_data_df = pd.DataFrame(new_data_df)
         else:
             current_date = pd.to_datetime(start_date)
-            new_data_df = pd.DataFrame()  # Only new data
+            new_data_df = pd.DataFrame()
             last_id = 0
 
         # COMBINE EXISTING AND NEW DATA (safe)
         if not existing_df.empty and not new_data_df.empty:
             final_df = pd.concat([existing_df, new_data_df], ignore_index=True).drop_duplicates()
+            final_df[DATE_] = pd.to_datetime(final_df[DATE_], format='mixed')
+            final_df[GENDER_] = final_df[GENDER_].replace({"M":"Male","F":"Female"})
         elif not existing_df.empty:
             final_df = existing_df.copy()
         elif not new_data_df.empty:
@@ -458,8 +460,8 @@ class DataFetcher:
                         final_df = pd.concat([final_df, validated_batch], ignore_index=True).drop_duplicates()
 
                     # Update last processed ID for recovery
-                    if 'encounter_id' in validated_batch.columns:
-                        last_id = validated_batch['encounter_id'].max()
+                    if ENCOUNTER_ID_ in validated_batch.columns:
+                        last_id = validated_batch[ENCOUNTER_ID_].max()
 
                     # Save intermediate results and recovery state
                     self._save_recovery_state({
@@ -503,13 +505,13 @@ class DataFetcher:
         """Process all records for a single day in batches"""
         day_df = pd.DataFrame()
         processed_count = 0
+
         while True:
             # Build query for current batch
             date_str = current_date.strftime('%Y-%m-%d')
-            date_filter = f"AND DATE(e.encounter_datetime) = '{date_str}' AND e.encounter_id > {last_id} LIMIT {batch_size}"
+            date_filter = f"AND DATE(e.encounter_datetime) = '{date_str}' AND e.encounter_id > {last_id} "
             query = query_template.format(date_filter=date_filter)
-            batch_query = f"{query} ORDER BY encounter_id"
-            # print(batch_query)
+            batch_query = f"{query} ORDER BY encounter_id LIMIT {batch_size}"
 
             logger.debug(f"Fetching batch for {date_str} from ID {last_id}")
             try:
@@ -525,8 +527,8 @@ class DataFetcher:
             processed_count += len(batch_df)
 
             # Update last ID for next batch
-            if not batch_df.empty and 'encounter_id' in batch_df.columns:
-                last_id = batch_df['encounter_id'].max()
+            if not batch_df.empty and ENCOUNTER_ID_ in batch_df.columns:
+                last_id = batch_df[ENCOUNTER_ID_].max()
 
             logger.info(f"Processed {processed_count} records for {date_str}")
 
@@ -588,6 +590,7 @@ class DataFetcher:
         """Safely get the last extraction date from existing Parquet"""
         try:
             df = pd.read_parquet(file_path, columns=[date_column], engine="pyarrow")
+            df = df[df[date_column]<=pd.Timestamp.now().normalize()]
             if not df.empty and date_column in df:
                 last_date = pd.to_datetime(df[date_column]).max()
                 return last_date.strftime('%Y-%m-%d')
@@ -667,5 +670,3 @@ class DataFetcher:
                 logger.warning(f"Failed to remove batch file {fpath}: {e}")
 
         logger.info(f"Cleaned up {removed} batch files from {batch_dir}")
-
-# End of DataFetcher class

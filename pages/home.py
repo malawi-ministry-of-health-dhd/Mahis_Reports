@@ -16,6 +16,11 @@ from datetime import datetime
 from datetime import datetime as dt
 from data_storage import DataStorage
 from config import DATA_FILE_NAME_
+from helpers.date_ranges import (
+                    get_relative_date_range,
+                    RELATIVE_PERIOD_LIST
+            )
+from helpers.navigation_callbacks import DEMO_UUID, DEMO_LOCATION
 
 # Importing parquet file path and from config
 
@@ -83,7 +88,7 @@ PREMIUM_DASHBOARD_REPORTS = {"Maternal and Child Health"}
 
 
 def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json, filter_summary=None,
-                          start_date=None, end_date=None, facility_code=None, scope_meta=None):
+                          start_date=None, end_date=None, facility_code=None, scope_meta=None, url_object=None):
     config = dashboards_json
     count_items_per_row = config.get("count_items_per_row") or 5
 
@@ -109,7 +114,7 @@ def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json, filt
         return build_premium_dashboard(filtered, data_opd, delta_days, config, filter_summary=filter_summary)
 
     # Build metrics from counts section
-    metrics = build_metrics_section(filtered, config["visualization_types"]["counts"])
+    metrics = build_metrics_section(filtered, config["visualization_types"]["counts"], url_object)
     charts = build_charts_section(filtered, data_opd, delta_days, config["visualization_types"]["charts"]["sections"])
 
     return html.Div([
@@ -118,60 +123,7 @@ def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json, filt
         charts
     ])
 
-def get_relative_date_range(option):
-    from datetime import datetime, timedelta
-    today = datetime.today().date()
-    
-    if option == 'Today':
-        return today, today
-    elif option == 'Yesterday':
-        yesterday = today - timedelta(days=1)
-        return yesterday, yesterday
-    elif option == 'Last 7 Days':
-        start_date = today - timedelta(days=7)
-        return start_date, today
-    elif option == 'Last 30 Days':
-        start_date = today - timedelta(days=30)
-        return start_date, today
-    elif option == 'This Week':
-        start_date = today - timedelta(days=today.weekday())
-        return start_date, today
-    elif option == 'Last Week':
-        start_date = today - timedelta(days=today.weekday() + 7)
-        end_date = start_date + timedelta(days=6)
-        return start_date, end_date
-    elif option == 'This Month':
-        start_date = today.replace(day=1)
-        return start_date, today
-    elif option == 'Last Month':
-        first_day_this_month = today.replace(day=1)
-        last_day_last_month = first_day_this_month - timedelta(days=1)
-        start_date = last_day_last_month.replace(day=1)
-        return start_date, last_day_last_month
-    # option Last 3 Months
-    elif option == 'Last 3 Months':
-        first_day_this_month = today.replace(day=1)
-        last_day_last_month = first_day_this_month - timedelta(days=1)
-        first_day_last_month = last_day_last_month.replace(day=1)
-        last_day_two_months_ago = first_day_last_month - timedelta(days=1)
-        first_day_two_months_ago = last_day_two_months_ago.replace(day=1)
-        start_date = first_day_two_months_ago
-        end_date = last_day_last_month
-        return start_date, end_date
-    # option This Year
-    elif option == 'This Year':
-        start_date = today.replace(month=1, day=1)
-        return start_date, today
-    # option Last Year
-    elif option == 'Last Year':
-        first_day_this_year = today.replace(month=1, day=1)
-        last_day_last_year = first_day_this_year - timedelta(days=1)
-        start_date = last_day_last_year.replace(month=1, day=1)
-        end_date = last_day_last_year
-        return start_date, end_date
 
-    else:
-        return None, None
 
 layout = html.Div(
     className="dashboard-layout-modern",
@@ -265,9 +217,7 @@ layout = html.Div(
                                                     id='dashboard-period-type-filter',
                                                     options=[
                                                         {'label': item, 'value': item}
-                                                        for item in ['Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days',
-                                                                   'This Week', 'Last Week', 'This Month', 'Last Month',
-                                                                   'Last 3 Months', 'This Year', 'Last Year']
+                                                        for item in RELATIVE_PERIOD_LIST
                                                     ],
                                                     value='Today',
                                                     clearable=True,
@@ -512,11 +462,11 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else None
 
         if not urlparams:
-            urlparams = {"Location": ["LL040033"], "uuid": ["m3his@dhd"]}
+            urlparams = {"Location": [DEMO_LOCATION], "uuid": [DEMO_UUID]}
         if not urlparams.get("Location"):
-            urlparams["Location"] = ["LL040033"]
+            urlparams["Location"] = [DEMO_LOCATION]
         if not urlparams.get("uuid"):
-            urlparams["uuid"] = ["m3his@dhd"]
+            urlparams["uuid"] = [DEMO_UUID]
 
 
         # Determine which report to show
@@ -533,11 +483,13 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         if urlparams.get('Location', [None])[0]:
             location = urlparams.get('Location', [None])[0]
         else:
-            location = "LL040033"
+            location = DEMO_LOCATION
         mnid_location = urlparams.get('Location', [None])[0] if urlparams.get('Location') else None
 
         user_levels = ['national', 'district']
         user_level = urlparams.get('user_level', [None])[0]
+
+        url_object = f"Location={location}&uuid={urlparams.get('uuid', [None])[0]}&user_level={user_level}"
 
         # Default level based on user_level
         if not level:
@@ -599,6 +551,20 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         data['datetime'] = data[DATE_]
         data[DATE_] = data[DATE_].dt.normalize()
 
+        def num_days_patient_seen(data):
+            try:
+                visit_counts = data.groupby(PERSON_ID_)[DATE_].nunique()
+                data['visit_days'] = data[PERSON_ID_].map(visit_counts)
+                data['new_revisit'] = np.where(
+                    data['visit_days'] == 1,
+                    'New',
+                    'Revisit'
+                )
+            except Exception:
+                data['new_revisit'] = 'Unknown'
+            return data
+        
+        data = num_days_patient_seen(data)
         today = dt.today().date()
         data["months"] = ((pd.Timestamp(today) - pd.to_datetime(data["DateValue"])).dt.days // 30).clip(lower=0)
 
@@ -608,10 +574,11 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             user_data = pd.DataFrame(columns=['user_id', 'role'])
         else:
             user_data = pd.read_csv(os.path.join(path, 'data', 'users_data.csv'))
-        test_admin = pd.DataFrame(columns=['user_id', 'role'], data=[['m3his@dhd', 'reports_admin']])
+        test_admin = pd.DataFrame(columns=['user_id', 'role'], data=[[DEMO_UUID, 'reports_admin']])
         user_data = pd.concat([user_data, test_admin], ignore_index=True)
 
         user_info = user_data[user_data['user_id'] == urlparams.get('uuid', [None])[0]]
+
         if user_info.empty:
             return (
                 html.Div("Unauthorized User. Please contact system administrator."),
@@ -832,6 +799,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                     'selected_facilities': facilities,
                     'selected_districts': districts,
                 },
+                url_object=url_object
             )
             rendered.append(html.Div([
                 html.H2(report_name, style={"marginTop": "10px"}),
