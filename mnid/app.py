@@ -5,14 +5,17 @@ This module builds the Maternal and Child Health dashboard layout,
 calculates configured indicator coverage, and renders the main dashboard
 sections such as trends, comparison views, heatmaps, and readiness panels.
 """
-from dash import html, dcc, clientside_callback, callback, callback_context, Input, Output, State, ALL
-from dash.exceptions import PreventUpdate
 import dash_mantine_components as dmc
-from helpers.helpers import create_count_from_config
+import diskcache
+import json
+import os
 import pandas as pd
 import plotly.graph_objects as go
+import uuid
 from datetime import datetime
-import json
+from dash import html, dcc, clientside_callback, callback, callback_context, Input, Output, State, ALL
+from dash.exceptions import PreventUpdate
+from helpers.helpers import create_count_from_config
 from mnid.constants import (
     OK_C, WARN_C, DANGER_C, INFO_C, MUTED, GRID_C, BG, BORDER, TEXT, DIM, FONT,
     CAT_PALETTES, HEATMAP_CS, FACILITY_DISTRICT as _FACILITY_DISTRICT,
@@ -52,6 +55,54 @@ _TREND_ACCENT = {
     'PNC': '#7C3AED',
 }
 _ANALYSIS_PALETTE = ['#2563EB', '#0F766E', '#7C3AED', '#C2410C', '#DB2777', '#0891B2', '#64748B']
+
+_MNID_UI_CACHE = {}
+_MNID_UI_CACHE_MAX = 16
+_MNID_UI_CACHE_TTL_SECONDS = 3600
+try:
+    _MNID_UI_DISK_CACHE = diskcache.Cache(os.path.join('.', 'cache', 'mnid_ui'))
+except Exception:
+    _MNID_UI_DISK_CACHE = None
+
+
+def _remember_ui_payload(prefix: str, records: list[dict]) -> str:
+    cache_key = f'{prefix}:{uuid.uuid4().hex}'
+    _MNID_UI_CACHE[cache_key] = records
+    while len(_MNID_UI_CACHE) > _MNID_UI_CACHE_MAX:
+        oldest_key = next(iter(_MNID_UI_CACHE))
+        _MNID_UI_CACHE.pop(oldest_key, None)
+    if _MNID_UI_DISK_CACHE is not None:
+        try:
+            _MNID_UI_DISK_CACHE.set(cache_key, records, expire=_MNID_UI_CACHE_TTL_SECONDS)
+        except Exception:
+            pass
+    return cache_key
+
+
+def _restore_ui_dataframe(cache_key: str | None) -> pd.DataFrame:
+    if not cache_key:
+        return pd.DataFrame()
+
+    records = _MNID_UI_CACHE.get(cache_key)
+    if records is None and _MNID_UI_DISK_CACHE is not None:
+        try:
+            records = _MNID_UI_DISK_CACHE.get(cache_key)
+        except Exception:
+            records = None
+        if records is not None:
+            _MNID_UI_CACHE[cache_key] = records
+
+    return _deserialize_store_df(records)
+
+
+def clear_runtime_caches() -> None:
+    _network_df_cache.clear()
+    _MNID_UI_CACHE.clear()
+    if _MNID_UI_DISK_CACHE is not None:
+        try:
+            _MNID_UI_DISK_CACHE.clear()
+        except Exception:
+            pass
 
 # MNID data helpers
 
@@ -1308,7 +1359,7 @@ def update_trend_chart(n_clicks_list, toggle_clicks, selected_ind_ids, stored_tr
 
     trend_payload = stored_trend or {}
     tracked = trend_payload.get('tracked', [])
-    df = _deserialize_store_df(trend_payload.get('records'))
+    df = _restore_ui_dataframe(trend_payload.get('data_key'))
     scope_meta = trend_payload.get('scope_meta') or {}
     cat_inds = [i for i in tracked if i.get('category') == cat and i.get('status') == 'tracked']
     ind_options = [{'label': i['label'], 'value': i['id']} for i in cat_inds]
@@ -1339,7 +1390,7 @@ def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None 
     default_fig = _location_trend_fig(df, default_inds, default_cat, 'line', scope_meta)
     trend_store = {
         'tracked': tracked,
-        'records': _serialize_store_df(df),
+        'data_key': _remember_ui_payload('trend', _serialize_store_df(df)),
         'scope_meta': scope_meta or {},
     }
 
@@ -3496,7 +3547,7 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
         chart_type = 'line' if chart_type == 'bar' else 'bar'
     store_payload = stored or {}
     tracked = store_payload.get('tracked', [])
-    mch_full = _deserialize_store_df(store_payload.get('records'))
+    mch_full = _restore_ui_dataframe(store_payload.get('data_key'))
     facility_options = store_payload.get('facility_options', [])
     district_options = store_payload.get('district_options', [])
     current_fac = store_payload.get('current_fac', '')
@@ -4763,7 +4814,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
     return html.Div(id='mnid-comparative', children=[
         dcc.Store(id='mnid-compare-store', data={
             'tracked':    tracked,
-            'records':    _serialize_store_df(mch_full),
+            'data_key':   _remember_ui_payload('compare', _serialize_store_df(mch_full)),
             'facility_options': fac_opts,
             'district_options': dist_opts,
             'current_fac': facility_code,
@@ -5135,6 +5186,7 @@ def _pph_cascade(df):
 # MNID header, alert, KPI, and section navigation components
 
 def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=None,
+            period_note=None,
             title='Maternal and Child Health Indicators', subtitle='Clean view of performance, comparison, coverage, and readiness.',
             theme='default'):
     facility_name = _FACILITY_NAMES.get(facility, facility or 'Network view')
@@ -5201,9 +5253,14 @@ def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=N
             ]),
             html.Div(className='mnid-info-pill', children=[
                 html.Div('Period', className='mnid-info-pill-label'),
-                html.Div(period,
-                         style={'fontSize': '11px', 'fontWeight': '700',
-                                'color': TEXT, 'lineHeight': '1.2'}),
+                html.Div([
+                    html.Div(period,
+                             style={'fontSize': '11px', 'fontWeight': '700',
+                                    'color': TEXT, 'lineHeight': '1.2'}),
+                    html.Div(period_note,
+                             style={'fontSize': '10px', 'color': MUTED, 'lineHeight': '1.3', 'marginTop': '4px'})
+                    if period_note else None,
+                ]),
             ]),
             html.Div(className='mnid-info-pill', children=[
                 html.Div('Program', className='mnid-info-pill-label'),
@@ -5395,15 +5452,9 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     selected_facilities = (scope_meta or {}).get('selected_facilities') or []
     selected_districts  = (scope_meta or {}).get('selected_districts') or []
     if selected_facilities and 'Facility' in facility_df.columns:
-        fac_filtered = facility_df[facility_df['Facility'].isin(selected_facilities)]
-        if not fac_filtered.empty:
-            facility_df = fac_filtered
+        facility_df = facility_df[facility_df['Facility'].isin(selected_facilities)]
     elif selected_districts and 'District' in facility_df.columns:
-        dist_filtered = facility_df[facility_df['District'].isin(selected_districts)]
-        if not dist_filtered.empty:
-            facility_df = dist_filtered
-    if facility_df.empty and not network_df.empty:
-        facility_df = network_df
+        facility_df = facility_df[facility_df['District'].isin(selected_districts)]
 
     selected_program = (scope_meta or {}).get('mnid_categories')
     selected_program = selected_program[0] if selected_program else 'All'
@@ -5419,6 +5470,7 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     wf_inds     = config.get('workforce_indicators') or vt.get('workforce_indicators', [])
     dq_inds     = config.get('data_quality_indicators') or vt.get('data_quality_indicators', [])
     period      = f'{start_date} to {end_date}'
+    period_note = (scope_meta or {}).get('data_period_note')
 
     requested_categories = (scope_meta or {}).get('mnid_categories')
     config_categories = config.get('mnid_categories')
@@ -5428,7 +5480,7 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
         effective_categories = requested_categories
     all_inds = _resolve_runtime_mnid_indicators(
         all_inds,
-        network_df if len(network_df) else facility_df,
+        facility_df,
         effective_categories,
     )
     category_order = _resolve_category_order(all_inds, effective_categories)
@@ -5534,9 +5586,9 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     ]
     analysis_acc = [a for a in analysis_acc if a]
 
-    performance_div, heatmap_div = _coverage_heatmap_section(all_inds, facility_code, network_df)
+    performance_div, heatmap_div = _coverage_heatmap_section(all_inds, facility_code, facility_df)
     service_table_div = _service_table_switcher(facility_df, category_order, default_cat, scope_meta)
-    comparative_div  = _comparative_analysis_section(all_inds, facility_code, network_df)
+    comparative_div  = _comparative_analysis_section(all_inds, facility_code, facility_df)
 
     def _sec_header(title, count=None, desc=None, eyebrow=None):
         return html.Div(className=f'mnid-section-header{" mnid-section-header-newborn" if dashboard_theme == "newborn" else ""}', children=[
@@ -5560,7 +5612,7 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
 
     main_content = html.Div(className=f'mnid-main{" mnid-main-newborn" if dashboard_theme == "newborn" else ""}', children=[
 
-        _topbar(facility_code, period, len(tracked), len(awaiting), facility_df=facility_df, network_df=network_df, title=dashboard_title, subtitle=dashboard_subtitle, theme=dashboard_theme),
+        _topbar(facility_code, period, len(tracked), len(awaiting), facility_df=facility_df, network_df=network_df, period_note=period_note, title=dashboard_title, subtitle=dashboard_subtitle, theme=dashboard_theme),
         _sidebar(facility_code, theme=dashboard_theme),
         _alert_banner(below, strong),
 
