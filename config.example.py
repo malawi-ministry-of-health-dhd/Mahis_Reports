@@ -40,6 +40,9 @@ PARQUET_FILE_PATH = os.path.join(os.getcwd(), 'data', 'latest_data_opd.parquet')
 CACHE_FILE_PATH = os.path.join(os.getcwd(), 'data', 'cache_opd.parquet')
 TIMESTAMP_FILE_PATH = os.path.join(os.getcwd(), 'data', 'TimeStamp.csv')
 
+DHIS2_UNAME='user'
+DHIS2_PASSWORD='password'
+
 # For local database connection
 DB_CONFIG_LOCAL = {
     'host': 'localhost',
@@ -70,23 +73,45 @@ SSH_CONFIG = {
 
 # on production remove COLLATE utf8mb3_general_ci
 QERY = """
-SELECT 
+SELECT
+    main.*,
+    CASE
+        WHEN visit_days = 1 THEN 'New'
+        ELSE 'Revisit'
+    END AS new_revisit
+FROM (
+    SELECT
         p.person_id,
         e.encounter_id,
         pn2.given_name,
         pn2.family_name,
-        gender AS Gender, 
-        FLOOR(DATEDIFF(e.encounter_datetime, birthdate) / 365) AS Age, 
-        CASE 
+        gender AS Gender,
+        birthdate,
+        FLOOR(DATEDIFF(e.encounter_datetime, birthdate)) AS AgeDays,
+        FLOOR(DATEDIFF(e.encounter_datetime, birthdate) / 365) AS Age,
+        CASE
             WHEN FLOOR(DATEDIFF(e.encounter_datetime, birthdate) / 365) < 5 THEN 'Under 5'
             ELSE 'Over 5'
         END AS Age_Group,
-        DATE(e.encounter_datetime) AS Date, 
-        pr.name AS Program, 
+        e.encounter_datetime AS Date,
+        pr.name AS Source_Program,
+        pr.name AS Program,
+        CASE
+            WHEN pr.name = 'NEONATAL PROGRAM' THEN 'NEONATAL PROGRAM'
+            WHEN et.name  IN ('ANC VISIT', 'LABOUR AND DELIVERY', 'POSTNATAL CARE') THEN 'MATERNAL AND CHILD HEALTH'
+            ELSE pr.name
+        END AS Reporting_Program,
+        CASE
+            WHEN et.name = 'ANC VISIT' THEN 'ANC'
+            WHEN et.name = 'LABOUR AND DELIVERY' THEN 'LABOUR'
+            WHEN et.name = 'POSTNATAL CARE' THEN 'PNC'
+            WHEN pr.name = 'NEONATAL PROGRAM' THEN 'NEONATAL'
+            ELSE pr.name
+        END AS Service_Area,
         l.name AS Facility,
-        l.location_id AS Facility_CODE, 
-        u.username AS User, 
-        l.city_village AS District, 
+        l.code AS Facility_CODE,
+        u.username AS User,
+        l.district AS District,
         et.name AS Encounter,
         pa.state_province AS Home_district,
         pa.township_division AS TA,
@@ -94,11 +119,12 @@ SELECT
         v.visit_days,
         cn.name AS obs_value_coded,
         c.name AS concept_name,
-        o.value_text as Value,
-        o.value_numeric as ValueN,
-        d.name as DrugName,
-        cnn.name as Value_name,
-        d.name as Order_Name
+        o.value_text AS Value,
+        o.value_numeric AS ValueN,
+        d.name AS DrugName,
+        cnn.name AS Value_name,
+        cnnn.name AS Order_Name,
+        o.value_datetime
     FROM person AS p
     JOIN patient AS pa2 ON p.person_id = pa2.patient_id
     JOIN person_name pn2 ON p.person_id = pn2.person_id
@@ -107,8 +133,7 @@ SELECT
     JOIN encounter_type AS et ON e.encounter_type = et.encounter_type_id
     INNER JOIN program AS pr ON e.program_id = pr.program_id
     INNER JOIN users AS u ON e.creator = u.user_id
-    INNER JOIN location AS l ON u.location_id = l.location_id
-    -- Join with precomputed visit days
+    INNER JOIN facilities AS l ON u.location_id = l.code
     JOIN (
         SELECT patient_id, COUNT(DISTINCT DATE(encounter_datetime)) AS visit_days
         FROM encounter
@@ -128,21 +153,25 @@ SELECT
         AND cnn.locale = 'en'
         AND cnn.concept_name_type = 'FULLY_SPECIFIED'
         AND cnn.voided = 0
-    LEFT JOIN drug as d on o.value_drug = d.drug_id
+    LEFT JOIN drug AS d ON o.value_drug = d.drug_id
+    LEFT JOIN orders AS od ON o.order_id = od.order_id
+    LEFT JOIN concept_name AS cnnn ON od.concept_id = cnnn.concept_id
+        AND cnnn.locale = 'en'
+        AND cnnn.concept_name_type = 'FULLY_SPECIFIED'
+        AND cnnn.voided = 0
     WHERE p.voided = 0
     {date_filter}
 ) AS main
-
 """
 
-actual_keys_in_data = ['person_id', 'encounter_id', 
+actual_keys_in_data = ['person_id', 'encounter_id',  
                                        'Gender', 'Age', 'Age_Group', 
                                        'Date', 'Program', 'Facility', 
                                        'Facility_CODE', 'User', 'District', 
                                        'Encounter', 'Home_district', 'TA', 
                                        'Village', 'visit_days', 'obs_value_coded','concept_name', 'Value',"",
-                                       'ValueN', 'DrugName', 'Value_name', 'new_revisit','count','count_set','sum','Order_Name']
-
+                                       'ValueN', 'DrugName', 'Value_name', 'new_revisit','count','count_set','sum','Order_Name',
+                                       'person_id_key','value_datetime','months','Service_Area']
 CONCEPTS = """
 SELECT 
     q.concept_id AS question_concept_id,

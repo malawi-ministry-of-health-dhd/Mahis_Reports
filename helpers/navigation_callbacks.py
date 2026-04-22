@@ -86,6 +86,7 @@ def register_navigation_callbacks(app, pathname_prefix):
             users = pd.read_csv(users_path)
 
             query = _build_query(location, uuid, user_level)
+            
             is_admin = uuid == DEMO_UUID
 
             if uuid in users["user_id"].tolist():

@@ -21,7 +21,7 @@
       "programs": [
         "OPD Program"
       ],
-      "date_updated": "2026-04-09",
+      "date_updated": "2026-04-21",
       "updated_by": "admin",
       "page_name": "malaria_report",
       "archived": "False"
@@ -220,6 +220,19 @@
       "updated_by": "admin",
       "page_name": "innocentwowa",
       "archived": "True"
+    },
+    {
+      "report_id": 18,
+      "report_name": "Advanced HIV Disease Register \u2013 Facility Monthly Report",
+      "date_created": "2026-04-21",
+      "creator": "admin",
+      "programs": [
+        "HIV PROGRAM"
+      ],
+      "date_updated": "2026-04-21",
+      "updated_by": "admin",
+      "page_name": "ahd_screening",
+      "archived": "False"
     }
   ]
 }

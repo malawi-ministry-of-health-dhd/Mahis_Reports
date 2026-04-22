@@ -1,4 +1,5 @@
 import datetime
+from datetime import datetime as dt
 from isoweek import Week
 import pandas as pd
 
@@ -18,6 +19,9 @@ RELATIVE_MONTHS = [
 ]
 
 RELATIVE_QUARTERS = ["Q1 Jan-Mar", "Q2 Apr-June", "Q3 Jul-Sep", "Q4 Oct-Dec"]
+RELATIVE_PERIOD_LIST = ['Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days',
+                        'This Week', 'Last Week', 'This Month', 'Last Month',
+                        'Last 3 Months', 'This Year', 'Last Year', 'Last 5 Years', 'Last 10 Years']
 
 _QUARTER_MAP = {
     "Q1JAN-MAR": (1, 3),
@@ -105,6 +109,76 @@ def get_biannual_start_end(period, year):
         end_date = datetime.date(year, end_month + 1, 1) - datetime.timedelta(days=1)
     
     return start_date, end_date
+
+def get_relative_date_range(option):
+    from datetime import datetime, timedelta
+    today = datetime.today().date()
+    
+    if option == 'Today':
+        return today, today
+    elif option == 'Yesterday':
+        yesterday = today - timedelta(days=1)
+        return yesterday, yesterday
+    elif option == 'Last 7 Days':
+        start_date = today - timedelta(days=7)
+        return start_date, today
+    elif option == 'Last 30 Days':
+        start_date = today - timedelta(days=30)
+        return start_date, today
+    elif option == 'This Week':
+        start_date = today - timedelta(days=today.weekday())
+        return start_date, today
+    elif option == 'Last Week':
+        start_date = today - timedelta(days=today.weekday() + 7)
+        end_date = start_date + timedelta(days=6)
+        return start_date, end_date
+    elif option == 'This Month':
+        start_date = today.replace(day=1)
+        return start_date, today
+    elif option == 'Last Month':
+        first_day_this_month = today.replace(day=1)
+        last_day_last_month = first_day_this_month - timedelta(days=1)
+        start_date = last_day_last_month.replace(day=1)
+        return start_date, last_day_last_month
+    # option Last 3 Months
+    elif option == 'Last 3 Months':
+        first_day_this_month = today.replace(day=1)
+        last_day_last_month = first_day_this_month - timedelta(days=1)
+        first_day_last_month = last_day_last_month.replace(day=1)
+        last_day_two_months_ago = first_day_last_month - timedelta(days=1)
+        first_day_two_months_ago = last_day_two_months_ago.replace(day=1)
+        start_date = first_day_two_months_ago
+        end_date = last_day_last_month
+        return start_date, end_date
+    # option This Year
+    elif option == 'This Year':
+        start_date = today.replace(month=1, day=1)
+        return start_date, today
+    # option Last Year
+    elif option == 'Last Year':
+        first_day_this_year = today.replace(month=1, day=1)
+        last_day_last_year = first_day_this_year - timedelta(days=1)
+        start_date = last_day_last_year.replace(month=1, day=1)
+        end_date = last_day_last_year
+        return start_date, end_date
+    elif option == 'Last 5 Years':
+        first_day_this_year = today.replace(month=1, day=1)
+        last_day_last_year = first_day_this_year - timedelta(days=1)
+        now = dt.now()
+        start_date = now.replace(year=now.year - 5).replace(month=1, day=1)
+        end_date = last_day_last_year
+        return start_date, end_date
+    
+    elif option == 'Last 10 Years':
+        first_day_this_year = today.replace(month=1, day=1)
+        last_day_last_year = first_day_this_year - timedelta(days=1)
+        now = dt.now()
+        start_date = now.replace(year=now.year - 10).replace(month=1, day=1)
+        end_date = last_day_last_year
+        return start_date, end_date
+
+    else:
+        return None, None
 
 def get_dhis2_period(start_date, period_type):
     dt = pd.to_datetime(start_date)
