@@ -58,9 +58,12 @@ class DataStorage:
     def invalidate_query_cache():
         DataStorage._cached_query.cache_clear()
         try:
-            from pages.home import _mnid_full_data_cache, _mnid_disk_cache
+            from pages.home import _mnid_full_data_cache, _mnid_disk_cache, clear_dashboard_state_cache
+            from mnid.app import clear_runtime_caches
             _mnid_full_data_cache.clear()
             _mnid_disk_cache.clear()
+            clear_dashboard_state_cache()
+            clear_runtime_caches()
         except Exception:
             pass
 
