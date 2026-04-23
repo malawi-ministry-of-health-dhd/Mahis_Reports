@@ -2,6 +2,7 @@ import dash
 import dash_mantine_components as dmc
 from dash import dcc, html, page_container
 import threading
+import time
 
 from config import PREFIX_NAME, DATA_FILE_NAME_
 from helpers.api_routes import register_api_routes
@@ -34,6 +35,7 @@ register_api_routes(server)
 
 
 def _prewarm_mnid_cache():
+    time.sleep(10)  # let the server finish startup before heavy work
     try:
         import pandas as pd
         from data_storage import DataStorage
