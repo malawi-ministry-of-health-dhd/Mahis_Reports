@@ -8,7 +8,6 @@ import json
 import numpy as np
 import uuid
 from dash.exceptions import PreventUpdate
-import os
 from flask import request
 from helpers.helpers import build_charts_section, build_metrics_section
 from mnid_renderer import render_mnid_dashboard
@@ -23,9 +22,7 @@ from helpers.date_ranges import (
             )
 from helpers.navigation_callbacks import DEMO_UUID, DEMO_LOCATION
 
-# Importing parquet file path and from config
-
-# importing referential columns from config
+# Importing referential columns from config
 from config import (actual_keys_in_data, 
                     DATA_FILE_NAME_, 
                     DATE_, PERSON_ID_, ENCOUNTER_ID_,
@@ -48,10 +45,78 @@ dash.register_page(__name__, path="/home")
 path = os.getcwd()
 json_path = os.path.join(path, 'data', 'visualizations', 'validated_dashboard.json')
 
-# Shared cross-process cache for MNID prepared DataFrames.
-# Uses diskcache so data persists across background callback worker processes.
-_mnid_disk_cache = diskcache.Cache('./cache/mnid')
-_dashboard_state_disk_cache = diskcache.Cache('./cache/dashboard_state')
+# Cache configuration with 100MB limit
+CACHE_SIZE_LIMIT_BYTES = 100 * 1024 * 1024  # 100 MB
+
+class CacheWithSizeLimit:
+    """Wrapper for diskcache with size limit management"""
+    
+    def __init__(self, cache_dir, size_limit_bytes=CACHE_SIZE_LIMIT_BYTES):
+        self.cache_dir = cache_dir
+        self.size_limit_bytes = size_limit_bytes
+        self.cache = diskcache.Cache(cache_dir)
+        self._ensure_size_limit()
+    
+    def _get_cache_size(self):
+        """Calculate current cache size in bytes"""
+        total_size = 0
+        try:
+            for key in self.cache.iterkeys():
+                try:
+                    value = self.cache.get(key)
+                    if value is not None:
+                        total_size += len(str(value).encode('utf-8'))
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        return total_size
+    
+    def _ensure_size_limit(self):
+        """Remove oldest items until cache is under size limit"""
+        try:
+            current_size = self._get_cache_size()
+            if current_size > self.size_limit_bytes:
+                # Remove oldest items (diskcache maintains order)
+                items_to_remove = []
+                for key in self.cache.iterkeys():
+                    items_to_remove.append(key)
+                    current_size = self._get_cache_size()
+                    if current_size <= self.size_limit_bytes:
+                        break
+                
+                # Remove excess items
+                for key in items_to_remove:
+                    try:
+                        del self.cache[key]
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+    
+    def get(self, key, default=None):
+        return self.cache.get(key, default)
+    
+    def set(self, key, value, expire=None):
+        result = self.cache.set(key, value, expire=expire)
+        self._ensure_size_limit()
+        return result
+    
+    def __contains__(self, key):
+        return key in self.cache
+    
+    def clear(self):
+        self.cache.clear()
+    
+    def delete(self, key):
+        try:
+            del self.cache[key]
+        except Exception:
+            pass
+
+# Shared cross-process cache for MNID prepared DataFrames with size limit
+_mnid_disk_cache = CacheWithSizeLimit('./cache/mnid')
+_dashboard_state_disk_cache = CacheWithSizeLimit('./cache/dashboard_state')
 
 # In-process fallback (used when background=False or within same worker)
 _mnid_full_data_cache: dict = {}
@@ -77,7 +142,6 @@ def normalize_report_name(name, menu_json):
             return "Maternal Health"
     return name
 
-
 def _remember_dashboard_state(state: dict) -> str:
     key = f"dashboard_state:{uuid.uuid4().hex}"
     _dashboard_state_cache[key] = state
@@ -86,12 +150,10 @@ def _remember_dashboard_state(state: dict) -> str:
         _dashboard_state_cache.pop(oldest_key, None)
     return key
 
-
 def _load_dashboard_state(key: str | None) -> dict | None:
     if not key:
         return None
     return _dashboard_state_cache.get(key)
-
 
 def clear_dashboard_state_cache() -> None:
     _dashboard_state_cache.clear()
@@ -100,13 +162,11 @@ def clear_dashboard_state_cache() -> None:
     except Exception:
         pass
 
-
 def _build_error_div(message: str, detail: str | None = None):
     children = [html.P(message, style={"color": "#475569", "fontWeight": "600"})]
     if detail:
         children.append(html.P(detail, style={"color": "#94A3B8", "fontSize": "12px"}))
     return html.Div(children)
-
 
 def _prepare_dashboard_state(start_date, end_date, level, districts, facilities, overview, category, urlparams, age, current_active, triggered_id):
     if not urlparams:
@@ -118,8 +178,11 @@ def _prepare_dashboard_state(start_date, end_date, level, districts, facilities,
 
     clicked_name = current_active
     if triggered_id and "menu-button" in triggered_id:
-        prop_dict = json.loads(triggered_id.split('.')[0])
-        clicked_name = prop_dict['name']
+        try:
+            prop_dict = json.loads(triggered_id.split('.')[0])
+            clicked_name = prop_dict['name']
+        except Exception:
+            clicked_name = current_active
 
     start_dt = pd.to_datetime(start_date).replace(hour=0, minute=0, second=0)
     end_dt = pd.to_datetime(end_date).replace(hour=23, minute=59, second=59)
@@ -232,7 +295,6 @@ def _prepare_dashboard_state(start_date, end_date, level, districts, facilities,
 
     districts = districts or []
     facilities = facilities or []
-    overview = overview or []
     if level == 'National':
         districts = []
         facilities = []
@@ -337,7 +399,6 @@ def _prepare_dashboard_state(start_date, end_date, level, districts, facilities,
         },
     }
 
-
 def _render_dashboard_from_state(state: dict):
     if not state:
         return _build_error_div("Dashboard render failed.", "Dashboard state was not found in cache.")
@@ -366,7 +427,7 @@ def _render_dashboard_from_state(state: dict):
     for report_name in selected_reports:
         dashboard_json = next((d for d in menu_json if d['report_name'] == report_name), None)
         if not dashboard_json:
-            break
+            continue
         is_mnid = dashboard_json.get('dashboard_type') == 'mnid'
 
         _fdata = filtered_data_mnid if is_mnid else filtered_data
@@ -380,7 +441,7 @@ def _render_dashboard_from_state(state: dict):
             if _mnid_scope_key in _mnid_full_data_cache:
                 _ndata = _mnid_full_data_cache[_mnid_scope_key]
             elif _disk_key in _mnid_disk_cache:
-                _ndata = _mnid_disk_cache[_disk_key]
+                _ndata = _mnid_disk_cache.get(_disk_key)
                 _mnid_full_data_cache[_mnid_scope_key] = _ndata
             else:
                 _mnid_cols = ', '.join([
@@ -469,16 +530,13 @@ def _render_dashboard_from_state(state: dict):
 min_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 max_date = datetime.now().replace(hour=23, minute=59, second=59, microsecond=0)
 
-path = os.getcwd()
 try:
     last_refreshed = pd.read_csv(f'{path}/data/TimeStamp.csv')['saving_time'].to_list()[0]
 except Exception as e:
     last_refreshed = "Unknown"
 
-
 # BUILD CHARTS
 PREMIUM_DASHBOARD_REPORTS = {"Maternal and Child Health"}
-
 
 def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json, filter_summary=None,
                           start_date=None, end_date=None, facility_code=None, scope_meta=None, url_object=None):
@@ -516,14 +574,13 @@ def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json, filt
         charts
     ])
 
-
-
 layout = html.Div(
     className="dashboard-layout-modern",
     children=[
         dcc.Location(id='url', refresh=False),
         dcc.Store(id='active-button-store', data='General Summary'),
         dcc.Store(id='dashboard-state-store'),
+        dcc.Store(id='url-params-store', data={}),  # Added missing store
         
         # Left Sidebar
         html.Div(
@@ -806,7 +863,6 @@ layout = html.Div(
         Output('scrolling-menu', 'children'),
         [Input('dashboard-interval-update-today', 'n_intervals'),
         Input('active-button-store', 'data')])
-
 def update_menu(interval, color):
     with open(json_path, 'r') as f:
         menu_json = json.load(f)
@@ -819,7 +875,6 @@ def update_menu(interval, color):
         )
         for d in menu_json
     ]
-
 
 @callback(
     [Output('dashboard-level-filter', 'value'),
@@ -842,9 +897,11 @@ def update_menu(interval, color):
     [
         State('url-params-store', 'data'),
         State('dashboard-age-filter', 'value'),
+        State('active-button-store', 'data'),  # Added missing state
+        State('dashboard-overview-filter', 'value'),  # Added missing state
     ],
 )
-def update_filter_controls(interval, start_date, end_date, level, districts, facilities, category, urlparams, age):
+def update_filter_controls(interval, start_date, end_date, level, districts, facilities, category, urlparams, age, current_active, overview):
     try:
         ctx = callback_context
         triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else None
@@ -856,12 +913,14 @@ def update_filter_controls(interval, start_date, end_date, level, districts, fac
         if not urlparams.get("uuid"):
             urlparams["uuid"] = [DEMO_UUID]
 
-
         # Determine which report to show
         clicked_name = current_active
         if triggered_id and "menu-button" in triggered_id:
-            prop_dict = json.loads(triggered_id.split('.')[0])
-            clicked_name = prop_dict['name']
+            try:
+                prop_dict = json.loads(triggered_id.split('.')[0])
+                clicked_name = prop_dict['name']
+            except Exception:
+                clicked_name = current_active
 
         # Date Logic
         start_dt = pd.to_datetime(start_date).replace(hour=0, minute=0, second=0)
@@ -900,7 +959,6 @@ def update_filter_controls(interval, start_date, end_date, level, districts, fac
                 FROM 'data/{DATA_FILE_NAME_}'
                 WHERE Date >= TIMESTAMP '{last_7_days}'
                 """
-            
         else:
             SQL = f"""
                 SELECT *
@@ -910,24 +968,18 @@ def update_filter_controls(interval, start_date, end_date, level, districts, fac
                 """
         try:
             data = DataStorage.query_duckdb(SQL)
-            # data.to_excel("data/archive/hmis.xlsx")
         except Exception as e:
             import traceback
             traceback.print_exc()
             return (
-                html.Div(
-                    'Missing Data. Ensure that the config file has correct database credentials',
-                    style={'color': 'red'}
-                ),
                 level or dash.no_update,
                 dash.no_update,
-                [],
-                [],
-                True,
-                "",
-                [],
-                [],
-                current_active or dash.no_update,
+                dash.no_update,
+                dash.no_update,
+                dash.no_update,
+                dash.no_update,
+                dash.no_update,
+                dash.no_update,
             )
 
         data[DATE_] = pd.to_datetime(data[DATE_], format='mixed')
@@ -969,16 +1021,14 @@ def update_filter_controls(interval, start_date, end_date, level, districts, fac
 
         if user_info.empty:
             return (
-                html.Div("Unauthorized User. Please contact system administrator."),
                 level,
                 {'display': 'none'} if level in ['National', 'Facility'] else {},
                 [],
                 [],
-                False,
+                True,
                 "",
                 [],
                 [],
-                clicked_name
             )
 
         # Base filters (age + MNID program category)
@@ -986,9 +1036,6 @@ def update_filter_controls(interval, start_date, end_date, level, districts, fac
         if age:
             base_mask &= (data[AGE_GROUP_] == age)
         category = category or "All"
-        # MNID dashboards derive Service_Area internally and handle program scoping via scope_meta.
-        # We keep the Encounter-based pre-filter only for non-MNID use (dropdowns, non-MNID charts).
-        # base_data_mnid skips the Encounter filter so all relevant observations reach the MNID renderer.
         base_data_mnid = data[base_mask].copy()
         encounter_mask = pd.Series(True, index=data.index)
         if category != "All" and "Encounter" in data.columns:
@@ -1008,7 +1055,6 @@ def update_filter_controls(interval, start_date, end_date, level, districts, fac
 
         districts = districts or []
         facilities = facilities or []
-        overview = overview or []
         if level == 'National':
             districts = []
             facilities = []
@@ -1053,157 +1099,15 @@ def update_filter_controls(interval, start_date, end_date, level, districts, fac
             facilities = [f for f in facilities if f in allowed_facilities]
             all_facilities = sorted(allowed_facilities)
 
-        # Filter network and facility data
-        network_data = base_data.copy()
-        if level != 'National' and district_col and districts:
-            network_data = network_data[network_data[district_col].isin(districts)]
-        filtered_data = network_data.copy()
-        if level == 'Facility' and facilities:
-            filtered_data = filtered_data[filtered_data[FACILITY_].isin(facilities)]
-        elif level == 'District' and facilities:
-            filtered_data = filtered_data[filtered_data[FACILITY_].isin(facilities)]
-
-        if filtered_data.empty and len(network_data):
-            filtered_data = network_data.copy()
-
-        # MNID-specific data paths: no Encounter pre-filter so all program observations are present.
-        # The MNID renderer uses Service_Area (derived from Program/Encounter) for internal scoping.
-        network_data_mnid = base_data_mnid.copy()
-        if level != 'National' and district_col and districts:
-            network_data_mnid = network_data_mnid[network_data_mnid[district_col].isin(districts)]
-        filtered_data_mnid = network_data_mnid.copy()
-        if level == 'Facility' and facilities:
-            filtered_data_mnid = filtered_data_mnid[filtered_data_mnid[FACILITY_].isin(facilities)]
-        elif level == 'District' and facilities:
-            filtered_data_mnid = filtered_data_mnid[filtered_data_mnid[FACILITY_].isin(facilities)]
-        if filtered_data_mnid.empty and len(network_data_mnid):
-            filtered_data_mnid = network_data_mnid.copy()
-
-        # Determine report selection
-        menu_json = load_dashboard_menu()
-        if overview:
-            selected_reports = overview
-        else:
-            selected_reports = [clicked_name] if clicked_name else [menu_json[0]["report_name"] if menu_json else "Dashboard"]
-        selected_reports = [normalize_report_name(r, menu_json) for r in selected_reports]
-
-        rendered = []
-        for report_name in selected_reports:
-            dashboard_json = next((d for d in menu_json if d['report_name'] == report_name), None)
-            if not dashboard_json:
-                break
-            is_mnid = dashboard_json.get('dashboard_type') == 'mnid'
-
-            # MNID uses unfiltered data paths; non-MNID uses Encounter-pre-filtered paths.
-            _fdata = filtered_data_mnid if is_mnid else filtered_data
-            if is_mnid:
-                # Use full parquet (no date filter) as the MNID network baseline so that
-                # _prepare_mnid_dataframe is cached once and not re-run on every date change.
-                _mnid_scope_key = (
-                    level,
-                    tuple(sorted(districts or [])),
-                    tuple(sorted(facilities or [])),
-                )
-                _disk_key = f"mnid_full_{'_'.join(str(k) for k in _mnid_scope_key)}"
-                if _mnid_scope_key in _mnid_full_data_cache:
-                    _ndata = _mnid_full_data_cache[_mnid_scope_key]
-                elif _disk_key in _mnid_disk_cache:
-                    _ndata = _mnid_disk_cache[_disk_key]
-                    _mnid_full_data_cache[_mnid_scope_key] = _ndata
-                else:
-                    _mnid_cols = ', '.join([
-                        'person_id', 'encounter_id', 'Date', 'Program', 'Reporting_Program',
-                        'Service_Area', 'Facility', 'Facility_CODE', 'District', 'Encounter',
-                        'obs_value_coded', 'concept_name', 'Value', 'ValueN', 'new_revisit',
-                        'Home_district', 'TA', 'Village', 'Age', 'Age_Group', 'Gender',
-                        'Source_Program',
-                    ])
-                    _sql_full = f"SELECT {_mnid_cols} FROM 'data/{DATA_FILE_NAME_}'"
-                    _full = DataStorage.query_duckdb(_sql_full)
-                    _full[DATE_] = pd.to_datetime(_full[DATE_], errors='coerce')
-                    if level != 'National' and district_col and districts:
-                        _full = _full[_full[district_col].isin(districts)]
-                    if level == 'Facility' and facilities:
-                        _full = _full[_full[FACILITY_].isin(facilities)]
-                    _mnid_full_data_cache.clear()
-                    _mnid_full_data_cache[_mnid_scope_key] = _full
-                    _mnid_disk_cache.set(_disk_key, _full, expire=3600)
-                    _ndata = _full
-            else:
-                _ndata = network_data
-
-            filtered_data_date = _fdata[
-                (_fdata[DATE_] >= start_dt) &
-                (_fdata[DATE_] <= end_dt)
-            ]
-
-            adj_start_dt, adj_end_dt = start_dt, end_dt
-            if is_mnid and filtered_data_date.empty and len(_fdata):
-                adj_start_dt = _fdata[DATE_].min()
-                adj_end_dt = _fdata[DATE_].max()
-                filtered_data_date = _fdata.copy()
-
-            delta_days = (adj_end_dt - adj_start_dt).days
-            facility_code_display = location
-            if is_mnid:
-                if len(facilities) == 1 and FACILITY_ in base_data_mnid.columns and FACILITY_CODE_ in base_data_mnid.columns:
-                    fac_match = base_data_mnid[base_data_mnid[FACILITY_].astype(str) == str(facilities[0])]
-                    if len(fac_match):
-                        facility_code_display = str(fac_match[FACILITY_CODE_].dropna().astype(str).iloc[0])
-                    else:
-                        facility_code_display = ''
-                elif len(facilities) > 1 or level in ['National', 'District']:
-                    facility_code_display = ''
-                else:
-                    facility_code_display = mnid_location or location
-
-            if level == 'Facility' and facilities:
-                scope_label = 'Facility' if len(facilities) == 1 else 'Facilities'
-                scope_value = facilities[0] if len(facilities) == 1 else f'{len(facilities)} selected facilities'
-            elif level == 'District' and facilities:
-                scope_label = 'Facility' if len(facilities) == 1 else 'Facilities'
-                scope_value = facilities[0] if len(facilities) == 1 else f'{len(facilities)} selected facilities'
-            elif level == 'District' and districts:
-                scope_label = 'District' if len(districts) == 1 else 'Districts'
-                scope_value = ', '.join(districts)
-            else:
-                scope_label = 'Districts'
-                scope_value = 'All districts'
-
-            mnid_categories = None
-            if category and category != "All":
-                mnid_categories = [category]
-
-            section = build_charts_from_json(
-                filtered_data_date, _ndata, delta_days, dashboard_json,
-                start_date=adj_start_dt,
-                end_date=adj_end_dt,
-                facility_code=facility_code_display,
-                scope_meta={
-                    'label': scope_label,
-                    'value': scope_value,
-                    'mnid_categories': mnid_categories,
-                    'level': level,
-                    'selected_facilities': facilities,
-                    'selected_districts': districts,
-                },
-                url_object=url_object
-            )
-            rendered.append(html.Div([
-                html.H2(report_name, style={"marginTop": "10px"}),
-                section
-            ]))
-
-        dashboard_content = html.Div(rendered) if len(rendered) > 1 else (rendered[0] if rendered else html.Div("No dashboard selected."))
         return (
-            controls['level'],
-            controls['district_group_style'],
-            controls['district_options'],
-            controls['districts'],
-            controls['district_disabled'],
-            controls['district_note'],
-            controls['facility_options'],
-            controls['facilities'],
+            level,
+            district_group_style,
+            [{'label': d, 'value': d} for d in all_districts],
+            districts,
+            district_disabled,
+            district_note,
+            [{'label': f, 'value': f} for f in all_facilities],
+            facilities,
         )
     except Exception as e:
         import traceback
@@ -1218,7 +1122,6 @@ def update_filter_controls(interval, start_date, end_date, level, districts, fac
             dash.no_update,
             dash.no_update,
         )
-
 
 @callback(
     [Output('dashboard-state-store', 'data'),
@@ -1257,7 +1160,6 @@ def update_dashboard_state(gen, interval, start_date, end_date, overview, catego
         traceback.print_exc()
         return dash.no_update, dash.no_update
 
-
 @callback(
     Output('dashboard-container', 'children'),
     Input('dashboard-state-store', 'data'),
@@ -1265,7 +1167,8 @@ def update_dashboard_state(gen, interval, start_date, end_date, overview, catego
 )
 def render_dashboard(state_key):
     try:
-        return _render_dashboard_from_state(_load_dashboard_state(state_key))
+        state = _load_dashboard_state(state_key)
+        return _render_dashboard_from_state(state)
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -1299,7 +1202,6 @@ def sync_picker_with_logic(period_type, n, current_start_date, current_end_date)
         return start_date, end_date, start_date.replace(day=1)
     today = datetime.now().date()
     return today, today, today.replace(day=1)
-
 
 @callback(
     Output('dashboard-period-type-filter', 'value', allow_duplicate=True),
@@ -1360,7 +1262,6 @@ def change_style(generate, reset):
     triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else None
     if triggered_id == "dashboard-btn-generate.n_clicks":
         style_active = {
-                    # "display": "flex",
                     "alignItems": "center",
                     "gap": "5px",
                     "border": "3px solid green",
@@ -1370,7 +1271,6 @@ def change_style(generate, reset):
     else:
         style_default = {}
         return style_default, style_default, style_default, style_default, style_default, style_default, style_default, style_default
-
 
 @callback(
     Output('dashboard-age-filter-group', 'style'),
