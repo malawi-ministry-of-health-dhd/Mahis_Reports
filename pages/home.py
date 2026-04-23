@@ -84,19 +84,13 @@ def _remember_dashboard_state(state: dict) -> str:
     while len(_dashboard_state_cache) > _DASHBOARD_STATE_CACHE_MAX:
         oldest_key = next(iter(_dashboard_state_cache))
         _dashboard_state_cache.pop(oldest_key, None)
-    _dashboard_state_disk_cache.set(key, state, expire=_DASHBOARD_STATE_TTL)
     return key
 
 
 def _load_dashboard_state(key: str | None) -> dict | None:
     if not key:
         return None
-    state = _dashboard_state_cache.get(key)
-    if state is None:
-        state = _dashboard_state_disk_cache.get(key)
-        if state is not None:
-            _dashboard_state_cache[key] = state
-    return state
+    return _dashboard_state_cache.get(key)
 
 
 def clear_dashboard_state_cache() -> None:
@@ -1267,6 +1261,7 @@ def update_dashboard_state(gen, interval, start_date, end_date, overview, catego
 @callback(
     Output('dashboard-container', 'children'),
     Input('dashboard-state-store', 'data'),
+    prevent_initial_call=True,
 )
 def render_dashboard(state_key):
     try:
