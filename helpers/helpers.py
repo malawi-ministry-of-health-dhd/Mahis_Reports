@@ -177,7 +177,7 @@ def build_single_chart(filtered, data_opd, delta_days, item_config,user_role=Non
         # Default empty figure for unknown chart types
         figure = create_empty_figure()
     figure = apply_figure_theme(figure, chart_type, theme_name)
-    if chart_type in ["Line","Pie","Column","Bar","Histogram","PivotTable","CrossTab","Sankey"]:
+    if chart_type in ["Line","Pie","Column","Bar","Histogram","PivotTable"]:
         return dcc.Graph(
             id=item_config["filters"]["unique"],
             figure=figure,
