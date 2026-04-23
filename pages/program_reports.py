@@ -28,6 +28,8 @@ from config import (actual_keys_in_data,
                     DRUG_NAME_,
                     VALUE_NAME_)
 
+from helpers.navigation_callbacks import DEMO_UUID
+
 dash.register_page(__name__, path="/program_reports")
 # data = pd.read_parquet('data/latest_data_opd.parquet')
 
@@ -257,7 +259,7 @@ def generate_chart(n_clicks, urlparams, selected_report, report_name, start_date
         user_data = pd.DataFrame(columns=['user_id', 'role'])
     else:
         user_data = pd.read_csv(os.path.join(path, 'data', 'users_data.csv'))
-    test_admin = pd.DataFrame(columns=['user_id', 'role'], data=[['m3his@dhd', 'reports_admin']])
+    test_admin = pd.DataFrame(columns=['user_id', 'role'], data=[[DEMO_UUID, 'reports_admin']])
     user_data = pd.concat([user_data, test_admin], ignore_index=True)
 
     user_info = user_data[user_data['user_id'] == urlparams.get('uuid', [None])[0]]

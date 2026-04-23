@@ -10,7 +10,9 @@ from data_storage import DataStorage
 from helpers.date_ranges import get_month_start_end, get_quarter_start_end, get_week_start_end
 from helpers.reports_class import ReportTableBuilder
 
-ALLOWED_API_UUIDS = {"m3his@dhd"}
+from helpers.navigation_callbacks import DEMO_UUID
+
+ALLOWED_API_UUIDS = {DEMO_UUID}
 
 
 def _is_authorized(uuid_param):

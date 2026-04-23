@@ -3,14 +3,17 @@
     "report_id": "report_148ad953",
     "report_name": "General Summary",
     "date_created": "2026-01-24",
+    "count_items_per_row": 6,
     "visualization_types": {
       "counts": [
         {
           "id": "count_5f0a560b",
           "name": "All Attendance",
+          "href": "program_reports",
+          "href_name": "view patients",
           "level": "facility",
           "filters": {
-            "measure": "countx",
+            "measure": "count",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [],
@@ -129,7 +132,7 @@
         },
         {
           "id": "count_aade5941",
-          "name": "Active Programs",
+          "name": "Active MAHIS Programs",
           "level": "facility",
           "filters": {
             "measure": "nunique",
@@ -179,7 +182,7 @@
         },
         {
           "id": "count_f9c74c60",
-          "name": "Avg Registration Time (Mins)",
+          "name": "Avg Patient Registration Time (Mins)",
           "level": "facility",
           "filters": {
             "measure": "time_diff_mins",
@@ -207,8 +210,33 @@
           }
         },
         {
+          "id": "count_c02cf51axy",
+          "name": "Avg Lab Orders - Lab Results (Mins)",
+          "level": "facility",
+          "filters": {
+            "measure": "time_diff_mins",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": [],
+            "variable2": "Encounter",
+            "value2": ["LAB ORDERS", "LAB RESULTS"],
+            "variable3": "concept_name",
+            "value3": [],
+            "variable4": "obs_value_coded",
+            "value4": "",
+            "variable5": "ValueN",
+            "value5": "",
+            "variable6": "Value",
+            "value6": "",
+            "variable7": "Gender",
+            "value7": "",
+            "variable8": "Age",
+            "value8": ""
+          }
+        },
+        {
           "id": "count_c02cf51a",
-          "name": "Avg Patient Duration > Exit(Mins)",
+          "name": "Avg Patient Arrival - Exit Duration (Mins)",
           "level": "facility",
           "filters": {
             "measure": "time_diff_mins",
@@ -229,6 +257,24 @@
             "value7": "",
             "variable8": "Age",
             "value8": ""
+          }
+        },
+        {
+          "id": "count_cde8771bxy",
+          "name": "Returning Patients",
+          "level": "facility",
+          "filters": {
+            "measure": "count",
+            "unique": "person_id",
+            "variable1": "Program",
+            "variable2": "Encounter",
+            "variable3": "concept_name",
+            "variable4": "obs_value_coded",
+            "variable5": "ValueN",
+            "variable6": "Value",
+            "variable7": "Gender",
+            "variable8": "new_revisit",
+            "value8": "Revisit"
           }
         }
       ],
@@ -308,7 +354,7 @@
                   "measure": "nunique",
                   "unique": "any",
                   "duration_default": "7days",
-                  "title": "Daily OPD Attendance - Last 7 Days",
+                  "title": "Daily Patient Attendance - Last 7 Days",
                   "unique_column": "person_id",
                   "filter_col1": [],
                   "filter_val1": "",

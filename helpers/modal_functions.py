@@ -360,6 +360,7 @@ def update_or_create_report(report_name_df, is_update=False, existing_report=Non
         for report in data["reports"]:
             if report.get("page_name") == page_name:
                 report["report_name"] = report_name
+                report["programs"] = [program_name]
                 report["date_updated"] = current_time
                 report["updated_by"] = "admin"
                 report["archived"] = "False"

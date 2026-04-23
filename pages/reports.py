@@ -32,6 +32,7 @@ from data_storage import DataStorage
 from config import (DATE_, FACILITY_, AGE_GROUP_, GENDER_, 
                     NEW_REVISIT_, HOME_DISTRICT_, TA_, VILLAGE_, 
                     FACILITY_CODE_, DATA_FILE_NAME_, actual_keys_in_data)
+from helpers.navigation_callbacks import DEMO_UUID
 
 
 dash.register_page(__name__, path="/hmis_reports")
@@ -215,7 +216,7 @@ layout = html.Div(
                             ]
                         )
                     ]
-                )
+                ),
             ]
         ),
         
@@ -336,7 +337,7 @@ def update_table(clicks,
         user_data = pd.DataFrame(columns=['user_id', 'role'])
     else:
         user_data = pd.read_csv(os.path.join(path, 'data', 'users_data.csv'))
-    test_admin = pd.DataFrame(columns=['user_id', 'role'], data=[['m3his@dhd', 'reports_admin']])
+    test_admin = pd.DataFrame(columns=['user_id', 'role'], data=[[DEMO_UUID, 'reports_admin']])
     user_data = pd.concat([user_data, test_admin], ignore_index=True)
     user_info = user_data[user_data['user_id'] == urlparams.get('uuid', [None])[0]]
     if user_info.empty:

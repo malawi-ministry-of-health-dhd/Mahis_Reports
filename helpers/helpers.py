@@ -31,18 +31,18 @@ from config import (actual_keys_in_data,
                     DRUG_NAME_,
                     VALUE_NAME_)
 
-def build_metrics_section(filtered, counts_config):
+def build_metrics_section(filtered, counts_config, url_object=None):
     """Build metric cards from counts configuration"""
     metrics = []
-    
     for count_config in counts_config:
+        href = count_config.get("href", "") +"?"+ url_object if url_object else ""
         metric = html.Div(className=f'mnid-kpi', children=[
         html.Div(style={'display': 'flex', 'justifyContent': 'space-between',
                         'alignItems': 'flex-start', 'gap': '6px'}, children=[
             html.Div([
                 html.Div(count_config["name"], className='kpi-lbl'),
                 html.Div(create_count_from_config(filtered, count_config["filters"]), className='kpi-val'),
-                html.Div("",   className='kpi-sub'),
+                html.Div(html.A(count_config.get("href_name") or "", href=href),className='kpi-sub')
             ]),
             html.Div(),
         ]),
@@ -177,7 +177,7 @@ def build_single_chart(filtered, data_opd, delta_days, item_config,user_role=Non
         # Default empty figure for unknown chart types
         figure = create_empty_figure()
     figure = apply_figure_theme(figure, chart_type, theme_name)
-    if chart_type in ["Line","Pie","Column","Bar","Histogram","PivotTable"]:
+    if chart_type in ["Line","Pie","Column","Bar","Histogram","PivotTable","CrossTab","Sankey"]:
         return dcc.Graph(
             id=item_config["filters"]["unique"],
             figure=figure,

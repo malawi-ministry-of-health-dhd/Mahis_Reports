@@ -14,6 +14,7 @@ from helpers.modal_functions import (validate_excel_file, load_reports_data, sav
                         create_count_item,create_chart_item, create_section,create_chart_fields, create_mnid_indicator_item, validate_dashboard_json,
                         upload_dashboard_json,validate_prog_reports_json,upload_prog_reports_json,CHART_TEMPLATES)
 from config import actual_keys_in_data
+from helpers.navigation_callbacks import DEMO_UUID
 
 dash.register_page(__name__, path="/reports_config", title="Admin Dashboard")
 
@@ -1394,7 +1395,7 @@ def validate_admin_access(urlparams):
     else:
         user_data = pd.read_csv(os.path.join(path, 'data', 'users_data.csv'))
         authorized_users = user_data[user_data['role'] == 'Superuser,Superuser']
-    test_admin = pd.DataFrame(columns=['user_id', 'role'], data=[['m3his@dhd', 'reports_admin']])
+    test_admin = pd.DataFrame(columns=['user_id', 'role'], data=[[DEMO_UUID, 'reports_admin']])
     user_data = pd.concat([authorized_users, test_admin], ignore_index=True)
 
     user_info = user_data[user_data['user_id'] == urlparams.get('uuid', [None])[0]]
