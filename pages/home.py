@@ -479,6 +479,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         start_dt = pd.to_datetime(start_date).replace(hour=0, minute=0, second=0)
         end_dt = pd.to_datetime(end_date).replace(hour=23, minute=59, second=59)
         last_7_days = start_dt - pd.Timedelta(days=7)
+        # print(start_dt, end_dt, last_7_days)
 
         if urlparams.get('Location', [None])[0]:
             location = urlparams.get('Location', [None])[0]
@@ -550,6 +551,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         data["DateValue"] = pd.to_datetime(data[DATE_]).dt.date
         data['datetime'] = data[DATE_]
         data[DATE_] = data[DATE_].dt.normalize()
+        data.to_excel("data/archive/hmis.xlsx", index=False)
 
         def num_days_patient_seen(data):
             try:
