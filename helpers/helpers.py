@@ -120,6 +120,7 @@ def create_count_from_config(df, filters):
 def build_charts_section(filtered, data_opd, delta_days, sections_config):
     """Build chart sections from JSON configuration"""
     sections = []
+
     
     for section_config in sections_config:
         chart_items_per_row = section_config.get('chart_items_per_row') or 3 #default number of charts per section
@@ -134,7 +135,6 @@ def build_charts_section(filtered, data_opd, delta_days, sections_config):
 def build_section_items(filtered, data_opd, delta_days, items_config, chart_items_per_row):
     """Build individual chart items within a section"""
     items = []
-    
     # Group items into pairs for card-container-2
     for i in range(0, len(items_config), chart_items_per_row):
         pair_items = items_config[i:i+chart_items_per_row]

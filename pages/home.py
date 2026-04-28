@@ -217,7 +217,7 @@ def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json, filt
     # Render all non-MNID dashboards with the generic chart builder.
     filtered = filtered.copy()
     filtered['Residence'] = filtered[HOME_DISTRICT_] + ', TA-' + filtered[TA_] + ', ' + filtered[VILLAGE_]
-    delta_days = 7 if delta_days <= 0 else delta_days
+    delta_days = 7 if delta_days < 7 else delta_days
 
     if config.get("report_name") in PREMIUM_DASHBOARD_REPORTS:
         return build_premium_dashboard(filtered, data_opd, delta_days, config, filter_summary=filter_summary)
