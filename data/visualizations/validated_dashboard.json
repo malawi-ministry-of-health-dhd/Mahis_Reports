@@ -191,9 +191,8 @@
             "value1": [],
             "variable2": "Encounter",
             "value2": [
-              "PATIENT REGISTRATION",
               "REGISTRATION",
-              "VITALS"
+              "ADULTINITIAL"
             ],
             "variable3": "concept_name",
             "value3": [],
