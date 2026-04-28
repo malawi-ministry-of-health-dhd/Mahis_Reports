@@ -551,7 +551,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         data["DateValue"] = pd.to_datetime(data[DATE_]).dt.date
         data['datetime'] = data[DATE_]
         data[DATE_] = data[DATE_].dt.normalize()
-        # data.to_excel("data/archive/hmis.xlsx", index=False)
+        data.to_excel("data/archive/hmis.xlsx", index=False)
 
         def num_days_patient_seen(data):
             try:

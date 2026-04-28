@@ -174,10 +174,23 @@ def _apply_filter(data, filter_col, filter_value):
             # if not isinstance(filter_value, list) or len(filter_value) != len(filter_col):
             #     raise ValueError("Multi-column filters require filter_value list same length as filter_col.")
             if isinstance(filter_value, list):
+                sets = []
                 for col, val in zip(filter_col, filter_value):
-                    # print(col, val)
-                    df = _apply_filter(df, col, val)
+                    base = data.copy()
+                    if isinstance(val, str) and val.startswith("!="):
+                        val = val[2:].strip()
+                        excluded_ids = set(
+                                    base.loc[base[col] == val, "person_id"].astype(str)
+                                )
+                        ids = set(base["person_id"].astype(str)) - excluded_ids
+                    else:
+                        temp = _apply_filter(base, col, val)
+                        ids = set(temp["person_id"].astype(str))
+        
+                    sets.append(ids)
 
+                final_persons = set.intersection(*sets) if sets else set()
+                df = df[df["person_id"].astype(str).isin(final_persons)]
                 return df
 
         filter_col = filter_col[0]  # reduce to single column
@@ -339,7 +352,7 @@ def create_count(df, aggregation='count', unique_column=PERSON_ID_, filter_col1=
 def create_count_sets(
     df,
     aggregation='count',
-    unique_column=PERSON_ID_,
+    unique_column="person_id",
     filter_col1=None, filter_value1=None,
     filter_col2=None, filter_value2=None,
     filter_col3=None, filter_value3=None,
@@ -353,7 +366,13 @@ def create_count_sets(
 ):
 
     data = df.copy()
-    data['defaulter_period'] = data[CONCEPT_NAME_]
+    data['defaulter_period'] = data['concept_name']
+    data['Date'] = pd.to_datetime(data['Date']).dt.normalize()
+    data["composite_id"] = (
+                    data[unique_column].astype(str)
+                    + "|"
+                    + pd.to_datetime(data["Date"]).astype(str)
+    )
 
     filter_cols = [
         filter_col1, filter_col2, filter_col3, filter_col4, filter_col5,
@@ -390,33 +409,20 @@ def create_count_sets(
     #Build sets using ID-level filtering
     sets = []
 
-    for i in range(set_length):
-        ids_list = []
+    for cols, vals in set_filters:
+        # apply the whole pair together
+        temp_df = _apply_filter(data.copy(), cols, vals)
 
-        for cols, vals in set_filters:
-            col_i = cols[i]
-            val_i = vals[i]
+        ids = set(temp_df["composite_id"].drop_duplicates())
 
-            temp_df = _apply_filter(data.copy(), col_i, val_i)
-            ids = set(temp_df[unique_column].drop_duplicates())
-
-            ids_list.append(ids)
-
-        # intersect IDs for this "i"
-        if ids_list:
-            combined_ids = set.intersection(*ids_list)
-        else:
-            combined_ids = set()
-
-        sets.append(combined_ids)
+        sets.append(ids)
 
     #Final intersection across all sets
     final_set = sets[0]
     for s in sets[1:]:
         final_set = final_set.intersection(s)
-
     #Apply remaining filters
-    remaining_df = data[data[unique_column].isin(final_set)]
+    remaining_df = data[data["composite_id"].isin(final_set)]
 
     df_filtered = remaining_df.copy()
     defaulter_col = None

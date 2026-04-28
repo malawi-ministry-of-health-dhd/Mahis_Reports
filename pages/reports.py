@@ -1,5 +1,5 @@
 import dash
-from dash import html, dcc, Input, Output, State, callback
+from dash import html, dcc, Input, Output, State, callback, callback_context
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
@@ -256,6 +256,25 @@ def update_report_dropdown(urlparams, program):
             dropdowns = json.load(x)
     prog_options = ['General Reports'] + dropdowns['programs']
     return prog_options, load_report_options(program)
+
+@callback(
+     Output('generate-btn', 'style'),
+     Input('generate-btn', 'n_clicks'))
+
+def update_generate_btn_style(n_clicks):
+    ctx = callback_context
+    triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else None
+    print(triggered_id)
+
+    inactive_button_style = {
+            "backgroundColor": "#B2B3B2",
+            "color": "white",
+            "border": "none",
+        }
+    if triggered_id == 'generate-btn.n_clicks':
+        return inactive_button_style
+    raise PreventUpdate
+
 
 @callback(
     [Output('standard-reports-table-container', 'children'),

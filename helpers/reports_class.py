@@ -145,6 +145,13 @@ class ReportTableBuilder:
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
             result = create_count(*args)
+        
+        elif measure == "nunique":
+            args: List[Any] = [self.filtered_df, measure]
+            args.append(spec["unique_column"])
+            for fcol, fval in spec["pairs"]:
+                args.extend([fcol, fval])
+            result = create_count(*args)
 
         elif measure == "cohort_sum":
             args_cohort.append(spec["num_field"])
