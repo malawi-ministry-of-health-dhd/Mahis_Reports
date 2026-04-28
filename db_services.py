@@ -438,7 +438,6 @@ class DataFetcher:
             final_df = pd.DataFrame()
 
         today = datetime.now().date()
-
         # Iterate through each day from start_date to today
         while current_date.date() <= today:
             logger.info(f"Processing date: {current_date.strftime('%Y-%m-%d')}")
@@ -515,6 +514,7 @@ class DataFetcher:
 
             logger.debug(f"Fetching batch for {date_str} from ID {last_id}")
             try:
+                # Debug: print the actual query being executed
                 batch_df = pd.read_sql(batch_query, conn)
             except Exception as e:
                 logger.error(f"SQL read failed for date {date_str}: {e}")

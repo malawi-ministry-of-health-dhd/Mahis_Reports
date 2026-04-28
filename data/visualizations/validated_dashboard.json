@@ -13,7 +13,7 @@
           "href_name": "view patients",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [],
@@ -38,7 +38,7 @@
           "name": "Attendance Male",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "variable2": "Encounter",
@@ -56,7 +56,7 @@
           "name": "Attendance Female",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "variable2": "Encounter",
@@ -74,7 +74,7 @@
           "name": "Attendance Under 5",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "variable2": "Encounter",
@@ -92,7 +92,7 @@
           "name": "Attendance Over 5",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "variable2": "Encounter",
@@ -263,7 +263,7 @@
           "name": "Returning Patients",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "variable2": "Encounter",
@@ -319,7 +319,7 @@
                 "type": "Column",
                 "level": "facility",
                 "filters": {
-                  "measure": "count",
+                  "measure": "nunique",
                   "unique": "any",
                   "duration_default": "any",
                   "title": "Attendance By Program",
@@ -532,7 +532,7 @@
           "name": "All Attendance",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [
@@ -552,7 +552,7 @@
           "name": "Attendance Male",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [
@@ -573,7 +573,7 @@
           "name": "Attendance Female",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [
@@ -594,7 +594,7 @@
           "name": "Attendance Under 5",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [
@@ -615,7 +615,7 @@
           "name": "Attendance Over 5",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [
@@ -636,7 +636,7 @@
           "name": "Malaria Cases",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [
@@ -660,7 +660,7 @@
           "name": "Malaria in Under 5",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [
@@ -685,7 +685,7 @@
           "name": "Admissions",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [
@@ -712,7 +712,7 @@
           "name": "Discharged Home",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [
@@ -738,7 +738,7 @@
           "name": "Died",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [
@@ -1125,7 +1125,7 @@
           "name": "Total Attendance",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "NCD PROGRAM"
@@ -1136,7 +1136,7 @@
           "name": "Attendance Male",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "NCD PROGRAM",
@@ -1149,7 +1149,7 @@
           "name": "Attendance Female",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "NCD PROGRAM",
@@ -1162,7 +1162,7 @@
           "name": "Attendance Under 5",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "NCD PROGRAM",
@@ -1175,7 +1175,7 @@
           "name": "Attendance Over 5",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "NCD PROGRAM",
@@ -1188,7 +1188,7 @@
           "name": "Diabetes Cases",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "NCD PROGRAM",
@@ -1203,7 +1203,7 @@
           "name": "Diabetes Type 1 Cases",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "NCD PROGRAM",
@@ -1218,7 +1218,7 @@
           "name": "Diabetes Type 2 Cases",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "NCD PROGRAM",
@@ -1233,7 +1233,7 @@
           "name": "Hypertension Cases",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "NCD PROGRAM",
@@ -1248,7 +1248,7 @@
           "name": "All cases registered in NCD Program",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "NCD PROGRAM",
@@ -1514,7 +1514,7 @@
           "name": "Total Attendance",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "IMMUNIZATION PROGRAM"
@@ -1525,7 +1525,7 @@
           "name": "Attendance Under 5",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "IMMUNIZATION PROGRAM",
@@ -1538,7 +1538,7 @@
           "name": "Attendance Under 2",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "IMMUNIZATION PROGRAM",
@@ -1551,7 +1551,7 @@
           "name": "Attendance Under 1",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "IMMUNIZATION PROGRAM",
@@ -1564,7 +1564,7 @@
           "name": "Attendance Over 5",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "IMMUNIZATION PROGRAM",
@@ -1577,7 +1577,7 @@
           "name": "Protected at Birth",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "encounter_id",
             "variable1": "Program",
             "value1": "IMMUNIZATION PROGRAM",
@@ -1594,7 +1594,7 @@
           "name": "Penta 1 doses",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "IMMUNIZATION PROGRAM",
@@ -1611,7 +1611,7 @@
           "name": "Penta 3 doses",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "IMMUNIZATION PROGRAM",
@@ -1628,7 +1628,7 @@
           "name": "MR 1 doses",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "IMMUNIZATION PROGRAM",
@@ -1645,7 +1645,7 @@
           "name": "MR 2 doses",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "IMMUNIZATION PROGRAM",
@@ -1804,7 +1804,7 @@
           "name": "Screened for HIV",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "variable2": "Encounter",
@@ -1827,7 +1827,7 @@
           "name": "Screened - Status Positive",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [],
@@ -1859,7 +1859,7 @@
           "name": "Screened - Status Negative",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [],
@@ -1892,7 +1892,7 @@
           "name": "Screen - Status Unknown",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [],
@@ -1924,7 +1924,7 @@
           "name": "Positive Clients on ART",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [],
@@ -1949,7 +1949,7 @@
           "name": "HIV Test Orders (MaHIS)",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [],
@@ -1978,7 +1978,7 @@
           "name": "HIV Tests Conducted",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [
@@ -2007,7 +2007,7 @@
           "name": "Test Result New Positive",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [
@@ -2041,7 +2041,7 @@
           "name": "HIV Patients Screened for AHD",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [],
@@ -2348,7 +2348,7 @@
           "name": "Enrolled Neonates",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [
@@ -2378,7 +2378,7 @@
           "name": "Triaged Neonates",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [
@@ -2407,7 +2407,7 @@
           "name": "Review of Systems done",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [
@@ -2436,7 +2436,7 @@
           "name": "Systematic Examination Done",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [
@@ -2465,7 +2465,7 @@
           "name": "Treated Neonates",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [
@@ -2527,7 +2527,7 @@
           "name": "Outcome Referred",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [
@@ -2558,7 +2558,7 @@
           "name": "Outcome Death <24 Hours",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [
@@ -2591,7 +2591,7 @@
           "name": "Outcome Death >24 Hours",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [
@@ -2624,7 +2624,7 @@
           "name": "Outcome Neonatal Dealth",
           "level": "facility",
           "filters": {
-            "measure": "count",
+            "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": [

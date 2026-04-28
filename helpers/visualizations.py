@@ -283,12 +283,14 @@ def create_count(df, aggregation='count', unique_column=PERSON_ID_, filter_col1=
     data['defaulter_period'] = data[CONCEPT_NAME_] #for defaulters
     
     data = data.copy()
+
     # Apply all filters using the helper function
     for col, val in zip(filter_cols, filter_vals):
         if col == "defaulter_period":
             continue
         else:
             data = _apply_filter(data, col, val)
+    
     
     # Remove duplicates based on unique_column and DATE_
     unique_visits = _prepare_data_for_visualization(data, unique_column)
@@ -323,6 +325,9 @@ def create_count(df, aggregation='count', unique_column=PERSON_ID_, filter_col1=
             return 0
         return int(mean_val)
     elif aggregation == 'defaulter_count':
+        # lets maintain individuals who passed through filters
+        filtered_ids = set(unique_visits[unique_column].dropna().unique())
+        df = df[df[unique_column].isin(filtered_ids)]
         df["start_date"] = pd.to_datetime(df["start_date"],errors='coerce')
         df['value_datetime'] = pd.to_datetime(df['value_datetime'],errors='coerce')
         df = df.dropna(subset=[DATE_, 'value_datetime'])
@@ -336,7 +341,7 @@ def create_count(df, aggregation='count', unique_column=PERSON_ID_, filter_col1=
                                     default['start_date'] - default["value_datetime"]
                                 ).dt.days
                     # print(default[["Program","concept_name","value_datetime","Duration_to_visit","start_date"]])
-                    default = default[default['Duration_to_visit']>= val]
+                    default = default[default['Duration_to_visit']> val]
                     ids = default[PERSON_ID_].unique().tolist()
                     df_defaulted_ids.extend(ids)
             except Exception as e:

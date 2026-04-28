@@ -258,36 +258,42 @@ def update_report_dropdown(urlparams, program):
     return prog_options, load_report_options(program)
 
 @callback(
-     Output('generate-btn', 'style'),
-     Input('generate-btn', 'n_clicks'))
-
-def update_generate_btn_style(n_clicks):
-    ctx = callback_context
-    triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else None
-    print(triggered_id)
-
-    inactive_button_style = {
-            "backgroundColor": "#B2B3B2",
-            "color": "white",
-            "border": "none",
-        }
-    if triggered_id == 'generate-btn.n_clicks':
-        return inactive_button_style
-    raise PreventUpdate
-
-
-@callback(
-    [Output('standard-reports-table-container', 'children'),
-     Output('generate-btn', 'n_clicks'),
-     Output('report-data-store', 'data')],
-
-    Input('generate-btn', 'n_clicks'), 
+    [
+        Output('standard-reports-table-container', 'children'),
+        Output('generate-btn', 'n_clicks'),
+        Output('report-data-store', 'data')
+    ],
+    Input('generate-btn', 'n_clicks'),
     Input('url-params-store', 'data'),
     Input('period_type-filter', 'value'),
     Input('year-filter', 'value'),
     Input('month-filter', 'value'),
     Input('report_name', 'value'),
-    prevent_initial_call=True
+    prevent_initial_call=True,
+
+    running=[
+        (
+            Output("generate-btn", "children"),
+            "Generating... wait",
+            "Generate Report"
+        ),
+        (
+            Output("generate-btn", "style"),
+            {
+                "cursor": "not-allowed",
+                "opacity": "0.7"
+            },
+            {
+                "cursor": "pointer",
+                "opacity": "1"
+            }
+        ),
+        (
+            Output("generate-btn", "disabled"),
+            True,
+            False
+        ),
+    ]
 )
 def update_table(clicks, 
                  urlparams, 
