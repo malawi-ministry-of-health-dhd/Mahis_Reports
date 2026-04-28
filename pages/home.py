@@ -53,7 +53,7 @@ _mnid_disk_cache = diskcache.Cache('./cache/mnid')
 # In-process fallback (used when background=False or within same worker)
 _mnid_full_data_cache: dict = {}
 DEFAULT_DASHBOARD_DAYS = 30
-DEFAULT_RELATIVE_PERIOD = 'Last 30 Days'
+DEFAULT_RELATIVE_PERIOD = 'Today'
 
 
 def _default_date_window():
@@ -137,7 +137,7 @@ def _resolve_user_scope(urlparams, user_data: pd.DataFrame) -> tuple[pd.Series |
         'user_id': requested_uuid,
         'assigned_level': assigned_level,
         'district': _first_non_empty(row, ['district', 'District', 'home_district', 'Home_district']),
-        'facility_code': _first_non_empty(row, ['facility_code', 'Facility_CODE', 'Location']) or (urlparams.get('Location', [None])[0] if urlparams else None),
+        'facility_code': (urlparams.get('Location', [None])[0] if urlparams else None),
         'facility_name': _first_non_empty(row, ['facility_name', 'Facility']),
         'roles': [r.strip() for r in str(row.get('role') or '').split(',') if r and str(r).strip()],
     }
@@ -588,6 +588,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         default_start, default_end = _default_date_window()
         start_dt = pd.to_datetime(start_date or default_start).replace(hour=0, minute=0, second=0)
         end_dt = pd.to_datetime(end_date or default_end).replace(hour=23, minute=59, second=59)
+        default_start_date = start_dt - pd.Timedelta(days=DEFAULT_DASHBOARD_DAYS)
 
         if urlparams.get('Location', [None])[0]:
             location = urlparams.get('Location', [None])[0]
@@ -634,7 +635,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                 {sql_comment}
                 SELECT *
                 FROM 'data/{DATA_FILE_NAME_}'
-                WHERE Date >= TIMESTAMP '{start_dt}'
+                WHERE Date >= TIMESTAMP '{default_start_date}'
                 AND Date <= TIMESTAMP '{end_dt}'
                 AND {FACILITY_CODE_} = '{location}'
                 """
@@ -643,7 +644,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                 {sql_comment}
                 SELECT *
                 FROM 'data/{DATA_FILE_NAME_}'
-                WHERE Date >= TIMESTAMP '{start_dt}'
+                WHERE Date >= TIMESTAMP '{default_start_date}'
                 AND Date <= TIMESTAMP '{end_dt}'
                 """
         try:
