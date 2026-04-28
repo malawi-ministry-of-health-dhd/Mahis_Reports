@@ -7,7 +7,6 @@ import os
 import json
 import numpy as np
 from dash.exceptions import PreventUpdate
-import os
 from flask import request
 from helpers.helpers import build_charts_section, build_metrics_section
 from mnid_renderer import render_mnid_dashboard
@@ -53,6 +52,116 @@ _mnid_disk_cache = diskcache.Cache('./cache/mnid')
 
 # In-process fallback (used when background=False or within same worker)
 _mnid_full_data_cache: dict = {}
+DEFAULT_DASHBOARD_DAYS = 30
+DEFAULT_RELATIVE_PERIOD = 'Last 30 Days'
+
+
+def _default_date_window():
+    today = datetime.now().date()
+    start = today - pd.Timedelta(days=29)
+    return start, today
+
+
+def _dataset_version_token() -> str:
+    timestamp_path = os.path.join(path, 'data', 'TimeStamp.csv')
+    data_path = os.path.join(path, 'data', DATA_FILE_NAME_)
+    parts = []
+    try:
+        parts.append(str(os.path.getmtime(data_path)))
+    except Exception:
+        parts.append('no-data-file')
+    try:
+        parts.append(str(os.path.getmtime(timestamp_path)))
+    except Exception:
+        parts.append('no-timestamp')
+    return '|'.join(parts)
+
+
+def clear_dashboard_state_cache() -> None:
+    _mnid_full_data_cache.clear()
+    try:
+        _mnid_disk_cache.clear()
+    except Exception:
+        pass
+
+
+def _load_user_registry() -> pd.DataFrame:
+    user_data_path = os.path.join(path, 'data', 'users_data.csv')
+    if os.path.exists(user_data_path):
+        user_data = pd.read_csv(user_data_path)
+    else:
+        user_data = pd.DataFrame(columns=['user_id', 'role'])
+
+    demo_row = {
+        'user_id': DEMO_UUID,
+        'role': 'reports_admin',
+        'user_level': 'facility',
+        'facility_code': DEMO_LOCATION,
+    }
+    user_data = pd.concat([user_data, pd.DataFrame([demo_row])], ignore_index=True)
+    for column in ['user_id', 'role', 'user_level', 'district', 'facility_code', 'facility_name']:
+        if column not in user_data.columns:
+            user_data[column] = pd.NA
+    return user_data
+
+
+def _first_non_empty(row: pd.Series, candidates: list[str]) -> str | None:
+    for name in candidates:
+        if name in row.index:
+            value = row.get(name)
+            if pd.notna(value) and str(value).strip():
+                return str(value).strip()
+    return None
+
+
+def _normalize_level(value: str | None) -> str:
+    value = str(value or '').strip().lower()
+    if value in {'national', 'district', 'facility'}:
+        return value
+    return 'facility'
+
+
+def _title_level(value: str) -> str:
+    return {'national': 'National', 'district': 'District', 'facility': 'Facility'}.get(value, 'Facility')
+
+
+def _resolve_user_scope(urlparams, user_data: pd.DataFrame) -> tuple[pd.Series | None, dict]:
+    requested_uuid = urlparams.get('uuid', [None])[0] if urlparams else None
+    user_info = user_data[user_data['user_id'] == requested_uuid]
+    if user_info.empty:
+        return None, {}
+
+    row = user_info.iloc[0]
+    assigned_level = _normalize_level(_first_non_empty(row, ['user_level']) or (urlparams.get('user_level', [None])[0] if urlparams else None))
+    scope = {
+        'user_id': requested_uuid,
+        'assigned_level': assigned_level,
+        'district': _first_non_empty(row, ['district', 'District', 'home_district', 'Home_district']),
+        'facility_code': _first_non_empty(row, ['facility_code', 'Facility_CODE', 'Location']) or (urlparams.get('Location', [None])[0] if urlparams else None),
+        'facility_name': _first_non_empty(row, ['facility_name', 'Facility']),
+        'roles': [r.strip() for r in str(row.get('role') or '').split(',') if r and str(r).strip()],
+    }
+    return row, scope
+
+
+def _apply_scope_to_data(data: pd.DataFrame, scope: dict, district_col: str | None = None) -> pd.DataFrame:
+    if data is None or data.empty:
+        return data
+
+    assigned_level = scope.get('assigned_level')
+    scoped = data
+    if assigned_level == 'facility':
+        facility_code = scope.get('facility_code')
+        facility_name = scope.get('facility_name')
+        if facility_code and FACILITY_CODE_ in scoped.columns:
+            scoped = scoped[scoped[FACILITY_CODE_].astype(str) == str(facility_code)]
+        elif facility_name and FACILITY_ in scoped.columns:
+            scoped = scoped[scoped[FACILITY_].astype(str) == str(facility_name)]
+    elif assigned_level == 'district':
+        district = scope.get('district')
+        if district and district_col and district_col in scoped.columns:
+            scoped = scoped[scoped[district_col].astype(str) == str(district)]
+    return scoped
 
 def load_dashboard_menu():
     try:
@@ -219,7 +328,7 @@ layout = html.Div(
                                                         {'label': item, 'value': item}
                                                         for item in RELATIVE_PERIOD_LIST
                                                     ],
-                                                    value='Today',
+                                                    value=DEFAULT_RELATIVE_PERIOD,
                                                     clearable=True,
                                                     className="modern-dropdown"
                                                 )
@@ -236,8 +345,8 @@ layout = html.Div(
                                                     min_date_allowed="2023-01-01",
                                                     max_date_allowed="2050-01-01",
                                                     initial_visible_month=datetime.now(),
-                                                    start_date=datetime.now().replace(hour=0, minute=0, second=0, microsecond=0),
-                                                    end_date=datetime.now().replace(hour=23, minute=59, second=59, microsecond=0),
+                                                    start_date=_default_date_window()[0],
+                                                    end_date=_default_date_window()[1],
                                                     display_format='YYYY-MM-DD',
                                                     className="modern-datepicker"
                                                 )
@@ -476,10 +585,9 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             clicked_name = prop_dict['name']
 
         # Date Logic
-        start_dt = pd.to_datetime(start_date).replace(hour=0, minute=0, second=0)
-        end_dt = pd.to_datetime(end_date).replace(hour=23, minute=59, second=59)
-        last_7_days = start_dt - pd.Timedelta(days=7)
-        # print(start_dt, end_dt, last_7_days)
+        default_start, default_end = _default_date_window()
+        start_dt = pd.to_datetime(start_date or default_start).replace(hour=0, minute=0, second=0)
+        end_dt = pd.to_datetime(end_date or default_end).replace(hour=23, minute=59, second=59)
 
         if urlparams.get('Location', [None])[0]:
             location = urlparams.get('Location', [None])[0]
@@ -487,39 +595,56 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             location = DEMO_LOCATION
         mnid_location = urlparams.get('Location', [None])[0] if urlparams.get('Location') else None
 
-        user_levels = ['national', 'district']
-        user_level = urlparams.get('user_level', [None])[0]
+        user_data = _load_user_registry()
+        user_row, scope = _resolve_user_scope(urlparams, user_data)
+        if user_row is None:
+            return (
+                html.Div("Unauthorized User. Please contact system administrator."),
+                level,
+                {'display': 'none'} if level in ['National', 'Facility'] else {},
+                [],
+                [],
+                False,
+                "",
+                [],
+                [],
+                clicked_name
+            )
+
+        user_level = scope['assigned_level']
+        if user_level == 'facility' and scope.get('facility_code'):
+            location = scope['facility_code']
+            mnid_location = scope['facility_code']
 
         url_object = f"Location={location}&uuid={urlparams.get('uuid', [None])[0]}&user_level={user_level}"
 
         # Default level based on user_level
-        if not level:
-            if user_level == 'national':
-                level = 'National'
-            elif user_level == 'district':
-                level = 'District'
-            else:
-                level = 'Facility'
-        
-        if level in ['National', 'District']:
+        requested_level = _normalize_level(level)
+        if user_level == 'national':
+            effective_level = requested_level if requested_level in {'national', 'district', 'facility'} else 'national'
+        elif user_level == 'district':
+            effective_level = requested_level if requested_level in {'district', 'facility'} else 'district'
+        else:
+            effective_level = 'facility'
+        level = _title_level(effective_level)
+
+        sql_comment = f"-- version:{_dataset_version_token()} scope:{user_level} level:{effective_level}"
+        if user_level == 'facility':
             SQL = f"""
+                {sql_comment}
                 SELECT *
                 FROM 'data/{DATA_FILE_NAME_}'
-                WHERE Date >= TIMESTAMP '{last_7_days}'
+                WHERE Date >= TIMESTAMP '{start_dt}'
+                AND Date <= TIMESTAMP '{end_dt}'
+                AND {FACILITY_CODE_} = '{location}'
                 """
-        elif user_level in user_levels:
-            SQL = f"""
-                SELECT *
-                FROM 'data/{DATA_FILE_NAME_}'
-                WHERE Date >= TIMESTAMP '{last_7_days}'
-                """
-            
         else:
             SQL = f"""
+                {sql_comment}
                 SELECT *
                 FROM 'data/{DATA_FILE_NAME_}'
-                WHERE Date >= TIMESTAMP '{last_7_days}'
-                AND {FACILITY_CODE_} = '{location}'
+                WHERE Date >= TIMESTAMP '{start_dt}'
+                AND Date <= TIMESTAMP '{end_dt}'
                 """
         try:
             data = DataStorage.query_duckdb(SQL)
@@ -570,30 +695,8 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         today = dt.today().date()
         data["months"] = ((pd.Timestamp(today) - pd.to_datetime(data["DateValue"])).dt.days // 30).clip(lower=0)
 
-        # get user
-        user_data_path = os.path.join(path, 'data', 'users_data.csv')
-        if not os.path.exists(user_data_path):
-            user_data = pd.DataFrame(columns=['user_id', 'role'])
-        else:
-            user_data = pd.read_csv(os.path.join(path, 'data', 'users_data.csv'))
-        test_admin = pd.DataFrame(columns=['user_id', 'role'], data=[[DEMO_UUID, 'reports_admin']])
-        user_data = pd.concat([user_data, test_admin], ignore_index=True)
-
-        user_info = user_data[user_data['user_id'] == urlparams.get('uuid', [None])[0]]
-
-        if user_info.empty:
-            return (
-                html.Div("Unauthorized User. Please contact system administrator."),
-                level,
-                {'display': 'none'} if level in ['National', 'Facility'] else {},
-                [],
-                [],
-                False,
-                "",
-                [],
-                [],
-                clicked_name
-            )
+        district_col = "District" if "District" in data.columns else (HOME_DISTRICT_ if HOME_DISTRICT_ in data.columns else None)
+        data = _apply_scope_to_data(data, scope, district_col)
 
         # Base filters (age + MNID program category)
         base_mask = pd.Series(True, index=data.index)
@@ -623,10 +726,46 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         districts = districts or []
         facilities = facilities or []
         overview = overview or []
-        if level == 'National':
+        if effective_level == 'national':
             districts = []
             facilities = []
-        elif level == 'District' and facilities and district_col:
+        elif effective_level == 'district':
+            scope_district = scope.get('district')
+            if scope_district:
+                districts = [scope_district]
+            elif districts:
+                districts = [d for d in districts if d in all_districts]
+            if facilities and district_col:
+                allowed_facilities = set(
+                    base_data[base_data[district_col].isin(districts)][FACILITY_]
+                    .dropna()
+                    .unique()
+                    .tolist()
+                ) if districts else set()
+                facilities = [f for f in facilities if f in allowed_facilities]
+        else:
+            districts = [scope.get('district')] if scope.get('district') else []
+            if FACILITY_ in base_data.columns:
+                assigned_facilities = []
+                if scope.get('facility_name'):
+                    assigned_facilities = (
+                        base_data[base_data[FACILITY_].astype(str) == str(scope['facility_name'])][FACILITY_]
+                        .dropna()
+                        .astype(str)
+                        .unique()
+                        .tolist()
+                    )
+                elif scope.get('facility_code') and FACILITY_CODE_ in base_data.columns:
+                    assigned_facilities = (
+                        base_data[base_data[FACILITY_CODE_].astype(str) == str(scope['facility_code'])][FACILITY_]
+                        .dropna()
+                        .astype(str)
+                        .unique()
+                        .tolist()
+                    )
+                facilities = assigned_facilities[:1]
+
+        if effective_level == 'district' and facilities and district_col:
             allowed_facilities = set(
                 base_data[base_data[district_col].isin(districts)][FACILITY_]
                 .dropna()
@@ -636,9 +775,9 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             facilities = [f for f in facilities if f in allowed_facilities]
 
         # Facility options based on selected districts
-        if level == "National":
+        if effective_level == "national":
             facilities_pool = base_data
-        elif level == "District" and district_col and not districts:
+        elif effective_level == "district" and district_col and not districts:
             facilities_pool = base_data.iloc[0:0]
         elif district_col and districts:
             facilities_pool = base_data[base_data[district_col].isin(districts)]
@@ -649,7 +788,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             if FACILITY_ in facilities_pool.columns else []
         )
 
-        show_district_filter = level == "District"
+        show_district_filter = effective_level == "district"
         district_group_style = {} if show_district_filter else {"display": "none"}
         district_disabled = not show_district_filter
         district_note = ""
@@ -657,7 +796,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             districts = []
 
         # Keep selected facilities consistent with selected districts
-        if level == "District" and district_col and districts:
+        if effective_level == "district" and district_col and districts:
             allowed_facilities = set(
                 base_data[base_data[district_col].isin(districts)][FACILITY_]
                 .dropna()
@@ -666,32 +805,29 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             )
             facilities = [f for f in facilities if f in allowed_facilities]
             all_facilities = sorted(allowed_facilities)
+        elif effective_level == "facility":
+            all_facilities = facilities.copy()
 
         # Filter network and facility data
         network_data = base_data.copy()
-        if level != 'National' and district_col and districts:
+        if effective_level != 'national' and district_col and districts:
             network_data = network_data[network_data[district_col].isin(districts)]
         filtered_data = network_data.copy()
-        if level == 'Facility' and facilities:
+        if effective_level == 'facility' and facilities:
             filtered_data = filtered_data[filtered_data[FACILITY_].isin(facilities)]
-        elif level == 'District' and facilities:
+        elif effective_level == 'district' and facilities:
             filtered_data = filtered_data[filtered_data[FACILITY_].isin(facilities)]
-
-        if filtered_data.empty and len(network_data):
-            filtered_data = network_data.copy()
 
         # MNID-specific data paths: no Encounter pre-filter so all program observations are present.
         # The MNID renderer uses Service_Area (derived from Program/Encounter) for internal scoping.
         network_data_mnid = base_data_mnid.copy()
-        if level != 'National' and district_col and districts:
+        if effective_level != 'national' and district_col and districts:
             network_data_mnid = network_data_mnid[network_data_mnid[district_col].isin(districts)]
         filtered_data_mnid = network_data_mnid.copy()
-        if level == 'Facility' and facilities:
+        if effective_level == 'facility' and facilities:
             filtered_data_mnid = filtered_data_mnid[filtered_data_mnid[FACILITY_].isin(facilities)]
-        elif level == 'District' and facilities:
+        elif effective_level == 'district' and facilities:
             filtered_data_mnid = filtered_data_mnid[filtered_data_mnid[FACILITY_].isin(facilities)]
-        if filtered_data_mnid.empty and len(network_data_mnid):
-            filtered_data_mnid = network_data_mnid.copy()
 
         # Determine report selection
         menu_json = load_dashboard_menu()
@@ -700,6 +836,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         else:
             selected_reports = [clicked_name] if clicked_name else [menu_json[0]["report_name"] if menu_json else "Dashboard"]
         selected_reports = [normalize_report_name(r, menu_json) for r in selected_reports]
+        dataset_version = _dataset_version_token()
 
         rendered = []
         for report_name in selected_reports:
@@ -707,6 +844,9 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             if not dashboard_json:
                 break
             is_mnid = dashboard_json.get('dashboard_type') == 'mnid'
+            mnid_categories = None
+            if category and category != "All":
+                mnid_categories = [category]
 
             # MNID uses unfiltered data paths; non-MNID uses Encounter-pre-filtered paths.
             _fdata = filtered_data_mnid if is_mnid else filtered_data
@@ -714,9 +854,11 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                 # Use full parquet (no date filter) as the MNID network baseline so that
                 # _prepare_mnid_dataframe is cached once and not re-run on every date change.
                 _mnid_scope_key = (
-                    level,
+                    dataset_version,
+                    effective_level,
                     tuple(sorted(districts or [])),
                     tuple(sorted(facilities or [])),
+                    tuple(sorted(mnid_categories or [])),
                 )
                 _disk_key = f"mnid_full_{'_'.join(str(k) for k in _mnid_scope_key)}"
                 if _mnid_scope_key in _mnid_full_data_cache:
@@ -735,9 +877,12 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                     _sql_full = f"SELECT {_mnid_cols} FROM 'data/{DATA_FILE_NAME_}'"
                     _full = DataStorage.query_duckdb(_sql_full)
                     _full[DATE_] = pd.to_datetime(_full[DATE_], errors='coerce')
-                    if level != 'National' and district_col and districts:
+                    _full = _apply_scope_to_data(_full, scope, district_col)
+                    if effective_level != 'national' and district_col and districts:
                         _full = _full[_full[district_col].isin(districts)]
-                    if level == 'Facility' and facilities:
+                    if effective_level == 'facility' and facilities:
+                        _full = _full[_full[FACILITY_].isin(facilities)]
+                    elif effective_level == 'district' and facilities:
                         _full = _full[_full[FACILITY_].isin(facilities)]
                     _mnid_full_data_cache.clear()
                     _mnid_full_data_cache[_mnid_scope_key] = _full
@@ -752,12 +897,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             ]
 
             adj_start_dt, adj_end_dt = start_dt, end_dt
-            if is_mnid and filtered_data_date.empty and len(_fdata):
-                adj_start_dt = _fdata[DATE_].min()
-                adj_end_dt = _fdata[DATE_].max()
-                filtered_data_date = _fdata.copy()
-
-            delta_days = (adj_end_dt - adj_start_dt).days
+            delta_days = max((adj_end_dt - adj_start_dt).days, 1)
             facility_code_display = location
             if is_mnid:
                 if len(facilities) == 1 and FACILITY_ in base_data_mnid.columns and FACILITY_CODE_ in base_data_mnid.columns:
@@ -766,27 +906,26 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                         facility_code_display = str(fac_match[FACILITY_CODE_].dropna().astype(str).iloc[0])
                     else:
                         facility_code_display = ''
-                elif len(facilities) > 1 or level in ['National', 'District']:
+                elif len(facilities) > 1 or effective_level in ['national', 'district']:
                     facility_code_display = ''
                 else:
                     facility_code_display = mnid_location or location
 
-            if level == 'Facility' and facilities:
+            if effective_level == 'facility' and facilities:
                 scope_label = 'Facility' if len(facilities) == 1 else 'Facilities'
                 scope_value = facilities[0] if len(facilities) == 1 else f'{len(facilities)} selected facilities'
-            elif level == 'District' and facilities:
+            elif effective_level == 'district' and facilities:
                 scope_label = 'Facility' if len(facilities) == 1 else 'Facilities'
                 scope_value = facilities[0] if len(facilities) == 1 else f'{len(facilities)} selected facilities'
-            elif level == 'District' and districts:
+            elif effective_level == 'district' and districts:
                 scope_label = 'District' if len(districts) == 1 else 'Districts'
                 scope_value = ', '.join(districts)
             else:
                 scope_label = 'Districts'
                 scope_value = 'All districts'
-
-            mnid_categories = None
-            if category and category != "All":
-                mnid_categories = [category]
+            data_period_note = None
+            if filtered_data_date.empty:
+                data_period_note = 'No data is available for the selected date range.'
 
             section = build_charts_from_json(
                 filtered_data_date, _ndata, delta_days, dashboard_json,
@@ -797,9 +936,11 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                     'label': scope_label,
                     'value': scope_value,
                     'mnid_categories': mnid_categories,
-                    'level': level,
+                    'level': effective_level,
                     'selected_facilities': facilities,
                     'selected_districts': districts,
+                    'data_period_note': data_period_note,
+                    'dataset_version': dataset_version,
                 },
                 url_object=url_object
             )
@@ -849,6 +990,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
 def sync_picker_with_logic(period_type, n):
     ctx = callback_context
     triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else ""
+    default_start, default_end = _default_date_window()
 
     if "dashboard-interval-update-today" in triggered_id:
         if period_type == "Today":
@@ -859,8 +1001,7 @@ def sync_picker_with_logic(period_type, n):
         s, e = get_relative_date_range(period_type)
         if s and e:
             return s, e
-    today = datetime.now().date()
-    return today, today
+    return default_start, default_end
 
 @callback(
     [Output('dashboard-period-type-filter', 'value', allow_duplicate=True),
@@ -874,8 +1015,7 @@ def sync_picker_with_logic(period_type, n):
     prevent_initial_call=True
 )
 def reset_ui_controls(n_clicks):
-    # Setting period to "Today" triggers the callback in Step 1
-    return 'Today', None, [], [], [], "All", None
+    return DEFAULT_RELATIVE_PERIOD, None, [], [], [], "All", None
 
 @callback(
     [Output('dashboard-period-type-filter', 'style'),
