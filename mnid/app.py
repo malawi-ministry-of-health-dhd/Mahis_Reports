@@ -5432,7 +5432,18 @@ _network_df_cache: dict = {}
 def render_mnid_dashboard(filtered, data_opd, delta_days, config,
                           facility_code, start_date, end_date,
                           scope_meta: dict | None = None):
-    _opd_key = (len(data_opd), tuple(data_opd.columns.tolist()) if not data_opd.empty else ())
+    dataset_version = (scope_meta or {}).get('dataset_version')
+    selected_programs = tuple(sorted((scope_meta or {}).get('mnid_categories') or []))
+    selected_facilities = tuple(sorted((scope_meta or {}).get('selected_facilities') or []))
+    selected_districts = tuple(sorted((scope_meta or {}).get('selected_districts') or []))
+    _opd_key = (
+        dataset_version,
+        len(data_opd),
+        tuple(data_opd.columns.tolist()) if not data_opd.empty else (),
+        selected_programs,
+        selected_facilities,
+        selected_districts,
+    )
     if _opd_key not in _network_df_cache:
         _network_df_cache.clear()
         _network_df_cache[_opd_key] = _prepare_mnid_dataframe(data_opd)
@@ -5449,8 +5460,8 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
             facility_df = network_df[date_mask]
         except Exception:
             facility_df = network_df
-    selected_facilities = (scope_meta or {}).get('selected_facilities') or []
-    selected_districts  = (scope_meta or {}).get('selected_districts') or []
+    selected_facilities = list(selected_facilities)
+    selected_districts = list(selected_districts)
     if selected_facilities and 'Facility' in facility_df.columns:
         facility_df = facility_df[facility_df['Facility'].isin(selected_facilities)]
     elif selected_districts and 'District' in facility_df.columns:
