@@ -420,7 +420,7 @@
                   "filter_val4": "",
                   "filter_col5": "",
                   "filter_val5": "",
-                  "custom_fields": "[\n {\"column\": \"Age\", \"expr\": \"Age / 365.25\"},\n  {\"column\": \"is_adult\",  \"expr\": \"Age > 18 * 365\"}\n]",
+                  "custom_fields": "[\n {\"column\": \"Age\", \"expr\": \"AgeDays / 365.25\"},\n  {\"column\": \"is_adult\",  \"expr\": \"Age > 18 * 365\"}\n]",
                   "age_col": "Age",
                   "gender_col": "Gender",
                   "bin_size": "10",

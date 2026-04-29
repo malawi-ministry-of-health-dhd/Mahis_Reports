@@ -102,7 +102,7 @@ report_config_panel = html.Div(
                                     end_date=datetime.now().replace(hour=23, minute=59, second=59, microsecond=0),
                                     display_format='YYYY-MM-DD',
                                     minimum_nights=0,
-                                    className="modern-datepicker-range",
+                                    # className="modern-datepicker-range",
                                     style={
                                         "width": "100%",
                                         "border": "1px solid #ced4da",
@@ -239,7 +239,7 @@ def update_filters(selected_program):
     filtered_object = {"reports":filtered_reports_list}
     program_reports = [x['report_name'] for x in filtered_object['reports']]
     default_report = program_reports[0] if program_reports else None
-    return program_reports, default_report 
+    return program_reports, ""
 
 @callback(
     [Output('program-reports-container', 'children'),
@@ -251,7 +251,24 @@ def update_filters(selected_program):
     [State("report-selector", "value"),
      State('prog-date-range-picker', 'start_date'),
      State('prog-date-range-picker', 'end_date'),
-     State('prog-hf-filter', 'value')] # These are read only when Input triggers
+     State('prog-hf-filter', 'value')], # These are read only when Input triggers
+     running=[
+        (
+            Output("btn-generate-report", "children"),
+            "Generating... wait",
+            "Generate Report"
+        ),
+        (
+            Output("btn-generate-report", "style"),
+            {"cursor": "not-allowed","opacity": "0.7"},
+            {"cursor": "pointer","opacity": "1"}
+        ),
+        (
+            Output("btn-generate-report", "disabled"),
+            True,
+            False
+        ),
+    ]
 )
 def generate_chart(n_clicks, urlparams, selected_report, report_name, start_date, end_date, hf):
     user_data_path = os.path.join(path, 'data', 'users_data.csv')
@@ -274,7 +291,7 @@ def generate_chart(n_clicks, urlparams, selected_report, report_name, start_date
     ctx = callback_context
     triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
 
-    if triggered_id == "btn-generate-report.n_clicks" and n_clicks is None:
+    if triggered_id != "btn-generate-report.n_clicks" and n_clicks is None:
         return no_update, no_update, no_update
 
     try:
@@ -331,7 +348,7 @@ def generate_chart(n_clicks, urlparams, selected_report, report_name, start_date
             data = data[data['Facility'].isin(hf_list)]
 
         if data.empty:
-            return html.Div("No data for selected facility."), hf_options, prog_options
+            return html.Div("No data for selected Date Range."), hf_options, prog_options
 
         #Get Config and Render
         with open(path_program_reports) as x:

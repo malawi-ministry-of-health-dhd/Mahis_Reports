@@ -644,6 +644,10 @@ def create_linelist_from_config(filtered, filters,user_role=None, **kwargs):
         ga = filters.get(f"group{i}_aggr") or filters.get(f"group{i}_aggregations")
         if ga:
             group_kwargs[f"group{i}_aggr"] = ga
+
+        gr = filters.get(f"group{i}_rename")
+        if gr:
+            group_kwargs[f"group{i}_rename"] = gr
     # Merge any extra **kwargs the user passes
     group_kwargs.update(kwargs)
 

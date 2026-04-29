@@ -997,6 +997,7 @@ def create_crosstab_table(
 def agg_join(series: pd.Series) -> str:
     """Aggregates unique values in a series into a comma-separated string."""
     return ', '.join(series.astype(str).unique())
+
 AGG_MAP: Dict[str, Union[str, Callable]] = {
     'first': 'first',
     'last': 'last',
@@ -1005,7 +1006,7 @@ AGG_MAP: Dict[str, Union[str, Callable]] = {
     'sum': 'sum',
     'mean': 'mean',
     'count': 'count',
-    'join': agg_join # join strings
+    'join': agg_join
 }
 
 def create_line_list(
@@ -1015,11 +1016,13 @@ def create_line_list(
     rename: Optional[dict] = None,
     cols_order: Optional[List[str]] = None,
     merge_methods: Optional[List[str]] = None,
-    message = None,custom_fields=None,
+    message = None,
+    custom_fields=None,
     **kwargs
 ) -> pd.DataFrame:
     """
     Creates a line list by aggregating data with consistent deduplication.
+    Supports group-specific renaming via group{i}_rename parameter.
     """
     ops = {
         "==": operator.eq, "!=": operator.ne, ">": operator.gt, "<": operator.lt,
@@ -1039,11 +1042,12 @@ def create_line_list(
     for i in range(1, 11):
         group_cols = kwargs.get(f"group_cols{i}", []) or []
         group_filters = kwargs.get(f"group{i}_filters", {}) or {}
-        group_aggr = kwargs.get(f"group{i}_aggr", {}) or {} 
+        group_aggr = kwargs.get(f"group{i}_aggr", {}) or {}
+        group_rename_map = kwargs.get(f"group{i}_rename", {}) or {}
         
         if not group_cols:
             continue
-            
+        
         aggr_cols_needed = list(group_aggr.keys())
         all_required_cols = list(set(group_cols + unique_col_list + aggr_cols_needed))
         
@@ -1095,11 +1099,18 @@ def create_line_list(
         df_group = df_group_filtered[all_required_cols].copy()
         
         count_col_name = f'unique_count_{i}'
-        
+
         # Calculate unique count per group
-        df_group[count_col_name] = (
-            df_group.groupby(group_cols)[unique_col_list].transform("nunique").sum(axis=1)
-        )
+        try:
+            if not df_group.empty and len(df_group) > 0:
+                df_group[count_col_name] = (
+                    df_group.groupby(group_cols)[unique_col_list].transform("nunique").sum(axis=1)
+                )
+            else:
+                df_group[count_col_name] = 0
+        except Exception as e:
+            print(f"Warning: Could not calculate unique count for group {i}: {e}")
+            df_group[count_col_name] = 0
         
         # Build aggregation dictionary
         agg_dict = {
@@ -1121,6 +1132,14 @@ def create_line_list(
             .reset_index(drop=True)
         )
         
+        # APPLY GROUP-SPECIFIC RENAME BEFORE APPENDING
+        if group_rename_map:
+            df_group = df_group.rename(columns=group_rename_map)
+            # print(f"Applied rename for group {i}: {group_rename_map}")
+        
+        # Remove any duplicate columns that might have been created
+        df_group = df_group.loc[:, ~df_group.columns.duplicated()]
+        
         group_dfs.append(df_group)
     
     if not group_dfs:
@@ -1132,23 +1151,44 @@ def create_line_list(
     for idx, right_df in enumerate(group_dfs[1:]):
         try:
             merge_how = merge_methods_list[idx] if idx < len(merge_methods_list) else DEFAULT_MERGE
+            
+            # Before merging, ensure unique_col_list columns exist in both dataframes
+            # If group rename changed the unique_col names, we need to handle that
+            merge_on = unique_col_list
+            for col in unique_col_list:
+                if col not in final_df.columns:
+                    print(f"Warning: Unique column '{col}' not found in left DataFrame after group {idx+1}")
+                if col not in right_df.columns:
+                    print(f"Warning: Unique column '{col}' not found in right DataFrame for group {idx+2}")
+            
             final_df = pd.merge(
                 final_df, 
                 right_df, 
-                on=unique_col_list,
-                how=merge_how
+                on=merge_on,
+                how=merge_how,
+                suffixes=('', f'_dup_{idx+2}')  # Avoid duplicate column names
             )
         except ValueError as e:
             print(f"Error during merge between group {idx+1} and group {idx+2} using method '{merge_how}'. Details: {e}")
             raise
+    # Remove any duplicate columns created during merge
+    final_df = final_df.loc[:, ~final_df.columns.duplicated()]
     
+    # Apply main rename (only for columns that haven't been renamed yet)
+    if rename:
+        # Only rename columns that exist in the DataFrame
+        rename_dict = {k: v for k, v in rename.items() if k in final_df.columns}
+        if rename_dict:
+            final_df = final_df.rename(columns=rename_dict)
+            # print(f"Applied main rename: {rename_dict}")
+    
+    # Apply column ordering
     if cols_order and isinstance(cols_order, list):
-        final_df = final_df[[c for c in cols_order if c in final_df.columns]]
+        # Only keep columns that exist in the final DataFrame
+        ordered_cols = [col for col in cols_order if col in final_df.columns]
+        final_df = final_df[ordered_cols]
     elif isinstance(cols_order, str):
         raise ValueError("cols_order must be a list.")
-    
-    if rename:
-        final_df = final_df.rename(columns=rename)
     
     final_df = final_df.fillna('')
     

@@ -1,260 +1,362 @@
-{"reports":[
-        {
-                "id": "1",
-                "report_name":"LINE LIST OF OPD DISPENSING AND DIAGNOSES",
-                "authorized_user":["Clinician","Nurse"],
-                "message": "Names have been masked. Visible only to : ",
-                "program":"OPD Program",
-                "type": "LineList",
-                "unique_col": "person_id",
-                "filters":{
-                    "unique": "any"
-                },
-                "rename": {
-                    "given_name": "First Name",
-                    "family_name": "Last Name",
-                    "Order_Name": "Prescribed Drug",
-                    "DrugName": "Drug Name",
-                    "ValueN": "Quantity Dispensed",
-                    "obs_value_coded": "Diagnosis"
-                },
-                "cols_order": [
-                    "Date",
-                    "given_name",
-                    "family_name",
-                    "Gender",
-                    "Age",
-                    "DrugName",
-                    "ValueN",
-                    "obs_value_coded"
-                ],
+{
+  "reports": [
+    {
+      "id": "1",
+      "report_name": "LINE LIST OF OPD DISPENSING AND DIAGNOSES",
+      "authorized_user": ["Clinician", "Nurse"],
+      "message": "Names have been masked. Visible only to : ",
+      "program": "OPD Program",
+      "type": "LineList",
+      "unique_col": "person_id",
+      "filters": {
+        "unique": "any"
+      },
+      "rename": {
+        "given_name": "First Name",
+        "family_name": "Last Name",
+        "Order_Name": "Prescribed Drug",
+        "DrugName": "Drug Name",
+        "ValueN": "Quantity Dispensed"
+      },
+      "cols_order": [
+        "Date",
+        "First Name",
+        "Last Name",
+        "Gender",
+        "Age",
+        "Drug Name",
+        "Quantity Dispensed",
+        "Diagnosis"
+      ],
+      "merge_methods": ["inner", "left"],
 
-                "merge_methods": ["inner", "left"],
+      "group_cols1": ["Date", "given_name", "family_name", "Gender", "Age"],
+      "group1_filters": {"Program": "OPD Program"},
 
-                "group_cols1": ["Date","given_name", "family_name", "Gender", "Age"],
-                "group1_filters": {"Program": "OPD Program"},
+      "group_cols2": ["DrugName", "ValueN"],
+      "group2_filters": {"Program": "OPD Program", "Encounter": "DISPENSING", "concept_name": "Amount dispensed"},
+      "group2_aggr": {"DrugName": "join", "ValueN": "join"},
 
-                "group_cols2": ["DrugName", "ValueN"],
-                "group2_filters": {"Program": "OPD Program","Encounter": "DISPENSING","concept_name": "Amount dispensed"},
-                "group2_aggr":{"DrugName":"join","ValueN":"join"},
-
-                "group_cols3": ["obs_value_coded"],
-                "group3_filters": {"Program": "OPD Program","Encounter": "DIAGNOSIS"},
-                "group3_aggr":{"obs_value_coded":"join"}
-
-        },
-        {
-                "id": "2",
-                "report_name":"GENERAL LINELIST - PATIENT CONSULTATION AND DISPENSATION",
-                "authorized_user":["Clinician","Nurse"],
-                "message": "Names have been masked. Visible only to : ",
-                "program":"OPD Program",
-                "type": "LineList",
-                "unique_col": ["person_id", "Date"],
-                "filters":{
-                    "unique": "any"
-                },
-                "rename": {
-                    "given_name": "First Name",
-                    "family_name": "Last Name",
-                    "Home_district": "District",
-                    "DrugName": "Medication Given",
-                    "ValueN": "Quantity Dispensed",
-                    "obs_value_coded_x": "Complaint",
-                    "obs_value_coded_y": "Diagnosis"
-                },
-                "cols_order": [
-                    "Date",
-                    "given_name",
-                    "family_name",
-                    "Gender",
-                    "Age",
-                    "Home_district",
-                    "TA",
-                    "Village",
-                    "obs_value_coded_x",
-                    "obs_value_coded_y",
-                    "DrugName"
-                ],
-
-                "merge_methods": ["inner", "left"],
-
-                "group_cols1": ["given_name", "family_name", "Gender", "Age","Home_district","TA","Village"],
-                "group1_filters": {"Program": "OPD Program", "Village":"!=''"},
-
-                "group_cols2": ["obs_value_coded"],
-                "group2_filters": {"Program": "OPD Program","Encounter": "PRESENTING COMPLAINTS","concept_name": "Presenting complaint"},
-                "group2_aggr":{"obs_value_coded":"join"},
-
-                "group_cols3": ["obs_value_coded"],
-                "group3_filters": {"Program": "OPD Program","Encounter": "DIAGNOSIS"},
-                "group3_aggr":{"obs_value_coded":"join"},
-
-                "group_cols4": ["DrugName"],
-                "group4_filters": {"Program": "OPD Program","Encounter": "DISPENSING"},
-                "group4_aggr":{"DrugName":"join"}
-        },
-        {
-                "id": "3",
-                "report_name":"MALARIA (MRDT) LINELIST",
-                "authorized_user":["Clinician","Nurse"],
-                "program":"OPD Program",
-                "type": "LineList",
-                "unique_col": ["person_id", "Date"],
-                "filters":{
-                    "unique": "any"
-                },
-                "rename": {
-                    "given_name": "First Name",
-                    "family_name": "Last Name",
-                    "Home_district": "District",
-                    "DrugName": "Drug Name",
-                    "ValueN": "Quantity Dispensed",
-                    "obs_value_coded": "Complaint",
-                    "Value": "MRDT Result"
-                },
-                "cols_order": [
-                    "Date",
-                    "given_name",
-                    "family_name",
-                    "Gender",
-                    "Age",
-                    "Home_district",
-                    "TA",
-                    "Village",
-                    "obs_value_coded",
-                    "Value",
-                    "DrugName"
-                ],
-
-                "merge_methods": ["left", "inner", "left"],
-
-                "group_cols1": ["Date","given_name", "family_name", "Gender", "Age","Home_district","TA","Village"],
-                "group1_filters": {"Program": "OPD Program", "Village":"!in:''"},
-
-                "group_cols2": ["obs_value_coded"],
-                "group2_filters": {"Program": "OPD Program","Encounter": "PRESENTING COMPLAINTS","concept_name": "Presenting complaint"},
-                "group2_aggr":{"obs_value_coded":"join"},
-
-                "group_cols3": ["Value"],
-                "group3_filters": {"Program": "OPD Program","Encounter": "LAB RESULTS","concept_name": "MRDT"},
-                "group3_aggr":{"Value":"join"},
-
-                "group_cols4": ["DrugName"],
-                "group4_filters": {"Program": "OPD Program",
-                                    "Encounter": "DISPENSING",
-                                    "DrugName":"in:''"},
-                "group4_aggr":{"DrugName":"join"}
-        },
-        {   "id":"4",
-            "report_name":"DRUGS AND QUANTITIES",
-            "authorized_user":"Any",
-            "program":"OPD Program",
-            "date_created":"2025-12-04",
-            "type":"PivotTable",
-            "filters":
-                {
-                "measure": "chart",
-                "unique": "any",
-                "duration_default": "any",
-                "index_col1": "DrugName",
-                "columns": ["Encounter"],
-                "values_col": "ValueN",
-                "title": "DRUGS AND QUANTITIES",
-                "unique_column": "encounter_id",
-                "aggfunc": "sum",
-                "filter_col1": "Program",
-                "filter_val1": "OPD Program",
-                "filter_col2": "Encounter",
-                "filter_val2": "DISPENSING",
-                "x_title": "",
-                "y_title": "",
-                "rename":{"DrugName":"DRUG","DISPENSING":"Number of drugs dispensed"},
-                "replace":{}
-            } 
-        },
-        {   "id":"5",
-            "report_name":"Lumefatrine Artemether Facility Report",
-            "authorized_user":"Any",
-            "program":"NCD PROGRAM",
-            "date_created":"2025-12-04",
-            "type":"PivotTable",
-            "filters":
-                {
-                "measure": "chart",
-                "unique": "any",
-                "duration_default": "any",
-                "index_col1": "obs_value_coded",
-                "columns": "Age_Group",
-                "values_col": "encounter_id",
-                "title": "Diseases diagnosed at the health facility",
-                "unique_column": "person_id",
-                "aggfunc": "count",
-                "filter_col1": "Program",
-                "filter_val1": "OPD Program",
-                "filter_col2": "Encounter",
-                "filter_val2": "DIAGNOSIS",
-                "filter_col3": "concept_name",
-                "filter_val3": "Primary diagnosis",
-                "x_title": "",
-                "y_title": ""
-            } 
-        },
-        {   "id":"6",
-            "report_name":"OPD DIAGNOSES, GENDER AND AGE GROUPS",
-            "authorized_user":"Any",
-            "program":"OPD Program",
-            "date_created":"2025-12-04",
-            "type":"CrossTab",
-            "filters":
-                {
-                "measure": "chart",
-                "unique": "any",
-                "duration_default": "any",
-                "index_col1": "obs_value_coded",
-                "columns": ["Gender", "Age_Group"],
-                "values_col": "encounter_id",
-                "title": "CrossTab Test Report",
-                "unique_column": "person_id",
-                "aggfunc": "count",
-                "filter_col1": "Program",
-                "filter_val1": "OPD Program",
-                "filter_col2": "Encounter",
-                "filter_val2": "DIAGNOSIS",
-                "filter_col3": "concept_name",
-                "filter_val3": "Primary diagnosis",
-                "rename": {"obs_value_coded":"DIAGNOSIS"},
-                "replace": ""
-            } 
-        },
-        {
-                "id": "7",
-                "report_name":"MALARIA DATA",
-                "authorized_user":"Any",
-                "program":"OPD Program",
-                "date_created":"2025-12-04",
-                "type": "PivotTable",
-                "filters": {
-                  "measure": "chart",
-                  "unique": "any",
-                  "duration_default": "any",
-                  "index_col1": "DrugName",
-                  "columns": "Program",
-                  "values_col": "ValueN",
-                  "title": "Medications dispensed",
-                  "unique_column": "encounter_id",
-                  "aggfunc": "sum",
-                  "filter_col1": "Program",
-                  "filter_val1": "OPD Program",
-                  "filter_col2": "Encounter",
-                  "filter_val2": "DISPENSING",
-                  "filter_col3": "",
-                  "filter_val3": "",
-                  "x_title": "",
-                  "y_title": ""
-                }
-        }
-                
-    ]   
- 
+      "group_cols3": ["obs_value_coded"],
+      "group3_filters": {"Program": "OPD Program", "Encounter": "DIAGNOSIS"},
+      "group3_aggr": {"obs_value_coded": "join"},
+      "group3_rename": {"obs_value_coded": "Diagnosis"}
+    },
+    {
+      "id": "2",
+      "report_name": "GENERAL LINELIST - PATIENT CONSULTATION AND DISPENSATION",
+      "authorized_user": ["Clinician", "Nurse"],
+      "message": "Names have been masked. Visible only to : ",
+      "program": "OPD Program",
+      "type": "LineList",
+      "unique_col": ["person_id", "Date"],
+      "filters": {
+        "unique": "any"
+      },
+      "rename": {
+        "given_name": "First Name",
+        "family_name": "Last Name",
+        "Home_district": "District",
+        "DrugName": "Medication Given",
+        "ValueN": "Quantity Dispensed"
+      },
+      "cols_order": [
+        "Date",
+        "First Name",
+        "Last Name",
+        "Gender",
+        "Age",
+        "District",
+        "TA",
+        "Village",
+        "Complaint",
+        "Diagnosis",
+        "Medication Given"
+      ],
+      "merge_methods": ["inner", "left"],
+      "group_cols1": ["given_name", "family_name", "Gender", "Age", "Home_district", "TA", "Village"],
+      "group1_filters": {"Program": "OPD Program", "Village": "!=''"},
+      "group_cols2": ["obs_value_coded"],
+      "group2_filters": {"Program": "OPD Program", "Encounter": "PRESENTING COMPLAINTS", "concept_name": "Presenting complaint"},
+      "group2_aggr": {"obs_value_coded": "join"},
+      "group2_rename": {"obs_value_coded": "Complaint"},
+      "group_cols3": ["obs_value_coded"],
+      "group3_filters": {"Program": "OPD Program", "Encounter": "DIAGNOSIS"},
+      "group3_aggr": {"obs_value_coded": "join"},
+      "group3_rename": {"obs_value_coded": "Diagnosis"},
+      "group_cols4": ["DrugName"],
+      "group4_filters": {"Program": "OPD Program", "Encounter": "DISPENSING"},
+      "group4_aggr": {"DrugName": "join"}
+    },
+    {
+      "id": "3",
+      "report_name": "MALARIA (MRDT) LINELIST",
+      "authorized_user": ["Clinician", "Nurse"],
+      "program": "OPD Program",
+      "type": "LineList",
+      "unique_col": ["person_id", "Date"],
+      "filters": {
+        "unique": "any"
+      },
+      "rename": {
+        "given_name": "First Name",
+        "family_name": "Last Name",
+        "Home_district": "District",
+        "DrugName": "Drug Name",
+        "ValueN": "Quantity Dispensed"
+      },
+      "cols_order": [
+        "Date",
+        "First Name",
+        "Last Name",
+        "Gender",
+        "Age",
+        "District",
+        "TA",
+        "Village",
+        "Complaint",
+        "MRDT Result",
+        "Drug Name"
+      ],
+      "merge_methods": ["left", "inner", "left"],
+      "group_cols1": ["Date", "given_name", "family_name", "Gender", "Age", "Home_district", "TA", "Village"],
+      "group1_filters": {"Program": "OPD Program", "Village": "!in:''"},
+      "group_cols2": ["obs_value_coded"],
+      "group2_filters": {"Program": "OPD Program", "Encounter": "PRESENTING COMPLAINTS", "concept_name": "Presenting complaint"},
+      "group2_aggr": {"obs_value_coded": "join"},
+      "group2_rename": {"obs_value_coded": "Complaint"},
+      "group_cols3": ["Value"],
+      "group3_filters": {"Program": "OPD Program", "Encounter": "LAB RESULTS", "concept_name": "MRDT"},
+      "group3_aggr": {"Value": "join"},
+      "group3_rename": {"Value": "MRDT Result"},
+      "group_cols4": ["DrugName"],
+      "group4_filters": {"Program": "OPD Program", "Encounter": "DISPENSING", "DrugName": "in:''"},
+      "group4_aggr": {"DrugName": "join"}
+    },
+    {
+      "id": "4",
+      "report_name": "DRUGS AND QUANTITIES",
+      "authorized_user": "Any",
+      "program": "OPD Program",
+      "date_created": "2025-12-04",
+      "type": "PivotTable",
+      "filters": {
+        "measure": "chart",
+        "unique": "any",
+        "duration_default": "any",
+        "index_col1": "DrugName",
+        "columns": ["Encounter"],
+        "values_col": "ValueN",
+        "title": "DRUGS AND QUANTITIES",
+        "unique_column": "encounter_id",
+        "aggfunc": "sum",
+        "filter_col1": "Program",
+        "filter_val1": "OPD Program",
+        "filter_col2": "Encounter",
+        "filter_val2": "DISPENSING",
+        "x_title": "",
+        "y_title": "",
+        "rename": {"DrugName": "DRUG", "DISPENSING": "Number of drugs dispensed"},
+        "replace": {}
+      }
+    },
+    {
+      "id": "5",
+      "report_name": "Lumefatrine Artemether Facility Report",
+      "authorized_user": "Any",
+      "program": "IMMUNIZATION PROGRAM",
+      "date_created": "2025-12-04",
+      "type": "PivotTable",
+      "filters": {
+        "measure": "chart",
+        "unique": "any",
+        "duration_default": "any",
+        "index_col1": "obs_value_coded",
+        "columns": "Age_Group",
+        "values_col": "encounter_id",
+        "title": "Diseases diagnosed at the health facility",
+        "unique_column": "person_id",
+        "aggfunc": "count",
+        "filter_col1": "Program",
+        "filter_val1": "OPD Program",
+        "filter_col2": "Encounter",
+        "filter_val2": "DIAGNOSIS",
+        "filter_col3": "concept_name",
+        "filter_val3": "Primary diagnosis",
+        "x_title": "",
+        "y_title": "",
+        "rename": {"obs_value_coded": "DIAGNOSIS"}
+      }
+    },
+    {
+      "id": "6",
+      "report_name": "OPD DIAGNOSES, GENDER AND AGE GROUPS",
+      "authorized_user": "Any",
+      "program": "OPD Program",
+      "date_created": "2025-12-04",
+      "type": "CrossTab",
+      "filters": {
+        "measure": "chart",
+        "unique": "any",
+        "duration_default": "any",
+        "index_col1": "obs_value_coded",
+        "columns": ["Gender", "Age_Group"],
+        "values_col": "encounter_id",
+        "title": "CrossTab Test Report",
+        "unique_column": "person_id",
+        "aggfunc": "count",
+        "filter_col1": "Program",
+        "filter_val1": "OPD Program",
+        "filter_col2": "Encounter",
+        "filter_val2": "DIAGNOSIS",
+        "filter_col3": "concept_name",
+        "filter_val3": "Primary diagnosis",
+        "rename": {"obs_value_coded": "DIAGNOSIS"},
+        "replace": ""
+      }
+    },
+    {
+      "id": "7",
+      "report_name": "MALARIA DATA",
+      "authorized_user": "Any",
+      "program": "OPD Program",
+      "date_created": "2025-12-04",
+      "type": "PivotTable",
+      "filters": {
+        "measure": "chart",
+        "unique": "any",
+        "duration_default": "any",
+        "index_col1": "DrugName",
+        "columns": "Program",
+        "values_col": "ValueN",
+        "title": "Medications dispensed",
+        "unique_column": "encounter_id",
+        "aggfunc": "sum",
+        "filter_col1": "Program",
+        "filter_val1": "OPD Program",
+        "filter_col2": "Encounter",
+        "filter_val2": "DISPENSING",
+        "filter_col3": "",
+        "filter_val3": "",
+        "x_title": "",
+        "y_title": ""
+      }
+    },
+    {
+      "id": "8",
+      "report_name": "NCD LINELIST - HYPERTENSION",
+      "authorized_user": [],
+      "message": "Names have been masked. Visible only to : ",
+      "program": "NCD PROGRAM",
+      "type": "LineList",
+      "unique_col": ["person_id", "Date"],
+      "filters": {
+        "unique": "any"
+      },
+      "rename": {
+        "given_name": "First Name",
+        "family_name": "Last Name",
+        "Home_district": "District",
+        "DrugName": "Medication Given",
+        "ValueN": "Quantity Dispensed"
+      },
+      "cols_order": [
+        "Date",
+        "First Name",
+        "Last Name",
+        "Gender",
+        "Age",
+        "District",
+        "TA",
+        "Village",
+        "Visit Type",
+        "SBP",
+        "DBP",
+        "Diagnosis",
+        "Medication Given"
+      ],
+      "merge_methods": ["left", "left", "left", "inner"],
+      "group_cols1": ["given_name", "family_name", "Gender", "Age", "Home_district", "TA", "Village"],
+      "group1_filters": {"Program": "NCD PROGRAM", "Village": "!=''"},
+      "group_cols2": ["obs_value_coded"],
+      "group2_filters": {"Program": "NCD PROGRAM", "Encounter": "PATIENT REGISTRATION", "concept_name": "Visit type"},
+      "group2_aggr": {"obs_value_coded": "join"},
+      "group2_rename": {"obs_value_coded": "Visit Type"},
+      "group_cols3": ["ValueN"],
+      "group3_filters": {"Program": "NCD PROGRAM", "Encounter": "VITALS", "concept_name": "Systolic blood pressure"},
+      "group3_aggr": {"ValueN": "max"},
+      "group3_rename": {"ValueN": "SBP"},
+      "group_cols4": ["ValueN"],
+      "group4_filters": {"Program": "NCD PROGRAM", "Encounter": "VITALS", "concept_name": "Diastolic blood pressure"},
+      "group4_aggr": {"ValueN": "max"},
+      "group4_rename": {"ValueN": "DBP"},
+      "group_cols5": ["obs_value_coded"],
+      "group5_filters": {"Program": "NCD PROGRAM", "Encounter": "DIAGNOSIS", "concept_name": "Primary diagnosis", "obs_value_coded": "Hypertension"},
+      "group5_aggr": {"obs_value_coded": "join"},
+      "group5_rename": {"obs_value_coded": "Diagnosis"},
+      
+      "group_cols6": ["Order_Name"],
+      "group6_filters": {"Program": "NCD PROGRAM", "Encounter": "TREATMENT"},
+      "group6_aggr": {"Order_Name": "join"},
+      "group6_rename": {"Order_Name": "Medication Given"}
+    },
+    {
+      "id": "9",
+      "report_name": "NCD LINELIST - DIABETES",
+      "authorized_user": [],
+      "message": "Names have been masked. Visible only to : ",
+      "program": "NCD PROGRAM",
+      "type": "LineList",
+      "unique_col": ["person_id", "Date"],
+      "filters": {
+        "unique": "any"
+      },
+      "rename": {
+        "given_name": "First Name",
+        "family_name": "Last Name",
+        "Home_district": "District",
+        "DrugName": "Medication Given",
+        "ValueN": "Quantity Dispensed"
+      },
+      "cols_order": [
+        "Date",
+        "First Name",
+        "Last Name",
+        "Gender",
+        "Age",
+        "District",
+        "TA",
+        "Village",
+        "Visit Type",
+        "SBP",
+        "DBP",
+        "Diagnosis",
+        "Medication Given"
+      ],
+      "merge_methods": ["left", "left", "left", "inner"],
+      "group_cols1": ["given_name", "family_name", "Gender", "Age", "Home_district", "TA", "Village"],
+      "group1_filters": {"Program": "NCD PROGRAM", "Village": "!=''"},
+      "group_cols2": ["obs_value_coded"],
+      "group2_filters": {"Program": "NCD PROGRAM", "Encounter": "PATIENT REGISTRATION", "concept_name": "Visit type"},
+      "group2_aggr": {"obs_value_coded": "join"},
+      "group2_rename": {"obs_value_coded": "Visit Type"},
+      "group_cols3": ["ValueN"],
+      "group3_filters": {"Program": "NCD PROGRAM", "Encounter": "VITALS", "concept_name": "Systolic blood pressure"},
+      "group3_aggr": {"ValueN": "max"},
+      "group3_rename": {"ValueN": "SBP"},
+      "group_cols4": ["ValueN"],
+      "group4_filters": {"Program": "NCD PROGRAM", "Encounter": "VITALS", "concept_name": "Diastolic blood pressure"},
+      "group4_aggr": {"ValueN": "max"},
+      "group4_rename": {"ValueN": "DBP"},
+      "group_cols5": ["obs_value_coded"],
+      "group5_filters": {"Program": "NCD PROGRAM", "Encounter": "DIAGNOSIS", "concept_name": "Primary diagnosis", "obs_value_coded": "in:Type 2 diabetes, Type 1 diabetes"},
+      "group5_aggr": {"obs_value_coded": "join"},
+      "group5_rename": {"obs_value_coded": "Diagnosis"},
+      
+      "group_cols6": ["Order_Name"],
+      "group6_filters": {"Program": "NCD PROGRAM", "Encounter": "TREATMENT"},
+      "group6_aggr": {"Order_Name": "join"},
+      "group6_rename": {"Order_Name": "Medication Given"}
+    }
+  ]
 }
