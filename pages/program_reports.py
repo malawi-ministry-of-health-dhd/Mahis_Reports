@@ -31,7 +31,6 @@ from config import (actual_keys_in_data,
 from helpers.navigation_callbacks import DEMO_UUID
 
 dash.register_page(__name__, path="/program_reports")
-# data = pd.read_parquet('data/latest_data_opd.parquet')
 
 from datetime import datetime, timedelta
 from dash import html, dcc

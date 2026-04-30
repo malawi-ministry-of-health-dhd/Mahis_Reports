@@ -1,20 +1,18 @@
 import pandas as pd
 import os
 from datetime import datetime, timedelta
-import socket
 import pymysql
 from sshtunnel import SSHTunnelForwarder
-import tempfile
-import pickle
 import logging
-import time
+from typing import Optional, Dict, Any, Generator
 
-from config import DB_CONFIG, SSH_CONFIG, DB_CONFIG_LOCAL, START_DATE, LOAD_FRESH_DATA, DATE_, GENDER_, ENCOUNTER_ID_, DATA_FILE_NAME_
-
+from config import (BATCH_SIZE, DB_CONFIG, SSH_CONFIG, USE_LOCALHOST,
+                    DB_CONFIG_LOCAL, START_DATE, 
+                    LOAD_FRESH_DATA, DATE_, GENDER_, 
+                    ENCOUNTER_ID_, DATA_FILE_NAME_)
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 if LOAD_FRESH_DATA:
     # drop file latest_data_opd.parquet if exists in data folder
@@ -23,650 +21,283 @@ if LOAD_FRESH_DATA:
         os.rename(file_path, f"{file_path}.backup")
         logger.info("Removed existing data file for fresh load.")
 
-
 class DataFetcher:
-    """
-    Robust DataFetcher with:
-      - per-day batch parquet saving
-      - safe read of main parquet (quarantines corrupted file)
-      - rebuild main parquet from daily batches
-      - recovery state to resume partially finished runs
-      - automatic re-attempts when batch save/read fails
-    """
-
-    def __init__(self, use_localhost=False, ssh_config=SSH_CONFIG, db_config=DB_CONFIG,
-                 max_batch_save_retries=3, batch_retry_delay=2):
-        """
-        Initialize DataFetcher with connection options
-
-        Args:
-            use_localhost: Boolean - True for local DB, False for remote
-            ssh_config: SSH configuration for remote connection
-            db_config: Database configuration
-            max_batch_save_retries: how many times to retry saving/validating a batch parquet
-            batch_retry_delay: seconds to wait between retries
-        """
+    def __init__(self, use_localhost=USE_LOCALHOST, ssh_config=SSH_CONFIG, 
+                 db_config=DB_CONFIG, db_config_local=DB_CONFIG_LOCAL,start_date=START_DATE, 
+                 load_fresh_data=LOAD_FRESH_DATA, single_tables_folder="data/single_tables",
+                 batch_size=BATCH_SIZE, batch_folder="data/batches"):
         self.use_localhost = use_localhost
-        self.ssh_route = ssh_config if not use_localhost else None
-        self.db_route = DB_CONFIG_LOCAL if use_localhost else db_config
+        self.load_fresh_data = load_fresh_data
+        self.ssh_config = ssh_config
+        self.db_config = db_config
+        self.db_config_local = db_config_local
+        self.batch_size = batch_size
+        self.batch_folder = batch_folder
+        self.single_tables_folder = single_tables_folder
+        self.start_date = start_date
         self.path = os.path.dirname(os.path.realpath(__file__))
-        self.recovery_file = os.path.join(tempfile.gettempdir(), "data_fetch_recovery.pkl")
-        self.max_batch_save_retries = max_batch_save_retries
-        self.batch_retry_delay = batch_retry_delay
-
-        # ensure data directories exist
-        os.makedirs(os.path.join(self.path, "data", "batches"), exist_ok=True)
-
-    def _get_db_connection(self, tunnel=None):
-        """Establish database connection with error handling"""
+        # Ensure batch folder exists
+        os.makedirs(os.path.join(self.path, batch_folder), exist_ok=True)
+    
+    def _get_db_connection(self, tunnel=None) -> pymysql.Connection:
+        """
+        Establish database connection with SSL support if configured
+        Returns:
+            pymysql.Connection: Database connection object
+        """
         try:
-            if not self.use_localhost:
-                # Remote connection with SSH tunnel
-                sock = socket.socket()
-                sock.settimeout(30)
-                sock.connect((self.db_route['host'], tunnel.local_bind_port))
-                sock.close()
-
+            if not self.use_localhost and tunnel:
+                # Remote connection through SSH tunnel
                 conn = pymysql.connect(
-                    host=self.db_route['host'],
+                    host=self.db_config.get('host', 'localhost'),
                     port=tunnel.local_bind_port,
-                    user=self.db_route['user'],
-                    password=self.db_route['password'],
-                    database=self.db_route['database'],
+                    user=self.db_config['user'],
+                    password=self.db_config['password'],
+                    database=self.db_config['database'],
                     connect_timeout=60,
                     read_timeout=3600,
-                    ssl={'ssl': {'fake_flag_to_enable_ssl': True}}
+                )
+            elif not self.use_localhost and 'ssl' in self.db_config:
+                # Direct connection with SSL
+                conn = pymysql.connect(
+                    host=self.db_config['host'],
+                    port=self.db_config.get('port', 3306),
+                    user=self.db_config['user'],
+                    password=self.db_config['password'],
+                    database=self.db_config['database'],
+                    ssl=self.db_config['ssl'],  # SSL configuration dict
+                    connect_timeout=60,
+                    read_timeout=3600,
                 )
             else:
-                # Direct local connection
+                # Local connection (no SSL)
                 conn = pymysql.connect(
-                    host=self.db_route['host'],
-                    port=self.db_route['port'],
-                    user=self.db_route['user'],
-                    password=self.db_route['password'],
-                    database=self.db_route['database'],
+                    host=self.db_config_local.get('host', 'localhost'),
+                    port=self.db_config_local.get('port', 3306),
+                    user=self.db_config_local['user'],
+                    password=self.db_config_local['password'],
+                    database=self.db_config_local['database'],
                     connect_timeout=30,
-                    read_timeout=1800
+                    read_timeout=1800,
                 )
-
-            logger.info("✅ Database connection established")
+            logger.info("Database connection established successfully")
             return conn
+            
         except Exception as e:
             logger.error(f"Database connection failed: {e}")
             raise
-
-
-    # Safe parquet helpers
-    def safe_read_parquet(self, filepath):
-        """
-        Safe parquet reader. If read fails, move the corrupt file aside
-        and return an empty DataFrame.
-        """
-        if not os.path.exists(filepath):
-            return pd.DataFrame()
-
+    
+    def _get_max_date_from_parquet(self, parquet_file_path: str, date_column: str) -> Optional[datetime]:
+        
+        full_path = os.path.join(self.path, parquet_file_path)
+        if not os.path.exists(full_path):
+            return self.start_date
         try:
-            return pd.read_parquet(filepath, engine="pyarrow")
+            df = pd.read_parquet(full_path, engine='pyarrow')
+            if not df.empty and date_column in df.columns:
+                max_date = pd.to_datetime(df[date_column]).max()
+                logger.info(f"Found existing data up to {max_date}")
+                return max_date
         except Exception as e:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            corrupt_path = f"{filepath}.corrupt_{timestamp}"
-            try:
-                os.rename(filepath, corrupt_path)
-                logger.error(f"❌ Parquet read failed and file moved to: {corrupt_path} — {e}")
-            except Exception as ex:
-                logger.error(f"Failed to rename corrupted parquet: {ex}. Original error: {e}")
-            return pd.DataFrame()
-
-    def _batch_file_path(self, current_date):
-        """Return absolute path for a day's batch parquet file"""
-        batch_dir = os.path.join(self.path, "data", "batches")
-        return os.path.join(batch_dir, f"{current_date.strftime('%Y-%m-%d')}.parquet")
-
-    def _save_daily_batch(self, df, current_date):
-        """
-        Save each day's batch as its own parquet file before merging.
-        Includes automatic re-attempts on failure.
-        Returns validated_df on success, None on persistent failure.
-        """
-        if df is None or df.empty:
-            logger.debug("No data to save for date %s", current_date)
-            return None
-
-        batch_path = self._batch_file_path(current_date)
-
-        attempt = 0
-        while attempt < self.max_batch_save_retries:
-            try:
-                # Save batch file (atomic approach)
-                temp_batch = f"{batch_path}.tmp"
-                df.to_parquet(temp_batch, index=False, engine="pyarrow")
-                os.replace(temp_batch, batch_path)
-                logger.info(f"📦 Saved batch file: {batch_path} ({len(df)} rows)")
-
-                # Validate by reading back
-                validated_df = pd.read_parquet(batch_path, engine="pyarrow")
-                # basic sanity check (non-empty)
-                if validated_df is None or validated_df.empty:
-                    raise ValueError("Validated batch read returned empty DataFrame")
-
-                return validated_df
-
-            except Exception as e:
-                attempt += 1
-                logger.error(f"Attempt {attempt}/{self.max_batch_save_retries} failed saving/validating "
-                             f"batch {batch_path}: {e}")
-                # try to cleanup temp file if exists
-                try:
-                    if os.path.exists(temp_batch):
-                        os.remove(temp_batch)
-                except Exception:
-                    pass
-
-                if attempt < self.max_batch_save_retries:
-                    logger.info(f"Retrying in {self.batch_retry_delay}s...")
-                    time.sleep(self.batch_retry_delay)
-
-        # All retries failed: quarantine and return None
-        try:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            quarantined = f"{batch_path}.bad_{timestamp}"
-            if os.path.exists(batch_path):
-                os.replace(batch_path, quarantined)
-            logger.error(f"All retries failed. Batch moved to {quarantined}")
-        except Exception as ex:
-            logger.error(f"Failed to quarantine bad batch file: {ex}")
-
+            logger.warning(f"Could not read existing parquet file: {e}")
+        
         return None
+    
+    def fetch_data(self, query_template: str, parquet_output: str, 
+                   date_column: str = 'Date', 
+                   id_column: str = 'encounter_id',
+                   start_date: Optional[datetime] = None) -> pd.DataFrame:
 
-    def rebuild_main_file_from_batches(self, main_file):
-        """
-        Rebuild the main parquet from saved daily batch parquets.
-        Returns the rebuilt DataFrame (or empty df on failure).
-        """
-        batch_dir = os.path.join(self.path, "data", "batches")
-        if not os.path.exists(batch_dir):
-            logger.error("No batch directory exists to rebuild from.")
-            return pd.DataFrame()
-
-        batch_files = [os.path.join(batch_dir, f) for f in os.listdir(batch_dir)
-                       if f.endswith(".parquet")]
-
-        if not batch_files:
-            logger.error("No batch files available for rebuild.")
-            return pd.DataFrame()
-
-        frames = []
-        for bf in sorted(batch_files):
-            try:
-                df = pd.read_parquet(bf, engine="pyarrow")
-                if not df.empty:
-                    frames.append(df)
-                else:
-                    logger.warning(f"Skipping empty batch file {bf}")
-            except Exception as e:
-                logger.warning(f"Failed to load batch file {bf}: {e}")
-
-        if not frames:
-            logger.error("All batch files failed to load. Cannot rebuild.")
-            return pd.DataFrame()
-
-        final_df = pd.concat(frames, ignore_index=True).drop_duplicates()
-        # Atomic write
-        temp_main = f"{main_file}.tmp"
+        # Determine start date
+        if not self.load_fresh_data:
+            max_date = self._get_max_date_from_parquet(parquet_output, "Date")
+            start_date = max_date if isinstance(max_date, datetime) else pd.to_datetime(max_date)
+        else:
+            # convert start_date to datetime if it's a string
+            start_date = self.start_date if isinstance(self.start_date, datetime) else pd.to_datetime(self.start_date)
+            logger.info(f"Forced fresh load. Starting from {start_date}")
+        
+        
+        # Collect all batches
+        all_batches = []
+        batch_number = 0
+        
         try:
-            final_df.to_parquet(temp_main, index=False, engine="pyarrow")
-            os.replace(temp_main, main_file)
-            logger.info(f"🎉 Main parquet rebuilt successfully from {len(frames)} batch files")
-        except Exception as e:
-            logger.error(f"Failed to write rebuilt main parquet: {e}")
-            try:
-                if os.path.exists(temp_main):
-                    os.remove(temp_main)
-            except Exception:
-                pass
-            return pd.DataFrame()
-
-        return final_df
-
-    # Recovery helpers
-    def _save_recovery_state(self, state):
-        """Save recovery state to file"""
-        try:
-            with open(self.recovery_file, 'wb') as f:
-                pickle.dump(state, f)
-        except Exception as e:
-            logger.warning(f"Failed to save recovery state: {e}")
-
-    def _load_recovery_state(self):
-        """Load recovery state if exists"""
-        if os.path.exists(self.recovery_file):
-            try:
-                with open(self.recovery_file, 'rb') as f:
-                    return pickle.load(f)
-            except Exception as e:
-                logger.warning(f"Failed to load recovery state: {e}")
-        return None
-
-    def _clear_recovery_state(self):
-        """Clean up recovery file"""
-        if os.path.exists(self.recovery_file):
-            try:
-                os.remove(self.recovery_file)
-            except Exception:
-                pass
-
-    # Main process flow
-    def fetch_data(self, query_template, filename='data/latest_data_opd.parquet',
-                   date_column=DATE_, batch_size=5000, force_rebuild=False):
-        """
-        Robust incremental data fetcher with auto-rebuild capability
-
-        Args:
-            query_template: SQL query with {date_filter} placeholder
-            filename: Relative path to output parquet file
-            date_column: Date column for incremental loading
-            batch_size: Number of records per batch
-            force_rebuild: If True, will rebuild the file from scratch with default start date
-        """
-        # Create absolute path
-        abs_filename = os.path.join(self.path, filename)
-        os.makedirs(os.path.dirname(abs_filename), exist_ok=True)
-
-        try:
-            # 1. Determine start date
-            file_exists = os.path.exists(abs_filename)
-            if force_rebuild or not file_exists or not self._is_existing_file_valid(abs_filename, date_column):
-                logger.warning("Starting fresh rebuild (force rebuild or missing/invalid file)")
-                start_date = START_DATE  # Default start date for rebuilds
-                if file_exists:
-                    # safe_read_parquet would have moved corrupt file; ensure removal for fresh rebuild
-                    try:
-                        os.remove(abs_filename)
-                    except Exception:
-                        pass
-                self._clear_recovery_state()
-            else:
-                start_date = self._get_last_extraction_date(abs_filename, date_column)
-                if start_date is None:
-                    # fallback
-                    start_date = START_DATE
-
-            # 2. Process in batches with recovery
+            # Get database connection
             if self.use_localhost:
                 conn = self._get_db_connection()
-                try:
-                    final_df = self._process_daily_batches(conn, query_template, abs_filename,
-                                                          date_column, batch_size, start_date)
-                finally:
+                all_batches = self._fetch_in_batches(conn, query_template, date_column, 
+                                                     id_column, start_date)
+                conn.close()
+            elif self.ssh_config:
+                with SSHTunnelForwarder(
+                    (self.ssh_config['ssh_host'], 22),
+                    ssh_username=self.ssh_config['ssh_user'],
+                    ssh_password=self.ssh_config.get('ssh_password'),
+                    ssh_private_key=self.ssh_config.get('ssh_pkey'),
+                    remote_bind_address=self.ssh_config['remote_bind_address']
+                ) as tunnel:
+                    logger.info(f"SSH tunnel established on port {tunnel.local_bind_port}")
+                    conn = self._get_db_connection(tunnel)
+                    all_batches = self._fetch_in_batches(conn, query_template, date_column,
+                                                        id_column, start_date)
                     conn.close()
-            elif self.ssh_route and "ssh_password" in self.ssh_route:
-                logger.info("Using password for SSH")
-                with SSHTunnelForwarder(
-                        (self.ssh_route['ssh_host'], 22),
-                        ssh_username=self.ssh_route['ssh_user'],
-                        ssh_password=self.ssh_route['ssh_password'],
-                        remote_bind_address=self.ssh_route['remote_bind_address']
-                ) as tunnel:
-                    logger.info(f"SSH tunnel established on port {tunnel.local_bind_port}")
-                    conn = self._get_db_connection(tunnel)
-                    try:
-                        final_df = self._process_daily_batches(conn, query_template, abs_filename,
-                                                              date_column, batch_size, start_date)
-                    finally:
-                        conn.close()
             else:
-                logger.info("Using private key for SSH")
-                with SSHTunnelForwarder(
-                        (self.ssh_route['ssh_host'], 22),
-                        ssh_username=self.ssh_route['ssh_user'],
-                        ssh_private_key=f"ssh/{self.ssh_route['ssh_pkey']}",
-                        remote_bind_address=self.ssh_route['remote_bind_address']
-                ) as tunnel:
-                    logger.info(f"SSH tunnel established on port {tunnel.local_bind_port}")
-                    conn = self._get_db_connection(tunnel)
-                    try:
-                        final_df = self._process_daily_batches(conn, query_template, abs_filename,
-                                                              date_column, batch_size, start_date)
-                    finally:
-                        conn.close()
-
-            return self._finalize_operation(final_df, abs_filename)
-
+                conn = self._get_db_connection()
+                all_batches = self._fetch_in_batches(conn, query_template, date_column,
+                                                    id_column, start_date)
+                conn.close()
+            
+            # Merge all batches and save final parquet
+            if all_batches:
+                final_df = pd.concat(all_batches, ignore_index=True)
+                final_df.drop_duplicates(inplace=True)
+                self.cleanup_batches()  # Clean up batch files after merging
+                return final_df
+            else:
+                logger.info("No new data fetched")
+                self.cleanup_batches()
+                return pd.DataFrame()  # Return empty DataFrame if no data fetched
+                
         except Exception as e:
-            logger.error(f"Data fetch failed: {e}")
-            logger.info("Recovery data preserved. Will resume from last batch.")
+            logger.error(f"Error in fetch_data: {e}")
             raise
-    def fetch_single_table(self, single_table_name, single_table_query):
+    
+    def _fetch_in_batches(self, conn: pymysql.Connection, query_template: str,
+                          date_column: str, id_column: str, start_date: datetime) -> list:
         """
-        Robust incremental data fetcher with auto-rebuild capability
+        Fetch data in batches and save each batch as parquet file
         
         Args:
-            query_template: SQL query with {date_filter} placeholder
-            filename: Relative path to output CSV file
-            date_column: Date column for incremental loading
-            batch_size: Number of records per batch
-            force_rebuild: If True, will rebuild the file from scratch with default start date 2025-01-01
+            conn: Database connection
+            query_template: SQL query template
+            date_column: Date column name
+            id_column: ID column name for pagination
+            start_date: Start date for fetching
+            
+        Returns:
+            list: List of dataframes for each batch
         """
+        batches = []
+        last_id = 0
+        current_date = start_date
+        today = datetime.now()
+
+        print(current_date, type(today))
         
-        try:
-            
-            if self.use_localhost:
-                conn = self._get_db_connection()
-                try:
-                    table_df = pd.read_sql(single_table_query, conn)
-                    table_df.to_csv(os.path.join(self.path, single_table_name))
-                finally:
-                    conn.close()
-            elif "ssh_password" in self.ssh_route:
-                print("Using password for SSH")
-                # Remote connection with SSH tunnel using password
-                with SSHTunnelForwarder(
-                    (self.ssh_route['ssh_host'], 22),
-                    ssh_username=self.ssh_route['ssh_user'],
-                    ssh_password=self.ssh_route['ssh_password'],
-                    remote_bind_address=self.ssh_route['remote_bind_address']
-                ) as tunnel:
-                    logger.info(f"SSH tunnel established on port {tunnel.local_bind_port}")
-                    conn = self._get_db_connection(tunnel)
-                    try:
-                        table_df = pd.read_sql(single_table_query, conn)
-                        table_df.to_csv(os.path.join(self.path, single_table_name))
-                    finally:
-                        conn.close()
-            else:
-                print("Using private key for SSH")
-
-                print(f"ssh/{self.ssh_route['ssh_pkey']}")
-                # Remote connection with SSH tunnel
-                with SSHTunnelForwarder(
-                    (self.ssh_route['ssh_host'], 22),
-                    ssh_username=self.ssh_route['ssh_user'],
-                    ssh_private_key=f"ssh/{self.ssh_route['ssh_pkey']}",
-                    # ssh_password=self.ssh_route['ssh_password'],
-                    remote_bind_address=self.ssh_route['remote_bind_address']
-                ) as tunnel:
-                    logger.info(f"SSH tunnel established on port {tunnel.local_bind_port}")
-                    conn = self._get_db_connection(tunnel)
-                    try:
-                        table_df = pd.read_sql(single_table_query, conn)
-                        table_df.to_csv(os.path.join(self.path, single_table_name))
-                    finally:
-                        conn.close()
-            
-            return table_df
-            
-        except Exception as e:
-            logger.error(f"Data fetch failed: {e}")
-            raise
-        
-    def _process_daily_batches(self, conn, query_template, filename, date_column, batch_size, start_date):
-        """Process data day by day with batch processing within each day"""
-        recovery_state = self._load_recovery_state()
-
-        # LOAD EXISTING DATA FIRST (using safe reader)
-        existing_df = self.safe_read_parquet(filename)
-        if existing_df.empty and os.path.exists(os.path.join(self.path, "data", "batches")):
-            # try to rebuild from batches if existing read failed/returned empty
-            logger.warning("Main parquet empty/corrupt — attempting rebuild from batches...")
-            rebuilt = self.rebuild_main_file_from_batches(filename)
-            if not rebuilt.empty:
-                existing_df = rebuilt
-
-        if recovery_state:
-            # if recovery contains partial df, it's only new data not yet merged into main file
-            current_date = pd.to_datetime(recovery_state.get('current_date'))
-            new_data_df = recovery_state.get('df', pd.DataFrame())
-            last_id = recovery_state.get('last_id', 0)
-            # ensure new_data_df is DataFrame
-            if not isinstance(new_data_df, pd.DataFrame):
-                new_data_df = pd.DataFrame(new_data_df)
-        else:
-            current_date = pd.to_datetime(start_date)
-            new_data_df = pd.DataFrame()
-            last_id = 0
-
-        # COMBINE EXISTING AND NEW DATA (safe)
-        if not existing_df.empty and not new_data_df.empty:
-            final_df = pd.concat([existing_df, new_data_df], ignore_index=True).drop_duplicates()
-            final_df[DATE_] = pd.to_datetime(final_df[DATE_], format='mixed')
-            final_df[GENDER_] = final_df[GENDER_].replace({"M":"Male","F":"Female"})
-        elif not existing_df.empty:
-            final_df = existing_df.copy()
-        elif not new_data_df.empty:
-            final_df = new_data_df.copy()
-        else:
-            final_df = pd.DataFrame()
-
-        today = datetime.now().date()
-        # Iterate through each day from start_date to today
-        while current_date.date() <= today:
+        while current_date.date() <= today.date():
             logger.info(f"Processing date: {current_date.strftime('%Y-%m-%d')}")
+            
+            date_str = current_date.strftime('%Y-%m-%d')
+            has_more_data = True
+            batch_count = 0
+            
+            while has_more_data:
+                # Build query with date filter and ID pagination
+                date_filter = f"AND DATE({date_column}) = '{date_str}' AND e.{id_column} > {last_id}"
+                query = query_template.format(date_filter=date_filter)
+                full_query = f"{query} ORDER BY e.{id_column} LIMIT {self.batch_size}"
 
-            # Process all batches for the current day
-            day_new_df = self._process_single_day(conn, query_template, date_column,
-                                                 batch_size, current_date, last_id)
-
-            if not day_new_df.empty:
-                # 1️⃣ Save daily batch to dedicated file and validate read-back (with retries)
-                validated_batch = self._save_daily_batch(day_new_df, current_date)
-
-                # 2️⃣ Only merge validated parquet batch
-                if validated_batch is not None:
-                    # Append validated batch into final_df
-                    if final_df.empty:
-                        final_df = validated_batch.copy()
+                # print(full_query)  # Debug: print the full query being executed
+                
+                try:
+                    batch_df = pd.read_sql(full_query, conn)
+                    
+                    if batch_df.empty:
+                        has_more_data = False
+                        logger.info(f"Completed {date_str} - {batch_count} batches fetched")
                     else:
-                        final_df = pd.concat([final_df, validated_batch], ignore_index=True).drop_duplicates()
-
-                    # Update last processed ID for recovery
-                    if ENCOUNTER_ID_ in validated_batch.columns:
-                        last_id = validated_batch[ENCOUNTER_ID_].max()
-
-                    # Save intermediate results and recovery state
-                    self._save_recovery_state({
-                        'current_date': current_date,
-                        'last_id': last_id,
-                        'df': validated_batch  # Store only new data for recovery
-                    })
-
-                    # 3️⃣ Save the COMBINED DATA (existing + new) atomically
-                    try:
-                        temp_main = f"{filename}.tmp"
-                        final_df.to_parquet(temp_main, index=False, engine="pyarrow")
-                        os.replace(temp_main, filename)
-                    except Exception as e:
-                        logger.error(f"Failed to write combined main parquet: {e}")
-                        # Attempt to rebuild from batches as fallback
-                        logger.info("Attempting rebuild of main parquet from batches as fallback...")
-                        rebuilt = self.rebuild_main_file_from_batches(filename)
-                        if not rebuilt.empty:
-                            final_df = rebuilt
-                        else:
-                            logger.error("Rebuild failed; keeping current final_df in memory and saving recovery state.")
-
-                    logger.info(f"Completed date {current_date.strftime('%Y-%m-%d')}. Total records: {len(final_df)}")
-
-                else:
-                    logger.error(f"❌ Batch for {current_date.strftime('%Y-%m-%d')} skipped due to validation failure.")
-
-            # Move to next day and reset last_id
+                        # Save batch as parquet file
+                        batch_filename = f"batch_{date_str}_{len(batch_df)}.parquet"
+                        batch_path = os.path.join(self.path, self.batch_folder, batch_filename)
+                        batch_df.to_parquet(batch_path, index=False, engine='pyarrow')
+                        # batch_df.to_csv(batch_path, index=False)
+                        logger.info(f"Saved batch {batch_count} for {date_str}: {batch_path} ({len(batch_df)} rows)")
+                        
+                        batches.append(batch_df)
+                        last_id = batch_df[id_column].max()
+                        batch_count += 1
+                        # print(last_id)
+                        
+                except Exception as e:
+                    logger.error(f"Error fetching batch for {date_str}: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    has_more_data = False
+            
+            # Move to next day, reset last_id
             current_date += timedelta(days=1)
             last_id = 0
+        
+        return batches
+    
+    def fetch_single_table(self, table_name: str, query: str, output_format: str = 'csv') -> pd.DataFrame:
+        """
+        Fetch data from single table and save as CSV
+        
+        Args:
+            table_name: Name of the output file (without extension)
+            query: SQL query to execute
+            output_format: Output format ('csv' or 'parquet')
             
-        # Cleanup batch files at the end of the run regardless of outcome
-            try:
-                self._cleanup_batches()
-            except Exception as e:
-                logger.warning(f"Batch cleanup encountered an error: {e}")
-        return final_df
-
-    def _process_single_day(self, conn, query_template, date_column, batch_size, current_date, last_id=0):
-        """Process all records for a single day in batches"""
-        day_df = pd.DataFrame()
-        processed_count = 0
-
-        while True:
-            # Build query for current batch
-            date_str = current_date.strftime('%Y-%m-%d')
-            date_filter = f"AND DATE(e.encounter_datetime) = '{date_str}' AND e.encounter_id > {last_id} "
-            query = query_template.format(date_filter=date_filter)
-            batch_query = f"{query} ORDER BY encounter_id LIMIT {batch_size}"
-
-            logger.debug(f"Fetching batch for {date_str} from ID {last_id}")
-            try:
-                # Debug: print the actual query being executed
-                batch_df = pd.read_sql(batch_query, conn)
-            except Exception as e:
-                logger.error(f"SQL read failed for date {date_str}: {e}")
-                break
-
-            if batch_df.empty:
-                break
-
-            day_df = pd.concat([day_df, batch_df], ignore_index=True)
-            processed_count += len(batch_df)
-
-            # Update last ID for next batch
-            if not batch_df.empty and ENCOUNTER_ID_ in batch_df.columns:
-                last_id = batch_df[ENCOUNTER_ID_].max()
-
-            logger.info(f"Processed {processed_count} records for {date_str}")
-
-        return day_df
-
-    def _finalize_operation(self, final_df, filename):
-        """Complete the operation with final checks and cleanup"""
-        if not final_df.empty:
-            # save final data using atomic write (also attempt to merge with existing safe_read)
-            try:
-                self._save_final_data(final_df, filename)
-                logger.info(f"Data update complete. Total records: {len(final_df)}")
-                self._clear_recovery_state()
-            except Exception as e:
-                logger.error(f"Failed final save: {e}")
-                # Try rebuild
-                logger.info("Attempting to rebuild main parquet from batches after final save failure...")
-                rebuilt = self.rebuild_main_file_from_batches(filename)
-                if not rebuilt.empty:
-                    logger.info("Rebuild succeeded during finalization.")
-                    final_df = rebuilt
-                    self._clear_recovery_state()
-                else:
-                    logger.error("Finalization rebuild failed.")
-        else:
-            logger.info("No new data found.")
-
-        return final_df
-
-    def _is_existing_file_valid(self, filepath, date_column):
-        """Check if existing Parquet file is valid and can be used for incremental update"""
-        if not os.path.exists(filepath):
-            return False
-
+        Returns:
+            pd.DataFrame: Fetched data
+        """
         try:
-            # Read only the date column metadata to verify structure
-            columns = pd.read_parquet(filepath, engine="pyarrow", columns=[date_column])
-            # Ensure column exists & not empty
-            if date_column not in columns.columns:
-                return False
-            if columns.empty:
-                return False
-            # quick parse
-            pd.to_datetime(columns[date_column].head(1))
-            return True
+            # Get database connection
+            if self.use_localhost:
+                conn = self._get_db_connection()
+                df = pd.read_sql(query, conn)
+                conn.close()
+            elif self.ssh_config:
+                with SSHTunnelForwarder(
+                    (self.ssh_config['ssh_host'], 22),
+                    ssh_username=self.ssh_config['ssh_user'],
+                    ssh_password=self.ssh_config.get('ssh_password'),
+                    ssh_private_key=self.ssh_config.get('ssh_pkey'),
+                    remote_bind_address=self.ssh_config['remote_bind_address']
+                ) as tunnel:
+                    logger.info(f"SSH tunnel established on port {tunnel.local_bind_port}")
+                    conn = self._get_db_connection(tunnel)
+                    df = pd.read_sql(query, conn)
+                    conn.close()
+            else:
+                conn = self._get_db_connection()
+                df = pd.read_sql(query, conn)
+                conn.close()
+            
+            # Save to file
+            output_path = os.path.join(self.path, self.single_tables_folder, f"{table_name}.{output_format}")
+            os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else '.', exist_ok=True)
+            
+            if output_format == 'csv':
+                df.to_csv(output_path, index=False)
+            elif output_format == 'parquet':
+                df.to_parquet(output_path, index=False, engine='pyarrow')
+            else:
+                raise ValueError(f"Unsupported output format: {output_format}")
+            
+            logger.info(f"Saved {table_name} to {output_path} ({len(df)} rows)")
+            return df
+            
         except Exception as e:
-            logger.warning(f"Existing file validation failed: {e}")
-            # attempt to quarantine the file
-            try:
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                corrupt_path = f"{filepath}.corrupt_{timestamp}"
-                os.rename(filepath, corrupt_path)
-                logger.warning(f"Existing main parquet moved to {corrupt_path} during validation")
-            except Exception:
-                pass
-            return False
-
-    def _get_last_extraction_date(self, file_path, date_column):
-        """Safely get the last extraction date from existing Parquet"""
-        try:
-            df = pd.read_parquet(file_path, columns=[date_column], engine="pyarrow")
-            df = df[df[date_column]<=pd.Timestamp.now().normalize()]
-            if not df.empty and date_column in df:
-                last_date = pd.to_datetime(df[date_column]).max()
-                return last_date.strftime('%Y-%m-%d')
-        except Exception as e:
-            logger.warning(f"Could not read last date from Parquet: {e}")
-        return None
-
-    def _save_final_data(self, df, filename):
-        """Atomic save operation that preserves existing data (Parquet)"""
-        temp_file = f"{filename}.tmp"
-        try:
-            # Merge with existing safely if exists
-            if os.path.exists(filename):
-                try:
-                    existing_df = self.safe_read_parquet(filename)
-                    if not existing_df.empty:
-                        df = pd.concat([existing_df, df], ignore_index=True).drop_duplicates()
-                except Exception as e:
-                    logger.warning(f"Failed to merge with existing file: {e}")
-
-            # Save to temp parquet
-            df.to_parquet(temp_file, index=False, engine="pyarrow")
-
-            # Atomic rename
-            os.replace(temp_file, filename)
-
-            # Save timestamp
-            timestamp_file = os.path.join(self.path, 'data', 'TimeStamp.csv')
-            os.makedirs(os.path.dirname(timestamp_file), exist_ok=True)
-            pd.DataFrame({'saving_time': [datetime.now().strftime("%d/%m/%Y, %H:%M:%S")]}).to_csv(timestamp_file, index=False)
-
-        except Exception as e:
-            if os.path.exists(temp_file):
-                try:
-                    os.remove(temp_file)
-                except Exception:
-                    pass
+            logger.error(f"Error fetching single table {table_name}: {e}")
             raise
-    def _cleanup_batches(self):
+    
+    def cleanup_batches(self):
         """
-        Remove all batch parquet files that were saved during the run.
-        This deletes files inside data/batches only—no other folders are touched.
-        Deletes:
-        - *.parquet
-        - *.tmp
-        - files containing '.bad_' or '.corrupt_' in filename
+        Clean up all batch parquet files after successful merge
         """
-        # Explicit expected path for safety
-        expected_batch_dir = os.path.join(self.path, "data", "batches")
-        batch_dir = expected_batch_dir  # keep naming consistent
-
-        # Safety check: ensure we never try to clean any other path
+        batch_dir = os.path.join(self.path, self.batch_folder)
         if not os.path.exists(batch_dir):
-            logger.debug("No batch directory to clean.")
             return
-
-        # Confirm we are operating on the intended directory (extra safety)
-        abs_expected = os.path.abspath(expected_batch_dir)
-        abs_batch_dir = os.path.abspath(batch_dir)
-        if abs_expected != abs_batch_dir:
-            logger.error("Batch cleanup path mismatch — aborting cleanup for safety.")
-            return
-
-        removed = 0
-        for fname in os.listdir(batch_dir):
-            fpath = os.path.join(batch_dir, fname)
-            try:
-                # Only remove files that match the batch-related patterns
-                if not os.path.isfile(fpath):
-                    continue
-                if (fname.endswith(".parquet") or fname.endswith(".tmp") or
-                        ".bad_" in fname or ".corrupt_" in fname):
-                    os.remove(fpath)
-                    removed += 1
-                    logger.debug(f"Removed batch file: {fpath}")
-            except Exception as e:
-                logger.warning(f"Failed to remove batch file {fpath}: {e}")
-
-        logger.info(f"Cleaned up {removed} batch files from {batch_dir}")
+        
+        try:
+            for filename in os.listdir(batch_dir):
+                if filename.startswith('batch_') and filename.endswith('.parquet'):
+                    file_path = os.path.join(batch_dir, filename)
+                    os.remove(file_path)
+                    logger.debug(f"Removed batch file: {filename}")
+            logger.info(f"Cleaned up batch files from {batch_dir}")
+        except Exception as e:
+            logger.warning(f"Error cleaning up batch files: {e}")

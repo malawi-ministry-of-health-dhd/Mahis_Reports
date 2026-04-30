@@ -31,3 +31,4 @@ data/TimeStamp.csv
 data/concepts_data.csv
 cache
 latest_data_opd.parquet.backup
+data/single_tables
