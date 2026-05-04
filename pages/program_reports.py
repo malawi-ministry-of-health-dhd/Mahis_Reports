@@ -270,11 +270,11 @@ def update_filters(selected_program):
     ]
 )
 def generate_chart(n_clicks, urlparams, selected_report, report_name, start_date, end_date, hf):
-    user_data_path = os.path.join(path, 'data', 'users_data.csv')
+    user_data_path = os.path.join(path, 'data','single_tables', 'users_data.csv')
     if not os.path.exists(user_data_path):
         user_data = pd.DataFrame(columns=['user_id', 'role'])
     else:
-        user_data = pd.read_csv(os.path.join(path, 'data', 'users_data.csv'))
+        user_data = pd.read_csv(os.path.join(path, 'data','single_tables', 'users_data.csv'))
     test_admin = pd.DataFrame(columns=['user_id', 'role'], data=[[DEMO_UUID, 'reports_admin']])
     user_data = pd.concat([user_data, test_admin], ignore_index=True)
 

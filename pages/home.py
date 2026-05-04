@@ -86,7 +86,7 @@ def clear_dashboard_state_cache() -> None:
 
 
 def _load_user_registry() -> pd.DataFrame:
-    user_data_path = os.path.join(path, 'data', 'users_data.csv')
+    user_data_path = os.path.join(path, 'data','single_tables', 'users_data.csv')
     if os.path.exists(user_data_path):
         user_data = pd.read_csv(user_data_path)
     else:

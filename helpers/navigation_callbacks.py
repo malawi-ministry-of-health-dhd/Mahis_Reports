@@ -79,7 +79,9 @@ def register_navigation_callbacks(app, pathname_prefix):
 
             path = os.getcwd()
             timestamp_path = os.path.join(path, "data", "TimeStamp.csv")
-            users_path = os.path.join(path, "data", "users_data.csv")
+            os.makedirs(os.path.dirname(timestamp_path), exist_ok=True)
+            users_path = os.path.join(path, "data", "single_tables", "users_data.csv")
+            os.makedirs(os.path.dirname(users_path), exist_ok=True)
             last_updated = pd.read_csv(timestamp_path)["saving_time"].to_list()[0]
             users = pd.read_csv(users_path)
 
@@ -94,6 +96,8 @@ def register_navigation_callbacks(app, pathname_prefix):
 
             return _build_nav(pathname_prefix, query, last_updated, is_admin)
         except Exception:
+            import traceback
+            traceback.print_exc()
             return _build_nav(pathname_prefix, "", "Unknown", False)
 
     @app.callback(Output("url-params-store", "data"), Input("url", "href"))
@@ -124,6 +128,7 @@ def register_navigation_callbacks(app, pathname_prefix):
         location = url_params.get("Location", [None])[0] if url_params else None
         uuid = url_params.get("uuid", [None])[0] if url_params else None
         user_level = url_params.get("user_level", [None])[0] if url_params else None
+
         query = _build_query(location, uuid, user_level)
 
         try:

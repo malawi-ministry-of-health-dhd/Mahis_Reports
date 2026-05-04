@@ -128,6 +128,10 @@ class DataStorage:
             DataStorage.invalidate_query_cache()
             logging.info(f"Data saved to {self.filepath} (Parquet format)")
 
+            timestamp_file = os.path.join(self.path, 'data', 'TimeStamp.csv')
+            os.makedirs(os.path.dirname(timestamp_file), exist_ok=True)
+            pd.DataFrame({'saving_time': [datetime.now().strftime("%d/%m/%Y, %H:%M:%S")]}).to_csv(timestamp_file, index=False)
+
             dropdown_json = {"programs":sorted(programs.name.dropna().unique().tolist()),
                          "encounters":sorted(encounter_types.name.dropna().unique().tolist()),
                          "concepts":sorted(df.concept_name.dropna().unique().tolist()),
@@ -204,6 +208,7 @@ if __name__ == "__main__":
 
     storage = DataStorage(query=QUERY_OBS, filename=DATA_FILE_NAME_)
     storage.fetch_transactional_data(date_column="encounter_datetime", incremental_id_column="encounter_id")
+
 
     if CONCEPTS:
         concepts = DataStorage(query=CONCEPTS)

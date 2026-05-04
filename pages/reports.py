@@ -357,11 +357,11 @@ def update_table(clicks,
     # data_opd.to_csv('data/archive/hmis.csv')
 
     # validate user
-    user_data_path = os.path.join(path, 'data', 'users_data.csv')
+    user_data_path = os.path.join(path, 'data','single_tables', 'users_data.csv')
     if not os.path.exists(user_data_path):
         user_data = pd.DataFrame(columns=['user_id', 'role'])
     else:
-        user_data = pd.read_csv(os.path.join(path, 'data', 'users_data.csv'))
+        user_data = pd.read_csv(os.path.join(path, 'data','single_tables', 'users_data.csv'))
     test_admin = pd.DataFrame(columns=['user_id', 'role'], data=[[DEMO_UUID, 'reports_admin']])
     user_data = pd.concat([user_data, test_admin], ignore_index=True)
     user_info = user_data[user_data['user_id'] == urlparams.get('uuid', [None])[0]]
