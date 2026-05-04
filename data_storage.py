@@ -128,7 +128,7 @@ class DataStorage:
             DataStorage.invalidate_query_cache()
             logging.info(f"Data saved to {self.filepath} (Parquet format)")
 
-            timestamp_file = os.path.join(self.path, 'data', 'TimeStamp.csv')
+            timestamp_file = os.path.join(self.data_dir,'TimeStamp.csv')
             os.makedirs(os.path.dirname(timestamp_file), exist_ok=True)
             pd.DataFrame({'saving_time': [datetime.now().strftime("%d/%m/%Y, %H:%M:%S")]}).to_csv(timestamp_file, index=False)
 
