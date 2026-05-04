@@ -124,15 +124,22 @@ def register_api_routes(server):
                 (pd.to_datetime(data[DATE_]) >= pd.to_datetime(start_date))
                 & (pd.to_datetime(data[DATE_]) <= pd.to_datetime(end_date))
             ]
+            filtered["start_date"] = start_date
+            filtered["end_date"] = end_date
 
             original_data = data[pd.to_datetime(data[DATE_]) <= pd.to_datetime(end_date)].copy()
             original_data["days_before"] = original_data["DateValue"].apply(lambda item: (start_date - item).days)
+            original_data["start_date"] = start_date
+            original_data["end_date"] = end_date
+            original_data["days_before_visit_date"] = original_data["start_date"].apply(
+                    lambda d: (start_date - d).days
+                )
 
             spec_path = os.path.join(os.getcwd(), "data", "uploads", f"{report['page_name']}.xlsx")
             if not os.path.exists(spec_path):
                 return jsonify({"error": "Report template not found"}), 500
 
-            builder = ReportTableBuilder(spec_path, filtered, original_data)
+            builder = ReportTableBuilder(spec_path, filtered, original_data, dhis2_period=None)
             builder.load_spec()
             sections = builder.build_section_tables()
             section_ids = builder.build_section_tables_with_ids()
@@ -175,6 +182,10 @@ def register_api_routes(server):
                 }
             )
         except ValueError as exc:
+            import traceback
+            traceback.print_exc()
             return jsonify({"error": str(exc)}), 400
         except Exception as exc:
+            import traceback
+            traceback.print_exc()
             return jsonify({"error": str(exc)}), 500

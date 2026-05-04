@@ -417,6 +417,7 @@ def update_table(clicks,
             return html.Div("Report not found on Server. Request Admin to add report"), 0, None
 
         builder = ReportTableBuilder(spec_path, filtered, original_data, dhis2_period)
+        
         builder.load_spec()
         components = builder.build_dash_components()
         section_data = builder.build_section_tables()
