@@ -359,12 +359,12 @@ def update_table(clicks,
     # validate user
     user_data_path = os.path.join(path, 'data','single_tables', 'users_data.csv')
     if not os.path.exists(user_data_path):
-        user_data = pd.DataFrame(columns=['user_id', 'role'])
+        user_data = pd.DataFrame(columns=['uuid', 'role'])
     else:
         user_data = pd.read_csv(os.path.join(path, 'data','single_tables', 'users_data.csv'))
-    test_admin = pd.DataFrame(columns=['user_id', 'role'], data=[[DEMO_UUID, 'reports_admin']])
+    test_admin = pd.DataFrame(columns=['uuid', 'role'], data=[[DEMO_UUID, 'reports_admin']])
     user_data = pd.concat([user_data, test_admin], ignore_index=True)
-    user_info = user_data[user_data['user_id'] == urlparams.get('uuid', [None])[0]]
+    user_info = user_data[user_data['uuid'] == urlparams.get('uuid', [None])[0]]
     if user_info.empty:
         return html.Div("Unauthorized User. Please contact system administrator."), dash.no_update, dash.no_update
  #for cohort analysis this has to be moved forward to the return function

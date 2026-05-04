@@ -89,8 +89,8 @@ def register_navigation_callbacks(app, pathname_prefix):
             
             is_admin = uuid == DEMO_UUID
 
-            if uuid in users["user_id"].tolist():
-                role_string = users.query(f'user_id == "{uuid}"')["role"].iloc[0]
+            if uuid in users["uuid"].tolist():
+                role_string = users.query(f'uuid == "{uuid}"')["role"].iloc[0]
                 roles_list = [r.strip() for r in role_string.split(",")]
                 is_admin = "Superuser" in roles_list
 

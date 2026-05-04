@@ -1391,14 +1391,14 @@ def sync_current_dashboard_index(selector_value):
 def validate_admin_access(urlparams):
     user_data_path = os.path.join(path, 'data','single_tables', 'users_data.csv')
     if not os.path.exists(user_data_path):
-        user_data = pd.DataFrame(columns=['user_id', 'role'])
+        user_data = pd.DataFrame(columns=['uuid', 'role'])
     else:
         user_data = pd.read_csv(os.path.join(path, 'data','single_tables', 'users_data.csv'))
         authorized_users = user_data[user_data['role'] == 'Superuser,Superuser']
-    test_admin = pd.DataFrame(columns=['user_id', 'role'], data=[[DEMO_UUID, 'reports_admin']])
+    test_admin = pd.DataFrame(columns=['uuid', 'role'], data=[[DEMO_UUID, 'reports_admin']])
     user_data = pd.concat([authorized_users, test_admin], ignore_index=True)
 
-    user_info = user_data[user_data['user_id'] == urlparams.get('uuid', [None])[0]]
+    user_info = user_data[user_data['uuid'] == urlparams.get('uuid', [None])[0]]
     if user_info.empty:
         return dash.no_update, html.Div([
             html.H2("Access Denied"),

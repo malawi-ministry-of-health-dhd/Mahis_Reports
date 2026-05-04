@@ -90,16 +90,16 @@ def _load_user_registry() -> pd.DataFrame:
     if os.path.exists(user_data_path):
         user_data = pd.read_csv(user_data_path)
     else:
-        user_data = pd.DataFrame(columns=['user_id', 'role'])
+        user_data = pd.DataFrame(columns=['uuid', 'role'])
 
     demo_row = {
-        'user_id': DEMO_UUID,
+        'uuid': DEMO_UUID,
         'role': 'reports_admin',
         'user_level': 'facility',
         'facility_code': DEMO_LOCATION,
     }
     user_data = pd.concat([user_data, pd.DataFrame([demo_row])], ignore_index=True)
-    for column in ['user_id', 'role', 'user_level', 'district', 'facility_code', 'facility_name']:
+    for column in ['uuid', 'role', 'user_level', 'district', 'facility_code', 'facility_name']:
         if column not in user_data.columns:
             user_data[column] = pd.NA
     return user_data
@@ -127,14 +127,14 @@ def _title_level(value: str) -> str:
 
 def _resolve_user_scope(urlparams, user_data: pd.DataFrame) -> tuple[pd.Series | None, dict]:
     requested_uuid = urlparams.get('uuid', [None])[0] if urlparams else None
-    user_info = user_data[user_data['user_id'] == requested_uuid]
+    user_info = user_data[user_data['uuid'] == requested_uuid]
     if user_info.empty:
         return None, {}
 
     row = user_info.iloc[0]
     assigned_level = _normalize_level(_first_non_empty(row, ['user_level']) or (urlparams.get('user_level', [None])[0] if urlparams else None))
     scope = {
-        'user_id': requested_uuid,
+        'uuid': requested_uuid,
         'assigned_level': assigned_level,
         'district': _first_non_empty(row, ['district', 'District', 'home_district', 'Home_district']),
         'facility_code': (urlparams.get('Location', [None])[0] if urlparams else None),
