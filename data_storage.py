@@ -50,7 +50,10 @@ class DataStorage:
     def fetch_transactional_data(self, date_column, incremental_id_column):
         """Fetch fresh data from DB and save to Parquet."""
         fetcher = DataFetcher(use_localhost=USE_LOCALHOST)
-        existing_df = pd.read_parquet(self.filepath)
+        if os.path.exists(self.filepath):
+            existing_df = pd.read_parquet(self.filepath)
+        else:
+            existing_df = pd.DataFrame()
 
         df = fetcher.fetch_data(
             query_template = self.query,
