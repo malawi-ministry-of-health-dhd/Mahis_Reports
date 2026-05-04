@@ -196,7 +196,7 @@ class DataFetcher:
                 # Build query with date filter and ID pagination
                 date_filter = f"AND DATE({date_column}) = '{date_str}' AND e.{id_column} > {last_id}"
                 query = query_template.format(date_filter=date_filter)
-                full_query = f"{query} ORDER BY e.{id_column} LIMIT {self.batch_size}"
+                full_query = f"{query} LIMIT {self.batch_size}"
 
                 # print(full_query)  # Debug: print the full query being executed
                 
