@@ -14,7 +14,7 @@ from dashboard_layouts import build_premium_dashboard
 from datetime import datetime
 from datetime import datetime as dt
 from data_storage import DataStorage
-from config import DATA_FILE_NAME_
+from config import DATA_FILE_NAME_,CUSTOM_GENDER_MAP
 from helpers.date_ranges import (
                     get_relative_date_range,
                     RELATIVE_PERIOD_LIST
@@ -670,10 +670,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             )
 
         data[DATE_] = pd.to_datetime(data[DATE_], format='mixed')
-        data[GENDER_] = data[GENDER_].replace({"M":"Male",
-                                               "F":"Female",
-                                               '{"label"=>"Male", "value"=>"M"}':"Male",
-                                               '{"label"=>"Female", "value"=>"F"}':"Female"})
+        data[GENDER_] = data[GENDER_].replace(CUSTOM_GENDER_MAP)
         data["DateValue"] = pd.to_datetime(data[DATE_]).dt.date
         data['datetime'] = data[DATE_]
         data[DATE_] = data[DATE_].dt.normalize()

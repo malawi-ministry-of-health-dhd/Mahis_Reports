@@ -4,6 +4,8 @@ USE_LOCALHOST = True
 START_DATE = '2025-12-01'
 LOAD_FRESH_DATA = False # Set to True to always start from START_DATE and fetch fresh data. Not recommended for large datasets.
 PREFIX_NAME = '/'  # Set to your desired prefix for https paths, e.g., '/myapp'
+BATCH_SIZE = 5000 # Number of records to fetch per batch when loading from database
+IS_HARMONIZED_MAHIS = False # Set to True if using the harmonized MAHIS database schema, False for legacy schema
 
 
 RELATIVE_DAYS = [ 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'This Week', 'Last Week', 'This Month', 'Last Month' ]
@@ -72,97 +74,116 @@ SSH_CONFIG = {
 }
 
 # on production remove COLLATE utf8mb3_general_ci
-QERY = """
+# multijoin query to get all obs for each encounter, including those without obs (using LEFT JOIN)
+QUERY_OBS = """
 SELECT
-    main.*,
+    e.encounter_id,
+    e.patient_id as person_id,
+    pn.given_name,
+    pn.family_name,
+    p.gender AS Gender,
+    p.birthdate,
+    FLOOR(DATEDIFF(e.encounter_datetime, birthdate)) AS AgeDays,
+    FLOOR(DATEDIFF(e.encounter_datetime, birthdate) / 365) AS Age,
     CASE
-        WHEN visit_days = 1 THEN 'New'
-        ELSE 'Revisit'
-    END AS new_revisit
-FROM (
-    SELECT
-        p.person_id,
-        e.encounter_id,
-        pn2.given_name,
-        pn2.family_name,
-        gender AS Gender,
-        birthdate,
-        FLOOR(DATEDIFF(e.encounter_datetime, birthdate)) AS AgeDays,
-        FLOOR(DATEDIFF(e.encounter_datetime, birthdate) / 365) AS Age,
-        CASE
-            WHEN FLOOR(DATEDIFF(e.encounter_datetime, birthdate) / 365) < 5 THEN 'Under 5'
-            ELSE 'Over 5'
-        END AS Age_Group,
-        e.encounter_datetime AS Date,
-        pr.name AS Source_Program,
-        pr.name AS Program,
-        CASE
-            WHEN pr.name = 'NEONATAL PROGRAM' THEN 'NEONATAL PROGRAM'
-            WHEN et.name  IN ('ANC VISIT', 'LABOUR AND DELIVERY', 'POSTNATAL CARE') THEN 'MATERNAL AND CHILD HEALTH'
-            ELSE pr.name
-        END AS Reporting_Program,
-        CASE
-            WHEN et.name = 'ANC VISIT' THEN 'ANC'
-            WHEN et.name = 'LABOUR AND DELIVERY' THEN 'LABOUR'
-            WHEN et.name = 'POSTNATAL CARE' THEN 'PNC'
-            WHEN pr.name = 'NEONATAL PROGRAM' THEN 'NEONATAL'
-            ELSE pr.name
-        END AS Service_Area,
-        l.name AS Facility,
-        l.code AS Facility_CODE,
-        u.username AS User,
-        l.district AS District,
-        et.name AS Encounter,
-        pa.state_province AS Home_district,
-        pa.township_division AS TA,
-        pa.city_village AS Village,
-        v.visit_days,
-        cn.name AS obs_value_coded,
-        c.name AS concept_name,
-        o.value_text AS Value,
-        o.value_numeric AS ValueN,
-        d.name AS DrugName,
-        cnn.name AS Value_name,
-        cnnn.name AS Order_Name,
-        o.value_datetime
-    FROM person AS p
-    JOIN patient AS pa2 ON p.person_id = pa2.patient_id
-    JOIN person_name pn2 ON p.person_id = pn2.person_id
-    JOIN person_address AS pa ON p.person_id = pa.person_id
-    JOIN encounter AS e ON p.person_id = e.patient_id
-    JOIN encounter_type AS et ON e.encounter_type = et.encounter_type_id
-    INNER JOIN program AS pr ON e.program_id = pr.program_id
-    INNER JOIN users AS u ON e.creator = u.user_id
-    INNER JOIN facilities AS l ON u.location_id = l.code
-    JOIN (
-        SELECT patient_id, COUNT(DISTINCT DATE(encounter_datetime)) AS visit_days
-        FROM encounter
-        GROUP BY patient_id
-    ) AS v ON v.patient_id = p.person_id
-    LEFT JOIN obs o ON o.encounter_id = e.encounter_id AND o.voided = 0
-    LEFT JOIN concept_name cn ON o.value_coded = cn.concept_id
-        AND cn.locale = 'en'
-        AND cn.concept_name_type = 'FULLY_SPECIFIED'
-        AND cn.voided = 0
-    LEFT JOIN concept_name c ON o.concept_id = c.concept_id
-        AND c.locale = 'en'
-        AND c.concept_name_type = 'FULLY_SPECIFIED'
-        AND c.voided = 0
-    LEFT JOIN concept co ON o.value_text = co.uuid
-    LEFT JOIN concept_name cnn ON co.concept_id = cnn.concept_id
-        AND cnn.locale = 'en'
-        AND cnn.concept_name_type = 'FULLY_SPECIFIED'
-        AND cnn.voided = 0
-    LEFT JOIN drug AS d ON o.value_drug = d.drug_id
-    LEFT JOIN orders AS od ON o.order_id = od.order_id
-    LEFT JOIN concept_name AS cnnn ON od.concept_id = cnnn.concept_id
-        AND cnnn.locale = 'en'
-        AND cnnn.concept_name_type = 'FULLY_SPECIFIED'
-        AND cnnn.voided = 0
-    WHERE p.voided = 0
-    {date_filter}
-) AS main
+        WHEN FLOOR(DATEDIFF(e.encounter_datetime, birthdate) / 365) < 5 THEN 'Under 5'
+        ELSE 'Over 5'
+    END AS Age_Group,
+    pa.state_province AS Home_district,
+    pa.township_division AS TA,
+    pa.city_village AS Village,
+    e.encounter_type AS Encounter,
+    e.encounter_datetime AS Date, #date
+    e.location_id,
+    e.creator,
+    e.provider_id,
+    e.program_id AS Program,
+    o.concept_id AS concept_name,
+    o.obs_datetime,
+    o.obs_group_id,
+    o.accession_number,
+    o.value_group_id,
+    o.value_boolean,
+    o.value_coded AS obs_value_coded,
+    o.value_coded_name_id,
+    o.value_drug AS DrugName,
+    o.value_datetime,
+    o.value_numeric as ValueN,
+    o.value_text as Value,
+    od.order_type_id as Order_Type,
+    od.concept_id as Order_Name
+FROM encounter e
+LEFT JOIN obs o ON e.encounter_id = o.encounter_id
+JOIN person p ON e.patient_id = p.person_id AND p.voided = 0
+JOIN person_name pn ON e.patient_id = pn.person_id AND pn.voided = 0
+# JOIN patient_program pp ON e.patient_id = pp.patient_id AND pp.voided = 0
+LEFT JOIN person_address pa ON pn.person_id = pa.person_id AND pa.voided = 0 AND pa.preferred = 0
+LEFT JOIN orders od ON o.order_id = od.order_id AND od.discontinued = 0
+WHERE e.voided = 0
+{date_filter}
+
 """
+
+# static tables
+QUERY_PROGRAMS = """
+SELECT program_id, name FROM program WHERE retired = 0
+"""
+QUERY_CONCEPT_NAMES = """
+SELECT concept_id, name FROM concept_name WHERE locale = 'en' AND concept_name_type = 'FULLY_SPECIFIED' AND voided = 0
+"""
+QUERY_ENCOUNTER_TYPES = """
+SELECT encounter_type_id, name FROM encounter_type WHERE retired = 0
+"""
+QUERY_LOCATIONS = """
+SELECT location_id, name, city_village  FROM location WHERE retired = 0
+"""
+QUERY_FACILITIES = """
+SELECT id, code, name, district FROM facilities
+"""
+
+QUERY_DRUGS = """
+SELECT drug_id, name, units FROM drug WHERE retired = 0
+"""
+
+QUERY_ORDER_TYPES = """
+SELECT order_type_id, name FROM order_type WHERE retired = 0
+"""
+
+QUERY_USERS = """
+SELECT
+    u.user_id,
+    u.username AS User,
+    u.person_id,
+    u.location_id,
+    u.uuid as uuid, 
+    ur.role as role 
+FROM users u 
+JOIN user_role ur ON u.user_id = ur.user_id
+WHERE u.retired = 0
+"""
+
+CUSTOM_MNID_MAP_PROGRAM = {
+    "NEONATAL PROGRAM": "NEONATAL PROGRAM",
+    "MATERNAL AND CHILD HEALTH": "MATERNAL AND CHILD HEALTH",
+    "ANC VISIT": "MATERNAL AND CHILD HEALTH",
+    "LABOUR AND DELIVERY": "MATERNAL AND CHILD HEALTH",
+    "POSTNATAL CARE": "MATERNAL AND CHILD HEALTH"
+}
+CUSTOM_MNID_MAP_SERVICE_AREA = {
+    "ANC VISIT": "ANC",
+    "LABOUR AND DELIVERY": "LABOUR",
+    "POSTNATAL CARE": "PNC",
+    "NEONATAL PROGRAM": "NEONATAL",
+}
+CUSTOM_GENDER_MAP = {
+    'M': 'Male',
+    'F': 'Female',
+    'O': 'Other',
+    'U': 'Undetermined',
+    '{"label"=>"Male", "value"=>"M"}':"Male",
+    '{"label"=>"Female", "value"=>"F"}':"Female"
+}
+
 
 actual_keys_in_data = ['person_id', 'encounter_id',  
                                        'Gender', 'Age', 'Age_Group', 

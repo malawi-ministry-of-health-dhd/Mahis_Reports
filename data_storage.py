@@ -112,7 +112,7 @@ class DataStorage:
             df['Order_Name'] = df['Order_Name'].map(concepts_dict)
 
         if df is not None and not df.empty:
-            df.to_excel(os.path.join(self.data_dir, 'latest_data.xlsx'), index=False)
+            # df.to_excel(os.path.join(self.data_dir, 'latest_data.xlsx'), index=False)
             df.to_parquet(self.filepath, index=False, engine='pyarrow')
             test = pd.read_parquet(self.filepath)
             
