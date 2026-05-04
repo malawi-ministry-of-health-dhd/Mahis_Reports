@@ -4,9 +4,7 @@ import urllib.parse
 import pandas as pd
 from dash import Input, Output, html
 from dash.exceptions import PreventUpdate
-
-DEMO_LOCATION = "LL040033"
-DEMO_UUID = "m3his@dhd"
+from config import DEMO_UUID, DEMO_LOCATION
 
 
 def normalize_url_params(params):
