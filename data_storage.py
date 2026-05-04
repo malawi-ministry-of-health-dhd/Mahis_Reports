@@ -50,6 +50,8 @@ class DataStorage:
     def fetch_transactional_data(self, date_column, incremental_id_column):
         """Fetch fresh data from DB and save to Parquet."""
         fetcher = DataFetcher(use_localhost=USE_LOCALHOST)
+        existing_df = pd.read_parquet(self.filepath)
+
         df = fetcher.fetch_data(
             query_template = self.query,
             parquet_output=self.filepath,
@@ -112,9 +114,10 @@ class DataStorage:
             df['Order_Name'] = df['Order_Name'].map(concepts_dict)
 
         if df is not None and not df.empty:
-            # df.to_excel(os.path.join(self.data_dir, 'latest_data.xlsx'), index=False)
+            
+            # combine with existing parquet
+            df = pd.concat([existing_df, df])
             df.to_parquet(self.filepath, index=False, engine='pyarrow')
-            test = pd.read_parquet(self.filepath)
             
             print(self.filepath)
             print("exists:", os.path.exists(self.filepath))
