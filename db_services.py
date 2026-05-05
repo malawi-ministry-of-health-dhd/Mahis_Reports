@@ -189,16 +189,18 @@ class DataFetcher:
             logger.info(f"Processing date: {current_date.strftime('%Y-%m-%d')}")
             
             date_str = current_date.strftime('%Y-%m-%d')
+            date_str1 = current_date.strftime('%Y-%m-%d')
+            date_str2 = (current_date + timedelta(days=1)).strftime('%Y-%m-%d')
             has_more_data = True
             batch_count = 0
             
             while has_more_data:
                 # Build query with date filter and ID pagination
-                date_filter = f"AND {date_column} >= '{date_str}' AND {date_column} <= '{date_str}' AND e.{id_column} > {last_id}"
+                date_filter = f"AND {date_column} >= '{date_str1}' AND {date_column} <= '{date_str2}' AND e.{id_column} > {last_id}"
                 query = query_template.format(date_filter=date_filter)
                 full_query = f"{query} LIMIT {self.batch_size}"
 
-                # print(full_query)  # Debug: print the full query being executed
+                print(full_query)  # Debug: print the full query being executed
                 
                 try:
                     batch_df = pd.read_sql(full_query, conn)
