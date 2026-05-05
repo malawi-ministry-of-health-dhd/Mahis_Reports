@@ -121,7 +121,12 @@ class DataStorage:
             # combine with existing parquet
             df = df.drop_duplicates()
             df = pd.concat([existing_df, df])
-            df.to_parquet(self.filepath, index=False, engine='pyarrow')
+            df.to_parquet(
+                            self.filepath,
+                            engine="pyarrow",
+                            index=False,
+                            use_dictionary=False
+                        )
             
             print(self.filepath)
             print("exists:", os.path.exists(self.filepath))
