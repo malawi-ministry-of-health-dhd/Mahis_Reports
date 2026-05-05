@@ -16,3 +16,4 @@ dash-iconify
 typing_extensions
 reportlab
 duckdb
+diskcache
