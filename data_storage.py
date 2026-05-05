@@ -133,12 +133,14 @@ class DataStorage:
             df = df.drop_duplicates()
             df = pd.concat([existing_df, df])
             df.to_parquet(
-                        self.filepath, 
-                        index=False, 
-                        engine='pyarrow',
-                        use_dictionary=False,
-                        compression='snappy'
-                    )
+                self.filepath, 
+                index=False, 
+                engine='pyarrow',
+                use_dictionary=False,
+                compression='uncompressed',
+                version='2.4',
+                coerce_timestamps='us'
+            )
             
             print(self.filepath)
             print("exists:", os.path.exists(self.filepath))
