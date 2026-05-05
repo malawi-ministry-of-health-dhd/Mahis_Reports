@@ -50,10 +50,6 @@ class DataStorage:
     def fetch_transactional_data(self, date_column, incremental_id_column):
         """Fetch fresh data from DB and save to Parquet."""
         fetcher = DataFetcher(use_localhost=USE_LOCALHOST)
-        if os.path.exists(self.filepath):
-            existing_df = pd.read_parquet(self.filepath)
-        else:
-            existing_df = pd.DataFrame()
 
         df = fetcher.fetch_data(
             query_template = self.query,
@@ -117,11 +113,32 @@ class DataStorage:
             df['Order_Name'] = df['Order_Name'].map(concepts_dict)
 
         if df is not None and not df.empty:
+
+            if os.path.exists(self.filepath):
+                try:
+                    # Try reading with pyarrow directly to handle dictionary issues
+                    import pyarrow.parquet as pq
+                    table = pq.read_table(self.filepath)
+                    existing_df = table.to_pandas()
+                except Exception as e:
+                    if "cannot have more than one dictionary" in str(e):
+                        logging.warning(f"Corrupted parquet file detected. Starting fresh.")
+                        existing_df = pd.DataFrame()
+                    else:
+                        raise
+            else:
+                existing_df = pd.DataFrame()
             
             # combine with existing parquet
             df = df.drop_duplicates()
             df = pd.concat([existing_df, df])
-            df.to_parquet(self.filepath, index=False, engine='pyarrow')
+            df.to_parquet(
+                        self.filepath, 
+                        index=False, 
+                        engine='pyarrow',
+                        use_dictionary=False,
+                        compression='snappy'
+                    )
             
             print(self.filepath)
             print("exists:", os.path.exists(self.filepath))
