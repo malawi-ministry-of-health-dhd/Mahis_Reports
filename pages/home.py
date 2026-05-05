@@ -148,13 +148,17 @@ def _apply_scope_to_data(data: pd.DataFrame, scope: dict, district_col: str | No
     if data is None or data.empty:
         return data
 
+
     assigned_level = scope.get('assigned_level')
     scoped = data
     if assigned_level == 'facility':
         facility_code = scope.get('facility_code')
         facility_name = scope.get('facility_name')
         if facility_code and FACILITY_CODE_ in scoped.columns:
-            scoped = scoped[scoped[FACILITY_CODE_].astype(str) == str(facility_code)]
+            if pd.api.types.is_integer_dtype(scoped[FACILITY_CODE_]) or pd.api.types.is_float_dtype(scoped[FACILITY_CODE_]):
+                scoped = scoped[scoped[FACILITY_CODE_].astype(int) == int(facility_code)] #for harmonized MaHIS
+            else:
+                scoped = scoped[scoped[FACILITY_CODE_].astype(str) == str(facility_code)]
         elif facility_name and FACILITY_ in scoped.columns:
             scoped = scoped[scoped[FACILITY_].astype(str) == str(facility_name)]
     elif assigned_level == 'district':
@@ -715,6 +719,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                 encounter_mask = data["Encounter"].fillna('').astype(str).str.contains('PNC|POSTNATAL|POST.NATAL', case=False, na=False)
         base_data = data[base_mask & encounter_mask].copy()
 
+
         district_col = "District" if "District" in base_data.columns else (HOME_DISTRICT_ if HOME_DISTRICT_ in base_data.columns else None)
         all_districts = (
             base_data[district_col].dropna().sort_values().unique().tolist()
@@ -806,7 +811,6 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
         elif effective_level == "facility":
             all_facilities = facilities.copy()
         
-        print(base_data)
 
         # Filter network and facility data
         network_data = base_data.copy()

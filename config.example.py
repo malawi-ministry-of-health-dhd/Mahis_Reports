@@ -136,7 +136,7 @@ QUERY_ENCOUNTER_TYPES = """
 SELECT encounter_type_id, name FROM encounter_type WHERE retired = 0
 """
 QUERY_LOCATIONS = """
-SELECT location_id, name, city_village  FROM location WHERE retired = 0
+SELECT location_id, name, county_district  FROM location WHERE retired = 0
 """
 QUERY_FACILITIES = """
 SELECT id, code, name, district FROM facilities
