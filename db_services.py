@@ -200,7 +200,7 @@ class DataFetcher:
                 query = query_template.format(date_filter=date_filter)
                 full_query = f"{query} LIMIT {self.batch_size}"
 
-                print(full_query)  # Debug: print the full query being executed
+                # print(full_query)  # Debug: print the full query being executed
                 
                 try:
                     batch_df = pd.read_sql(full_query, conn)
