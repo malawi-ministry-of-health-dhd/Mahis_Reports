@@ -805,6 +805,8 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             all_facilities = sorted(allowed_facilities)
         elif effective_level == "facility":
             all_facilities = facilities.copy()
+        
+        print(base_data)
 
         # Filter network and facility data
         network_data = base_data.copy()
@@ -815,7 +817,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             filtered_data = filtered_data[filtered_data[FACILITY_].isin(facilities)]
         elif effective_level == 'district' and facilities:
             filtered_data = filtered_data[filtered_data[FACILITY_].isin(facilities)]
-
+        
         # MNID-specific data paths: no Encounter pre-filter so all program observations are present.
         # The MNID renderer uses Service_Area (derived from Program/Encounter) for internal scoping.
         network_data_mnid = base_data_mnid.copy()
@@ -835,7 +837,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
             selected_reports = [clicked_name] if clicked_name else [menu_json[0]["report_name"] if menu_json else "Dashboard"]
         selected_reports = [normalize_report_name(r, menu_json) for r in selected_reports]
         dataset_version = _dataset_version_token()
-
+    
         rendered = []
         for report_name in selected_reports:
             dashboard_json = next((d for d in menu_json if d['report_name'] == report_name), None)
@@ -893,6 +895,7 @@ def update_dashboard(gen, interval, start_date, end_date, level, districts, faci
                 (_fdata[DATE_] >= start_dt) &
                 (_fdata[DATE_] <= end_dt)
             ]
+
 
             adj_start_dt, adj_end_dt = start_dt, end_dt
             delta_days = max((adj_end_dt - adj_start_dt).days, 1)
