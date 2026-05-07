@@ -81,7 +81,7 @@ class DataStorage:
         facilities_path = os.path.join(self.script_dir,self.tables_dir, "facilities_data.csv")
         if not os.path.exists(facilities_path):
             logging.warning(f"Facilities data file not found at {facilities_path}. Skipping facilities data loading.")
-            locations['code'] = locations['code'].astype(str)
+            locations['location_id'] = locations['location_id'].astype(str)
             facilities_dict = locations.set_index('location_id')['name'].to_dict()
             facility_districts_dict = locations.set_index('location_id')['county_district'].to_dict()
         else:
