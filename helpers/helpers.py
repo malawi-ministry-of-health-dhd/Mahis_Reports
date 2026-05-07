@@ -631,7 +631,7 @@ def create_linelist_from_config(filtered, filters,user_role=None, **kwargs):
 
     group_kwargs = {}
 
-    for i in range(1, 10 + 1):
+    for i in range(1, 30 + 1):
         # group_colsN
         c = filters.get(f"group_cols{i}")
         if c:
@@ -650,6 +650,8 @@ def create_linelist_from_config(filtered, filters,user_role=None, **kwargs):
             group_kwargs[f"group{i}_rename"] = gr
     # Merge any extra **kwargs the user passes
     group_kwargs.update(kwargs)
+
+    print(group_kwargs)
 
     return create_line_list(
         df=filtered,

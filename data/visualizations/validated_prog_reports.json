@@ -2,7 +2,7 @@
   "reports": [
     {
       "id": "1",
-      "report_name": "LINE LIST OF OPD DISPENSING AND DIAGNOSES",
+      "report_name": "LINE LIST OF OPD Dispensing AND DIAGNOSES",
       "authorized_user": ["Clinician", "Nurse"],
       "message": "Names have been masked. Visible only to : ",
       "program": "OPD Program",
@@ -34,11 +34,11 @@
       "group1_filters": {"Program": "OPD Program"},
 
       "group_cols2": ["DrugName", "ValueN"],
-      "group2_filters": {"Program": "OPD Program", "Encounter": "DISPENSING", "concept_name": "Amount dispensed"},
+      "group2_filters": {"Program": "OPD Program", "Encounter": "Dispensing", "concept_name": "Amount dispensed"},
       "group2_aggr": {"DrugName": "join", "ValueN": "join"},
 
       "group_cols3": ["obs_value_coded"],
-      "group3_filters": {"Program": "OPD Program", "Encounter": "DIAGNOSIS"},
+      "group3_filters": {"Program": "OPD Program", "Encounter": "Diagnosis"},
       "group3_aggr": {"obs_value_coded": "join"},
       "group3_rename": {"obs_value_coded": "Diagnosis"}
     },
@@ -81,11 +81,11 @@
       "group2_aggr": {"obs_value_coded": "join"},
       "group2_rename": {"obs_value_coded": "Complaint"},
       "group_cols3": ["obs_value_coded"],
-      "group3_filters": {"Program": "OPD Program", "Encounter": "DIAGNOSIS"},
+      "group3_filters": {"Program": "OPD Program", "Encounter": "Diagnosis"},
       "group3_aggr": {"obs_value_coded": "join"},
       "group3_rename": {"obs_value_coded": "Diagnosis"},
       "group_cols4": ["DrugName"],
-      "group4_filters": {"Program": "OPD Program", "Encounter": "DISPENSING"},
+      "group4_filters": {"Program": "OPD Program", "Encounter": "Dispensing"},
       "group4_aggr": {"DrugName": "join"}
     },
     {
@@ -102,7 +102,7 @@
         "given_name": "First Name",
         "family_name": "Last Name",
         "Home_district": "District",
-        "DrugName": "Drug Name",
+        "DrugName": "Drug Given",
         "ValueN": "Quantity Dispensed"
       },
       "cols_order": [
@@ -116,21 +116,22 @@
         "Village",
         "Complaint",
         "MRDT Result",
-        "Drug Name"
+        "Drug Given"
       ],
       "merge_methods": ["left", "inner", "left"],
       "group_cols1": ["Date", "given_name", "family_name", "Gender", "Age", "Home_district", "TA", "Village"],
       "group1_filters": {"Program": "OPD Program", "Village": "!in:''"},
       "group_cols2": ["obs_value_coded"],
-      "group2_filters": {"Program": "OPD Program", "Encounter": "PRESENTING COMPLAINTS", "concept_name": "Presenting complaint"},
+      "group2_filters": {"Program": "OPD Program", "Encounter": "Presenting complaints", "concept_name": "Presenting complaint"},
       "group2_aggr": {"obs_value_coded": "join"},
       "group2_rename": {"obs_value_coded": "Complaint"},
       "group_cols3": ["Value"],
-      "group3_filters": {"Program": "OPD Program", "Encounter": "LAB RESULTS", "concept_name": "MRDT"},
+      "group3_filters": {"Program": "OPD Program", "Encounter": "Lab results", "concept_name": "Malaria Rapid Diagonostic Test"},
       "group3_aggr": {"Value": "join"},
       "group3_rename": {"Value": "MRDT Result"},
+
       "group_cols4": ["DrugName"],
-      "group4_filters": {"Program": "OPD Program", "Encounter": "DISPENSING", "DrugName": "in:''"},
+      "group4_filters": {"Program": "OPD Program", "Encounter": "Dispensing"},
       "group4_aggr": {"DrugName": "join"}
     },
     {
@@ -153,10 +154,10 @@
         "filter_col1": "Program",
         "filter_val1": "OPD Program",
         "filter_col2": "Encounter",
-        "filter_val2": "DISPENSING",
+        "filter_val2": "Dispensing",
         "x_title": "",
         "y_title": "",
-        "rename": {"DrugName": "DRUG", "DISPENSING": "Number of drugs dispensed"},
+        "rename": {"DrugName": "DRUG", "Dispensing": "Number of drugs dispensed"},
         "replace": {}
       }
     },
@@ -180,12 +181,12 @@
         "filter_col1": "Program",
         "filter_val1": "OPD Program",
         "filter_col2": "Encounter",
-        "filter_val2": "DIAGNOSIS",
+        "filter_val2": "Diagnosis",
         "filter_col3": "concept_name",
-        "filter_val3": "Primary diagnosis",
+        "filter_val3": "Primary Diagnosis",
         "x_title": "",
         "y_title": "",
-        "rename": {"obs_value_coded": "DIAGNOSIS"}
+        "rename": {"obs_value_coded": "Diagnosis"}
       }
     },
     {
@@ -208,10 +209,10 @@
         "filter_col1": "Program",
         "filter_val1": "OPD Program",
         "filter_col2": "Encounter",
-        "filter_val2": "DIAGNOSIS",
+        "filter_val2": "Diagnosis",
         "filter_col3": "concept_name",
-        "filter_val3": "Primary diagnosis",
-        "rename": {"obs_value_coded": "DIAGNOSIS"},
+        "filter_val3": "Primary Diagnosis",
+        "rename": {"obs_value_coded": "Diagnosis"},
         "replace": ""
       }
     },
@@ -235,7 +236,7 @@
         "filter_col1": "Program",
         "filter_val1": "OPD Program",
         "filter_col2": "Encounter",
-        "filter_val2": "DISPENSING",
+        "filter_val2": "Dispensing",
         "filter_col3": "",
         "filter_val3": "",
         "x_title": "",
@@ -279,24 +280,24 @@
       "group_cols1": ["given_name", "family_name", "Gender", "Age", "Home_district", "TA", "Village"],
       "group1_filters": {"Program": "NCD PROGRAM", "Village": "!=''"},
       "group_cols2": ["obs_value_coded"],
-      "group2_filters": {"Program": "NCD PROGRAM", "Encounter": "PATIENT REGISTRATION", "concept_name": "Visit type"},
+      "group2_filters": {"Program": "NCD PROGRAM", "Encounter": "Patient registration", "concept_name": "Visit type"},
       "group2_aggr": {"obs_value_coded": "join"},
       "group2_rename": {"obs_value_coded": "Visit Type"},
       "group_cols3": ["ValueN"],
-      "group3_filters": {"Program": "NCD PROGRAM", "Encounter": "VITALS", "concept_name": "Systolic blood pressure"},
+      "group3_filters": {"Program": "NCD PROGRAM", "Encounter": "Vitals", "concept_name": "Systolic"},
       "group3_aggr": {"ValueN": "max"},
       "group3_rename": {"ValueN": "SBP"},
       "group_cols4": ["ValueN"],
-      "group4_filters": {"Program": "NCD PROGRAM", "Encounter": "VITALS", "concept_name": "Diastolic blood pressure"},
+      "group4_filters": {"Program": "NCD PROGRAM", "Encounter": "Vitals", "concept_name": "Diastolic"},
       "group4_aggr": {"ValueN": "max"},
       "group4_rename": {"ValueN": "DBP"},
       "group_cols5": ["obs_value_coded"],
-      "group5_filters": {"Program": "NCD PROGRAM", "Encounter": "DIAGNOSIS", "concept_name": "Primary diagnosis", "obs_value_coded": "Hypertension"},
+      "group5_filters": {"Program": "NCD PROGRAM", "Encounter": "Diagnosis", "concept_name": "Primary Diagnosis", "obs_value_coded": "HTN"},
       "group5_aggr": {"obs_value_coded": "join"},
       "group5_rename": {"obs_value_coded": "Diagnosis"},
       
       "group_cols6": ["Order_Name"],
-      "group6_filters": {"Program": "NCD PROGRAM", "Encounter": "TREATMENT"},
+      "group6_filters": {"Program": "NCD PROGRAM", "Encounter": "Treatment"},
       "group6_aggr": {"Order_Name": "join"},
       "group6_rename": {"Order_Name": "Medication Given"}
     },
@@ -327,36 +328,58 @@
         "District",
         "TA",
         "Village",
+        "Patient Drinks Alcohol",
+        "Patient Smokes",
         "Visit Type",
         "SBP",
         "DBP",
         "Diagnosis",
         "Medication Given"
       ],
-      "merge_methods": ["left", "left", "left", "inner"],
+      "merge_methods": ["left", "left", "left","left", "left","left","left","left"],
       "group_cols1": ["given_name", "family_name", "Gender", "Age", "Home_district", "TA", "Village"],
       "group1_filters": {"Program": "NCD PROGRAM", "Village": "!=''"},
+      
       "group_cols2": ["obs_value_coded"],
-      "group2_filters": {"Program": "NCD PROGRAM", "Encounter": "PATIENT REGISTRATION", "concept_name": "Visit type"},
+      "group2_filters": {"Program": "NCD PROGRAM", "Encounter": "Patient registration", "concept_name": "Visit type"},
       "group2_aggr": {"obs_value_coded": "join"},
       "group2_rename": {"obs_value_coded": "Visit Type"},
-      "group_cols3": ["ValueN"],
-      "group3_filters": {"Program": "NCD PROGRAM", "Encounter": "VITALS", "concept_name": "Systolic blood pressure"},
-      "group3_aggr": {"ValueN": "max"},
-      "group3_rename": {"ValueN": "SBP"},
-      "group_cols4": ["ValueN"],
-      "group4_filters": {"Program": "NCD PROGRAM", "Encounter": "VITALS", "concept_name": "Diastolic blood pressure"},
-      "group4_aggr": {"ValueN": "max"},
-      "group4_rename": {"ValueN": "DBP"},
+
+      "group_cols3": ["obs_value_coded"],
+      "group3_filters": {"Program": "NCD PROGRAM", "Encounter": "Assessment", "concept_name": "Does the patient drink alcohol?"},
+      "group3_aggr": {"obs_value_coded": "first"},
+      "group3_rename": {"obs_value_coded": "Patient Drinks Alcohol"},
+
+      "group_cols4": ["obs_value_coded"],
+      "group4_filters": {"Program": "NCD PROGRAM", "Encounter": "Assessment", "concept_name": "Smoking history"},
+      "group4_aggr": {"obs_value_coded": "first"},
+      "group4_rename": {"obs_value_coded": "Patient Smokes"},
+
       "group_cols5": ["obs_value_coded"],
-      "group5_filters": {"Program": "NCD PROGRAM", "Encounter": "DIAGNOSIS", "concept_name": "Primary diagnosis", "obs_value_coded": "in:Type 2 diabetes, Type 1 diabetes"},
+      "group5_filters": {"Program": "NCD PROGRAM", "Encounter": "Patient registration", "concept_name": "Visit type"},
       "group5_aggr": {"obs_value_coded": "join"},
-      "group5_rename": {"obs_value_coded": "Diagnosis"},
+      "group5_rename": {"obs_value_coded": "Visit Type"},
       
-      "group_cols6": ["Order_Name"],
-      "group6_filters": {"Program": "NCD PROGRAM", "Encounter": "TREATMENT"},
-      "group6_aggr": {"Order_Name": "join"},
-      "group6_rename": {"Order_Name": "Medication Given"}
+      
+      "group_cols6": ["ValueN"],
+      "group6_filters": {"Program": "NCD PROGRAM", "Encounter": "Vitals", "concept_name": "Systolic"},
+      "group6_aggr": {"ValueN": "max"},
+      "group6_rename": {"ValueN": "SBP"},
+
+      "group_cols7": ["ValueN"],
+      "group7_filters": {"Program": "NCD PROGRAM", "Encounter": "Vitals", "concept_name": "Diastolic"},
+      "group7_aggr": {"ValueN": "max"},
+      "group7_rename": {"ValueN": "DBP"},
+
+      "group_cols8": ["obs_value_coded"],
+      "group8_filters": {"Program": "NCD PROGRAM", "Encounter": "Diagnosis", "concept_name": "Primary Diagnosis", "obs_value_coded": "in:Type 2 diabetes, Type 1 diabetes"},
+      "group8_aggr": {"obs_value_coded": "join"},
+      "group8_rename": {"obs_value_coded": "Diagnosis"},
+      
+      "group_cols9": ["Order_Name"],
+      "group9_filters": {"Program": "NCD PROGRAM", "Encounter": "Treatment"},
+      "group9_aggr": {"Order_Name": "join"},
+      "group9_rename": {"Order_Name": "Medication Given"}
     }
   ]
 }

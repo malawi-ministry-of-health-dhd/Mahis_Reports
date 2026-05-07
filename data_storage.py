@@ -10,7 +10,8 @@ from functools import lru_cache
 
 logging.basicConfig(level=logging.DEBUG)
 
-QUERY_OBS = cfg.QUERY_OBS
+QUERY_OBS_OLD = cfg.QUERY_OBS_OLD
+QUERY_OBS_HARMONIZED = cfg.QUERY_OBS_HARMONIZED
 QUERY_PROGRAMS = cfg.QUERY_PROGRAMS
 QUERY_CONCEPT_NAMES = cfg.QUERY_CONCEPT_NAMES
 QUERY_ENCOUNTER_TYPES = cfg.QUERY_ENCOUNTER_TYPES
@@ -32,7 +33,7 @@ CONCEPTS = getattr(cfg, "CONCEPTS", None)
 
 class DataStorage:
     def __init__ (self, 
-                  query=QUERY_OBS,
+                  query=QUERY_OBS_OLD,
                   data_dir="data",
                   tables_dir = "data/single_tables", 
                   filename=DATA_FILE_NAME_):
@@ -97,7 +98,7 @@ class DataStorage:
 
         users = pd.read_csv(os.path.join(self.script_dir,self.tables_dir, "users_data.csv"))
         username_dict = users.set_index('user_id')['User'].to_dict()
-        user_location_dict = users.set_index('user_id')['location_id'].to_dict()
+        # user_location_dict = users.set_index('user_id')['location_id'].to_dict()
 
         # merge single tables with main df
         if not df.empty:
@@ -113,7 +114,7 @@ class DataStorage:
             df['DrugUnits'] = df['DrugName'].map(drugs_unit_dict)
             df['DrugName'] = df['DrugName'].map(drugs_name_dict)
             df['User'] = df['creator'].map(username_dict)
-            df['Facility_CODE'] = df['creator'].map(user_location_dict)
+            df['Facility_CODE'] = df['location_id']
             df['Facility'] = df['Facility_CODE'].map(facilities_dict)
             df['District'] = df['Facility_CODE'].map(facility_districts_dict)
             df['Order_Type'] = df['Order_Type'].map(order_type_dict)
@@ -216,8 +217,12 @@ if __name__ == "__main__":
     users = DataStorage(query=QUERY_USERS)
     users.fetch_and_save_single_table(table_name="users_data")
 
-    storage = DataStorage(query=QUERY_OBS, filename=DATA_FILE_NAME_)
-    storage.fetch_transactional_data(date_column="encounter_datetime", incremental_id_column="encounter_id")
+    if not IS_HARMONIZED_MAHIS:
+        transactional = DataStorage(query=QUERY_OBS_OLD, filename=DATA_FILE_NAME_)
+        transactional.fetch_transactional_data(date_column="encounter_datetime", incremental_id_column="encounter_id")
+    else:
+        transactional = DataStorage(query=QUERY_OBS_HARMONIZED, filename=DATA_FILE_NAME_)
+        transactional.fetch_transactional_data(date_column="encounter_datetime", incremental_id_column="encounter_id")
 
 
     if CONCEPTS:

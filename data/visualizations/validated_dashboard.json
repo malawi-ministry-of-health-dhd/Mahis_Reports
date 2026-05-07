@@ -218,7 +218,10 @@
             "variable1": "Program",
             "value1": [],
             "variable2": "Encounter",
-            "value2": ["LAB ORDERS", "LAB RESULTS"],
+            "value2": [
+              "LAB ORDERS",
+              "LAB RESULTS"
+            ],
             "variable3": "concept_name",
             "value3": [],
             "variable4": "obs_value_coded",
@@ -1193,7 +1196,7 @@
             "variable1": "Program",
             "value1": "NCD PROGRAM",
             "variable2": "Encounter",
-            "value2": "DIAGNOSIS",
+            "value2": "Diagnosis",
             "variable3": "obs_value_coded",
             "value3": "Type 1 diabetes | Type 2 diabetes"
           }
@@ -1208,7 +1211,7 @@
             "variable1": "Program",
             "value1": "NCD PROGRAM",
             "variable2": "Encounter",
-            "value2": "DIAGNOSIS",
+            "value2": "Diagnosis",
             "variable3": "obs_value_coded",
             "value3": "Type 1 diabetes"
           }
@@ -1223,7 +1226,7 @@
             "variable1": "Program",
             "value1": "NCD PROGRAM",
             "variable2": "Encounter",
-            "value2": "DIAGNOSIS",
+            "value2": "Diagnosis",
             "variable3": "obs_value_coded",
             "value3": "Type 2 diabetes"
           }
@@ -1238,9 +1241,9 @@
             "variable1": "Program",
             "value1": "NCD PROGRAM",
             "variable2": "Encounter",
-            "value2": "DIAGNOSIS",
+            "value2": "Diagnosis",
             "variable3": "obs_value_coded",
-            "value3": "Hypertension"
+            "value3": "HTN"
           }
         },
         {
@@ -1253,7 +1256,7 @@
             "variable1": "Program",
             "value1": "NCD PROGRAM",
             "variable2": "Encounter",
-            "value2": "DIAGNOSIS"
+            "value2": "Diagnosis"
           }
         }
       ],
@@ -1310,7 +1313,7 @@
                   "filter_val4": "",
                   "filter_col5": "",
                   "filter_val5": "",
-                  "custom_fields": "[{\"column\": \"Age\", \"expr\": \"Age / 365.25\"}]",
+                  "custom_fields": "",
                   "age_col": "Age",
                   "gender_col": "Gender",
                   "bin_size": "5",
@@ -1417,14 +1420,14 @@
                   "filter_col1": "Program",
                   "filter_val1": "NCD PROGRAM",
                   "filter_col2": "Encounter",
-                  "filter_val2": "OUTPATIENT DIAGNOSIS | DIAGNOSIS",
+                  "filter_val2": "OUTPATIENT DIAGNOSIS | Diagnosis",
                   "filter_col3": "new_revisit",
                   "filter_val3": "New"
                 }
               },
               {
                 "id": "chart_ncd_7",
-                "name": "NCD Type for All Patients",
+                "name": "NCD Type for Existing Patients",
                 "type": "Column",
                 "level": "facility",
                 "filters": {
@@ -1433,8 +1436,8 @@
                   "duration_default": "any",
                   "x_col": "obs_value_coded",
                   "y_col": "encounter_id",
-                  "title": "NCD Type for All Patients",
-                  "x_title": "NCD Type for New Patients",
+                  "title": "NCD Type for Existing Patients",
+                  "x_title": "NCD Type",
                   "y_title": "Number of Patients",
                   "unique_column": "obs_value_coded",
                   "legend_title": "Legend",
@@ -1442,9 +1445,9 @@
                   "filter_col1": "Program",
                   "filter_val1": "NCD PROGRAM",
                   "filter_col2": "Encounter",
-                  "filter_val2": "OUTPATIENT DIAGNOSIS | DIAGNOSIS",
-                  "filter_col3": "",
-                  "filter_val3": ""
+                  "filter_val2": "OUTPATIENT DIAGNOSIS | Diagnosis",
+                  "filter_col3": "new_revisit",
+                  "filter_val3": "Revisit"
                 }
               },
               {
@@ -1809,7 +1812,7 @@
             "variable1": "Program",
             "variable2": "Encounter",
             "value2": [
-              "HIV STATUS AT ENROLLMENT"
+              "Past medical history"
             ],
             "variable3": "concept_name",
             "value3": [
@@ -1833,7 +1836,7 @@
             "value1": [],
             "variable2": "Encounter",
             "value2": [
-              "HIV STATUS AT ENROLLMENT"
+              "Past medical history"
             ],
             "variable3": "concept_name",
             "value3": [
@@ -1841,8 +1844,7 @@
             ],
             "variable4": "obs_value_coded",
             "value4": [
-              "HIV Positive",
-              "Reactive"
+              "HIV Positive"
             ],
             "variable5": "ValueN",
             "value5": "",
@@ -1865,7 +1867,7 @@
             "value1": [],
             "variable2": "Encounter",
             "value2": [
-              "HIV STATUS AT ENROLLMENT"
+              "Past medical history"
             ],
             "variable3": "concept_name",
             "value3": [
@@ -1873,9 +1875,7 @@
             ],
             "variable4": "obs_value_coded",
             "value4": [
-              "HIV negative",
-              "Negative",
-              "Non-reactive"
+              "HIV negative"
             ],
             "variable5": "ValueN",
             "value5": "",
@@ -1898,7 +1898,7 @@
             "value1": [],
             "variable2": "Encounter",
             "value2": [
-              "HIV STATUS AT ENROLLMENT"
+              "Past medical history"
             ],
             "variable3": "concept_name",
             "value3": [
@@ -1906,8 +1906,7 @@
             ],
             "variable4": "obs_value_coded",
             "value4": [
-              "HIV unknown",
-              "Unknown"
+              "HIV unknown"
             ],
             "variable5": "ValueN",
             "value5": "",
@@ -1929,11 +1928,17 @@
             "variable1": "Program",
             "value1": [],
             "variable2": "Encounter",
-            "value2": [],
+            "value2": [
+              "Past medical history"
+            ],
             "variable3": "concept_name",
-            "value3": [],
+            "value3": [
+              "Is the client on ART?"
+            ],
             "variable4": "obs_value_coded",
-            "value4": [],
+            "value4": [
+              "Yes"
+            ],
             "variable5": "ValueN",
             "value5": "",
             "variable6": "Value",
@@ -1955,7 +1960,7 @@
             "value1": [],
             "variable2": "Encounter",
             "value2": [
-              "LAB ORDERS"
+              "Lab orders"
             ],
             "variable3": "concept_name",
             "value3": [
@@ -1986,10 +1991,12 @@
             ],
             "variable2": "Encounter",
             "value2": [
-              "PATIENT OUTCOME"
+              "Lab results"
             ],
             "variable3": "concept_name",
-            "value3": [],
+            "value3": [
+              "Rapid HIV Test"
+            ],
             "variable4": "obs_value_coded",
             "value4": "",
             "variable5": "ValueN",
@@ -2015,21 +2022,18 @@
             ],
             "variable2": "Encounter",
             "value2": [
-              "PATIENT OUTCOME"
+              "Lab results"
             ],
             "variable3": "concept_name",
             "value3": [
-              "Lab test result"
+              "Rapid HIV Test"
             ],
             "variable4": "obs_value_coded",
-            "value4": [
-              "HIV Positive",
-              "Positive"
-            ],
+            "value4": [],
             "variable5": "ValueN",
             "value5": "",
             "variable6": "Value",
-            "value6": "",
+            "value6": "Positive- Confirmed Professional Test",
             "variable7": "Gender",
             "value7": "",
             "variable8": "Age_Group",
@@ -2116,7 +2120,7 @@
                   "filter_col1": [
                     "Encounter"
                   ],
-                  "filter_val1": "HIV STATUS AT ENROLLMENT",
+                  "filter_val1": "Past medical history",
                   "filter_col2": [
                     "concept_name"
                   ],
@@ -2154,15 +2158,15 @@
                   "legend_title": "Legend",
                   "color": "",
                   "filter_col1": "Encounter",
-                  "filter_val1": "HIV STATUS AT ENROLLMENT",
-                  "filter_col2": "",
-                  "filter_val2": "",
+                  "filter_val1": "Past medical history",
+                  "filter_col2": "concept_name",
+                  "filter_val2": "HIV status",
                   "filter_col3": "Encounter",
-                  "filter_val3": "HIV STATUS AT ENROLLMENT",
+                  "filter_val3": "Past medical history",
                   "filter_col4": "",
                   "filter_val4": "",
                   "filter_col5": "Encounter",
-                  "filter_val5": "HIV STATUS AT ENROLLMENT"
+                  "filter_val5": "Past medical history"
                 }
               },
               {
@@ -2179,13 +2183,15 @@
                   "filter_col1": [
                     "Encounter"
                   ],
-                  "filter_val1": "HIV STATUS AT ENROLLMENT",
+                  "filter_val1": "Lab results",
                   "filter_col2": [
                     "concept_name"
                   ],
-                  "filter_val2": "HIV status",
-                  "filter_col3": [],
-                  "filter_val3": "",
+                  "filter_val2": "Rapid HIV Test",
+                  "filter_col3": [
+                    "Program"
+                  ],
+                  "filter_val3": "HTS PROGRAM",
                   "filter_col4": [],
                   "filter_val4": "",
                   "filter_col5": "",
@@ -2246,7 +2252,7 @@
                   "filter_col2": [
                     "Encounter"
                   ],
-                  "filter_val2": "PATIENT OUTCOME",
+                  "filter_val2": "Lab results",
                   "filter_col3": [],
                   "filter_val3": "",
                   "filter_col4": [],
@@ -2329,6 +2335,456 @@
                   "names_col": "obs_value_coded",
                   "values_col": "person_id",
                   "colormap": "{}"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "report_id": "report_f6d7d65d",
+    "report_name": "Advanced HIV Disease",
+    "date_created": "2026-05-06",
+    "visualization_types": {
+      "counts": [
+        {
+          "id": "count_121400f6",
+          "name": "Patients Screened for HIV",
+          "filters": {
+            "measure": "count",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": [],
+            "variable2": "Encounter",
+            "value2": [],
+            "variable3": "concept_name",
+            "value3": [
+              "HIV status"
+            ],
+            "variable4": "obs_value_coded",
+            "value4": "",
+            "variable5": "ValueN",
+            "value5": "",
+            "variable6": "Value",
+            "value6": "",
+            "variable7": "Gender",
+            "value7": [],
+            "variable8": "Age",
+            "value8": ""
+          }
+        },
+        {
+          "id": "count_1f7400bf",
+          "name": "Patients Screened for HIV - Male",
+          "filters": {
+            "measure": "nunique",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": [],
+            "variable2": "Encounter",
+            "value2": [],
+            "variable3": "concept_name",
+            "value3": [
+              "HIV status"
+            ],
+            "variable4": "obs_value_coded",
+            "value4": "",
+            "variable5": "ValueN",
+            "value5": "",
+            "variable6": "Value",
+            "value6": "",
+            "variable7": "Gender",
+            "value7": [
+              "Male"
+            ],
+            "variable8": "Age",
+            "value8": ""
+          }
+        },
+        {
+          "id": "count_60b8d34f",
+          "name": "Patients Screened for HIV - Female",
+          "filters": {
+            "measure": "count",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": [],
+            "variable2": "Encounter",
+            "value2": [],
+            "variable3": "concept_name",
+            "value3": [
+              "HIV status"
+            ],
+            "variable4": "obs_value_coded",
+            "value4": "",
+            "variable5": "ValueN",
+            "value5": "",
+            "variable6": "Value",
+            "value6": "",
+            "variable7": "Gender",
+            "value7": [
+              "Female"
+            ],
+            "variable8": "Age",
+            "value8": ""
+          }
+        },
+        {
+          "id": "count_60b8d34fg",
+          "name": "Patients Screened for HIV - HIV Previous Positive",
+          "filters": {
+            "measure": "count",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": [],
+            "variable2": "Encounter",
+            "value2": [
+              "Past medical history"
+            ],
+            "variable3": "concept_name",
+            "value3": [
+              "HIV status"
+            ],
+            "variable4": "obs_value_coded",
+            "value4": [
+              "HIV Positive"
+            ],
+            "variable5": "ValueN",
+            "value5": "",
+            "variable6": "Value",
+            "value6": "",
+            "variable7": "Gender",
+            "value7": [],
+            "variable8": "Age",
+            "value8": ""
+          }
+        },
+        {
+          "id": "count_8c6aebed",
+          "name": "Patients on ART",
+          "filters": {
+            "measure": "count",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": [],
+            "variable2": "Encounter",
+            "value2": [],
+            "variable3": "concept_name",
+            "value3": [
+              "Is client on ART?"
+            ],
+            "variable4": "obs_value_coded",
+            "value4": "",
+            "variable5": "ValueN",
+            "value5": "",
+            "variable6": "Value",
+            "value6": "",
+            "variable7": "Gender",
+            "value7": "",
+            "variable8": "Age",
+            "value8": ""
+          }
+        },
+        {
+          "id": "count_ea6f5d0d",
+          "name": "Screened for AHD",
+          "filters": {
+            "measure": "nunique",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": [],
+            "variable2": "Encounter",
+            "value2": [
+              "Ahd past medical history"
+            ],
+            "variable3": "concept_name",
+            "value3": [],
+            "variable4": "obs_value_coded",
+            "value4": "",
+            "variable5": "ValueN",
+            "value5": "",
+            "variable6": "Value",
+            "value6": "",
+            "variable7": "Gender",
+            "value7": [],
+            "variable8": "Age",
+            "value8": ""
+          }
+        },
+        {
+          "id": "count_ea6f5d0d1",
+          "name": "Screened for AHD - WHO Stage 1",
+          "filters": {
+            "measure": "nunique",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": [],
+            "variable2": "Encounter",
+            "value2": [
+              "Ahd hiv staging"
+            ],
+            "variable3": "concept_name",
+            "value3": [
+              "WHO stage"
+            ],
+            "variable4": "obs_value_coded",
+            "value4": [
+              "*WHO stage I "
+            ],
+            "variable5": "ValueN",
+            "value5": "",
+            "variable6": "Value",
+            "value6": "",
+            "variable7": "Gender",
+            "value7": [],
+            "variable8": "Age",
+            "value8": ""
+          }
+        },
+        {
+          "id": "count_ea6f5d0d2",
+          "name": "Screened for AHD - WHO Stage 2",
+          "filters": {
+            "measure": "nunique",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": [],
+            "variable2": "Encounter",
+            "value2": [
+              "Ahd hiv staging"
+            ],
+            "variable3": "concept_name",
+            "value3": [
+              "WHO stage"
+            ],
+            "variable4": "obs_value_coded",
+            "value4": [
+              "*WHO stage II "
+            ],
+            "variable5": "ValueN",
+            "value5": "",
+            "variable6": "Value",
+            "value6": "",
+            "variable7": "Gender",
+            "value7": [],
+            "variable8": "Age",
+            "value8": ""
+          }
+        },
+        {
+          "id": "count_ea6f5d0d3",
+          "name": "Screened for AHD - WHO Stage 3",
+          "filters": {
+            "measure": "nunique",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": [],
+            "variable2": "Encounter",
+            "value2": [
+              "Ahd hiv staging"
+            ],
+            "variable3": "concept_name",
+            "value3": [
+              "WHO stage"
+            ],
+            "variable4": "obs_value_coded",
+            "value4": [
+              "*WHO stage III "
+            ],
+            "variable5": "ValueN",
+            "value5": "",
+            "variable6": "Value",
+            "value6": "",
+            "variable7": "Gender",
+            "value7": [],
+            "variable8": "Age",
+            "value8": ""
+          }
+        },
+        {
+          "id": "count_ea6f5d0d4",
+          "name": "Screened for AHD - WHO Stage 4",
+          "filters": {
+            "measure": "nunique",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": [],
+            "variable2": "Encounter",
+            "value2": [
+              "Ahd hiv staging"
+            ],
+            "variable3": "concept_name",
+            "value3": [
+              "WHO stage"
+            ],
+            "variable4": "obs_value_coded",
+            "value4": [
+              "*WHO stage IV "
+            ],
+            "variable5": "ValueN",
+            "value5": "",
+            "variable6": "Value",
+            "value6": "",
+            "variable7": "Gender",
+            "value7": [],
+            "variable8": "Age",
+            "value8": ""
+          }
+        }
+      ],
+      "charts": {
+        "sections": [
+          {
+            "section_name": "AHD Screening and Results",
+            "items": [
+              {
+                "id": "chart_d3b7b75a",
+                "name": "Attendance By Program",
+                "type": "Column",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "7days",
+                  "title": "Attendance By Program",
+                  "unique_column": "person_id",
+                  "filter_col1": [],
+                  "filter_val1": "",
+                  "filter_col2": [],
+                  "filter_val2": "",
+                  "filter_col3": [],
+                  "filter_val3": "",
+                  "filter_col4": [],
+                  "filter_val4": "",
+                  "filter_col5": [],
+                  "filter_val5": "",
+                  "y_col": "person_id",
+                  "x_col": "Program",
+                  "x_title": "Date",
+                  "y_title": "Number of Patients",
+                  "legend_title": "Legend",
+                  "color": ""
+                }
+              },
+              {
+                "id": "chart_6a133940",
+                "name": "Daily HIV Screening - Last 7 Days",
+                "type": "Line",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "7days",
+                  "title": "Daily HIV Screening - Last 7 Days",
+                  "unique_column": "person_id",
+                  "filter_col1": [
+                    "concept_name"
+                  ],
+                  "filter_val1": "HIV status",
+                  "filter_col2": [],
+                  "filter_val2": "",
+                  "filter_col3": [],
+                  "filter_val3": "",
+                  "filter_col4": [],
+                  "filter_val4": "",
+                  "filter_col5": [],
+                  "filter_val5": "",
+                  "date_col": "Date",
+                  "y_col": "person_id",
+                  "x_title": "Date",
+                  "y_title": "Number of Patients",
+                  "legend_title": "Legend",
+                  "color": "obs_value_coded"
+                }
+              },
+              {
+                "id": "chart_cdb8f2ec",
+                "name": "AHD Presenting Complaints (Symptoms)",
+                "type": "Bar",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "7days",
+                  "title": "AHD Presenting Complaints (Symptoms)",
+                  "unique_column": "person_id",
+                  "filter_col1": [
+                    "concept_name"
+                  ],
+                  "filter_val1": "Ahd presenting complaints",
+                  "filter_col2": [],
+                  "filter_val2": "",
+                  "filter_col3": [],
+                  "filter_val3": "",
+                  "filter_col4": [],
+                  "filter_val4": "",
+                  "filter_col5": [],
+                  "filter_val5": "",
+                  "label_col": "obs_value_coded",
+                  "value_col": "person_id",
+                  "top_n": "10",
+                  "x_title": "Date",
+                  "y_title": "Number of Patients"
+                }
+              },
+              {
+                "id": "chart_02d1942a",
+                "name": "AHD WHO Clinical Staging",
+                "type": "Column",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "7days",
+                  "title": "AHD WHO Clinical Staging",
+                  "unique_column": "person_id",
+                  "filter_col1": [
+                    "Encounter"
+                  ],
+                  "filter_val1": "Ahd hiv staging",
+                  "filter_col2": [
+                    "concept_name"
+                  ],
+                  "filter_val2": "WHO stage",
+                  "filter_col3": [],
+                  "filter_val3": "",
+                  "filter_col4": [],
+                  "filter_val4": "",
+                  "filter_col5": [],
+                  "filter_val5": "",
+                  "y_col": "obs_value_coded",
+                  "x_col": "person_id",
+                  "x_title": "Date",
+                  "y_title": "Number of Patients",
+                  "legend_title": "Legend",
+                  "color": ""
+                }
+              },
+              {
+                "id": "chart_0f339442",
+                "name": "AHD LabTests conducted",
+                "type": "Bar",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "7days",
+                  "title": "AHD LabTests conducted",
+                  "unique_column": "person_id",
+                  "filter_col1": [
+                    "Encounter"
+                  ],
+                  "filter_val1": "Ahd lab results",
+                  "filter_col2": [],
+                  "filter_val2": "",
+                  "filter_col3": [],
+                  "filter_val3": "",
+                  "filter_col4": [],
+                  "filter_val4": "",
+                  "filter_col5": [],
+                  "filter_val5": "",
+                  "label_col": "obs_value_coded",
+                  "value_col": "Encounter",
+                  "top_n": "10",
+                  "x_title": "Date",
+                  "y_title": "Number of Patients"
                 }
               }
             ]

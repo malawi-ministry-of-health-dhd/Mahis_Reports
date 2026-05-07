@@ -416,8 +416,7 @@ def create_count_sets(
 
     for cols, vals in set_filters:
         # apply the whole pair together
-        temp_df = _apply_filter(data.copy(), cols, vals)
-
+        temp_df = _apply_filter(data, cols, vals)
         ids = set(temp_df["composite_id"].drop_duplicates())
 
         sets.append(ids)
@@ -1039,7 +1038,7 @@ def create_line_list(
     
     group_dfs = []
     
-    for i in range(1, 11):
+    for i in range(1, 31): #rows extended to 30
         group_cols = kwargs.get(f"group_cols{i}", []) or []
         group_filters = kwargs.get(f"group{i}_filters", {}) or {}
         group_aggr = kwargs.get(f"group{i}_aggr", {}) or {}
@@ -1139,6 +1138,8 @@ def create_line_list(
         
         # Remove any duplicate columns that might have been created
         df_group = df_group.loc[:, ~df_group.columns.duplicated()]
+
+        # print(group_filters, df_group)
         
         group_dfs.append(df_group)
     
