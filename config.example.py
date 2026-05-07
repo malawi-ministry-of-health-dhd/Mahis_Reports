@@ -76,7 +76,47 @@ SSH_CONFIG = {
 
 # on production remove COLLATE utf8mb3_general_ci
 # multijoin query to get all obs for each encounter, including those without obs (using LEFT JOIN)
-QUERY_OBS = """
+actual_keys_in_data = ['person_id', 'encounter_id',  
+                                       'Gender', 'Age', 'Age_Group', 
+                                       'Date', 'Program', 'Facility', 
+                                       'Facility_CODE', 'User', 'District', 
+                                       'Encounter', 'Home_district', 'TA', 
+                                       'Village', 'visit_days', 'obs_value_coded','concept_name', 'Value',"",
+                                       'ValueN', 'DrugName', 'Value_name', 'new_revisit','count','count_set','sum','Order_Name',
+                                       'person_id_key','value_datetime','months','Service_Area']
+
+# ['Gender','Program','Encounter','obs_value_coded','concept_name', 'Value','ValueN', 'DrugName', 'Value_name']
+CONCEPTS = """
+SELECT 
+    q.concept_id AS question_concept_id,
+    qn.name AS question_name,
+    a.concept_id AS obs_value_coded_id,
+    an.name AS obs_value_coded,
+    ca.sort_weight AS display_order
+    
+FROM concept q  -- q = question concept
+INNER JOIN concept_answer ca ON ca.concept_id = q.concept_id
+INNER JOIN concept a ON a.concept_id = ca.answer_concept  -- a = answer concept
+INNER JOIN concept_name qn ON qn.concept_id = q.concept_id 
+    AND qn.locale = 'en' 
+    AND qn.concept_name_type = 'FULLY_SPECIFIED'
+    AND qn.voided = 0
+INNER JOIN concept_name an ON an.concept_id = a.concept_id 
+    AND an.locale = 'en' 
+    AND an.concept_name_type = 'FULLY_SPECIFIED'
+    AND an.voided = 0
+WHERE q.datatype_id = (
+    SELECT concept_datatype_id 
+    FROM concept_datatype 
+    WHERE name = 'Coded'  -- Only Coded type questions have dropdown answers
+)
+AND q.retired = 0
+AND a.retired = 0
+ORDER BY q.concept_id, ca.sort_weight
+"""
+
+# multijoin query to get all obs for each encounter, including those without obs (using LEFT JOIN)
+QUERY_OBS_OLD = """
 SELECT
     e.encounter_id,
     e.patient_id as person_id,
@@ -122,7 +162,66 @@ LEFT JOIN person_address pa ON pn.person_id = pa.person_id AND pa.voided = 0 AND
 LEFT JOIN orders od ON o.order_id = od.order_id AND od.discontinued = 0
 WHERE e.voided = 0
 {date_filter}
+"""
 
+QUERY_OBS_HARMONIZED = """
+SELECT
+    e.patient_id as person_id,
+    v.visit_id,
+    v.date_started,
+    v.date_stopped,
+    pi.identifier,
+    pit.name as patient_identifier_type,
+    pn.given_name,
+    pn.family_name,
+    p.gender AS Gender,
+    p.birthdate,
+    FLOOR(DATEDIFF(e.encounter_datetime, birthdate)) AS AgeDays,
+    FLOOR(DATEDIFF(e.encounter_datetime, birthdate) / 365) AS Age,
+    CASE
+        WHEN FLOOR(DATEDIFF(e.encounter_datetime, birthdate) / 365) < 5 THEN 'Under 5'
+        ELSE 'Over 5'
+    END AS Age_Group,
+    patt.name as person_attribute_name,
+    pat.value as person_attribute_type,
+    pa.state_province AS Home_district,
+    pa.township_division AS TA,
+    pa.city_village AS Village,
+    e.encounter_id,
+    e.encounter_type AS Encounter,
+    e.encounter_datetime AS Date, #date
+    e.location_id,
+    e.creator,
+    e.provider_id,
+    e.program_id AS Program,
+    o.concept_id AS concept_name,
+    o.obs_datetime,
+    o.obs_group_id,
+    o.accession_number,
+    o.value_group_id,
+    o.value_boolean,
+    o.value_coded AS obs_value_coded,
+    o.value_coded_name_id,
+    o.value_drug AS DrugName,
+    o.value_datetime,
+    o.value_numeric as ValueN,
+    o.value_text as Value,
+    od.order_type_id as Order_Type,
+    od.concept_id as Order_Name
+FROM encounter e
+LEFT JOIN visit v on e.visit_id = v.visit_id AND v.voided = 0
+JOIN person p ON e.patient_id = p.person_id AND p.voided = 0
+JOIN person_name pn ON e.patient_id = pn.person_id AND pn.voided = 0
+LEFT JOIN patient_identifier pi on e.patient_id = pi.patient_id AND pi.identifier_type = 3
+LEFT JOIN patient_identifier_type pit on  pi.identifier_type = pit.patient_identifier_type_id AND pit.retired = 0
+LEFT JOIN obs o ON e.encounter_id = o.encounter_id
+# JOIN patient_program pp ON e.patient_id = pp.patient_id AND pp.voided = 0
+LEFT JOIN person_address pa ON pn.person_id = pa.person_id AND pa.voided = 0 AND pa.preferred = 0
+LEFT JOIN person_attribute pat ON p.person_id = pat.person_id AND pat.voided = 0
+LEFT JOIN orders od ON o.order_id = od.order_id AND od.discontinued = 0
+LEFT JOIN person_attribute_type patt ON pat.person_attribute_type_id = patt.person_attribute_type_id AND patt.retired = 0
+WHERE e.voided = 0
+{date_filter}
 """
 
 # static tables
@@ -184,41 +283,3 @@ CUSTOM_GENDER_MAP = {
     '{"label"=>"Male", "value"=>"M"}':"Male",
     '{"label"=>"Female", "value"=>"F"}':"Female"
 }
-
-
-actual_keys_in_data = ['person_id', 'encounter_id',  
-                                       'Gender', 'Age', 'Age_Group', 
-                                       'Date', 'Program', 'Facility', 
-                                       'Facility_CODE', 'User', 'District', 
-                                       'Encounter', 'Home_district', 'TA', 
-                                       'Village', 'visit_days', 'obs_value_coded','concept_name', 'Value',"",
-                                       'ValueN', 'DrugName', 'Value_name', 'new_revisit','count','count_set','sum','Order_Name',
-                                       'person_id_key','value_datetime','months','Service_Area']
-CONCEPTS = """
-SELECT 
-    q.concept_id AS question_concept_id,
-    qn.name AS question_name,
-    a.concept_id AS answer_concept_id,
-    an.name AS obs_value_coded,
-    ca.sort_weight AS display_order
-    
-FROM concept q  -- q = question concept
-INNER JOIN concept_answer ca ON ca.concept_id = q.concept_id
-INNER JOIN concept a ON a.concept_id = ca.answer_concept  -- a = answer concept
-INNER JOIN concept_name qn ON qn.concept_id = q.concept_id 
-    AND qn.locale = 'en' 
-    AND qn.concept_name_type = 'FULLY_SPECIFIED'
-    AND qn.voided = 0
-INNER JOIN concept_name an ON an.concept_id = a.concept_id 
-    AND an.locale = 'en' 
-    AND an.concept_name_type = 'FULLY_SPECIFIED'
-    AND an.voided = 0
-WHERE q.datatype_id = (
-    SELECT concept_datatype_id 
-    FROM concept_datatype 
-    WHERE name = 'Coded'  -- Only Coded type questions have dropdown answers
-)
-AND q.retired = 0
-AND a.retired = 0
-ORDER BY q.concept_id, ca.sort_weight
-"""
