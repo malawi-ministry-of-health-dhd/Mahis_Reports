@@ -1344,16 +1344,17 @@ def update_trend_chart(n_clicks_list, toggle_clicks, selected_ind_ids, stored_tr
     mode = chart_type or 'line'
     selected_ind_ids = selected_ind_ids or []
     ctx = callback_context
+    triggered_prop = None
     if ctx and ctx.triggered:
-        prop_id = ctx.triggered[0]['prop_id']
-        if 'trend-cat-btn' in prop_id:
+        triggered_prop = ctx.triggered[0]['prop_id']
+        if 'trend-cat-btn' in triggered_prop:
             try:
-                next_cat = json.loads(prop_id.split('.')[0]).get('index', cat)
+                next_cat = json.loads(triggered_prop.split('.')[0]).get('index', cat)
                 if next_cat in categories:
                     cat = next_cat
             except Exception:
                 pass
-        elif prop_id == 'mnid-trend-chart-toggle.n_clicks':
+        elif triggered_prop == 'mnid-trend-chart-toggle.n_clicks':
             mode = 'bar' if mode == 'line' else 'line'
             selected_ind_ids = []
 
@@ -1365,7 +1366,12 @@ def update_trend_chart(n_clicks_list, toggle_clicks, selected_ind_ids, stored_tr
     ind_options = [{'label': i['label'], 'value': i['id']} for i in cat_inds]
     valid_ids = [opt['value'] for opt in ind_options]
     selected = [iid for iid in selected_ind_ids if iid in valid_ids][:3]
-    if not selected:
+    should_default_selection = (
+        not triggered_prop
+        or 'trend-cat-btn' in str(triggered_prop)
+        or triggered_prop == 'mnid-trend-chart-toggle.n_clicks'
+    )
+    if not selected and should_default_selection:
         selected = valid_ids[:3]
     active_inds = [i for i in cat_inds if i['id'] in selected]
     fig = _location_trend_fig(df, active_inds, cat, mode, scope_meta)
@@ -2241,13 +2247,14 @@ def _location_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str,
     scope_meta = scope_meta or {}
     selected_facs = [str(v) for v in (scope_meta.get('selected_facilities') or [])]
     selected_dists = [str(v) for v in (scope_meta.get('selected_districts') or [])]
-    level = str(scope_meta.get('level') or '')
+    level = str(scope_meta.get('level') or '').strip().lower()
 
     d2 = df.copy()
     d2['_m'] = pd.to_datetime(d2['Date']).dt.to_period('M')
     periods = sorted(d2['_m'].dropna().unique())[-12:]
 
     facility_name_map = {}
+    facility_code_by_name = {}
     if 'Facility_CODE' in d2.columns:
         for fac_code, fac_df in d2.groupby('Facility_CODE', dropna=True):
             fac_name = _FACILITY_NAMES.get(str(fac_code), str(fac_code))
@@ -2256,15 +2263,24 @@ def _location_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str,
                 if not names.empty:
                     fac_name = names.mode().iloc[0]
             facility_name_map[str(fac_code)] = fac_name
+            facility_code_by_name.setdefault(str(fac_name), str(fac_code))
 
     entity_mode = 'district'
     entities = []
     if selected_facs and 'Facility_CODE' in d2.columns:
         entity_mode = 'facility'
-        entities = selected_facs[:6]
+        entities = []
+        for selected in selected_facs:
+            selected_text = str(selected)
+            if selected_text in facility_name_map:
+                entities.append(selected_text)
+                continue
+            mapped_code = facility_code_by_name.get(selected_text)
+            entities.append(mapped_code or selected_text)
+        entities = entities[:6]
     elif selected_dists and 'District' in d2.columns:
         entities = selected_dists[:6]
-    elif level == 'Facility' and 'Facility_CODE' in d2.columns:
+    elif level == 'facility' and 'Facility_CODE' in d2.columns:
         entity_mode = 'facility'
         entities = d2['Facility_CODE'].dropna().astype(str).value_counts().index.tolist()[:6]
     elif 'District' in d2.columns:
@@ -2284,8 +2300,13 @@ def _location_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str,
     series_idx = 0
     for entity in entities:
         if entity_mode == 'facility':
-            entity_df = d2[d2['Facility_CODE'].astype(str) == str(entity)].copy()
-            entity_label = facility_name_map.get(str(entity), str(entity))
+            entity_str = str(entity)
+            entity_df = d2[d2['Facility_CODE'].astype(str) == entity_str].copy()
+            if entity_df.empty and 'Facility' in d2.columns:
+                entity_df = d2[d2['Facility'].astype(str) == entity_str].copy()
+                if not entity_df.empty and 'Facility_CODE' in entity_df.columns:
+                    entity_str = str(entity_df['Facility_CODE'].dropna().astype(str).iloc[0])
+            entity_label = facility_name_map.get(entity_str, str(entity))
         else:
             entity_df = d2[d2['District'].astype(str) == str(entity)].copy()
             entity_label = str(entity)
