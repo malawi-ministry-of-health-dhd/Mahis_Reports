@@ -1228,6 +1228,7 @@ layout = html.Div(
         "background": "#f8f9fa"
     },
     children=[
+        dcc.Location(id='url', refresh=False),
         # ---------- LEFT SIDEBAR ----------
         html.Div(
             id="sidebar",

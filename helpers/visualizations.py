@@ -327,7 +327,7 @@ def create_count(df, aggregation='count', unique_column=PERSON_ID_, filter_col1=
     elif aggregation == 'defaulter_count':
         # lets maintain individuals who passed through filters
         filtered_ids = set(unique_visits[unique_column].dropna().unique())
-        df = df[df[unique_column].isin(filtered_ids)]
+        df = df[df[unique_column].isin(filtered_ids)].copy()
         df["start_date"] = pd.to_datetime(df["start_date"],errors='coerce')
         df['value_datetime'] = pd.to_datetime(df['value_datetime'],errors='coerce')
         df = df.dropna(subset=[DATE_, 'value_datetime'])
@@ -368,8 +368,17 @@ def create_count_sets(
     filter_col8=None, filter_value8=None,
     filter_col9=None, filter_value9=None,
     filter_col10=None, filter_value10=None
-):
-
+):  
+    # print(df.shape,aggregation, 
+    #       unique_column, filter_col1,filter_value1,
+    #       filter_col1,filter_value1,filter_col2,filter_value2,
+    #       filter_col3,filter_value3,filter_col4,filter_value4,
+    #       filter_col5,filter_value5,filter_col6,filter_value6,
+    #       filter_col7,filter_value7,filter_col8,filter_value8,
+    #       filter_col9,filter_value9,filter_col10,filter_value10,)
+    import time
+    # start = time.perf_counter()
+    # print(f"started analyzing data for aggregation: {aggregation}, {filter_value2}")
     data = df.copy()
     data['defaulter_period'] = data['concept_name']
     data['Date'] = pd.to_datetime(data['Date']).dt.normalize()
@@ -394,6 +403,8 @@ def create_count_sets(
     non_set_filters = []  # [(col, val)]
 
     for col, val in zip(filter_cols, filter_vals):
+        if not col:
+            continue
         col_norm = _normalize_filter_value(col)
         val_norm = _normalize_filter_value(val)
 
@@ -415,10 +426,10 @@ def create_count_sets(
     sets = []
 
     for cols, vals in set_filters:
-        # apply the whole pair together
-        temp_df = _apply_filter(data, cols, vals)
+        temp_df = data.copy()
+        for col, val in zip(cols, vals):
+            temp_df = _apply_filter(temp_df, col, val)
         ids = set(temp_df["composite_id"].drop_duplicates())
-
         sets.append(ids)
 
     #Final intersection across all sets

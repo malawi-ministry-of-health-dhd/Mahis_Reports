@@ -269,6 +269,7 @@ def update_report_dropdown(urlparams, program):
     Input('year-filter', 'value'),
     Input('month-filter', 'value'),
     Input('report_name', 'value'),
+    Input('url', 'pathname'),
     prevent_initial_call=True,
 
     running=[
@@ -300,7 +301,8 @@ def update_table(clicks,
                  period_type, 
                  year_filter, 
                  month_filter, 
-                 report_filter):
+                 report_filter,
+                 pathname):
     
     ctx = dash.callback_context
     if not ctx.triggered:
@@ -399,7 +401,7 @@ def update_table(clicks,
         filtered = data[
             (data_dates >= pd.to_datetime(start_date)) &
             (data_dates <= pd.to_datetime(end_date))
-        ]
+        ].copy()
         filtered["start_date"] = start_date
         filtered["end_date"] = end_date
 

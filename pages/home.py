@@ -562,6 +562,7 @@ def update_menu(interval, color):
         Input('dashboard-overview-filter', 'value'),
         Input('dashboard-category-filter', 'value'),
         Input({"type": "menu-button", "name": ALL}, "n_clicks"),
+        Input('url', 'pathname')
     ],
     [
         State('url-params-store', 'data'),
@@ -569,7 +570,9 @@ def update_menu(interval, color):
         State('active-button-store', 'data')
     ],
 )
-def update_dashboard(gen, interval, start_date, end_date, level, districts, facilities, overview, category, menu_clicks, urlparams, age, current_active):
+def update_dashboard(gen, interval, start_date, end_date, level, 
+                     districts, facilities, overview, category, 
+                     menu_clicks,pathname, urlparams, age, current_active):
     try:
         ctx = callback_context
         triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else None

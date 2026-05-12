@@ -313,6 +313,7 @@
         "unique": "any"
       },
       "rename": {
+        "identifier":"ID",
         "given_name": "First Name",
         "family_name": "Last Name",
         "Home_district": "District",
@@ -321,6 +322,7 @@
       },
       "cols_order": [
         "Date",
+        "ID",
         "First Name",
         "Last Name",
         "Gender",
@@ -337,7 +339,7 @@
         "Medication Given"
       ],
       "merge_methods": ["left", "left", "left","left", "left","left","left","left"],
-      "group_cols1": ["given_name", "family_name", "Gender", "Age", "Home_district", "TA", "Village"],
+      "group_cols1": ["identifier","given_name", "family_name", "Gender", "Age", "Home_district", "TA", "Village"],
       "group1_filters": {"Program": "NCD PROGRAM", "Village": "!=''"},
       
       "group_cols2": ["obs_value_coded"],

@@ -651,8 +651,6 @@ def create_linelist_from_config(filtered, filters,user_role=None, **kwargs):
     # Merge any extra **kwargs the user passes
     group_kwargs.update(kwargs)
 
-    print(group_kwargs)
-
     return create_line_list(
         df=filtered,
         unique_col=unique_col,

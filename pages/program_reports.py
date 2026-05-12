@@ -214,6 +214,7 @@ def programs_report(data, programs_report_list, user_role):
 
 layout = html.Div(
     html.Div(children=[
+            dcc.Location(id='url', refresh=False),
             report_config_panel,
             html.Div(id='program-reports-container'),
             dcc.Interval(
@@ -243,10 +244,12 @@ def update_filters(selected_program):
 @callback(
     [Output('program-reports-container', 'children'),
      Output('prog-hf-filter', 'options'),
-     Output("program-selector", "options")],
+     Output("program-selector", "options"),
+     Output("btn-generate-report", "n_clicks")],
     [Input("btn-generate-report", "n_clicks"),
      Input('url-params-store', 'data'),
-     Input("report-selector", "value")], # Only these trigger the update
+     Input("report-selector", "value"),
+     Input('url', 'pathname')], # Only these trigger the update
     [State("report-selector", "value"),
      State('prog-date-range-picker', 'start_date'),
      State('prog-date-range-picker', 'end_date'),
@@ -269,7 +272,7 @@ def update_filters(selected_program):
         ),
     ]
 )
-def generate_chart(n_clicks, urlparams, selected_report, report_name, start_date, end_date, hf):
+def generate_chart(n_clicks, urlparams, selected_report, pathname, report_name, start_date, end_date, hf):
     user_data_path = os.path.join(path, 'data','single_tables', 'users_data.csv')
     if not os.path.exists(user_data_path):
         user_data = pd.DataFrame(columns=['uuid', 'role'])
@@ -280,7 +283,7 @@ def generate_chart(n_clicks, urlparams, selected_report, report_name, start_date
 
     user_info = user_data[user_data['uuid'] == urlparams.get('uuid', [None])[0]]
     if user_info.empty:
-        return html.Div("Unauthorized User. Please contact system administrator."), no_update,no_update
+        return html.Div("Unauthorized User. Please contact system administrator."), no_update,no_update,0
     user_role = user_info['role'].to_list()
     if user_role:
         role = user_role[0]
@@ -291,7 +294,7 @@ def generate_chart(n_clicks, urlparams, selected_report, report_name, start_date
     triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
 
     if triggered_id != "btn-generate-report.n_clicks" and n_clicks is None:
-        return no_update, no_update, no_update
+        return no_update, no_update, no_update,0
 
     try:
         start_dt = pd.to_datetime(start_date).replace(hour=0, minute=0, second=0)
@@ -300,7 +303,7 @@ def generate_chart(n_clicks, urlparams, selected_report, report_name, start_date
         if urlparams.get('Location', [None])[0]:
             location = urlparams.get('Location', [None])[0]
         else:
-            return html.Div("Missing Parameters"), no_update, no_update
+            return html.Div("Missing Parameters"), no_update, no_update,0
 
 
         SQL = f"""
@@ -313,7 +316,7 @@ def generate_chart(n_clicks, urlparams, selected_report, report_name, start_date
         except Exception as e:
             return html.Div('Missing Data. ' \
             'Ensure that the config file has correct database credentials'
-            ,style={'color':'red'}), [], ''  # Empty DataFrame with expected columns
+            ,style={'color':'red'}), [], '',0  # Empty DataFrame with expected columns
         
         data[DATE_] = pd.to_datetime(data[DATE_], format='mixed').dt.strftime('%Y-%m-%d')
         data[GENDER_] = data[GENDER_].replace({"M":"Male",
@@ -339,7 +342,7 @@ def generate_chart(n_clicks, urlparams, selected_report, report_name, start_date
         report_name = report_name or selected_report
 
         if not report_name:
-             return html.Div("Please select a report name and click Generate."), hf_options, prog_options
+             return html.Div("Please select a report name and click Generate."), hf_options, prog_options,0
 
         #Filter by Facility Selection
         if hf and hf != "*All health facilities":
@@ -347,17 +350,17 @@ def generate_chart(n_clicks, urlparams, selected_report, report_name, start_date
             data = data[data['Facility'].isin(hf_list)]
 
         if data.empty:
-            return html.Div("No data for selected Date Range."), hf_options, prog_options
+            return html.Div("No data for selected Date Range."), hf_options, prog_options,0
 
         #Get Config and Render
         with open(path_program_reports) as x:
             config = json.load(x)
         report_cfg = [r for r in config.get("reports", []) if r.get("report_name") == report_name]
-        return programs_report(data, report_cfg, role), hf_options, prog_options
+        return programs_report(data, report_cfg, role), hf_options, prog_options,0
 
     except Exception as e:
         traceback.print_exc()
-        return html.Div(f"Error: {str(e)}"), hf_options, prog_options
+        return html.Div(f"Error: {str(e)}"), hf_options, prog_options,0
     
 @callback(
     [Output('prog-date-range-picker', 'start_date'),
