@@ -22,6 +22,8 @@ exec python -m gunicorn \
     --graceful-timeout 120 \
     --keep-alive 5 \
     --bind 0.0.0.0:8040 \
+    --log-level debug \
+    --capture-output \
     --access-logfile "$BASE_DIR/gunicorn_access.log" \
     --error-logfile "$BASE_DIR/gunicorn_error.log" \
     wsgi:server

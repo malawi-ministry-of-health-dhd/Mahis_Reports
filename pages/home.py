@@ -52,7 +52,7 @@ _mnid_disk_cache = diskcache.Cache('./cache/mnid')
 
 # In-process fallback (used when background=False or within same worker)
 _mnid_full_data_cache: dict = {}
-DEFAULT_DASHBOARD_DAYS = 30
+DEFAULT_DASHBOARD_DAYS = 7
 DEFAULT_RELATIVE_PERIOD = 'Today'
 
 
@@ -655,8 +655,10 @@ def update_dashboard(gen, interval, start_date, end_date, level,
                 AND Date <= TIMESTAMP '{end_dt}'
                 """
         try:
+            
             data = DataStorage.query_duckdb(SQL)
             # data.to_excel("data/archive/hmis.xlsx")
+            
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -675,7 +677,6 @@ def update_dashboard(gen, interval, start_date, end_date, level,
                 [],
                 current_active or dash.no_update,
             )
-
         data[DATE_] = pd.to_datetime(data[DATE_], format='mixed')
         data[GENDER_] = data[GENDER_].replace(CUSTOM_GENDER_MAP)
         data["DateValue"] = pd.to_datetime(data[DATE_]).dt.date
@@ -903,7 +904,6 @@ def update_dashboard(gen, interval, start_date, end_date, level,
                 (_fdata[DATE_] <= end_dt)
             ]
 
-
             adj_start_dt, adj_end_dt = start_dt, end_dt
             delta_days = max((adj_end_dt - adj_start_dt).days, 1)
             facility_code_display = location
@@ -958,6 +958,7 @@ def update_dashboard(gen, interval, start_date, end_date, level,
             ]))
 
         dashboard_content = html.Div(rendered) if len(rendered) > 1 else (rendered[0] if rendered else html.Div("No dashboard selected."))
+
         return (
             dashboard_content,
             level,
