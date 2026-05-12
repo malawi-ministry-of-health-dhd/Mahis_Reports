@@ -290,12 +290,6 @@ def generate_chart(n_clicks, urlparams, selected_report, pathname, report_name, 
     else:
         role = None
 
-    ctx = callback_context
-    triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
-
-    if triggered_id != "btn-generate-report.n_clicks" and n_clicks is None:
-        return no_update, no_update, no_update,0
-
     try:
         start_dt = pd.to_datetime(start_date).replace(hour=0, minute=0, second=0)
         end_dt = pd.to_datetime(end_date).replace(hour=23, minute=59, second=59)
@@ -351,6 +345,11 @@ def generate_chart(n_clicks, urlparams, selected_report, pathname, report_name, 
 
         if data.empty:
             return html.Div("No data for selected Date Range."), hf_options, prog_options,0
+        
+        ctx = callback_context
+        # triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
+        if not ctx.triggered or ctx.triggered_id != "btn-generate-report":
+            return no_update, no_update, prog_options, 0
 
         #Get Config and Render
         with open(path_program_reports) as x:
