@@ -327,7 +327,7 @@
     {
       "id": "9",
       "report_name": "NCD LINELIST - DIABETES",
-      "authorized_user": ["ccc"],
+      "authorized_user": [],
       "message": "NOTE: This patient data only comprise selected data columns. To view more, visit the patient profile. Names have been masked. Visible only to : ",
       "program": "NCD PROGRAM",
       "type": "LineList",

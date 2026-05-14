@@ -125,8 +125,8 @@ class DataStorage:
         if df is not None and not df.empty:
             
             # combine with existing parquet
-            df = df.drop_duplicates()
             df = pd.concat([existing_df, df])
+            df = df.drop_duplicates()
             df.to_parquet(self.filepath, index=False, engine='pyarrow')
             
             print(self.filepath)
