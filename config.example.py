@@ -43,6 +43,7 @@ PARQUET_FILE_PATH = os.path.join(os.getcwd(), 'data', 'latest_data_opd.parquet')
 CACHE_FILE_PATH = os.path.join(os.getcwd(), 'data', 'cache_opd.parquet')
 TIMESTAMP_FILE_PATH = os.path.join(os.getcwd(), 'data', 'TimeStamp.csv')
 
+DHIS2_URL = "https://102.211.20.17/dhis"
 DHIS2_UNAME='user'
 DHIS2_PASSWORD='password'
 
@@ -118,8 +119,9 @@ ORDER BY q.concept_id, ca.sort_weight
 # multijoin query to get all obs for each encounter, including those without obs (using LEFT JOIN)
 QUERY_OBS_OLD = """
 SELECT
-    e.encounter_id,
     e.patient_id as person_id,
+    pi.identifier,
+    pit.name as patient_identifier_type,
     pn.given_name,
     pn.family_name,
     p.gender AS Gender,
@@ -130,9 +132,11 @@ SELECT
         WHEN FLOOR(DATEDIFF(e.encounter_datetime, birthdate) / 365) < 5 THEN 'Under 5'
         ELSE 'Over 5'
     END AS Age_Group,
+    pat.value as cell,
     pa.state_province AS Home_district,
     pa.township_division AS TA,
     pa.city_village AS Village,
+    e.encounter_id,
     e.encounter_type AS Encounter,
     e.encounter_datetime AS Date, #date
     e.location_id,
@@ -154,12 +158,17 @@ SELECT
     od.order_type_id as Order_Type,
     od.concept_id as Order_Name
 FROM encounter e
-LEFT JOIN obs o ON e.encounter_id = o.encounter_id
 JOIN person p ON e.patient_id = p.person_id AND p.voided = 0
 JOIN person_name pn ON e.patient_id = pn.person_id AND pn.voided = 0
+LEFT JOIN patient_identifier pi on e.patient_id = pi.patient_id AND pi.identifier_type = 3
+LEFT JOIN patient_identifier_type pit on  pi.identifier_type = pit.patient_identifier_type_id AND pit.retired = 0
+LEFT JOIN obs o ON e.encounter_id = o.encounter_id
 # JOIN patient_program pp ON e.patient_id = pp.patient_id AND pp.voided = 0
 LEFT JOIN person_address pa ON pn.person_id = pa.person_id AND pa.voided = 0 AND pa.preferred = 0
+LEFT JOIN person_attribute pat ON p.person_id = pat.person_id AND pat.voided = 0
 LEFT JOIN orders od ON o.order_id = od.order_id AND od.discontinued = 0
+LEFT JOIN person_attribute_type patt ON pat.person_attribute_type_id = patt.person_attribute_type_id 
+    AND patt.retired = 0 AND patt.person_attribute_type_id = 12
 WHERE e.voided = 0
 {date_filter}
 """
@@ -182,8 +191,7 @@ SELECT
         WHEN FLOOR(DATEDIFF(e.encounter_datetime, birthdate) / 365) < 5 THEN 'Under 5'
         ELSE 'Over 5'
     END AS Age_Group,
-    patt.name as person_attribute_name,
-    pat.value as person_attribute_type,
+    pat.value as cell,
     pa.state_province AS Home_district,
     pa.township_division AS TA,
     pa.city_village AS Village,
@@ -219,7 +227,8 @@ LEFT JOIN obs o ON e.encounter_id = o.encounter_id
 LEFT JOIN person_address pa ON pn.person_id = pa.person_id AND pa.voided = 0 AND pa.preferred = 0
 LEFT JOIN person_attribute pat ON p.person_id = pat.person_id AND pat.voided = 0
 LEFT JOIN orders od ON o.order_id = od.order_id AND od.discontinued = 0
-LEFT JOIN person_attribute_type patt ON pat.person_attribute_type_id = patt.person_attribute_type_id AND patt.retired = 0
+LEFT JOIN person_attribute_type patt ON pat.person_attribute_type_id = patt.person_attribute_type_id 
+    AND patt.retired = 0 AND patt.person_attribute_type_id = 12
 WHERE e.voided = 0
 {date_filter}
 """

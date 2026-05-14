@@ -87,6 +87,7 @@ def clear_dashboard_state_cache() -> None:
 
 def _load_user_registry() -> pd.DataFrame:
     user_data_path = os.path.join(path, 'data','single_tables', 'users_data.csv')
+
     if os.path.exists(user_data_path):
         user_data = pd.read_csv(user_data_path)
     else:
@@ -95,13 +96,27 @@ def _load_user_registry() -> pd.DataFrame:
     demo_row = {
         'uuid': DEMO_UUID,
         'role': 'reports_admin',
-        'user_level': 'facility',
+        'user_level': 'national',
+        'district': None,
+        'facility_name': None,
         'facility_code': DEMO_LOCATION,
     }
+
     user_data = pd.concat([user_data, pd.DataFrame([demo_row])], ignore_index=True)
     for column in ['uuid', 'role', 'user_level', 'district', 'facility_code', 'facility_name']:
         if column not in user_data.columns:
             user_data[column] = pd.NA
+
+    def parse_list(val):
+        if pd.isna(val):
+            return None
+        if isinstance(val, str) and ',' in val:
+            return [x.strip() for x in val.split(',')]
+        return val
+
+    user_data['district'] = user_data['district'].apply(parse_list)
+    user_data['facility_name'] = user_data['facility_name'].apply(parse_list)
+
     return user_data
 
 
@@ -116,6 +131,7 @@ def _first_non_empty(row: pd.Series, candidates: list[str]) -> str | None:
 
 def _normalize_level(value: str | None) -> str:
     value = str(value or '').strip().lower()
+    print(value)
     if value in {'national', 'district', 'facility'}:
         return value
     return 'facility'
@@ -125,47 +141,38 @@ def _title_level(value: str) -> str:
     return {'national': 'National', 'district': 'District', 'facility': 'Facility'}.get(value, 'Facility')
 
 
-def _resolve_user_scope(urlparams, user_data: pd.DataFrame) -> tuple[pd.Series | None, dict]:
+def _resolve_user_scope(urlparams, user_data: pd.DataFrame):
     requested_uuid = urlparams.get('uuid', [None])[0] if urlparams else None
     user_info = user_data[user_data['uuid'] == requested_uuid]
     if user_info.empty:
         return None, {}
-
     row = user_info.iloc[0]
-    assigned_level = _normalize_level(_first_non_empty(row, ['user_level']) or (urlparams.get('user_level', [None])[0] if urlparams else None))
+    level = _normalize_level(row.get('user_level'))
     scope = {
-        'uuid': requested_uuid,
-        'assigned_level': assigned_level,
-        'district': _first_non_empty(row, ['district', 'District', 'home_district', 'Home_district']),
-        'facility_code': (urlparams.get('Location', [None])[0] if urlparams else None),
-        'facility_name': _first_non_empty(row, ['facility_name', 'Facility']),
-        'roles': [r.strip() for r in str(row.get('role') or '').split(',') if r and str(r).strip()],
+        'level': level,
+        'districts': row.get('district'),
+        'facilities': row.get('facility_name')
     }
     return row, scope
 
 
-def _apply_scope_to_data(data: pd.DataFrame, scope: dict, district_col: str | None = None) -> pd.DataFrame:
+def _apply_scope_to_data(data: pd.DataFrame, scope: dict, district_col='district', facility_col='facility_name'):
     if data is None or data.empty:
         return data
-
-
-    assigned_level = scope.get('assigned_level')
-    scoped = data
-    if assigned_level == 'facility':
-        facility_code = scope.get('facility_code')
-        facility_name = scope.get('facility_name')
-        if facility_code and FACILITY_CODE_ in scoped.columns:
-            if pd.api.types.is_integer_dtype(scoped[FACILITY_CODE_]) or pd.api.types.is_float_dtype(scoped[FACILITY_CODE_]):
-                scoped = scoped[scoped[FACILITY_CODE_].astype(int) == int(facility_code)] #for harmonized MaHIS
-            else:
-                scoped = scoped[scoped[FACILITY_CODE_].astype(str) == str(facility_code)]
-        elif facility_name and FACILITY_ in scoped.columns:
-            scoped = scoped[scoped[FACILITY_].astype(str) == str(facility_name)]
-    elif assigned_level == 'district':
-        district = scope.get('district')
-        if district and district_col and district_col in scoped.columns:
-            scoped = scoped[scoped[district_col].astype(str) == str(district)]
-    return scoped
+    level = scope.get('level')
+    districts = scope.get('districts')
+    facilities = scope.get('facilities')
+    if level == 'national':
+        return data
+    if level == 'district':
+        if districts:
+            return data[data[district_col].isin(districts)]
+        return data
+    if level == 'facility':
+        if facilities:
+            return data[data[facility_col].isin(facilities)]
+        return data
+    return data
 
 def load_dashboard_menu():
     try:
@@ -605,6 +612,7 @@ def update_dashboard(gen, interval, start_date, end_date, level,
 
         user_data = _load_user_registry()
         user_row, scope = _resolve_user_scope(urlparams, user_data)
+
         if user_row is None:
             return (
                 html.Div("Unauthorized User. Please contact system administrator."),
@@ -619,7 +627,7 @@ def update_dashboard(gen, interval, start_date, end_date, level,
                 clicked_name
             )
 
-        user_level = scope['assigned_level']
+        user_level = scope['level']
         if user_level == 'facility' and scope.get('facility_code'):
             location = scope['facility_code']
             mnid_location = scope['facility_code']
@@ -627,7 +635,7 @@ def update_dashboard(gen, interval, start_date, end_date, level,
         url_object = f"Location={location}&uuid={urlparams.get('uuid', [None])[0]}&user_level={user_level}"
 
         # Default level based on user_level
-        requested_level = _normalize_level(level)
+        requested_level = user_level
         if user_level == 'national':
             effective_level = requested_level if requested_level in {'national', 'district', 'facility'} else 'national'
         elif user_level == 'district':
@@ -635,6 +643,7 @@ def update_dashboard(gen, interval, start_date, end_date, level,
         else:
             effective_level = 'facility'
         level = _title_level(effective_level)
+
 
         sql_comment = f"-- version:{_dataset_version_token()} scope:{user_level} level:{effective_level}"
         if user_level == 'facility':
@@ -702,6 +711,7 @@ def update_dashboard(gen, interval, start_date, end_date, level,
         data["months"] = ((pd.Timestamp(today) - pd.to_datetime(data["DateValue"])).dt.days // 30).clip(lower=0)
 
         district_col = "District" if "District" in data.columns else (HOME_DISTRICT_ if HOME_DISTRICT_ in data.columns else None)
+        
         data = _apply_scope_to_data(data, scope, district_col)
 
         # Base filters (age + MNID program category)
@@ -795,7 +805,7 @@ def update_dashboard(gen, interval, start_date, end_date, level,
             if FACILITY_ in facilities_pool.columns else []
         )
 
-        show_district_filter = effective_level == "district"
+        show_district_filter = effective_level == "national"
         district_group_style = {} if show_district_filter else {"display": "none"}
         district_disabled = not show_district_filter
         district_note = ""
@@ -959,6 +969,7 @@ def update_dashboard(gen, interval, start_date, end_date, level,
 
         dashboard_content = html.Div(rendered) if len(rendered) > 1 else (rendered[0] if rendered else html.Div("No dashboard selected."))
 
+        
         return (
             dashboard_content,
             level,

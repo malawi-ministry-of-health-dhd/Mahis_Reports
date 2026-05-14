@@ -299,10 +299,10 @@
                     "Facility"
                   ],
                   "columns": "",
-                  "values_col": "person_id_key",
+                  "values_col": "person_id",
                   "title": "Attendance by Health Facility",
-                  "unique_column": "person_id_key",
-                  "aggfunc": "count",
+                  "unique_column": "person_id",
+                  "aggfunc": "nunique",
                   "filter_col1": "",
                   "filter_val1": "",
                   "filter_col2": "",
