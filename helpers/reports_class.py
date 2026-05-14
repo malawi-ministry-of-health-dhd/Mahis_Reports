@@ -5,13 +5,17 @@ from helpers.dhis_integrater import get_dhis_data
 import dash
 from datetime import datetime
 from dash import html, dash_table
+from config import (DATE_,CONCEPT_NAME_,
+                    ENCOUNTER_ID_,PERSON_ID_,VALUE_NUMERIC_,
+                    DHIS2_URL)
+
 
 class ReportTableBuilder:
     def __init__(self, excel_path: str, filtered_df: pd.DataFrame, original_df: pd.DataFrame, dhis2_period: str):
         self.excel_path = excel_path
-        self.filtered_df = filtered_df
-        self.original_df = original_df
-        self.dhis_url = 'https://dhis2.health.gov.mw/api/dataValueSets.json'
+        self.filtered_df = self._prepare_base_dataframe(filtered_df)
+        self.original_df = self._prepare_base_dataframe(original_df)
+        self.dhis_url = f"{DHIS2_URL}/api/dataValueSets.json"
         self.vars_df: pd.DataFrame | None = None
         self.filters_df: pd.DataFrame | None = None
         self.filters_map: Dict[str, Any] = {}
@@ -19,6 +23,17 @@ class ReportTableBuilder:
         self._errors: List[str] = []
         self.report_name: pd.DataFrame | None = None
         self.dhis2_period = dhis2_period
+        self._set_cache = {}
+        self._mask_cache = {}
+
+    @staticmethod
+    def _prepare_base_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()
+        if DATE_ in df.columns:
+            df[DATE_] = pd.to_datetime(df[DATE_]).dt.normalize()
+        if CONCEPT_NAME_ in df.columns:
+            df['defaulter_period'] = df[CONCEPT_NAME_]
+        return df
 
     def load_spec(self) -> None:
         xls = pd.ExcelFile(self.excel_path, engine="openpyxl")
@@ -39,8 +54,8 @@ class ReportTableBuilder:
             if not fname:
                 continue
             measure = str(row.get("measure", "count")).strip().lower()
-            num_field = str(row.get("num_field", "ValueN")).strip()
-            unique_column = str(row.get("unique_column", "encounter_id")).strip()
+            num_field = str(row.get("num_field", VALUE_NUMERIC_)).strip()
+            unique_column = str(row.get("unique_column", PERSON_ID_)).strip()
             pairs: List[Tuple[str, Any]] = []
             for i in range(1, 10):
                 fcol = str(row.get(f"variable{i}", "")).strip()
@@ -205,8 +220,12 @@ class ReportTableBuilder:
         return vals[0] if vals else "Report"
     
     def _generate_dhis_params(self) -> Dict:
+        if "dhis2_id" in self.report_name.columns:
+            dataSetID = self.report_name['dhis2_id'].iloc[0]
+        else:
+            dataSetID = self.report_name['id'].iloc[0]
         params = {
-            'dataSet':self.report_name['id'].iloc[0],
+            'dataSet':dataSetID,
             'period':self.dhis2_period,
             'orgUnit':'glIscvEdIJz'}
         return params

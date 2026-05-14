@@ -261,6 +261,54 @@ def _apply_filter(data, filter_col, filter_value):
 
     return df[df[filter_col] == filter_value]
 
+def _apply_filter_mask(df, filter_col, filter_value):
+    if filter_col not in df.columns:
+        return pd.Series(False, index=df.index)
+    if isinstance(filter_value, list):
+        return df[filter_col].isin(filter_value)
+    if isinstance(filter_value, str):
+        #Wildcard / contains
+        if filter_value.startswith("*") or filter_value.startswith("%"):
+            needle = filter_value[1:]
+            return (
+                df[filter_col]
+                .astype(str)
+                .str.contains(needle, case=False, na=False)
+            )
+        #Operator parsing
+        match = re.match(r'^(>=|<=|!=|=|>|<)?\s*(.*)$', filter_value.strip())
+        if match:
+            operator, value_str = match.groups()
+            operator = operator or "="
+            value_str = value_str.strip()
+            #Empty placeholder
+            if value_str == "_":
+                value = ""
+            else:
+                # Numeric conversion
+                try:
+                    if "." in value_str:
+                        value = float(value_str)
+                    else:
+                        value = int(value_str)
+                except:
+                    value = value_str
+            series = df[filter_col]
+            if operator == "=":
+                return series == value
+            if operator == "!=":
+                return series != value
+            if operator == ">":
+                return series > value
+            if operator == "<":
+                return series < value
+            if operator == ">=":
+                return series >= value
+            if operator == "<=":
+                return series <= value
+
+        return df[filter_col] == filter_value
+    return df[filter_col] == filter_value
 
 def create_count(df, aggregation='count', unique_column=PERSON_ID_, filter_col1=None, filter_value1=None, 
                  filter_col2=None, filter_value2=None, filter_col3=None, filter_value3=None,
@@ -357,109 +405,53 @@ def create_count(df, aggregation='count', unique_column=PERSON_ID_, filter_col1=
 def create_count_sets(
     df,
     aggregation='count',
-    unique_column="person_id",
-    filter_col1=None, filter_value1=None,
-    filter_col2=None, filter_value2=None,
-    filter_col3=None, filter_value3=None,
-    filter_col4=None, filter_value4=None,
-    filter_col5=None, filter_value5=None,
-    filter_col6=None, filter_value6=None,
-    filter_col7=None, filter_value7=None,
-    filter_col8=None, filter_value8=None,
-    filter_col9=None, filter_value9=None,
-    filter_col10=None, filter_value10=None
-):  
-    # print(df.shape,aggregation, 
-    #       unique_column, filter_col1,filter_value1,
-    #       filter_col1,filter_value1,filter_col2,filter_value2,
-    #       filter_col3,filter_value3,filter_col4,filter_value4,
-    #       filter_col5,filter_value5,filter_col6,filter_value6,
-    #       filter_col7,filter_value7,filter_col8,filter_value8,
-    #       filter_col9,filter_value9,filter_col10,filter_value10,)
-    import time
-    # start = time.perf_counter()
-    # print(f"started analyzing data for aggregation: {aggregation}, {filter_value2}")
-    data = df.copy()
-    data['defaulter_period'] = data['concept_name']
-    data['Date'] = pd.to_datetime(data['Date']).dt.normalize()
+    unique_column=PERSON_ID_,
+    *filters
+):
+
+    data = df
     data["composite_id"] = (
                     data[unique_column].astype(str)
                     + "|"
                     + pd.to_datetime(data["Date"]).astype(str)
     )
 
-    filter_cols = [
-        filter_col1, filter_col2, filter_col3, filter_col4, filter_col5,
-        filter_col6, filter_col7, filter_col8, filter_col9, filter_col10
-    ]
 
-    filter_vals = [
-        filter_value1, filter_value2, filter_value3, filter_value4, filter_value5,
-        filter_value6, filter_value7, filter_value8, filter_value9, filter_value10
-    ]
+    set_filters = []
+    non_set_filters = []
 
-    #Identify set vs non-set filters ---
-    set_filters = []      # [(col_list, val_list)]
-    non_set_filters = []  # [(col, val)]
+    for i in range(0, len(filters), 2):
+        col = filters[i]
+        val = filters[i + 1]
 
-    for col, val in zip(filter_cols, filter_vals):
         if not col:
             continue
+
         col_norm = _normalize_filter_value(col)
         val_norm = _normalize_filter_value(val)
 
-        if isinstance(col_norm, list) and isinstance(val_norm, list):
+        if isinstance(col_norm, list):
             set_filters.append((col_norm, val_norm))
         else:
             non_set_filters.append((col, val))
 
-    #Validate set lengths
-    if len(set_filters) < 1:
-        return "Error"
-
-    set_length = len(set_filters[0][0])
-    for cols, vals in set_filters:
-        if len(cols) != set_length or len(vals) != set_length:
-            return "Error"
-
-    #Build sets using ID-level filtering
     sets = []
 
     for cols, vals in set_filters:
-        temp_df = data.copy()
+        mask = pd.Series(True, index=data.index)
+
         for col, val in zip(cols, vals):
-            temp_df = _apply_filter(temp_df, col, val)
-        ids = set(temp_df["composite_id"].drop_duplicates())
+            mask &= _apply_filter_mask(data, col, val)
+
+        ids = set(data.loc[mask, 'composite_id'])
         sets.append(ids)
+    final_set = set.intersection(*sets)
 
-    #Final intersection across all sets
-    final_set = sets[0]
-    for s in sets[1:]:
-        final_set = final_set.intersection(s)
-    #Apply remaining filters
-    remaining_df = data[data["composite_id"].isin(final_set)]
-
-    df_filtered = remaining_df.copy()
-    defaulter_col = None
-    defaulter_value = None
-
+    mask = data['composite_id'].isin(final_set)
     for col, val in non_set_filters:
-        if col == "defaulter_period":
-            defaulter_col = col
-            defaulter_value = val
-        else:
-            df_filtered = _apply_filter(df_filtered, col, val)
-
-    # --- Prepare + aggregate ---
-    data_final = _prepare_data_for_visualization(df_filtered, unique_column)
-
-    return create_count(
-        data_final,
-        aggregation=aggregation,
-        filter_col1=defaulter_col,
-        filter_value1=defaulter_value
-    )
-
+        mask &= _apply_filter_mask(data, col, val)
+    result_df = data.loc[mask]
+    return result_df[unique_column].nunique()
 
 def create_count_unique(df, unique_column=PERSON_ID_, filter_col1=None, filter_value1=None, filter_col2=None, filter_value2=None, 
                  filter_col3=None, filter_value3=None, filter_col4=None, filter_value4=None,
