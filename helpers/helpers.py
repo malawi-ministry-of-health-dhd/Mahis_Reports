@@ -1,6 +1,7 @@
 import dash
 from dash import html, dcc
 import pandas as pd
+from itertools import chain
 from helpers.visualizations import (create_column_chart, 
                           create_count,
                           create_count_sets,
@@ -29,7 +30,7 @@ from config import (actual_keys_in_data,
                     VALUE_,
                     VALUE_NUMERIC_,
                     DRUG_NAME_,
-                    VALUE_NAME_)
+                    VALUE_NAME_, VALUE_DATETIME_)
 
 def build_metrics_section(filtered, counts_config, url_object=None):
     """Build metric cards from counts configuration"""
@@ -85,6 +86,10 @@ def create_count_from_config(df, filters):
         filters.get("variable9", ""),
         filters.get("variable10", "")
     ]
+    variables_list = list(chain.from_iterable([item] if not isinstance(item, list) else item 
+                            for item in variables if item != ""
+                        )) + [unique_col, DATE_] 
+    df = df[variables_list]
 
     values = [
         parse_filter_value(filters.get("value1", "")),
@@ -99,14 +104,12 @@ def create_count_from_config(df, filters):
         parse_filter_value(filters.get("value10", ""))
     ]
     active_filters = []
+
     for var, val in zip(variables, values):
         if var and val:
             active_filters.append((var, val))
     if not active_filters:
         return create_count(df,aggregation, unique_col)
-    
-    
-
     # if active_filters[0][0] != filters.get("variable1"):
     #     return create_count(df, unique_col)  # failsafe
     args = []

@@ -3,6 +3,7 @@ import os
 from datetime import datetime as dt
 
 import pandas as pd
+pd.options.mode.chained_assignment = None
 from flask import jsonify, request
 
 from config import DATA_FILE_NAME_, DATE_, FACILITY_CODE_, GENDER_
@@ -127,7 +128,7 @@ def register_api_routes(server):
             filtered["start_date"] = start_date
             filtered["end_date"] = end_date
 
-            original_data = data[pd.to_datetime(data[DATE_]) <= pd.to_datetime(end_date)].copy()
+            original_data = data[pd.to_datetime(data[DATE_]) <= pd.to_datetime(end_date)]
             original_data["days_before"] = original_data["DateValue"].apply(lambda item: (start_date - item).days)
             original_data["start_date"] = start_date
             original_data["end_date"] = end_date

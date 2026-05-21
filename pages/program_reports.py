@@ -11,6 +11,8 @@ import traceback
 from helpers.helpers import build_single_chart
 from datetime import datetime, timedelta
 from data_storage import DataStorage
+import warnings
+warnings.filterwarnings("ignore")
 from config import (actual_keys_in_data, 
                     DATA_FILE_NAME_, 
                     DATE_, PERSON_ID_, ENCOUNTER_ID_,
@@ -31,6 +33,8 @@ from config import (actual_keys_in_data,
 from helpers.navigation_callbacks import DEMO_UUID
 
 dash.register_page(__name__, path="/program_reports")
+
+pd.options.mode.chained_assignment = None
 
 from datetime import datetime, timedelta
 from dash import html, dcc
@@ -301,7 +305,7 @@ def generate_chart(n_clicks, urlparams, selected_report, pathname, report_name, 
 
 
         SQL = f"""
-                SELECT * FROM 'data/{DATA_FILE_NAME_}'
+                SELECT * FROM '{DATA_FILE_NAME_}'
                 WHERE Date BETWEEN '{start_dt}' AND '{end_dt}'
                 AND {FACILITY_CODE_} = '{location}'
                """

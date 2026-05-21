@@ -10,6 +10,7 @@ import diskcache
 import json
 import os
 import pandas as pd
+pd.options.mode.chained_assignment = None
 import plotly.graph_objects as go
 import uuid
 from datetime import datetime
@@ -197,7 +198,7 @@ def _value_counts(df, concept, col='obs_value_coded', unique_col='person_id'):
 def _monthly_visits(df, encounter_val, unique_col='person_id'):
     sub = pd.DataFrame()
     if 'Encounter' in df.columns:
-        sub = df[df['Encounter'] == encounter_val].copy()
+        sub = df[df['Encounter'] == encounter_val]
     if sub.empty and 'Service_Area' in df.columns:
         area_map = {
             'ANC VISIT': 'ANC',
@@ -207,7 +208,7 @@ def _monthly_visits(df, encounter_val, unique_col='person_id'):
         }
         service_area = area_map.get(str(encounter_val or '').strip().upper())
         if service_area:
-            sub = df[df['Service_Area'].astype(str) == service_area].copy()
+            sub = df[df['Service_Area'].astype(str) == service_area]
     if not len(sub): return pd.DataFrame(columns=['month','n'])
     sub['month'] = pd.to_datetime(sub['Date']).dt.to_period('M')
     out = sub.groupby('month')[unique_col].nunique().reset_index()
@@ -1254,7 +1255,7 @@ def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str, chart_type: str =
     # Vectorised monthly: one groupby per indicator across all months
     if 'Date' not in df.columns:
         return fig
-    d2 = df.copy()
+    d2 = df
     d2['_m'] = pd.to_datetime(d2['Date']).dt.to_period('M')
     periods = sorted(d2['_m'].dropna().unique())[-12:]  # last 12 months
 
@@ -1453,17 +1454,17 @@ def _encounter_slice(df: pd.DataFrame, regex: str) -> pd.DataFrame:
     token = str(regex or '').upper()
     if 'Service_Area' in df.columns:
         if 'ANC' in token and 'LABOUR' not in token and 'DELIVERY' not in token:
-            return df[df['Service_Area'].astype(str) == 'ANC'].copy()
+            return df[df['Service_Area'].astype(str) == 'ANC']
         if 'LABOUR' in token or 'DELIVERY' in token or 'BIRTH' in token:
-            return df[df['Service_Area'].astype(str) == 'Labour'].copy()
+            return df[df['Service_Area'].astype(str) == 'Labour']
         if 'PNC' in token or 'POSTNATAL' in token:
-            return df[df['Service_Area'].astype(str) == 'PNC'].copy()
+            return df[df['Service_Area'].astype(str) == 'PNC']
         if 'NEONATAL' in token or 'NEWBORN' in token:
-            return df[df['Service_Area'].astype(str) == 'Newborn'].copy()
+            return df[df['Service_Area'].astype(str) == 'Newborn']
     if 'Encounter' not in df.columns:
         return pd.DataFrame()
     enc = df['Encounter'].fillna('').astype(str)
-    return df[enc.str.contains(regex, case=False, na=False)].copy()
+    return df[enc.str.contains(regex, case=False, na=False)]
 
 
 def _count_entities(df: pd.DataFrame, col: str) -> int:
@@ -1476,7 +1477,7 @@ def _concept_count(df: pd.DataFrame, concept: str, values=None,
                    col: str = 'obs_value_coded', any_value: bool = False) -> int:
     if df is None or df.empty or 'concept_name' not in df.columns:
         return 0
-    sub = df[df['concept_name'].fillna('').astype(str) == concept].copy()
+    sub = df[df['concept_name'].fillna('').astype(str) == concept]
     if sub.empty:
         return 0
 
@@ -1510,7 +1511,7 @@ def _service_table_payload(df: pd.DataFrame, scope_meta: dict | None = None) -> 
         if 'Facility_CODE' in src.columns:
             entities = []
             for fac_code, fac_df in src.groupby('Facility_CODE', dropna=True, sort=True):
-                fac_df = fac_df.copy()
+                fac_df = fac_df
                 fac_name = str(fac_code)
                 if 'Facility' in fac_df.columns:
                     names = fac_df['Facility'].dropna().astype(str)
@@ -1776,7 +1777,7 @@ def _monthly_concept_rate(df, concept, positive_values=None, title='', target=No
                           color='#2563EB', target_col='obs_value_coded'):
     if df is None or df.empty or 'Date' not in df.columns or 'concept_name' not in df.columns:
         return None
-    sub = df[df['concept_name'].fillna('').astype(str) == concept].copy()
+    sub = df[df['concept_name'].fillna('').astype(str) == concept]
     if sub.empty:
         return None
     col = target_col if target_col in sub.columns else ('obs_value_coded' if 'obs_value_coded' in sub.columns else None)
@@ -1791,7 +1792,7 @@ def _monthly_concept_rate(df, concept, positive_values=None, title='', target=No
     xs = [pd.Period(m, 'M').to_timestamp().to_pydatetime() for m in months]
     ys = []
     for m in months:
-        month_df = sub[sub['_m'] == m].copy()
+        month_df = sub[sub['_m'] == m]
         den = month_df['person_id'].dropna().astype(str).nunique() if 'person_id' in month_df.columns else len(month_df)
         if den <= 0:
             ys.append(None)
@@ -1841,7 +1842,7 @@ def _monthly_concept_rate(df, concept, positive_values=None, title='', target=No
 def _monthly_concept_mix_fig(df, concept, categories, title, target_col='obs_value_coded'):
     if df is None or df.empty or 'Date' not in df.columns or 'concept_name' not in df.columns:
         return None
-    sub = df[df['concept_name'].fillna('').astype(str) == concept].copy()
+    sub = df[df['concept_name'].fillna('').astype(str) == concept]
     if sub.empty:
         return None
     col = target_col if target_col in sub.columns else ('obs_value_coded' if 'obs_value_coded' in sub.columns else None)
@@ -1858,7 +1859,7 @@ def _monthly_concept_mix_fig(df, concept, categories, title, target_col='obs_val
         vals = []
         wanted = {str(v).strip().lower() for v in values}
         for m in months:
-            month_df = sub[sub['_m'] == m].copy()
+            month_df = sub[sub['_m'] == m]
             den = month_df['person_id'].dropna().astype(str).nunique() if 'person_id' in month_df.columns else len(month_df)
             if den <= 0:
                 vals.append(0)
@@ -1894,7 +1895,7 @@ def _monthly_concept_mix_fig(df, concept, categories, title, target_col='obs_val
 def _concept_rate(df, concept, positive_values=None, target_col='obs_value_coded'):
     if df is None or df.empty or 'concept_name' not in df.columns:
         return 0, 0, 0.0
-    sub = df[df['concept_name'].fillna('').astype(str) == concept].copy()
+    sub = df[df['concept_name'].fillna('').astype(str) == concept]
     if sub.empty:
         return 0, 0, 0.0
     den = sub['person_id'].dropna().astype(str).nunique() if 'person_id' in sub.columns else len(sub)
@@ -2249,7 +2250,7 @@ def _location_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str,
     selected_dists = [str(v) for v in (scope_meta.get('selected_districts') or [])]
     level = str(scope_meta.get('level') or '').strip().lower()
 
-    d2 = df.copy()
+    d2 = df
     d2['_m'] = pd.to_datetime(d2['Date']).dt.to_period('M')
     periods = sorted(d2['_m'].dropna().unique())[-12:]
 
@@ -2301,14 +2302,14 @@ def _location_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str,
     for entity in entities:
         if entity_mode == 'facility':
             entity_str = str(entity)
-            entity_df = d2[d2['Facility_CODE'].astype(str) == entity_str].copy()
+            entity_df = d2[d2['Facility_CODE'].astype(str) == entity_str]
             if entity_df.empty and 'Facility' in d2.columns:
-                entity_df = d2[d2['Facility'].astype(str) == entity_str].copy()
+                entity_df = d2[d2['Facility'].astype(str) == entity_str]
                 if not entity_df.empty and 'Facility_CODE' in entity_df.columns:
                     entity_str = str(entity_df['Facility_CODE'].dropna().astype(str).iloc[0])
             entity_label = facility_name_map.get(entity_str, str(entity))
         else:
-            entity_df = d2[d2['District'].astype(str) == str(entity)].copy()
+            entity_df = d2[d2['District'].astype(str) == str(entity)]
             entity_label = str(entity)
         for ind in cat_inds:
             xs, ys = [], []
@@ -2494,7 +2495,7 @@ def _matrix_by_group(df: pd.DataFrame, inds: list,
 
 def _matrix_monthly(df: pd.DataFrame, inds: list) -> tuple:
     """Monthly view for a single facility. Returns (x_labels, z)."""
-    d2 = df.copy()
+    d2 = df
     d2['_m'] = pd.to_datetime(d2['Date']).dt.to_period('M')
     periods = sorted(d2['_m'].dropna().unique())
     if not periods:
@@ -2591,7 +2592,7 @@ def _compute_heatmap_store(mch_full: pd.DataFrame, tracked: list,
     store['facilities_by_district'] = district_facs_map
 
     for ylbl, yval in year_options.items():
-        df = mch_full[mch_full['Date'].dt.year == yval].copy() if yval else mch_full.copy()
+        df = mch_full[mch_full['Date'].dt.year == yval] if yval else mch_full
         if not len(df):
             for key in ['monthly', 'by_facility', 'by_district']:
                 store[key][ylbl] = {'x': [], 'z': [], 'tick_angle': 0}
@@ -3632,14 +3633,14 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
         period_code = 'M'
         period_fmt = lambda p: pd.Period(p, 'M').strftime('%b %Y')
 
-    d2 = mch_full.copy()
+    d2 = mch_full
     d2['_period'] = pd.to_datetime(d2['Date']).dt.to_period(period_code)
     periods = sorted(d2['_period'].dropna().unique())[-12:]
 
     fig = go.Figure()
     series_idx = 0
     for entity in entities:
-        entity_df = get_df(entity).copy()
+        entity_df = get_df(entity)
         if entity_df.empty:
             continue
         for ind in active_inds:
@@ -5490,11 +5491,11 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
 
     selected_program = (scope_meta or {}).get('mnid_categories')
     selected_program = selected_program[0] if selected_program else 'All'
-    facility_df = facility_df.copy()
+    facility_df = facility_df
     facility_df.attrs['mnid_program'] = selected_program
     network_df.attrs['mnid_program'] = selected_program
     if network_df.empty:
-        network_df = facility_df.copy()
+        network_df = facility_df
 
     vt          = config.get('visualization_types', {})
     all_inds    = config.get('priority_indicators') or vt.get('priority_indicators', [])

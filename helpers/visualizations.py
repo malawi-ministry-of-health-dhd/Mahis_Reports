@@ -10,6 +10,8 @@ from typing import List, Optional, Dict, Union, Callable
 import json
 import ast
 
+pd.options.mode.chained_assignment = None
+
 from config import PERSON_ID_, ENCOUNTER_ID_, DATE_, CONCEPT_NAME_
 
 """
@@ -22,7 +24,7 @@ def _prepare_data_for_visualization(df, unique_column, apply_deduplication=True)
     This mirrors the logic used in create_count functions.
     If a new column name is introduced e.g. for generation of composite key, the system is required to create the column
     """
-    data = df.copy()
+    data = df
     if isinstance(unique_column, str) and unique_column not in data.columns:
         data[unique_column] = data[PERSON_ID_].astype(str) +"_"+ data[DATE_].dt.strftime('%Y-%m-%d')
         return data
@@ -36,7 +38,7 @@ def _prepare_data_for_visualization(df, unique_column, apply_deduplication=True)
             return data
 
 def apply_calculated_fields(df, rules_json):
-    df = df.copy()
+    df = df
     if not rules_json:
         return df
     rules = json.loads(rules_json) if isinstance(rules_json, str) else rules_json
@@ -163,7 +165,7 @@ def _apply_filter(data, filter_col, filter_value):
     if filter_col is None or filter_value is None:
         return data
 
-    df = data.copy()
+    df = data
 
     # Normalize: list, pipe-separated, stringified list...
     filter_value = _normalize_filter_value(filter_value)
@@ -176,7 +178,7 @@ def _apply_filter(data, filter_col, filter_value):
             if isinstance(filter_value, list):
                 sets = []
                 for col, val in zip(filter_col, filter_value):
-                    base = data.copy()
+                    base = data
                     if isinstance(val, str) and val.startswith("!="):
                         val = val[2:].strip()
                         excluded_ids = set(
@@ -327,10 +329,9 @@ def create_count(df, aggregation='count', unique_column=PERSON_ID_, filter_col1=
         filter_value1, filter_value2, filter_value3, filter_value4, filter_value5,
         filter_value6, filter_value7, filter_value8, filter_value9, filter_value10
     ]
-
-    data['defaulter_period'] = data[CONCEPT_NAME_] #for defaulters
-    
-    data = data.copy()
+     #for defaulters
+    data["DateValue"] = pd.to_datetime(data[DATE_]).dt.date
+    data['datetime'] = data[DATE_]
 
     # Apply all filters using the helper function
     for col, val in zip(filter_cols, filter_vals):
@@ -347,7 +348,7 @@ def create_count(df, aggregation='count', unique_column=PERSON_ID_, filter_col1=
     if aggregation == 'count':
         return len(unique_visits[unique_column].dropna())
     elif aggregation == 'nunique':
-        return unique_visits[unique_column].nunique()
+        return len(unique_visits.drop_duplicates(subset=unique_column))
     elif aggregation == 'list':
         return unique_visits[unique_column].dropna().unique().tolist()
     elif aggregation == 'time_diff_mins':
@@ -373,9 +374,10 @@ def create_count(df, aggregation='count', unique_column=PERSON_ID_, filter_col1=
             return 0
         return int(mean_val)
     elif aggregation == 'defaulter_count':
+        unique_visits['defaulter_period'] = unique_visits[CONCEPT_NAME_]
         # lets maintain individuals who passed through filters
         filtered_ids = set(unique_visits[unique_column].dropna().unique())
-        df = df[df[unique_column].isin(filtered_ids)].copy()
+        df = df[df[unique_column].isin(filtered_ids)]
         df["start_date"] = pd.to_datetime(df["start_date"],errors='coerce')
         df['value_datetime'] = pd.to_datetime(df['value_datetime'],errors='coerce')
         df = df.dropna(subset=[DATE_, 'value_datetime'])
@@ -616,7 +618,7 @@ def create_line_chart(df, date_col, y_col, title, x_title,
         except Exception as e:
             raise ValueError(f"Error converting {date_col} to datetime: {e}")
     
-    data = data.copy()
+    data = data
     data['date_only'] = pd.to_datetime(data[date_col]).dt.date
     
     if color:
@@ -868,7 +870,7 @@ def create_crosstab_table(
     Create a crosstab table with multilayer column headers using Dash DataTable.
     """
 
-    data = df.copy()
+    data = df
 
     # Apply filters
     data = _apply_filter(data, filter_col1, filter_value1)
@@ -932,7 +934,7 @@ def create_crosstab_table(
                 "id": str(col)
             })
 
-    ct_flat = ct.copy()
+    ct_flat = ct
     ct_flat.columns = [
         "|".join(str(c) for c in col) if isinstance(col, tuple) else str(col)
         for col in ct.columns
@@ -1036,7 +1038,7 @@ def create_line_list(
     if not unique_col_list:
         raise ValueError("unique_col must specify at least one column.")
     
-    df_base = df.copy()
+    df_base = df
     df_base = apply_calculated_fields(df_base, custom_fields)
     
     group_dfs = []
@@ -1052,8 +1054,9 @@ def create_line_list(
         
         aggr_cols_needed = list(group_aggr.keys())
         all_required_cols = list(set(group_cols + unique_col_list + aggr_cols_needed))
+        # print(all_required_cols)
         
-        df_group_filtered = df_base.copy()
+        df_group_filtered = df_base
         filter_mask = pd.Series(True, index=df_group_filtered.index)
         
         for col, raw_val in group_filters.items():
@@ -1084,7 +1087,7 @@ def create_line_list(
             if current_filter is not None:
                 filter_mask = filter_mask & current_filter
         
-        df_group_filtered = df_group_filtered[filter_mask].copy()
+        df_group_filtered = df_group_filtered[filter_mask]
         
         if df_group_filtered.empty:
             continue
@@ -1098,7 +1101,7 @@ def create_line_list(
         if DATE_ in df_group_filtered.columns:
             df_group_filtered = df_group_filtered.drop_duplicates(subset=unique_col_list + [DATE_])
         
-        df_group = df_group_filtered[all_required_cols].copy()
+        df_group = df_group_filtered[all_required_cols]
         
         count_col_name = f'unique_count_{i}'
 
@@ -1238,7 +1241,7 @@ def create_age_gender_histogram(
     """
     Create an age–gender histogram with labeled bins and data labels.
     """
-    data = df.copy()
+    data = df
     
     # Apply filters
     data = _apply_filter(data, filter_col1, filter_value1)
@@ -1270,7 +1273,7 @@ def create_age_gender_histogram(
         for i in range(len(bins) - 1)
     ]
     
-    data = data.copy()
+    data = data
     data["age_bin"] = pd.cut(
         data[age_col],
         bins=bins,

@@ -15,6 +15,8 @@ from datetime import datetime
 from datetime import datetime as dt
 from data_storage import DataStorage
 from config import DATA_FILE_NAME_,CUSTOM_GENDER_MAP
+import warnings
+warnings.filterwarnings("ignore")
 from helpers.date_ranges import (
                     get_relative_date_range,
                     RELATIVE_PERIOD_LIST
@@ -43,14 +45,12 @@ from config import (actual_keys_in_data,
 
 dash.register_page(__name__, path="/home")
 
+pd.options.mode.chained_assignment = None
+
 path = os.getcwd()
 json_path = os.path.join(path, 'data', 'visualizations', 'validated_dashboard.json')
 
-# Shared cross-process cache for MNID prepared DataFrames.
-# Uses diskcache so data persists across background callback worker processes.
 _mnid_disk_cache = diskcache.Cache('./cache/mnid')
-
-# In-process fallback (used when background=False or within same worker)
 _mnid_full_data_cache: dict = {}
 DEFAULT_DASHBOARD_DAYS = 7
 DEFAULT_RELATIVE_PERIOD = 'Today'
@@ -131,7 +131,6 @@ def _first_non_empty(row: pd.Series, candidates: list[str]) -> str | None:
 
 def _normalize_level(value: str | None) -> str:
     value = str(value or '').strip().lower()
-    print(value)
     if value in {'national', 'district', 'facility'}:
         return value
     return 'facility'
@@ -226,7 +225,7 @@ def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json, filt
         )
 
     # Render all non-MNID dashboards with the generic chart builder.
-    filtered = filtered.copy()
+    filtered = filtered
     filtered['Residence'] = filtered[HOME_DISTRICT_] + ', TA-' + filtered[TA_] + ', ' + filtered[VILLAGE_]
     delta_days = 7 if delta_days < 7 else delta_days
 
@@ -650,7 +649,7 @@ def update_dashboard(gen, interval, start_date, end_date, level,
             SQL = f"""
                 {sql_comment}
                 SELECT *
-                FROM 'data/{DATA_FILE_NAME_}'
+                FROM '{DATA_FILE_NAME_}'
                 WHERE Date >= TIMESTAMP '{default_start_date}'
                 AND Date <= TIMESTAMP '{end_dt}'
                 AND {FACILITY_CODE_} = '{location}'
@@ -659,7 +658,7 @@ def update_dashboard(gen, interval, start_date, end_date, level,
             SQL = f"""
                 {sql_comment}
                 SELECT *
-                FROM 'data/{DATA_FILE_NAME_}'
+                FROM '{DATA_FILE_NAME_}'
                 WHERE Date >= TIMESTAMP '{default_start_date}'
                 AND Date <= TIMESTAMP '{end_dt}'
                 """
@@ -688,8 +687,6 @@ def update_dashboard(gen, interval, start_date, end_date, level,
             )
         data[DATE_] = pd.to_datetime(data[DATE_], format='mixed')
         data[GENDER_] = data[GENDER_].replace(CUSTOM_GENDER_MAP)
-        data["DateValue"] = pd.to_datetime(data[DATE_]).dt.date
-        data['datetime'] = data[DATE_]
         data[DATE_] = data[DATE_].dt.normalize()
         # data.to_excel("data/archive/hmis.xlsx", index=False)
 
@@ -708,7 +705,7 @@ def update_dashboard(gen, interval, start_date, end_date, level,
         
         data = num_days_patient_seen(data)
         today = dt.today().date()
-        data["months"] = ((pd.Timestamp(today) - pd.to_datetime(data["DateValue"])).dt.days // 30).clip(lower=0)
+        # data["months"] = ((pd.Timestamp(today) - pd.to_datetime(data["DateValue"])).dt.days // 30).clip(lower=0)
 
         district_col = "District" if "District" in data.columns else (HOME_DISTRICT_ if HOME_DISTRICT_ in data.columns else None)
         
@@ -722,7 +719,7 @@ def update_dashboard(gen, interval, start_date, end_date, level,
         # MNID dashboards derive Service_Area internally and handle program scoping via scope_meta.
         # We keep the Encounter-based pre-filter only for non-MNID use (dropdowns, non-MNID charts).
         # base_data_mnid skips the Encounter filter so all relevant observations reach the MNID renderer.
-        base_data_mnid = data[base_mask].copy()
+        base_data_mnid = data[base_mask]
         encounter_mask = pd.Series(True, index=data.index)
         if category != "All" and "Encounter" in data.columns:
             if category == "ANC":
@@ -731,7 +728,7 @@ def update_dashboard(gen, interval, start_date, end_date, level,
                 encounter_mask = data["Encounter"].fillna('').astype(str).str.contains('LABOUR|DELIVERY|BIRTH', case=False, na=False)
             elif category == "PNC":
                 encounter_mask = data["Encounter"].fillna('').astype(str).str.contains('PNC|POSTNATAL|POST.NATAL', case=False, na=False)
-        base_data = data[base_mask & encounter_mask].copy()
+        base_data = data[base_mask & encounter_mask]
 
 
         district_col = "District" if "District" in base_data.columns else (HOME_DISTRICT_ if HOME_DISTRICT_ in base_data.columns else None)
@@ -823,14 +820,14 @@ def update_dashboard(gen, interval, start_date, end_date, level,
             facilities = [f for f in facilities if f in allowed_facilities]
             all_facilities = sorted(allowed_facilities)
         elif effective_level == "facility":
-            all_facilities = facilities.copy()
+            all_facilities = facilities
         
 
         # Filter network and facility data
-        network_data = base_data.copy()
+        network_data = base_data
         if effective_level != 'national' and district_col and districts:
             network_data = network_data[network_data[district_col].isin(districts)]
-        filtered_data = network_data.copy()
+        filtered_data = network_data
         if effective_level == 'facility' and facilities:
             filtered_data = filtered_data[filtered_data[FACILITY_].isin(facilities)]
         elif effective_level == 'district' and facilities:
@@ -838,10 +835,10 @@ def update_dashboard(gen, interval, start_date, end_date, level,
         
         # MNID-specific data paths: no Encounter pre-filter so all program observations are present.
         # The MNID renderer uses Service_Area (derived from Program/Encounter) for internal scoping.
-        network_data_mnid = base_data_mnid.copy()
+        network_data_mnid = base_data_mnid
         if effective_level != 'national' and district_col and districts:
             network_data_mnid = network_data_mnid[network_data_mnid[district_col].isin(districts)]
-        filtered_data_mnid = network_data_mnid.copy()
+        filtered_data_mnid = network_data_mnid
         if effective_level == 'facility' and facilities:
             filtered_data_mnid = filtered_data_mnid[filtered_data_mnid[FACILITY_].isin(facilities)]
         elif effective_level == 'district' and facilities:
@@ -892,7 +889,7 @@ def update_dashboard(gen, interval, start_date, end_date, level,
                         'Home_district', 'TA', 'Village', 'Age', 'Age_Group', 'Gender',
                         'Source_Program',
                     ])
-                    _sql_full = f"SELECT {_mnid_cols} FROM 'data/{DATA_FILE_NAME_}'"
+                    _sql_full = f"SELECT {_mnid_cols} FROM '{DATA_FILE_NAME_}'"
                     _full = DataStorage.query_duckdb(_sql_full)
                     _full[DATE_] = pd.to_datetime(_full[DATE_], errors='coerce')
                     _full = _apply_scope_to_data(_full, scope, district_col)

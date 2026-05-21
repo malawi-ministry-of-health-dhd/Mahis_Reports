@@ -1,4 +1,5 @@
 import pandas as pd
+pd.options.mode.chained_assignment = None
 from typing import Any, Dict, List, Tuple
 from helpers.visualizations import create_sum, create_count, create_count_sets
 from helpers.dhis_integrater import get_dhis_data
@@ -28,7 +29,7 @@ class ReportTableBuilder:
 
     @staticmethod
     def _prepare_base_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-        df = df.copy()
+        df = df
         if DATE_ in df.columns:
             df[DATE_] = pd.to_datetime(df[DATE_]).dt.normalize()
         if CONCEPT_NAME_ in df.columns:

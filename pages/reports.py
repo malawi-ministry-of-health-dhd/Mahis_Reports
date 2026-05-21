@@ -10,6 +10,8 @@ import json
 from dash.exceptions import PreventUpdate
 from helpers.reports_class import ReportTableBuilder
 from mnid.data_utils import prepare_mnid_dataframe
+import warnings
+warnings.filterwarnings("ignore")
 from helpers.date_ranges import (
     RELATIVE_MONTHS,
     RELATIVE_QUARTERS,
@@ -36,6 +38,8 @@ from helpers.navigation_callbacks import DEMO_UUID
 
 
 dash.register_page(__name__, path="/hmis_reports")
+
+pd.options.mode.chained_assignment = None
 
 relative_week = [str(week) for week in range(1, 53)]  # Can extend to 53 if needed
 relative_month = RELATIVE_MONTHS
@@ -337,7 +341,7 @@ def update_table(clicks,
     
     SQL = f"""
         SELECT *
-        FROM 'data/{DATA_FILE_NAME_}'
+        FROM '{DATA_FILE_NAME_}'
         WHERE {FACILITY_CODE_} = '{location}'
         """
     
@@ -379,7 +383,7 @@ def update_table(clicks,
     if report.get("page_name") in mnh_report_pages:
         data = prepare_mnid_dataframe(data)
 
-    original_data = data.copy()
+    original_data = data
     try:
         period_map = {
             'Weekly': get_week_start_end,
@@ -401,11 +405,11 @@ def update_table(clicks,
         filtered = data[
             (data_dates >= pd.to_datetime(start_date)) &
             (data_dates <= pd.to_datetime(end_date))
-        ].copy()
+        ]
         filtered["start_date"] = start_date
         filtered["end_date"] = end_date
 
-        original_data = original_data[original_dates <= pd.to_datetime(end_date)].copy()
+        original_data = original_data[original_dates <= pd.to_datetime(end_date)]
         original_data["start_date"] = start_date
         original_data["end_date"] = end_date
         

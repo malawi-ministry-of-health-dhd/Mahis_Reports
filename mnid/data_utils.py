@@ -4,6 +4,7 @@ import json
 import re
 import numpy as np
 import pandas as pd
+pd.options.mode.chained_assignment = None
 
 from .constants import (
     ALL_DISTRICTS,
@@ -380,7 +381,7 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
         & _ctx_series('mnid_newborn_parenteral_antibiotics').eq('Yes')
     ).map({True: 'Yes', False: ''})
 
-    birth_weight_rows = out.loc[concept.eq('Birth weight'), ['person_id']].copy()
+    birth_weight_rows = out.loc[concept.eq('Birth weight'), ['person_id']]
     value_numeric = out['ValueN'] if 'ValueN' in out.columns else pd.Series([None] * len(out), index=out.index)
     birth_weight_rows['mnid_birth_weight_g'] = [
         _normalize_birth_weight_g(_first_numeric(pd.Series([vn, ov, vv])))
@@ -413,7 +414,7 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
     ).map({True: 'Yes', False: ''})
 
     person_ctx['person_id'] = person_ctx['person_id'].astype(str)
-    merged = out.copy()
+    merged = out
     merged['person_id'] = merged['person_id'].astype(str)
     return merged.merge(person_ctx, on='person_id', how='left')
 
@@ -497,7 +498,7 @@ def _normalize_mnid_semantics(df: pd.DataFrame) -> pd.DataFrame:
     if df is None or df.empty:
         return df
 
-    out = df.copy()
+    out = df
     if 'Program' in out.columns and 'Source_Program' not in out.columns:
         out['Source_Program'] = out['Program']
 
@@ -637,7 +638,7 @@ def prepare_mnid_dataframe(df: pd.DataFrame | None) -> pd.DataFrame:
                 case=False,
                 na=False,
             )
-        ].copy()
+        ]
     if 'Date' in mch_full.columns:
         mch_full['Date'] = pd.to_datetime(mch_full['Date'], errors='coerce')
 

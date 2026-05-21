@@ -4,8 +4,11 @@ from datetime import datetime, timedelta
 import pymysql
 from sshtunnel import SSHTunnelForwarder
 import logging
+import duckdb
+import glob
 from typing import Optional, Dict, Any, Generator
-
+import warnings
+warnings.filterwarnings("ignore")
 from config import (BATCH_SIZE, DB_CONFIG, SSH_CONFIG, USE_LOCALHOST,
                     DB_CONFIG_LOCAL, START_DATE, 
                     LOAD_FRESH_DATA, DATE_, GENDER_, 
@@ -16,9 +19,9 @@ logger = logging.getLogger(__name__)
 
 if LOAD_FRESH_DATA:
     # drop file latest_data_opd.parquet if exists in data folder
-    file_path = os.path.join(os.getcwd(), "data", DATA_FILE_NAME_)
+    file_path = os.path.join(os.getcwd(), DATA_FILE_NAME_)
     if os.path.exists(file_path):
-        os.rename(file_path, f"{file_path}.backup")
+        os.rename(file_path, f"{file_path}_backup")
         logger.info("Removed existing data file for fresh load.")
 
 class DataFetcher:
@@ -90,12 +93,19 @@ class DataFetcher:
     def _get_max_date_from_parquet(self, parquet_file_path: str, date_column: str) -> Optional[datetime]:
         
         full_path = os.path.join(self.path, parquet_file_path)
-        if not os.path.exists(full_path):
+        parquet_files = glob.glob(os.path.join(full_path, "*.parquet"))
+        if not parquet_files:
             return self.start_date
         try:
-            df = pd.read_parquet(full_path, engine='pyarrow')
-            if not df.empty and date_column in df.columns:
-                max_date = pd.to_datetime(df[date_column]).max()
+            logger.info(f"Getting max from parquet using DuckDB")
+            conn = duckdb.connect()
+            file_list = "', '".join(parquet_files)
+            query = f"SELECT MAX(Date) AS max_date FROM read_parquet(['{file_list}'], union_by_name=True)"
+            result = conn.execute(query).df()
+            conn.close()
+            
+            if not result.empty and not result['max_date'].isna().iloc[0]:
+                max_date = pd.to_datetime(result['max_date'].iloc[0])
                 logger.info(f"Found existing data up to {max_date}")
                 return max_date
         except Exception as e:
@@ -103,14 +113,53 @@ class DataFetcher:
         
         return None
     
+    def _load_batches_from_files(self, batch_paths: list) -> pd.DataFrame:
+        """
+        Load and concatenate all batch files into a single dataframe
+        
+        Args:
+            batch_paths: List of batch file paths
+            
+        Returns:
+            pd.DataFrame: Concatenated dataframe from all batches
+        """
+        if not batch_paths:
+            logger.info("No batch files to load")
+            return pd.DataFrame()
+        
+        logger.info(f"Loading {len(batch_paths)} batch files into memory...")
+        batches = []
+        
+        try:
+            for batch_path in batch_paths:
+                if os.path.exists(batch_path):
+                    df = pd.read_parquet(batch_path, engine='pyarrow')
+                    batches.append(df)
+                    logger.debug(f"Loaded batch: {os.path.basename(batch_path)} ({len(df)} rows)")
+                else:
+                    logger.warning(f"Batch file not found: {batch_path}")
+            
+            if batches:
+                final_df = pd.concat(batches, ignore_index=True)
+                logger.info(f"Concatenated {len(batches)} batches ({len(final_df)} total rows)")
+                return final_df
+            else:
+                logger.info("No valid batch files found")
+                return pd.DataFrame()
+                
+        except Exception as e:
+            logger.error(f"Error loading batches from files: {e}")
+            raise
+    
     def fetch_data(self, query_template: str, parquet_output: str, 
                    date_column: str = 'Date', 
                    id_column: str = 'encounter_id',
                    start_date: Optional[datetime] = None) -> pd.DataFrame:
+        logging.info("Fetching Started...")
 
         # Determine start date
         if not self.load_fresh_data:
-            max_date = self._get_max_date_from_parquet(parquet_output, "Date")
+            max_date = self._get_max_date_from_parquet(parquet_output, date_column)
             start_date = max_date if isinstance(max_date, datetime) else pd.to_datetime(max_date)
         else:
             # convert start_date to datetime if it's a string
@@ -118,15 +167,14 @@ class DataFetcher:
             logger.info(f"Forced fresh load. Starting from {start_date}")
         
         
-        # Collect all batches
-        all_batches = []
-        batch_number = 0
+        # Collect all batch file paths (not dataframes)
+        batch_paths = []
         
         try:
-            # Get database connection
+            # Get database connection and fetch batches
             if self.use_localhost:
                 conn = self._get_db_connection()
-                all_batches = self._fetch_in_batches(conn, query_template, date_column, 
+                batch_paths = self._fetch_in_batches(conn, query_template, date_column, 
                                                      id_column, start_date)
                 conn.close()
             elif self.ssh_config:
@@ -139,20 +187,27 @@ class DataFetcher:
                 ) as tunnel:
                     logger.info(f"SSH tunnel established on port {tunnel.local_bind_port}")
                     conn = self._get_db_connection(tunnel)
-                    all_batches = self._fetch_in_batches(conn, query_template, date_column,
+                    batch_paths = self._fetch_in_batches(conn, query_template, date_column,
                                                         id_column, start_date)
                     conn.close()
             else:
                 conn = self._get_db_connection()
-                all_batches = self._fetch_in_batches(conn, query_template, date_column,
+                batch_paths = self._fetch_in_batches(conn, query_template, date_column,
                                                     id_column, start_date)
                 conn.close()
             
-            # Merge all batches and save final parquet
-            if all_batches:
-                final_df = pd.concat(all_batches, ignore_index=True)
-                final_df.drop_duplicates(inplace=True)
-                self.cleanup_batches()  # Clean up batch files after merging
+            # Load all batches from disk and merge into final dataframe
+            if batch_paths:
+                logger.info(f"Merging {len(batch_paths)} batch files...")
+                final_df = self._load_batches_from_files(batch_paths)
+                
+                if not final_df.empty:
+                    print("Final data before duplication =", len(final_df))
+                    final_df.drop_duplicates(inplace=True)
+                    logger.info(f"Final dataframe contains {len(final_df)} rows after deduplication")
+                
+                # Clean up batch files after successful merge
+                self.cleanup_batches()
                 return final_df
             else:
                 logger.info("No new data fetched")
@@ -166,7 +221,7 @@ class DataFetcher:
     def _fetch_in_batches(self, conn: pymysql.Connection, query_template: str,
                           date_column: str, id_column: str, start_date: datetime) -> list:
         """
-        Fetch data in batches and save each batch as parquet file
+        Fetch data in batches and save each batch as parquet file without storing in RAM
         
         Args:
             conn: Database connection
@@ -176,31 +231,31 @@ class DataFetcher:
             start_date: Start date for fetching
             
         Returns:
-            list: List of dataframes for each batch
+            list: List of saved batch file paths (not dataframes)
         """
-        batches = []
-        last_id = 0
+        batch_paths = []  # Store only file paths, not dataframes
         current_date = start_date
         today = datetime.now()
 
-        print(current_date, type(today))
+        # print(current_date, type(today))
         
         while current_date.date() <= today.date():
             logger.info(f"Processing date: {current_date.strftime('%Y-%m-%d')}")
             
             date_str = current_date.strftime('%Y-%m-%d')
-            date_str1 = current_date.strftime('%Y-%m-%d')
-            date_str2 = (current_date + timedelta(days=1)).strftime('%Y-%m-%d')
+            date_start_midnight = current_date.strftime('%Y-%m-%d 00:00:00')
+            date_end_midnight = current_date.strftime('%Y-%m-%d 23:59:59')
             has_more_data = True
             batch_count = 0
+            last_id_for_date = 0
             
             while has_more_data:
-                # Build query with date filter and ID pagination
-                date_filter = f"AND {date_column} >= '{date_str1}' AND {date_column} <= '{date_str2}' AND e.{id_column} > {last_id}"
+                # Fetch batches for the current date only (midnight to 23:59:59)
+                # Use encounter_id pagination to ensure no duplicates across batches
+                date_filter = f"AND {date_column} >= '{date_start_midnight}' AND {date_column} <= '{date_end_midnight}' AND e.{id_column} > {last_id_for_date}"
                 query = query_template.format(date_filter=date_filter)
-                full_query = f"{query} LIMIT {self.batch_size}"
+                full_query = f"{query} ORDER BY e.{id_column} LIMIT {self.batch_size}"
 
-                # print(full_query)  # Debug: print the full query being executed
                 
                 try:
                     batch_df = pd.read_sql(full_query, conn)
@@ -209,17 +264,23 @@ class DataFetcher:
                         has_more_data = False
                         logger.info(f"Completed {date_str} - {batch_count} batches fetched")
                     else:
+                        # Update last_id_for_date to continue pagination within this date
+                        last_id_for_date = batch_df[id_column].max()
+                        batch_size = len(batch_df)
+                        
                         # Save batch as parquet file
-                        batch_filename = f"batch_{date_str}_{len(batch_df)}.parquet"
+                        batch_filename = f"batch_{date_str}_b{batch_count:04d}_{batch_size}.parquet"
                         batch_path = os.path.join(self.path, self.batch_folder, batch_filename)
                         batch_df.to_parquet(batch_path, index=False, engine='pyarrow')
-                        # batch_df.to_csv(batch_path, index=False)
-                        logger.info(f"Saved batch {batch_count} for {date_str}: {batch_path} ({len(batch_df)} rows)")
                         
-                        batches.append(batch_df)
-                        last_id = batch_df[id_column].max()
+                        logger.info(f"Saved batch {batch_count} for {date_str}: {batch_path} ({batch_size} rows)")
+                        
+                        # Store only the file path, not the dataframe
+                        batch_paths.append(batch_path)
                         batch_count += 1
-                        # print(last_id)
+                        
+                        # Explicitly delete the dataframe to free memory immediately
+                        del batch_df
                         
                 except Exception as e:
                     logger.error(f"Error fetching batch for {date_str}: {e}")
@@ -227,11 +288,10 @@ class DataFetcher:
                     traceback.print_exc()
                     has_more_data = False
             
-            # Move to next day, reset last_id
+            # Move to next day
             current_date += timedelta(days=1)
-            last_id = 0
         
-        return batches
+        return batch_paths  # Return list of file paths only
     
     def fetch_single_table(self, table_name: str, query: str, output_format: str = 'csv') -> pd.DataFrame:
         """

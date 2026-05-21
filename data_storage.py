@@ -5,8 +5,12 @@ from db_services import DataFetcher
 from datetime import datetime
 import logging
 import json
+import re
 import duckdb
-from functools import lru_cache
+import pyarrow.parquet as pq
+import pyarrow as pa
+import warnings
+warnings.filterwarnings("ignore")
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -19,8 +23,13 @@ QUERY_LOCATIONS = cfg.QUERY_LOCATIONS
 QUERY_FACILITIES = cfg.QUERY_FACILITIES
 QUERY_DRUGS = cfg.QUERY_DRUGS
 QUERY_USERS = cfg.QUERY_USERS
+QUERY_USER_PROGRAMS = cfg.QUERY_USER_PROGRAMS
+# QUERY_BIDS = cfg.BIDS
 QUERY_ORDER_TYPES = cfg.QUERY_ORDER_TYPES
 IS_HARMONIZED_MAHIS = cfg.IS_HARMONIZED_MAHIS
+CUSTOM_GENDER_MAP = cfg.CUSTOM_GENDER_MAP
+# ASSESSMENT_MAP = cfg.AESSESSMENT_TYPE
+# COLS_TO_DROP = cfg.NONE_ESSENTIAL_COLUMNS
 
 CUSTOM_MNID_MAP_PROGRAM = cfg.CUSTOM_MNID_MAP_PROGRAM
 CUSTOM_MNID_MAP_SERVICE_AREA = cfg.CUSTOM_MNID_MAP_SERVICE_AREA
@@ -45,19 +54,23 @@ class DataStorage:
         self.tables_dir = os.path.join(self.script_dir, tables_dir)
         os.makedirs(self.data_dir, exist_ok=True)
         os.makedirs(os.path.join(self.script_dir, tables_dir), exist_ok=True)
-        self.filepath = os.path.join(self.data_dir, filename)
+
+        if os.path.isabs(filename):
+            self.filepath = filename
+        else:
+            self.filepath = os.path.join(self.script_dir, filename)
+
+        # Treat DATA_FILE_NAME_ as a parquet directory path.
+        if self.filepath.lower().endswith('.parquet'):
+            self.filepath = os.path.dirname(self.filepath)
+        os.makedirs(self.filepath, exist_ok=True)
+
         self.dropdown_filepath = os.path.join(self.data_dir, 'dcc_dropdown_json', 'dropdowns.json')
 
     def fetch_transactional_data(self, date_column, incremental_id_column):
         """Fetch fresh data from DB and save to Parquet."""
+        logging.info("Fetching Transactional Tables.")
         fetcher = DataFetcher(use_localhost=USE_LOCALHOST)
-        try:
-            if os.path.exists(self.filepath):
-                existing_df = pd.read_parquet(self.filepath)
-            else:
-                existing_df = pd.DataFrame()
-        except Exception:
-            existing_df = pd.DataFrame()
 
         df = fetcher.fetch_data(
             query_template = self.query,
@@ -100,6 +113,9 @@ class DataStorage:
 
         users = pd.read_csv(os.path.join(self.script_dir,self.tables_dir, "users_data.csv"))
         username_dict = users.set_index('user_id')['User'].to_dict()
+
+        user_programs = pd.read_csv(os.path.join(self.script_dir,self.tables_dir, "user_programs.csv"))
+        # username_dict = user_programs.set_index('user_id')['User'].to_dict()
         # user_location_dict = users.set_index('user_id')['location_id'].to_dict()
 
         # merge single tables with main df
@@ -107,9 +123,9 @@ class DataStorage:
             df['Gender'] = df['Gender'].map(CUSTOM_GENDER_MAP).fillna(df['Gender'])
             df['Program'] = df['Program'].map(programs_dict)
             df['Source_Program'] = df['Program']
-            df['new_revisit'] = ""
             df['Reporting_Program'] = df['Source_Program'].map(CUSTOM_MNID_MAP_PROGRAM).fillna(df['Source_Program'])
             df['Service_Area'] = df['Encounter'].map(CUSTOM_MNID_MAP_SERVICE_AREA).map({"NEONATAL PROGRAM": "NEONATAL"}).fillna(df['Program'])
+            df['new_revisit'] = ""
             df['concept_name'] = df['concept_name'].map(concepts_dict)
             df['obs_value_coded'] = df['obs_value_coded'].map(concepts_dict)
             df['Encounter'] = df['Encounter'].map(encounter_types_dict)
@@ -121,65 +137,145 @@ class DataStorage:
             df['District'] = df['Facility_CODE'].map(facility_districts_dict)
             df['Order_Type'] = df['Order_Type'].map(order_type_dict)
             df['Order_Name'] = df['Order_Name'].map(concepts_dict)
+            # df["Assessment_Type"] = df['Encounter'].map(ASSESSMENT_MAP).fillna(df['Encounter'])
+            df = df.reset_index(drop=True)
+            print(len(df))
+            # df = df.drop(columns=COLS_TO_DROP)
+        try:
+            if df is not None and not df.empty:
+                # Partition into monthly parquet files under the configured directory.
+                if date_column in df.columns:
+                    df[date_column] = pd.to_datetime(df[date_column], errors='coerce')
+                elif 'Date' in df.columns:
+                    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+                    date_column = 'Date'
+                else:
+                    raise ValueError("No valid date column found for monthly parquet partitioning.")
 
-        if df is not None and not df.empty:
-            
-            # combine with existing parquet
-            df = pd.concat([existing_df, df])
-            df = df.drop_duplicates()
-            df.to_parquet(self.filepath, index=False, engine='pyarrow')
-            
-            print(self.filepath)
-            print("exists:", os.path.exists(self.filepath))
-            print("size:", os.path.getsize(self.filepath))
+                df['month_key'] = df[date_column].dt.strftime('%Y%m')
+                for month, month_df in df.groupby('month_key'):
+                    month_file = os.path.join(self.filepath, f"data_{month}.parquet")
+                    if os.path.exists(month_file):
+                        existing_df = pd.read_parquet(month_file, engine='pyarrow')
+                        for col in existing_df.columns:
+                            if col not in month_df.columns:
+                                month_df[col] = None
+                        for col in month_df.columns:
+                            if col not in existing_df.columns:
+                                existing_df[col] = None
+                        month_df = month_df[existing_df.columns]
+                        month_df = pd.concat([existing_df, month_df], ignore_index=True)
+                        month_df = month_df.drop_duplicates()
+                    month_df.to_parquet(month_file, index=False, engine='pyarrow')
+                df = df.drop(columns=['month_key'])
+                # df = pd.concat([existing_df, df])
+                # df = df.drop_duplicates()
+                # df.to_parquet(self.filepath, index=False, engine='pyarrow')
+                
+                print(self.filepath)
+                print("exists:", os.path.exists(self.filepath))
+                print("size:", os.path.getsize(self.filepath))
 
-            with open(self.filepath, "rb") as f:
-                print("start:", f.read(4))
-                f.seek(-4, 2)
-                print("end:", f.read(4))
+                DataStorage.invalidate_query_cache()
+                logging.info(f"Data saved to {self.filepath} (Parquet format)")
 
-            DataStorage.invalidate_query_cache()
-            logging.info(f"Data saved to {self.filepath} (Parquet format)")
+                timestamp_file = os.path.join(self.data_dir,'TimeStamp.csv')
+                os.makedirs(os.path.dirname(timestamp_file), exist_ok=True)
+                pd.DataFrame({'saving_time': [datetime.now().strftime("%d/%m/%Y, %H:%M:%S")]}).to_csv(timestamp_file, index=False)
 
-            timestamp_file = os.path.join(self.data_dir,'TimeStamp.csv')
-            os.makedirs(os.path.dirname(timestamp_file), exist_ok=True)
-            pd.DataFrame({'saving_time': [datetime.now().strftime("%d/%m/%Y, %H:%M:%S")]}).to_csv(timestamp_file, index=False)
+                dropdown_json = {"programs":sorted(user_programs.name.dropna().unique().tolist()),
+                            "encounters":sorted(encounter_types.name.dropna().unique().tolist()),
+                            "concepts":sorted(df.concept_name.dropna().unique().tolist()),
+                            "concept_answers":sorted(df.obs_value_coded.dropna().unique().tolist()),
+                            "gender":sorted(df.Gender.dropna().unique().tolist()),
+                            #  "age_group":sorted(df.Age_Group.dropna().unique().tolist()),
+                            "DrugName":sorted(drugs.name.dropna().unique().tolist())
+                            }
+                with open(self.dropdown_filepath, 'w') as r:
+                    json.dump(dropdown_json, r, indent=2)
+            else:
+                logging.warning("No data fetched from database.")
+        except Exception as e:
+            logging.error(f"Error merging data: {e}")
+            raise
 
-            dropdown_json = {"programs":sorted(programs.name.dropna().unique().tolist()),
-                         "encounters":sorted(encounter_types.name.dropna().unique().tolist()),
-                         "concepts":sorted(df.concept_name.dropna().unique().tolist()),
-                         "concept_answers":sorted(df.obs_value_coded.dropna().unique().tolist()),
-                         "gender":sorted(df.Gender.dropna().unique().tolist()),
-                        #  "age_group":sorted(df.Age_Group.dropna().unique().tolist()),
-                         "DrugName":sorted(drugs.name.dropna().unique().tolist())
-                         }
-            with open(self.dropdown_filepath, 'w') as r:
-                json.dump(dropdown_json, r, indent=2)
-        else:
-            logging.warning("No data fetched from database.")
+    # Structure: { sql_str: {"mtime_sig": str, "result": pd.DataFrame} }
+    _query_cache: dict = {}
+    _CACHE_MAXSIZE: int = 32
+
+    @staticmethod
+    def _parquet_mtime_signature(sql: str) -> str:
+        import glob as _glob
+        # Catch explicit *.parquet paths already in the SQL
+        paths = re.findall(r"['\"]([^'\"]+\.parquet[^'\"]*)['\"]", sql, re.IGNORECASE)
+        # Also catch bare directory paths that will be expanded to globs
+        dir_paths = re.findall(r"['\"]([^'\"]+)['\"]", sql, re.IGNORECASE)
+
+        files: list = []
+        for p in paths:
+            files.extend(_glob.glob(p))
+        for d in dir_paths:
+            if os.path.isdir(d):
+                files.extend(_glob.glob(os.path.join(d, "*.parquet")))
+
+        files = sorted(set(files))
+        sig_parts = []
+        for f in files:
+            try:
+                st = os.stat(f)
+                sig_parts.append(f"{f}:{st.st_mtime}:{st.st_size}")
+            except OSError:
+                pass
+        return "|".join(sig_parts) if sig_parts else "no_files"
+
+    @staticmethod
+    def _expand_dir_paths(sql: str) -> str:
+        """Replace bare directory paths in FROM clauses with read_parquet globs."""
+        def replace_dir_path(match):
+            quote = match.group(1)
+            path = match.group(2)
+            if os.path.isdir(path) and not path.endswith('*'):
+                pattern = os.path.join(path, '*.parquet')
+                return f"FROM read_parquet({quote}{pattern}{quote}, union_by_name=True)"
+            return match.group(0)
+        return re.sub(r"FROM\s+(['\"])(.+?)\1", replace_dir_path, sql, flags=re.IGNORECASE)
 
     @staticmethod
     def query_duckdb(sql: str) -> pd.DataFrame:
-        return DataStorage._cached_query(sql).copy()
+        cache = DataStorage._query_cache
+        mtime_sig = DataStorage._parquet_mtime_signature(sql)
 
-    @staticmethod
-    @lru_cache(maxsize=32)
-    def _cached_query(sql: str) -> pd.DataFrame:
-        logging.debug("DuckDB cache miss")
-        return duckdb.query(sql).df()
+        cached = cache.get(sql)
+        if cached is not None and cached["mtime_sig"] == mtime_sig:
+            logging.debug("DuckDB cache hit")
+            return cached["result"].copy()
+
+        logging.debug("DuckDB cache miss — executing query")
+        expanded_sql = DataStorage._expand_dir_paths(sql)
+        conn = duckdb.connect()
+        try:
+            result = conn.execute(expanded_sql).df()
+        finally:
+            conn.close()
+
+        # Evict the oldest entry when the cache is full (simple FIFO)
+        if len(cache) >= DataStorage._CACHE_MAXSIZE and sql not in cache:
+            oldest_key = next(iter(cache))
+            del cache[oldest_key]
+
+        cache[sql] = {"mtime_sig": mtime_sig, "result": result}
+        return result.copy()
 
     @staticmethod
     def invalidate_query_cache():
-        DataStorage._cached_query.cache_clear()
-        try:
-            from pages.home import _mnid_full_data_cache, _mnid_disk_cache, clear_dashboard_state_cache
-            from mnid.app import clear_runtime_caches
-            _mnid_full_data_cache.clear()
-            _mnid_disk_cache.clear()
-            clear_dashboard_state_cache()
-            clear_runtime_caches()
-        except Exception:
-            pass
+        """Clear the entire in-process query cache (called after new data is written)."""
+        DataStorage._query_cache.clear()
+        logging.debug("Query cache invalidated")
+
+    @staticmethod
+    def _cached_query(sql: str) -> pd.DataFrame:
+        """Backward-compatibility alias — delegates to query_duckdb."""
+        return DataStorage.query_duckdb(sql)
 
     def fetch_and_save_single_table(self, table_name, format="csv"):
         """Fetch fresh data from DB and save to CSV."""
@@ -218,6 +314,12 @@ if __name__ == "__main__":
 
     users = DataStorage(query=QUERY_USERS)
     users.fetch_and_save_single_table(table_name="users_data")
+
+    user_programs = DataStorage(query=QUERY_USER_PROGRAMS)
+    user_programs.fetch_and_save_single_table(table_name="user_programs")
+
+    # bids = DataStorage(query=QUERY_BIDS)
+    # bids.fetch_and_save_single_table(table_name="bids")
 
     if not IS_HARMONIZED_MAHIS:
         transactional = DataStorage(query=QUERY_OBS_OLD, filename=DATA_FILE_NAME_)

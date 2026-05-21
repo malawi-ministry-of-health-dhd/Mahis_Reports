@@ -8,6 +8,8 @@ import pandas as pd
 from datetime import datetime
 import base64
 import io
+import warnings
+warnings.filterwarnings("ignore")
 from helpers.modal_functions import (validate_excel_file, load_reports_data, save_reports_data, 
                         check_existing_report, get_next_report_id, update_or_create_report,load_excel_file,
                         save_excel_file, update_report_metadata, archive_report, load_preview_data,
