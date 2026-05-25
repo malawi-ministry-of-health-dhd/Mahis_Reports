@@ -12,7 +12,7 @@ DEMO_LOCATION = "LL040033"
 RELATIVE_DAYS = [ 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'This Week', 'Last Week', 'This Month', 'Last Month' ]
 
 # REFERENTIAL COLUMNS - THESE SHOULD MATCH THE QUERY OUTPUT COLUMNS
-DATA_FILE_NAME_ = "latest_data_opd.parquet"
+DATA_FILE_NAME_ = "data/parquet"
 
 FIRST_NAME_ = 'given_name'
 LAST_NAME_ = 'family_name'
@@ -29,6 +29,7 @@ TA_ = 'TA'
 VILLAGE_ = 'Village'
 FACILITY_CODE_ = 'Facility_CODE'
 OBS_VALUE_CODED_ = 'obs_value_coded'
+VALUE_DATETIME_ = 'value_datetime'
 CONCEPT_NAME_ = 'concept_name'
 VALUE_ = 'Value'
 VALUE_NUMERIC_ = 'ValueN'
@@ -116,7 +117,7 @@ AND a.retired = 0
 ORDER BY q.concept_id, ca.sort_weight
 """
 
-# multijoin query to get all obs for each encounter, including those without obs (using LEFT JOIN)
+# on production remove COLLATE utf8mb3_general_ci
 QUERY_OBS_OLD = """
 SELECT
     e.patient_id as person_id,
@@ -172,6 +173,7 @@ LEFT JOIN person_attribute_type patt ON pat.person_attribute_type_id = patt.pers
 WHERE e.voided = 0
 {date_filter}
 """
+
 
 QUERY_OBS_HARMONIZED = """
 SELECT
@@ -271,6 +273,14 @@ JOIN user_role ur ON u.user_id = ur.user_id
 WHERE u.retired = 0
 """
 
+QUERY_USER_PROGRAMS = """
+SELECT 
+    up.user_id, 
+    p.name 
+FROM user_programs up
+JOIN program p on up.program_id = p.program_id AND p.retired = 0
+"""
+
 CUSTOM_MNID_MAP_PROGRAM = {
     "NEONATAL PROGRAM": "NEONATAL PROGRAM",
     "MATERNAL AND CHILD HEALTH": "MATERNAL AND CHILD HEALTH",
@@ -292,3 +302,43 @@ CUSTOM_GENDER_MAP = {
     '{"label"=>"Male", "value"=>"M"}':"Male",
     '{"label"=>"Female", "value"=>"F"}':"Female"
 }
+
+#  COLLATE utf8mb3_general_ci
+
+actual_keys_in_data = ['person_id', 'encounter_id','person_id_key', 'Service_Area',
+                                       'Gender', 'Age', 'Age_Group', 
+                                       'Date', 'Program', 'Facility', 
+                                       'Facility_CODE', 'User', 'District', 
+                                       'Encounter', 'Home_district', 'TA', 
+                                       'Village', 'visit_days', 'obs_value_coded','concept_name', 'Value',"",
+                                       'ValueN', 'DrugName', 'Value_name', 'new_revisit','count','count_set','sum','Order_Name']
+
+
+CONCEPTS = """
+SELECT 
+    q.concept_id AS question_concept_id,
+    qn.name AS question_name,
+    a.concept_id AS obs_value_coded_id,
+    an.name AS obs_value_coded,
+    ca.sort_weight AS display_order
+    
+FROM concept q  -- q = question concept
+INNER JOIN concept_answer ca ON ca.concept_id = q.concept_id
+INNER JOIN concept a ON a.concept_id = ca.answer_concept  -- a = answer concept
+INNER JOIN concept_name qn ON qn.concept_id = q.concept_id 
+    AND qn.locale = 'en' 
+    AND qn.concept_name_type = 'FULLY_SPECIFIED'
+    AND qn.voided = 0
+INNER JOIN concept_name an ON an.concept_id = a.concept_id 
+    AND an.locale = 'en' 
+    AND an.concept_name_type = 'FULLY_SPECIFIED'
+    AND an.voided = 0
+WHERE q.datatype_id = (
+    SELECT concept_datatype_id 
+    FROM concept_datatype 
+    WHERE name = 'Coded'  -- Only Coded type questions have dropdown answers
+)
+AND q.retired = 0
+AND a.retired = 0
+ORDER BY q.concept_id, ca.sort_weight
+"""

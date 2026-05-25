@@ -82,8 +82,19 @@ def register_navigation_callbacks(app, pathname_prefix):
             os.makedirs(os.path.dirname(timestamp_path), exist_ok=True)
             users_path = os.path.join(path, "data", "single_tables", "users_data.csv")
             os.makedirs(os.path.dirname(users_path), exist_ok=True)
-            last_updated = pd.read_csv(timestamp_path)["saving_time"].to_list()[0]
-            users = pd.read_csv(users_path)
+            if os.path.exists(timestamp_path):
+                timestamp_df = pd.read_csv(timestamp_path)
+                if "saving_time" in timestamp_df.columns and not timestamp_df.empty:
+                    last_updated = timestamp_df["saving_time"].to_list()[0]
+                else:
+                    last_updated = "Unknown"
+            else:
+                last_updated = "Unknown"
+
+            if os.path.exists(users_path):
+                users = pd.read_csv(users_path)
+            else:
+                users = pd.DataFrame(columns=["uuid", "role"])
 
             query = _build_query(location, uuid, user_level)
             

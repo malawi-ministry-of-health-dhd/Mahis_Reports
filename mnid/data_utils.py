@@ -651,7 +651,41 @@ def serialize_store_df(df: pd.DataFrame) -> list[dict]:
     """Convert dataframe rows to JSON-safe records for Dash stores."""
     if df is None or df.empty:
         return []
-    return json.loads(df.to_json(orient='records', date_format='iso'))
+    safe_df = df.copy()
+
+    def _json_safe_value(value):
+        if value is None:
+            return None
+        try:
+            if pd.isna(value):
+                return None
+        except Exception:
+            pass
+
+        if isinstance(value, (str, int, float, bool)):
+            return value
+        if isinstance(value, pd.Timestamp):
+            return value.isoformat()
+        if isinstance(value, dict):
+            return json.dumps(value, default=str)
+        if isinstance(value, (list, tuple, set)):
+            return json.dumps(list(value), default=str)
+        if hasattr(value, "isoformat"):
+            try:
+                return value.isoformat()
+            except Exception:
+                pass
+        return str(value)
+
+    for column in safe_df.columns:
+        if pd.api.types.is_datetime64_any_dtype(safe_df[column]):
+            safe_df[column] = pd.to_datetime(safe_df[column], errors='coerce').apply(
+                lambda item: item.isoformat() if pd.notna(item) else None
+            )
+        elif safe_df[column].dtype == "object":
+            safe_df[column] = safe_df[column].map(_json_safe_value)
+
+    return safe_df.to_dict(orient='records')
 
 
 def deserialize_store_df(records: list[dict] | None) -> pd.DataFrame:

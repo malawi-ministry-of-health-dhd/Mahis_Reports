@@ -157,37 +157,55 @@ def build_single_chart(filtered, data_opd, delta_days, item_config,user_role=Non
     """Build a single chart based on configuration"""
     chart_type = item_config["type"]
     filters = item_config["filters"]
-    
-    if chart_type == "Line":
-        figure = create_line_chart_from_config(data_opd, delta_days, filters)
-    elif chart_type == "Pie":
-        figure = create_pie_chart_from_config(filtered, filters)
-    elif chart_type == "Column":
-        figure = create_column_chart_from_config(filtered, filters)
-    elif chart_type == "Bar":
-        figure = create_bar_chart_from_config(filtered, filters)
-    elif chart_type == "Histogram":
-        figure = create_histogram_from_config(filtered, filters)
-    elif chart_type == "PivotTable":
-        figure = create_pivot_table_from_config(filtered, filters)
-    elif chart_type == "CrossTab":
-        figure = create_crosstab_from_config(filtered, filters)
-    elif chart_type == "LineList":
-        figure = create_linelist_from_config(filtered, item_config, user_role)
-    elif chart_type == "Sankey":
-        figure = create_sankey_from_config(filtered, filters)
-    else:
-        # Default empty figure for unknown chart types
-        figure = create_empty_figure()
-    figure = apply_figure_theme(figure, chart_type, theme_name)
-    if chart_type in ["Line","Pie","Column","Bar","Histogram","PivotTable"]:
+    component_id = item_config.get("id") or f"chart-{chart_type.lower()}"
+
+    try:
+        if chart_type == "Line":
+            figure = create_line_chart_from_config(data_opd, delta_days, filters)
+        elif chart_type == "Pie":
+            figure = create_pie_chart_from_config(filtered, filters)
+        elif chart_type == "Column":
+            figure = create_column_chart_from_config(filtered, filters)
+        elif chart_type == "Bar":
+            figure = create_bar_chart_from_config(filtered, filters)
+        elif chart_type == "Histogram":
+            figure = create_histogram_from_config(filtered, filters)
+        elif chart_type == "PivotTable":
+            figure = create_pivot_table_from_config(filtered, filters)
+        elif chart_type == "CrossTab":
+            return html.Div(
+                create_crosstab_from_config(filtered, filters),
+                id=component_id,
+                className=style,
+            )
+        elif chart_type == "LineList":
+            return html.Div(
+                create_linelist_from_config(filtered, item_config, user_role),
+                id=component_id,
+                className=style,
+            )
+        elif chart_type == "Sankey":
+            figure = create_sankey_from_config(filtered, filters)
+        else:
+            figure = create_empty_figure()
+
+        figure = apply_figure_theme(figure, chart_type, theme_name)
         return dcc.Graph(
-            id=item_config["filters"]["unique"],
+            id=component_id,
             figure=figure,
             className=style
         )
-    else:
-        return figure
+    except Exception as exc:
+        chart_name = item_config.get("name", component_id)
+        return html.Div(
+            [
+                html.Div(f"Chart failed: {chart_name}", style={"fontWeight": "600", "marginBottom": "6px"}),
+                html.Div(str(exc), style={"fontSize": "12px", "color": "#64748b"}),
+            ],
+            id=f"{component_id}-error",
+            className=style,
+            style={"padding": "16px", "border": "1px solid #e2e8f0", "borderRadius": "8px", "backgroundColor": "#fff"},
+        )
 
 
 def apply_figure_theme(figure, chart_type, theme_name=None):
