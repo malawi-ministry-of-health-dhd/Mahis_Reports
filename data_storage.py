@@ -38,6 +38,7 @@ CUSTOM_GENDER_MAP = cfg.CUSTOM_GENDER_MAP
 USE_LOCALHOST = cfg.USE_LOCALHOST
 DATA_FILE_NAME_ = cfg.DATA_FILE_NAME_
 CONCEPTS = getattr(cfg, "CONCEPTS", None)
+KEYS_IN_DATA = cfg.actual_keys_in_data
 
 
 class DataStorage:

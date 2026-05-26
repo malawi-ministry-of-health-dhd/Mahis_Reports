@@ -31,8 +31,8 @@ import io
 import base64
 from data_storage import DataStorage
 
-from config import (DATE_, FACILITY_, AGE_GROUP_, GENDER_, 
-                    NEW_REVISIT_, HOME_DISTRICT_, TA_, VILLAGE_, 
+from config import (DATE_, FACILITY_, AGE_GROUP_, GENDER_, PROGRAM_,PERSON_ID_,ENCOUNTER_ID_,
+                    NEW_REVISIT_, HOME_DISTRICT_, TA_, VILLAGE_, CONCEPT_NAME_,VALUE_DATETIME_,
                     FACILITY_CODE_, DATA_FILE_NAME_, actual_keys_in_data)
 from helpers.navigation_callbacks import DEMO_UUID
 
@@ -334,25 +334,53 @@ def update_table(clicks,
     if not report:
         return html.Div("Report Not Found"), 0, None
     
+    spec_path = f"data/uploads/{report['page_name']}.xlsx"
+    if not os.path.exists(spec_path):
+        return html.Div("Report not found on Server. Request Admin to add report"), 0, None
+    programs = (pd.read_excel(spec_path, sheet_name="FILTERS")
+                    .filter(regex='value1')
+                    .stack()
+                    .dropna()
+                    .unique()
+                    .tolist()
+                )
+    
+    # scan spec_path on FILTERS sheet and get unique items in columns whose name starts with variable (1-10)
+    variables = (pd.read_excel(spec_path, sheet_name="FILTERS")
+                    .filter(regex='^variable([1-9]|10)$|^unique_column$')
+                    .stack()
+                    .dropna()
+                    .unique()
+                    .tolist()
+                )
+    variables = [item.strip() for var in variables if pd.notna(var) 
+                            for item in str(var).split('|')]
+    variables = list(set(variables) & set(actual_keys_in_data)) + [DATE_,CONCEPT_NAME_,VALUE_DATETIME_]
+    variables = list(set(variables)) 
+    
     if urlparams.get('Location', [None])[0]:
         location = urlparams.get('Location', [None])[0]
     else:
         location = None
     
     SQL = f"""
-        SELECT *
+        SELECT {', '.join(variables)}
         FROM '{DATA_FILE_NAME_}'
         WHERE {FACILITY_CODE_} = '{location}'
+        AND {PROGRAM_} IN ({', '.join(f"'{prog}'" for prog in programs)})
         """
     
     try:
         data = DataStorage.query_duckdb(SQL)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return html.Div('Missing Data. ' \
             'Ensure that the config file has correct database credentials.'
             ,style={'color':'red'}), 0, None # Empty DataFrame with expected columns
     
-    data[GENDER_] = data[GENDER_].replace({"M":"Male",
+    if GENDER_ in data.columns:
+        data[GENDER_] = data[GENDER_].replace({"M":"Male",
                                                "F":"Female",
                                                '{"label"=>"Male", "value"=>"M"}':"Male",
                                                '{"label"=>"Female", "value"=>"F"}':"Female"})
@@ -417,12 +445,7 @@ def update_table(clicks,
             lambda d: (start_date - d).days
         )
 
-
-        spec_path = f"data/uploads/{report['page_name']}.xlsx"
-        if not os.path.exists(spec_path):
-            return html.Div("Report not found on Server. Request Admin to add report"), 0, None
-
-        builder = ReportTableBuilder(spec_path, filtered, original_data, dhis2_period)
+        builder = ReportTableBuilder(spec_path,start_date,end_date, filtered, original_data, dhis2_period)
         
         builder.load_spec()
         components = builder.build_dash_components()

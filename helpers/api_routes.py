@@ -140,7 +140,7 @@ def register_api_routes(server):
             if not os.path.exists(spec_path):
                 return jsonify({"error": "Report template not found"}), 500
 
-            builder = ReportTableBuilder(spec_path, filtered, original_data, dhis2_period=None)
+            builder = ReportTableBuilder(spec_path,start_date,end_date, filtered, original_data, dhis2_period=None)
             builder.load_spec()
             sections = builder.build_section_tables()
             section_ids = builder.build_section_tables_with_ids()

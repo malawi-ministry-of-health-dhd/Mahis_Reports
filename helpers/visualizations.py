@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import dash
@@ -9,6 +10,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Union, Callable
 import json
 import ast
+import duckdb
 
 pd.options.mode.chained_assignment = None
 
@@ -312,205 +314,178 @@ def _apply_filter_mask(df, filter_col, filter_value):
         return df[filter_col] == filter_value
     return df[filter_col] == filter_value
 
-def create_count(df, aggregation='count', unique_column=PERSON_ID_, filter_col1=None, filter_value1=None, 
-                 filter_col2=None, filter_value2=None, filter_col3=None, filter_value3=None,
-                 filter_col4=None, filter_value4=None, filter_col5=None, filter_value5=None, 
-                 filter_col6=None, filter_value6=None, filter_col7=None, filter_value7=None,
-                 filter_col8=None, filter_value8=None, filter_col9=None, filter_value9=None, 
-                 filter_col10=None, filter_value10=None):
-    data = df
-
-    filter_cols = [
-        filter_col1, filter_col2, filter_col3, filter_col4, filter_col5,
-        filter_col6, filter_col7, filter_col8, filter_col9, filter_col10
-    ]
-
-    filter_vals = [
-        filter_value1, filter_value2, filter_value3, filter_value4, filter_value5,
-        filter_value6, filter_value7, filter_value8, filter_value9, filter_value10
-    ]
-     #for defaulters
-    data["DateValue"] = pd.to_datetime(data[DATE_]).dt.date
-    data['datetime'] = data[DATE_]
-
-    # Apply all filters using the helper function
-    for col, val in zip(filter_cols, filter_vals):
+def build_filter_query(cols, vals, unique_column, isSet, start_date, end_date):
+    """
+    Build a SQL WHERE clause based on filter type.
+    Supports single filters and paired list filters with AND conditions.
+    
+    Args:
+        cols (str or list): Column name(s)
+        vals (str, list, or list of lists): Filter value(s)
+        unique_column (str/list): Column to select from
+    
+    Returns:
+        str: SQL SELECT query
+    """
+    def parse_value(val_str):
+        """Parse a single value for operators, wildcards, or numeric types."""
+        val_str = str(val_str).strip()
+        # Handle wildcard/LIKE patterns
+        if val_str.startswith(("*", "%")):
+            return "LIKE", f"%{val_str[1:]}%"
+        # Handle operators (>=, <=, !=, =, >, <)
+        if match := re.match(r'^(>=|<=|!=|=|>|<)?\s*(.*)$', val_str):
+            operator, value_str = match.groups()
+            operator = operator or "="
+            value_str = value_str.strip()
+            
+            # Parse value
+            value = "" if value_str == "_" else (
+                float(value_str) if "." in value_str else int(value_str)
+            ) if value_str.replace(".", "", 1).isdigit() else value_str
+            
+            return operator, value
+        return "=", val_str
+    
+    def build_single_condition(col, val):
+        """Build a single WHERE condition."""
+        # Handle list values for IN clause
+        if isinstance(val, list):
+            placeholders = ", ".join([f"'{v}'" for v in val])
+            return f"{col} IN ({placeholders})"
         if col == "defaulter_period":
-            continue
-        else:
-            data = _apply_filter(data, col, val)
+            return f"concept_name = 'Appointment date' AND (NOW() - CAST(value_datetime AS TIMESTAMP)) > INTERVAL {val} DAY"
+        if col == "days_before_visit_date":
+            return f"{DATE_} >= ('{start_date}'::DATE - INTERVAL {int(val)} DAY) AND {DATE_} <= ('{start_date}'::DATE - INTERVAL 1 DAY)"
+        operator, value = parse_value(val)
+        if operator == "LIKE":
+            return f"{col} LIKE '{value}'"
+        return f"{col} {operator} '{value}'"
     
-    
-    # Remove duplicates based on unique_column and DATE_
-    unique_visits = _prepare_data_for_visualization(data, unique_column)
-    
-    # Handle different aggregation types
-    if aggregation == 'count':
-        return len(unique_visits[unique_column].dropna())
-    elif aggregation == 'nunique':
-        return len(unique_visits.drop_duplicates(subset=unique_column))
-    elif aggregation == 'list':
-        return unique_visits[unique_column].dropna().unique().tolist()
-    elif aggregation == 'time_diff_mins':
-        # Calculate time difference between min and max datetime for each patient
-        # Note: This assumes there's a 'DATETIME' column in your dataframe
-        if 'datetime' not in unique_visits.columns:
-            raise ValueError("datetime column is required for time_diff aggregation")
-        patient_times = data.groupby([unique_column, DATE_])['datetime'].agg(['min', 'max'])
-        patient_times['time_diff'] = (patient_times['max'] - patient_times['min']).dt.total_seconds() / (60)
-        patient_times = patient_times[patient_times['time_diff'] < 120]
-        mean_val = patient_times['time_diff'].mean()
-        if pd.isna(mean_val):
-            return 0
-        return int(mean_val)
-    elif aggregation == 'time_diff_hour':
-        if 'datetime' not in unique_visits.columns:
-            raise ValueError("datetime column is required for time_diff aggregation")
-        patient_times = data.groupby([unique_column, DATE_])['datetime'].agg(['min', 'max'])
-        patient_times['time_diff'] = (patient_times['max'] - patient_times['min']).dt.total_seconds() / (60 * 60)
-        patient_times = patient_times[patient_times['time_diff'] < 2]
-        mean_val = patient_times['time_diff'].mean()
-        if pd.isna(mean_val):
-            return 0
-        return int(mean_val)
-    elif aggregation == 'defaulter_count':
-        unique_visits['defaulter_period'] = unique_visits[CONCEPT_NAME_]
-        # lets maintain individuals who passed through filters
-        filtered_ids = set(unique_visits[unique_column].dropna().unique())
-        df = df[df[unique_column].isin(filtered_ids)]
-        df["start_date"] = pd.to_datetime(df["start_date"],errors='coerce')
-        df['value_datetime'] = pd.to_datetime(df['value_datetime'],errors='coerce')
-        df = df.dropna(subset=[DATE_, 'value_datetime'])
-        df_defaulted_ids = []
-        for col,val in zip(filter_cols, filter_vals):
-            try:
-                if col == "defaulter_period":
-                    default = df[df[col].isin(["Appointment date","Next scheduled visit","Return visit date"])]\
-                        .sort_values(by=[PERSON_ID_,DATE_]) #restart the filter
-                    default['Duration_to_visit'] = (
-                                    default['start_date'] - default["value_datetime"]
-                                ).dt.days
-                    # print(default[["Program","concept_name","value_datetime","Duration_to_visit","start_date"]])
-                    default = default[default['Duration_to_visit']> val]
-                    ids = default[PERSON_ID_].unique().tolist()
-                    df_defaulted_ids.extend(ids)
-            except Exception as e:
-                print(e)
-                df_defaulted_ids = []
-        return len(df_defaulted_ids)
+    # Handle paired lists
+    if isinstance(cols, list):
+        conditions = [
+            build_single_condition(col, val) 
+            for col, val in zip(cols, vals)
+        ]
+        where_clause = " AND ".join(conditions)
+        return f"SELECT {unique_column} FROM df WHERE {where_clause}"
+    where_clause = build_single_condition(cols, vals)
+    if isinstance(unique_column, list):
+        unique_column_str = ", ".join(unique_column)
+    else:        unique_column_str = unique_column
+    if isSet:
+        return f"SELECT DISTINCT {unique_column_str} FROM df WHERE {where_clause}"
+    return f"{where_clause}"
 
-    elif aggregation in ['sum', 'mean', 'min', 'max', 'std', 'var']:
-        return int(unique_visits[unique_column].agg(aggregation))
+def create_count(df, aggregation='count', unique_column=PERSON_ID_, *filters, start_date=None, end_date=None):
+
+    isSet = False
+
+    if filters:
+        filter_cols = [item for item in filters[:-2][::2] if item is not None]
+        filter_vals = [item for item in filters[:-2][1::2] if item is not None]
+        start_date = filters[-2] if len(filters) % 2 == 0 else start_date
+        end_date = filters[-1] if len(filters) % 2 == 0 else end_date
     else:
-        return len(unique_visits[unique_column].dropna())
+        filter_cols = []
+        filter_vals = []
+
+    queries = []
+    for col, val in zip(filter_cols, filter_vals):
+        query = build_filter_query(col, val, unique_column, isSet, start_date, end_date)
+        queries.append(query)
+
+    joined_query =f"SELECT {unique_column} FROM df WHERE "  + " AND ".join(queries)
+    if not queries:
+        joined_query = f"SELECT {unique_column} FROM df"
+    
+    intersect_duckdb = duckdb.sql(joined_query)
+    result = intersect_duckdb.df()
+    if aggregation == 'count':
+        return len(result[unique_column].dropna().unique())
+    elif aggregation == 'nunique':
+        return len(result[unique_column].dropna().unique())
+    elif aggregation == 'list':
+        return result[unique_column].dropna().unique().tolist()
+    elif aggregation in ['sum', 'mean', 'min', 'max', 'std', 'var']:
+        return int(result[unique_column].agg(aggregation))
+    else:
+        return len(result[unique_column].dropna().unique())
 
 def create_count_sets(
     df,
     aggregation='count',
     unique_column=PERSON_ID_,
-    *filters
+    *filters,
+    start_date=None,
+    end_date=None
 ):
-
-    data = df
-    data["composite_id"] = (
-                    data[unique_column].astype(str)
-                    + "|"
-                    + pd.to_datetime(data["Date"]).astype(str)
-    )
-
+    isSet = True
 
     set_filters = []
     non_set_filters = []
-
-    for i in range(0, len(filters), 2):
+    for i in range(0, len(filters)-2, 2):
         col = filters[i]
         val = filters[i + 1]
-
         if not col:
             continue
-
         col_norm = _normalize_filter_value(col)
         val_norm = _normalize_filter_value(val)
-
         if isinstance(col_norm, list):
             set_filters.append((col_norm, val_norm))
         else:
             non_set_filters.append((col, val))
+    
+    start_date = filters[-2] if len(filters) % 2 == 0 else start_date
+    end_date = filters[-1] if len(filters) % 2 == 0 else end_date
 
-    sets = []
-
+    queries = []
+    cols_list = []
+    vals_list = []
     for cols, vals in set_filters:
-        mask = pd.Series(True, index=data.index)
-
+        if len(cols) != len(vals):
+            raise ValueError("For multi-column filters, filter_value must be a list of the same length as filter_col.")
+        cols_list = []
+        vals_list = []
         for col, val in zip(cols, vals):
-            mask &= _apply_filter_mask(data, col, val)
+            cols_list.append(col)
+            vals_list.append(val)
+        query = build_filter_query(cols_list, vals_list, unique_column, isSet, start_date, end_date)
+        queries.append(query)
 
-        ids = set(data.loc[mask, 'composite_id'])
-        sets.append(ids)
-    final_set = set.intersection(*sets)
+    for cols, vals in non_set_filters:
+        query = build_filter_query(cols, vals, unique_column, isSet, start_date, end_date)
+        queries.append(query)
 
-    mask = data['composite_id'].isin(final_set)
-    for col, val in non_set_filters:
-        mask &= _apply_filter_mask(data, col, val)
-    result_df = data.loc[mask]
-    return result_df[unique_column].nunique()
+    intersection_query = " INTERSECT ".join(queries)
+    # print(intersection_query)
+    intersect_duckdb = duckdb.sql(intersection_query)
 
-def create_count_unique(df, unique_column=PERSON_ID_, filter_col1=None, filter_value1=None, filter_col2=None, filter_value2=None, 
-                 filter_col3=None, filter_value3=None, filter_col4=None, filter_value4=None,
-                 filter_col5=None, filter_value5=None, filter_col6=None, filter_value6=None):
-    data = df
-    
-    # Apply all filters using the helper function
-    data = _apply_filter(data, filter_col1, filter_value1)
-    data = _apply_filter(data, filter_col2, filter_value2)
-    data = _apply_filter(data, filter_col3, filter_value3)
-    data = _apply_filter(data, filter_col4, filter_value4)
-    data = _apply_filter(data, filter_col5, filter_value5)
-    data = _apply_filter(data, filter_col6, filter_value6) 
-    
-    return len(data[unique_column].dropna().unique())
+    result = intersect_duckdb.df()
+    return result[unique_column].nunique()
 
-def create_sum(df, num_field='ValueN', filter_col1=None, filter_value1=None, filter_col2=None, filter_value2=None, 
-                 filter_col3=None, filter_value3=None, filter_col4=None, filter_value4=None,
-                 filter_col5=None, filter_value5=None, filter_col6=None, filter_value6=None):
-    data = df
-    
-    # Apply all filters using the helper function
-    data = _apply_filter(data, filter_col1, filter_value1)
-    data = _apply_filter(data, filter_col2, filter_value2)
-    data = _apply_filter(data, filter_col3, filter_value3)
-    data = _apply_filter(data, filter_col4, filter_value4)
-    data = _apply_filter(data, filter_col5, filter_value5)
-    data = _apply_filter(data, filter_col6, filter_value6)
-    
-    return data[num_field].sum()
+def create_sum(df, unique_column=PERSON_ID_, num_field='ValueN', *filters, start_date=None, end_date=None):
 
-def create_sum_sets(df, filter_col1, filter_value1, filter_col2, filter_value2, num_field='ValueN',
-                      unique_column=ENCOUNTER_ID_, **extra_filters):
-    """
-    Sum values for unique IDs that satisfy a paired condition.
-    """
-    if not (isinstance(filter_value1, list) and isinstance(filter_value2, list)):
-        raise ValueError("filter_value1 and filter_value2 must be lists of the same length.")
-    if len(filter_value1) != len(filter_value2):
-        raise ValueError("filter_value1 and filter_value2 must have the same length.")
+    isSet = False
 
-    pair_ids = []
-    for v1, v2 in zip(filter_value1, filter_value2):
-        ids = set(df.loc[(df[filter_col1] == v1) & (df[filter_col2] == v2), unique_column])
-        pair_ids.append(ids)
+    if filters:
+        filter_cols = [item for item in filters[:-2][::2] if item is not None]
+        filter_vals = [item for item in filters[:-2][1::2] if item is not None]
+        start_date = filters[-2] if len(filters) % 2 == 0 else start_date
+        end_date = filters[-1] if len(filters) % 2 == 0 else end_date
+    else:
+        filter_cols = []
+        filter_vals = []
+    queries = []
+    for col, val in zip(filter_cols, filter_vals):
+        query = build_filter_query(col, val, [unique_column,num_field], isSet, start_date, end_date)
+        queries.append(query)
+    joined_query =f"SELECT {unique_column}, {num_field} FROM df WHERE "  + " AND ".join(queries)
+    intersect_duckdb = duckdb.sql(joined_query)
+    result = intersect_duckdb.df()
+    return result[num_field].sum()
 
-    pair_total = set.intersection(*pair_ids)
-    filtered = df[df[unique_column].isin(pair_total)]
-
-    # Apply extra filters if provided
-    for i in range(3, 7):
-        col = extra_filters.get(f'filter_col{i}')
-        val = extra_filters.get(f'filter_value{i}')
-        if col is not None and val is not None:
-            filtered = _apply_filter(filtered, col, val)
-
-    return filtered[num_field].sum()
 
 def create_column_chart(df, x_col, y_col, title, x_title, y_title,
                         unique_column=PERSON_ID_, legend_title=None,
@@ -2014,3 +1989,83 @@ def create_bullet_chart(actual, target, title, ranges=None,
     )
     
     return fig
+
+# def create_count(df, aggregation='count', unique_column=PERSON_ID_, *filters):
+#     data = df
+
+#     filter_cols = [item for item in filters[::2] if item is not None]
+#     filter_vals = [item for item in filters[1::2] if item is not None]
+#      #for defaulters
+#     data["DateValue"] = pd.to_datetime(data[DATE_]).dt.date
+#     data['datetime'] = data[DATE_]
+
+#     # Apply all filters using the helper function
+#     for col, val in zip(filter_cols, filter_vals):
+#         if col == "defaulter_period":
+#             continue
+#         else:
+#             data = _apply_filter(data, col, val)
+    
+    
+#     # Remove duplicates based on unique_column and DATE_
+#     unique_visits = _prepare_data_for_visualization(data, unique_column)
+    
+#     # Handle different aggregation types
+#     if aggregation == 'count':
+#         return len(unique_visits[unique_column].dropna())
+#     elif aggregation == 'nunique':
+#         return len(unique_visits.drop_duplicates(subset=unique_column))
+#     elif aggregation == 'list':
+#         return unique_visits[unique_column].dropna().unique().tolist()
+#     elif aggregation == 'time_diff_mins':
+#         # Calculate time difference between min and max datetime for each patient
+#         # Note: This assumes there's a 'DATETIME' column in your dataframe
+#         if 'datetime' not in unique_visits.columns:
+#             raise ValueError("datetime column is required for time_diff aggregation")
+#         patient_times = data.groupby([unique_column, DATE_])['datetime'].agg(['min', 'max'])
+#         patient_times['time_diff'] = (patient_times['max'] - patient_times['min']).dt.total_seconds() / (60)
+#         patient_times = patient_times[patient_times['time_diff'] < 120]
+#         mean_val = patient_times['time_diff'].mean()
+#         if pd.isna(mean_val):
+#             return 0
+#         return int(mean_val)
+#     elif aggregation == 'time_diff_hour':
+#         if 'datetime' not in unique_visits.columns:
+#             raise ValueError("datetime column is required for time_diff aggregation")
+#         patient_times = data.groupby([unique_column, DATE_])['datetime'].agg(['min', 'max'])
+#         patient_times['time_diff'] = (patient_times['max'] - patient_times['min']).dt.total_seconds() / (60 * 60)
+#         patient_times = patient_times[patient_times['time_diff'] < 2]
+#         mean_val = patient_times['time_diff'].mean()
+#         if pd.isna(mean_val):
+#             return 0
+#         return int(mean_val)
+#     elif aggregation == 'defaulter_count':
+#         unique_visits['defaulter_period'] = unique_visits[CONCEPT_NAME_]
+#         # lets maintain individuals who passed through filters
+#         filtered_ids = set(unique_visits[unique_column].dropna().unique())
+#         df = df[df[unique_column].isin(filtered_ids)]
+#         df["start_date"] = pd.to_datetime(df["start_date"],errors='coerce')
+#         df['value_datetime'] = pd.to_datetime(df['value_datetime'],errors='coerce')
+#         df = df.dropna(subset=[DATE_, 'value_datetime'])
+#         df_defaulted_ids = []
+#         for col,val in zip(filter_cols, filter_vals):
+#             try:
+#                 if col == "defaulter_period":
+#                     default = df[df[col].isin(["Appointment date","Next scheduled visit","Return visit date"])]\
+#                         .sort_values(by=[PERSON_ID_,DATE_]) #restart the filter
+#                     default['Duration_to_visit'] = (
+#                                     default['start_date'] - default["value_datetime"]
+#                                 ).dt.days
+#                     # print(default[["Program","concept_name","value_datetime","Duration_to_visit","start_date"]])
+#                     default = default[default['Duration_to_visit']> val]
+#                     ids = default[PERSON_ID_].unique().tolist()
+#                     df_defaulted_ids.extend(ids)
+#             except Exception as e:
+#                 print(e)
+#                 df_defaulted_ids = []
+#         return len(df_defaulted_ids)
+
+#     elif aggregation in ['sum', 'mean', 'min', 'max', 'std', 'var']:
+#         return int(unique_visits[unique_column].agg(aggregation))
+#     else:
+#         return len(unique_visits[unique_column].dropna())

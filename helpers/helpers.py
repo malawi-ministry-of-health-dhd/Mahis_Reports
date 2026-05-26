@@ -115,6 +115,7 @@ def create_count_from_config(df, filters):
     args = []
     for var, val in active_filters:
         args.extend([var, val])
+    args.extend([filters.get("start_date"), filters.get("end_date")])
     if aggregation == "count_set":
         return create_count_sets(df,aggregation, unique_col, *args)
     else:

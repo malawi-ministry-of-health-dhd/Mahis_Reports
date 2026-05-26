@@ -526,7 +526,7 @@
   },
   {
     "report_id": "report_20c213d4",
-    "report_name": "Outpatient-OPD",
+    "report_name": "OPD Program",
     "date_created": "2026-01-24",
     "visualization_types": {
       "counts": [
@@ -636,7 +636,7 @@
         },
         {
           "id": "count_e730ec0a",
-          "name": "Malaria Cases",
+          "name": "Malaria Cases (Confirmed + Unconfirmed)",
           "level": "facility",
           "filters": {
             "measure": "nunique",
@@ -647,11 +647,11 @@
             ],
             "variable2": "Encounter",
             "value2": [
-              "DIAGNOSIS"
+              "Diagnosis"
             ],
             "variable3": "concept_name",
             "variable4": "obs_value_coded",
-            "value4": "Malaria",
+            "value4": "*Malaria",
             "variable5": "ValueN",
             "variable6": "Value",
             "variable7": "Gender",
@@ -671,11 +671,11 @@
             ],
             "variable2": "Encounter",
             "value2": [
-              "DIAGNOSIS"
+              "Diagnosis"
             ],
             "variable3": "concept_name",
             "variable4": "obs_value_coded",
-            "value4": "Malaria",
+            "value4": "*Malaria",
             "variable5": "ValueN",
             "variable6": "Value",
             "variable7": "Gender",
@@ -696,7 +696,7 @@
             ],
             "variable2": "Encounter",
             "value2": [
-              "PATIENT OUTCOME"
+              "Outcome"
             ],
             "variable3": "concept_name",
             "value3": [
@@ -723,7 +723,7 @@
             ],
             "variable2": "Encounter",
             "value2": [
-              "PATIENT OUTCOME"
+              "Outcome"
             ],
             "variable3": "concept_name",
             "value3": [
@@ -749,7 +749,7 @@
             ],
             "variable2": "Encounter",
             "value2": [
-              "PATIENT OUTCOME"
+              "Outcome"
             ],
             "variable3": "concept_name",
             "value3": [
@@ -847,12 +847,10 @@
                   "top_n": "10",
                   "filter_col1": "Program",
                   "filter_val1": "OPD Program",
-                  "filter_col2": "Encounter",
-                  "filter_val2": "PRESENTING COMPLAINTS",
+                  "filter_col2": "concept_name",
+                  "filter_val2": "Presenting complaint",
                   "filter_col3": "Program",
                   "filter_val3": "OPD Program",
-                  "filter_col4": "Encounter",
-                  "filter_val4": "Presenting complaints",
                   "filter_col5": "Program",
                   "filter_val5": "OPD Program"
                 }
@@ -876,7 +874,7 @@
                   "filter_col1": "Program",
                   "filter_val1": "OPD Program",
                   "filter_col2": "Encounter",
-                  "filter_val2": "DIAGNOSIS",
+                  "filter_val2": "Diagnosis",
                   "filter_col3": "Program",
                   "filter_val3": "OPD Program",
                   "filter_col4": "Encounter",
@@ -905,7 +903,7 @@
                   "filter_col1": "Program",
                   "filter_val1": "OPD Program",
                   "filter_col2": "Encounter",
-                  "filter_val2": "LAB ORDERS",
+                  "filter_val2": "Lab orders",
                   "filter_col3": "concept_name",
                   "filter_val3": "Test type",
                   "filter_col4": "Encounter",
@@ -934,10 +932,10 @@
                   "filter_col1": "Program",
                   "filter_val1": "OPD Program",
                   "filter_col2": "Encounter",
-                  "filter_val2": "LAB RESULTS",
+                  "filter_val2": "Lab results",
                   "filter_col3": "concept_name",
                   "filter_col4": "Encounter",
-                  "filter_val4": "LAB RESULTS",
+                  "filter_val4": "Lab results",
                   "filter_col5": "Program",
                   "filter_val5": "OPD Program"
                 }
@@ -961,11 +959,11 @@
                   "filter_col1": "Program",
                   "filter_val1": "OPD Program",
                   "filter_col2": "Encounter",
-                  "filter_val2": "PAST MEDICAL HISTORY",
+                  "filter_val2": "Medical history",
                   "filter_col3": "Program",
                   "filter_val3": "OPD Program",
                   "filter_col4": "Encounter",
-                  "filter_val4": "PAST MEDICAL HISTORY",
+                  "filter_val4": "Medical history",
                   "filter_col5": "Program",
                   "filter_val5": "OPD Program"
                 }
@@ -989,7 +987,7 @@
                   "filter_col1": "Program",
                   "filter_val1": "OPD Program",
                   "filter_col2": "Encounter",
-                  "filter_val2": "TREATMENT",
+                  "filter_val2": "Treatment",
                   "filter_col3": "concept_name"
                 }
               },
@@ -1012,11 +1010,11 @@
                   "filter_col1": "Program",
                   "filter_val1": "OPD Program",
                   "filter_col2": "Encounter",
-                  "filter_val2": "DISPENSING",
+                  "filter_val2": "Dispensing",
                   "filter_col3": "Program",
                   "filter_val3": "OPD Program",
                   "filter_col4": "Encounter",
-                  "filter_val4": "DISPENSING",
+                  "filter_val4": "Dispensing",
                   "filter_col5": "Program",
                   "filter_val5": "OPD Program"
                 }

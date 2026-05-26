@@ -4,15 +4,16 @@ from typing import Any, Dict, List, Tuple
 from helpers.visualizations import create_sum, create_count, create_count_sets
 from helpers.dhis_integrater import get_dhis_data
 import dash
+import duckdb
 from datetime import datetime
 from dash import html, dash_table
 from config import (DATE_,CONCEPT_NAME_,
-                    ENCOUNTER_ID_,PERSON_ID_,VALUE_NUMERIC_,
-                    DHIS2_URL)
+                    ENCOUNTER_ID_,PERSON_ID_,VALUE_NUMERIC_,VALUE_DATETIME_,
+                    DHIS2_URL, actual_keys_in_data)
 
 
 class ReportTableBuilder:
-    def __init__(self, excel_path: str, filtered_df: pd.DataFrame, original_df: pd.DataFrame, dhis2_period: str):
+    def __init__(self, excel_path: str,report_start_date, report_end_date, filtered_df: pd.DataFrame, original_df: pd.DataFrame, dhis2_period: str):
         self.excel_path = excel_path
         self.filtered_df = self._prepare_base_dataframe(filtered_df)
         self.original_df = self._prepare_base_dataframe(original_df)
@@ -26,6 +27,8 @@ class ReportTableBuilder:
         self.dhis2_period = dhis2_period
         self._set_cache = {}
         self._mask_cache = {}
+        self.start_date = report_start_date
+        self.end_date = report_end_date
 
     @staticmethod
     def _prepare_base_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -139,71 +142,137 @@ class ReportTableBuilder:
             self._value_cache[filter_name] = result_str
             return result_str
 
-        args: List[Any] = [self.filtered_df]
-        args_cohort: List[Any] = [self.original_df]
+        filtered_data = self.filtered_df
+        original_data = self.original_df
 
         if measure == "sum":
-            args.append(spec["num_field"])
+            fcols = list(dict.fromkeys([item.strip() for fcol, fval in spec["pairs"]
+                    for item in (fcol if isinstance(fcol, list) else str(fcol).split('|'))
+                ])) + [DATE_,PERSON_ID_]
+            fcols = [c for c in fcols if c in actual_keys_in_data]
+            processed_df = duckdb.sql(f"SELECT {spec['unique_column']}, {', '.join(fcols)} FROM filtered_data").df()
+            args = [processed_df, PERSON_ID_,spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
-            result = create_sum(*args)
+            if len(processed_df) > 0:
+                result = create_sum(*args, self.start_date, self.end_date)
+            else: result = 0
+        elif measure == "cohort_sum":
+            fcols = list(dict.fromkeys([item.strip() for fcol, fval in spec["pairs"]
+                    for item in (fcol if isinstance(fcol, list) else str(fcol).split('|'))
+                ])) + [DATE_,PERSON_ID_]
+            fcols = [c for c in fcols if c in actual_keys_in_data]
+            processed_df = duckdb.sql(f"SELECT {spec['unique_column']}, {', '.join(fcols)} FROM original_data").df()
+            args = [processed_df, PERSON_ID_,spec["unique_column"]]
+            for fcol, fval in spec["pairs"]:
+                args.extend([fcol, fval])
+            if len(processed_df) > 0:
+                result = create_sum(*args, self.start_date, self.end_date)
+            else: result = 0
 
         elif measure == "count_set":
-            args.append("count")
-            args.append(spec["unique_column"])
+            fcols = list(dict.fromkeys([item.strip() for fcol, fval in spec["pairs"]
+                    for item in (fcol if isinstance(fcol, list) else str(fcol).split('|'))
+                ])) + [DATE_]
+            fcols = [c for c in fcols if c in actual_keys_in_data]
+            processed_df = duckdb.sql(f"SELECT {spec['unique_column']}, {', '.join(fcols)} FROM filtered_data").df()
+            args = [processed_df, "count", spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
-            result = create_count_sets(*args)
+            if len(processed_df) > 0:
+                result = create_count_sets(*args, self.start_date, self.end_date)
+            else: result = 0
+        
+        elif measure == "cohort_count_set":
+            fcols = list(dict.fromkeys([item.strip() for fcol, fval in spec["pairs"]
+                    for item in (fcol if isinstance(fcol, list) else str(fcol).split('|'))
+                ])) + [DATE_]
+            fcols = [c for c in fcols if c in actual_keys_in_data]
+            processed_df = duckdb.sql(f"SELECT {spec['unique_column']}, {', '.join(fcols)} FROM original_data").df()
+            args = [processed_df, "count", spec["unique_column"]]
+            for fcol, fval in spec["pairs"]:
+                args.extend([fcol, fval])
+            if len(processed_df) > 0:
+                result = create_count_sets(*args, self.start_date, self.end_date)
+            else: result = 0
+
+        elif measure == "cohort_count_set_defaulter":
+            fcols = list(dict.fromkeys([item.strip() for fcol, fval in spec["pairs"]
+                    for item in (fcol if isinstance(fcol, list) else str(fcol).split('|'))
+                ])) + [DATE_,CONCEPT_NAME_,VALUE_DATETIME_]
+            fcols = [c for c in fcols if c in actual_keys_in_data]
+            processed_df = duckdb.sql(f"SELECT {spec['unique_column']}, {', '.join(fcols)} FROM original_data").df()
+            args = [processed_df, "count", spec["unique_column"]]
+            for fcol, fval in spec["pairs"]:
+                args.extend([fcol, fval])
+            if len(processed_df) > 0:
+                result = create_count_sets(*args, self.start_date, self.end_date)
+            else: result = 0
 
         elif measure == "count":
-            args: List[Any] = [self.filtered_df, measure]
-            args.append(spec["unique_column"])
+            fcols = list(dict.fromkeys([item.strip() for fcol, fval in spec["pairs"]
+                    for item in (fcol if isinstance(fcol, list) else str(fcol).split('|'))
+                ])) + [DATE_]
+            fcols = [c for c in fcols if c in actual_keys_in_data]
+            processed_df = duckdb.sql(f"SELECT {spec['unique_column']}, {', '.join(fcols)} FROM filtered_data").df()
+            args = [processed_df, "count", spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
-            result = create_count(*args)
+            if len(processed_df) > 0:
+                result = create_count(*args, self.start_date, self.end_date)
+            else: result = 0
         
         elif measure == "nunique":
-            args: List[Any] = [self.filtered_df, measure]
-            args.append(spec["unique_column"])
+            fcols = list(dict.fromkeys([item.strip() for fcol, fval in spec["pairs"]
+                    for item in (fcol if isinstance(fcol, list) else str(fcol).split('|'))
+                ])) + [DATE_]
+            fcols = [c for c in fcols if c in actual_keys_in_data]
+            processed_df = duckdb.sql(f"SELECT {spec['unique_column']}, {', '.join(fcols)} FROM filtered_data").df()
+            args = [processed_df, "count", spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
-            result = create_count(*args)
+            if len(processed_df) > 0:
+                result = create_count(*args, self.start_date, self.end_date)
+            else: result = 0
 
-        elif measure == "cohort_sum":
-            args_cohort.append(spec["num_field"])
-            for fcol, fval in spec["pairs"]:
-                args_cohort.extend([fcol, fval])
-            result = create_sum(*args_cohort)
-        elif measure == "cohort_count_set":
-            args_cohort.append("count")
-            args_cohort.append(spec["unique_column"])
-            for fcol, fval in spec["pairs"]:
-                args_cohort.extend([fcol, fval])
-            result = create_count_sets(*args_cohort)
-        elif measure == "cohort_count_set_defaulter":
-            args_cohort.append("defaulter_count")
-            args_cohort.append(spec["unique_column"])
-            for fcol, fval in spec["pairs"]:
-                args_cohort.extend([fcol, fval])
-            result = create_count_sets(*args_cohort)
         elif measure == "cohort_count":
-            args_cohort.append("count")
-            args_cohort.append(spec["unique_column"])
-            for fcol, fval in spec["pairs"]:
-                args_cohort.extend([fcol, fval])
-            result = create_count(*args_cohort)
-        elif measure == "cohort_count_defaulter":
-            args_cohort.append("defaulter_count")
-            args_cohort.append(spec["unique_column"])
-            for fcol, fval in spec["pairs"]:
-                args_cohort.extend([fcol, fval])
-            result = create_count(*args_cohort)
-        elif measure == "count_defaulter":
-            args.append("defaulter_count")
-            args.append(spec["unique_column"])
+            fcols = list(dict.fromkeys([item.strip() for fcol, fval in spec["pairs"]
+                    for item in (fcol if isinstance(fcol, list) else str(fcol).split('|'))
+                ])) + [DATE_,CONCEPT_NAME_,VALUE_DATETIME_]
+            fcols = [c for c in fcols if c in actual_keys_in_data]
+            processed_df = duckdb.sql(f"SELECT {spec['unique_column']}, {', '.join(fcols)} FROM original_data").df()
+            args = [processed_df, "count", spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
-            result = create_count(*args)
+            if len(processed_df) > 0:
+                result = create_count(*args, self.start_date, self.end_date)
+            else: result = 0
+
+        elif measure == "cohort_count_defaulter":
+            fcols = list(dict.fromkeys([item.strip() for fcol, fval in spec["pairs"]
+                    for item in (fcol if isinstance(fcol, list) else str(fcol).split('|'))
+                ])) + [DATE_,CONCEPT_NAME_,VALUE_DATETIME_]
+            fcols = [c for c in fcols if c in actual_keys_in_data]
+            processed_df = duckdb.sql(f"SELECT {spec['unique_column']}, {', '.join(fcols)} FROM original_data").df()
+            args = [processed_df, "count", spec["unique_column"]]
+            for fcol, fval in spec["pairs"]:
+                args.extend([fcol, fval])
+            if len(processed_df) > 0:
+                result = create_count(*args, self.start_date, self.end_date)
+            else: result = 0
+
+        elif measure == "count_defaulter":
+            fcols = list(dict.fromkeys([item.strip() for fcol, fval in spec["pairs"]
+                    for item in (fcol if isinstance(fcol, list) else str(fcol).split('|'))
+                ])) + [DATE_,CONCEPT_NAME_,VALUE_DATETIME_]
+            fcols = [c for c in fcols if c in actual_keys_in_data]
+            processed_df = duckdb.sql(f"SELECT {spec['unique_column']}, {', '.join(fcols)} FROM filtered_data").df()
+            args = [processed_df, "count", spec["unique_column"]]
+            for fcol, fval in spec["pairs"]:
+                args.extend([fcol, fval])
+            if len(processed_df) > 0:
+                result = create_count(*args, self.start_date, self.end_date)
+            else: result = 0
         else:
             result = ""
 
@@ -518,3 +587,4 @@ class ReportTableBuilder:
                 )
             ]
         )
+    
