@@ -114,7 +114,13 @@ class ReportTableBuilder:
         if not filter_name:
             return ""
         if filter_name in self._value_cache:
-            return self._value_cache[filter_name]
+            cached = self._value_cache[filter_name]
+            # If a sentinel dict is cached (calculated not yet resolved), resolve now.
+            if isinstance(cached, dict) and "__calculated__" in cached:
+                resolved = self._resolve_calculated(cached["__calculated__"], filter_name)
+                self._value_cache[filter_name] = resolved
+                return resolved
+            return cached
         if filter_name not in self.filters_map:
             self._errors.append(f"FILTERS row not found: '{filter_name}'")
             self._value_cache[filter_name] = "N/A"
@@ -273,11 +279,19 @@ class ReportTableBuilder:
             if len(processed_df) > 0:
                 result = create_count(*args, self.start_date, self.end_date)
             else: result = 0
+        elif measure == "calculated":
+            # Store the expression for deferred evaluation; resolved after
+            # all other filter values are pre-computed in _precompute_all_filter_values.
+            expression = str(spec.get("unique_column", "")).strip()
+            self._value_cache[filter_name] = {"__calculated__": expression}
+            return self._value_cache[filter_name]
         else:
             result = ""
 
         result_str = "" if result is None else str(result)
         self._value_cache[filter_name] = result_str
+        if isinstance(result, (int, float)):
+            self._value_cache[filter_name] = f"{result:g}" # format to remove trailing zeros
         return result_str
 
     def _collect_value_columns(self) -> List[str]:
@@ -321,7 +335,74 @@ class ReportTableBuilder:
         df["DHIS2-SCANFORM"] = mapped
         return df
 
+    def _precompute_all_filter_values(self) -> None:
+        """Pre-compute every filter value so that 'calculated' expressions can
+        reference filters from any section.  Two-pass approach:
+          Pass 1 – compute all non-calculated filters (populates _value_cache).
+          Pass 2 – resolve all calculated filters using the fully-populated cache.
+        """
+        import re
+
+        # Pass 1: non-calculated filters
+        for fname, spec in self.filters_map.items():
+            if spec["measure"] != "calculated":
+                self._compute_value_from_filter(fname)
+
+        # Pass 2: calculated filters (expression evaluation)
+        for fname, spec in self.filters_map.items():
+            if spec["measure"] == "calculated":
+                # Ensure the sentinel dict is in cache (handles first-call case)
+                cached = self._value_cache.get(fname)
+                if not isinstance(cached, dict) or "__calculated__" not in cached:
+                    self._compute_value_from_filter(fname)
+                    cached = self._value_cache.get(fname)
+
+                if isinstance(cached, dict) and "__calculated__" in cached:
+                    resolved = self._resolve_calculated(cached["__calculated__"], fname)
+                    self._value_cache[fname] = resolved
+
+    def _resolve_calculated(self, expression: str, filter_name: str) -> str:
+        import re
+        has_division = "/" in expression
+        token_pattern = re.compile(r"\{([^}]+)\}")
+
+        def replace_token(match: re.Match) -> str:
+            ref_name = match.group(1).strip()
+            cached = self._value_cache.get(ref_name)
+            if isinstance(cached, dict):
+                self._errors.append(
+                    f"Calculated filter '{filter_name}': dependency '{ref_name}' "
+                    "is also calculated and could not be pre-resolved."
+                )
+                return "0"
+            val_str = str(cached or "0").replace("%", "").strip()
+            try:
+                float(val_str)  # validate it's numeric
+                return val_str
+            except ValueError:
+                return "0"
+
+        substituted = token_pattern.sub(replace_token, expression)
+
+        try:
+            raw_result = eval(substituted, {"__builtins__": {}})  # safe – only arithmetic
+            if has_division:
+                rounded = round(float(raw_result), 2)
+                # Strip unnecessary trailing zeros (e.g. 3.10 → 3.1, 3.00 → 3)
+                result_str = f"{rounded:.2f}".rstrip("0").rstrip(".")
+            else:
+                result_str = str(int(round(float(raw_result))))
+        except Exception as exc:
+            self._errors.append(
+                f"Calculated filter '{filter_name}': could not evaluate "
+                f"'{substituted}' — {exc}"
+            )
+            result_str = "N/A"
+
+        return result_str
+
     def build_section_tables(self) -> List[Tuple[str, pd.DataFrame]]:
+        self._precompute_all_filter_values()
         value_cols = self._collect_value_columns()
         sections: List[Tuple[str, pd.DataFrame]] = []
         current_section_name = ""
@@ -355,16 +436,16 @@ class ReportTableBuilder:
                 if current_headers.get(vc, vc) == 'DHIS2-SCANFORM':
                     out[current_headers.get(vc, vc)] = filter_ref
                 else:
-                    out[current_headers.get(vc, vc)] = (
-                        self._compute_value_from_filter(filter_ref) if filter_ref else ""
-                )
+                    out[current_headers.get(vc, vc)] = (self._compute_value_from_filter(filter_ref) if filter_ref else "")       
             buffer.append(out)
+
+        
 
         if buffer:
             df = pd.DataFrame(buffer)
             df = df.loc[:, (df != "").any(axis=0)]
             # df = self._apply_dhis_mapping(df)
-            sections.append((current_section_name, df))    
+            sections.append((current_section_name, df))  
         return sections
     
  
@@ -587,4 +668,3 @@ class ReportTableBuilder:
                 )
             ]
         )
-    
