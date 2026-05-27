@@ -306,13 +306,11 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, repo
     if not ctx.triggered:
         return dash.no_update, 0, None
     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
-
     if clicks is None or clicks == 0:
         raise PreventUpdate
     # Handle missing inputs to prevent errors
     if not urlparams or not period_type or not year_filter or not month_filter or not report_filter:
         return html.Div("Missing Report Parameters"), 0, None
-
     reports_json = os.path.join(path, 'data', 'hmis_reports.json')
     with open(reports_json, "r") as f:
         json_data = json.load(f)
@@ -331,58 +329,11 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, repo
     spec_path = f"data/uploads/{report['page_name']}.xlsx"
     if not os.path.exists(spec_path):
         return html.Div("Report not found on Server. Request Admin to add report"), 0, None
-    programs = (pd.read_excel(spec_path, sheet_name="FILTERS")
-                    .filter(regex='value1')
-                    .stack()
-                    .dropna()
-                    .unique()
-                    .tolist()
-                )
-    
-    # scan spec_path on FILTERS sheet and get unique items in columns whose name starts with variable (1-10)
-    variables = (pd.read_excel(spec_path, sheet_name="FILTERS")
-                    .filter(regex='^variable([1-9]|10)$|^unique_column$')
-                    .stack()
-                    .dropna()
-                    .unique()
-                    .tolist()
-                )
-    variables = [item.strip() for var in variables if pd.notna(var) 
-                            for item in str(var).split('|')]
-    variables = list(set(variables) & set(actual_keys_in_data)) + [DATE_,CONCEPT_NAME_,VALUE_DATETIME_]
-    variables = list(set(variables)) 
     
     if urlparams.get('Location', [None])[0]:
         location = urlparams.get('Location', [None])[0]
     else:
         location = None
-    
-    SQL = f"""
-        SELECT {', '.join(variables)}
-        FROM '{DATA_FILE_NAME_}'
-        WHERE {FACILITY_CODE_} = '{location}'
-        AND {PROGRAM_} IN ({', '.join(f"'{prog}'" for prog in programs)})
-        """
-    
-    try:
-        data = DataStorage.query_duckdb(SQL)
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return html.Div('Missing Data. ' \
-            'Ensure that the config file has correct database credentials.'
-            ,style={'color':'red'}), 0, None # Empty DataFrame with expected columns
-    
-    if GENDER_ in data.columns:
-        data[GENDER_] = data[GENDER_].replace({"M":"Male",
-                                               "F":"Female",
-                                               '{"label"=>"Male", "value"=>"M"}':"Male",
-                                               '{"label"=>"Female", "value"=>"F"}':"Female"})
-    data["DateValue"] = pd.to_datetime(data[DATE_]).dt.date
-    today = dt.today().date()
-    data["months"] = data["DateValue"].apply(lambda d: (today - d).days // 30)
-    # data_opd = data_opd.dropna(subset = ['obs_value_coded','concept_name', 'Value','ValueN', 'DrugName', 'Value_name'], how='all')
-    # data_opd.to_csv('data/archive/hmis.csv')
 
     # validate user
     user_data_path = os.path.join(path, 'data','single_tables', 'users_data.csv')
@@ -403,9 +354,14 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, repo
         "sick_neonate",
     }
     if report.get("page_name") in mnh_report_pages:
+        sql = f"""
+                SELECT *
+                FROM '{DATA_FILE_NAME_}'
+                WHERE {FACILITY_CODE_} = '{location}'
+            """
+        data = DataStorage.query_duckdb(sql)
         data = prepare_mnid_dataframe(data)
 
-    original_data = data
     try:
         period_map = {
             'Weekly': get_week_start_end,
@@ -419,27 +375,7 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, repo
 
         dhis2_period = get_dhis2_period(start_date, period_type)
 
-        # Convert once (avoid repeated conversions)
-        data_dates = pd.to_datetime(data[DATE_])
-        original_dates = pd.to_datetime(original_data[DATE_])
-
-
-        filtered = data[
-            (data_dates >= pd.to_datetime(start_date)) &
-            (data_dates <= pd.to_datetime(end_date))
-        ]
-        filtered["start_date"] = start_date
-        filtered["end_date"] = end_date
-
-        original_data = original_data[original_dates <= pd.to_datetime(end_date)]
-        original_data["start_date"] = start_date
-        original_data["end_date"] = end_date
-        
-        original_data["days_before_visit_date"] = original_data["start_date"].apply(
-            lambda d: (start_date - d).days
-        )
-
-        builder = ReportTableBuilder(spec_path,start_date,end_date, filtered, original_data, dhis2_period)
+        builder = ReportTableBuilder(spec_path,start_date,end_date,location, dhis2_period)
         
         builder.load_spec()
         components = builder.build_dash_components()

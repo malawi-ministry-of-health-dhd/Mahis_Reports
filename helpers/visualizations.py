@@ -11,10 +11,11 @@ from typing import List, Optional, Dict, Union, Callable
 import json
 import ast
 import duckdb
+from data_storage import DataStorage
 
 pd.options.mode.chained_assignment = None
 
-from config import PERSON_ID_, ENCOUNTER_ID_, DATE_, CONCEPT_NAME_
+from config import PERSON_ID_, ENCOUNTER_ID_, DATE_, CONCEPT_NAME_,DATA_FILE_NAME_
 
 """
 MAIN USE CASE OF THIS FILE IS TO PROVIDE VISUALIZATION FUNCTIONS FOR PATIENT DATA
@@ -314,7 +315,7 @@ def _apply_filter_mask(df, filter_col, filter_value):
         return df[filter_col] == filter_value
     return df[filter_col] == filter_value
 
-def build_filter_query(cols, vals, unique_column, isSet, start_date, end_date):
+def build_filter_query(cols, vals, unique_column, isSet, start_date, end_date, query_filter:str=None):
     """
     Build a SQL WHERE clause based on filter type.
     Supports single filters and paired list filters with AND conditions.
@@ -369,16 +370,16 @@ def build_filter_query(cols, vals, unique_column, isSet, start_date, end_date):
             for col, val in zip(cols, vals)
         ]
         where_clause = " AND ".join(conditions)
-        return f"SELECT {unique_column} FROM df WHERE {where_clause}"
+        return f"SELECT DISTINCT {unique_column} FROM '{DATA_FILE_NAME_}' WHERE {query_filter} AND {where_clause}"
     where_clause = build_single_condition(cols, vals)
     if isinstance(unique_column, list):
         unique_column_str = ", ".join(unique_column)
     else:        unique_column_str = unique_column
     if isSet:
-        return f"SELECT DISTINCT {unique_column_str} FROM df WHERE {where_clause}"
+        return f"SELECT DISTINCT {unique_column_str} FROM '{DATA_FILE_NAME_}' WHERE {query_filter} AND {where_clause}"
     return f"{where_clause}"
 
-def create_count(df, aggregation='count', unique_column=PERSON_ID_, *filters, start_date=None, end_date=None):
+def create_count(query_fiter, aggregation='count', unique_column=PERSON_ID_, *filters, start_date=None, end_date=None):
 
     isSet = False
 
@@ -396,12 +397,11 @@ def create_count(df, aggregation='count', unique_column=PERSON_ID_, *filters, st
         query = build_filter_query(col, val, unique_column, isSet, start_date, end_date)
         queries.append(query)
 
-    joined_query =f"SELECT {unique_column} FROM df WHERE "  + " AND ".join(queries)
+    joined_query =f"SELECT DISTINCT {unique_column} FROM '{DATA_FILE_NAME_}' WHERE {query_fiter} AND "  + " AND ".join(queries)
     if not queries:
-        joined_query = f"SELECT {unique_column} FROM df"
+        joined_query = f"SELECT DISTINCT {unique_column} FROM '{DATA_FILE_NAME_}' WHERE {query_fiter}"
     
-    intersect_duckdb = duckdb.sql(joined_query)
-    result = intersect_duckdb.df()
+    result = DataStorage.query_duckdb(joined_query)
     if aggregation == 'count':
         return len(result[unique_column].dropna().unique())
     elif aggregation == 'nunique':
@@ -414,8 +414,7 @@ def create_count(df, aggregation='count', unique_column=PERSON_ID_, *filters, st
         return len(result[unique_column].dropna().unique())
 
 def create_count_sets(
-    df,
-    aggregation='count',
+    query_fiter,aggregation='count',
     unique_column=PERSON_ID_,
     *filters,
     start_date=None,
@@ -451,21 +450,19 @@ def create_count_sets(
         for col, val in zip(cols, vals):
             cols_list.append(col)
             vals_list.append(val)
-        query = build_filter_query(cols_list, vals_list, unique_column, isSet, start_date, end_date)
+        query = build_filter_query(cols_list, vals_list, unique_column, isSet, start_date, end_date, query_fiter)
         queries.append(query)
 
     for cols, vals in non_set_filters:
-        query = build_filter_query(cols, vals, unique_column, isSet, start_date, end_date)
+        query = build_filter_query(cols, vals, unique_column, isSet, start_date, end_date, query_fiter)
         queries.append(query)
 
     intersection_query = " INTERSECT ".join(queries)
     # print(intersection_query)
-    intersect_duckdb = duckdb.sql(intersection_query)
-
-    result = intersect_duckdb.df()
+    result = DataStorage.query_duckdb(intersection_query)
     return result[unique_column].nunique()
 
-def create_sum(df, unique_column=PERSON_ID_, num_field='ValueN', *filters, start_date=None, end_date=None):
+def create_sum(query_fiter, unique_column=PERSON_ID_, num_field='ValueN', *filters, start_date=None, end_date=None):
 
     isSet = False
 
@@ -481,9 +478,10 @@ def create_sum(df, unique_column=PERSON_ID_, num_field='ValueN', *filters, start
     for col, val in zip(filter_cols, filter_vals):
         query = build_filter_query(col, val, [unique_column,num_field], isSet, start_date, end_date)
         queries.append(query)
-    joined_query =f"SELECT {unique_column}, {num_field} FROM df WHERE "  + " AND ".join(queries)
-    intersect_duckdb = duckdb.sql(joined_query)
-    result = intersect_duckdb.df()
+    joined_query =f"SELECT {unique_column}, {num_field} FROM '{DATA_FILE_NAME_}' WHERE {query_fiter} AND "  + " AND ".join(queries)
+    if not queries:
+        joined_query =f"SELECT {unique_column}, {num_field} FROM '{DATA_FILE_NAME_}' WHERE {query_fiter}"  
+    result = DataStorage.query_duckdb(joined_query)
     return result[num_field].sum()
 
 

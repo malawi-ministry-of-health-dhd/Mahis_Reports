@@ -306,7 +306,7 @@ def generate_chart(n_clicks, urlparams, selected_report, pathname, report_name, 
 
         SQL = f"""
                 SELECT * FROM '{DATA_FILE_NAME_}'
-                WHERE Date BETWEEN '{start_dt}' AND '{end_dt}'
+                WHERE {DATE_} BETWEEN '{start_dt}' AND '{end_dt}'
                 AND {FACILITY_CODE_} = '{location}'
                """
         try:
