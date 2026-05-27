@@ -206,7 +206,7 @@ except Exception as e:
 PREMIUM_DASHBOARD_REPORTS = {"Maternal and Child Health"}
 
 
-def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json, filter_summary=None,
+def build_charts_from_json(filtered_query, filtered_with_range_query, delta_days, dashboards_json, filter_summary=None,
                           start_date=None, end_date=None, facility_code=None, scope_meta=None, url_object=None):
     config = dashboards_json
     count_items_per_row = config.get("count_items_per_row") or 5
@@ -214,8 +214,8 @@ def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json, filt
     # Route MNID dashboard configs to the dedicated MNID renderer.
     if config.get('dashboard_type') == 'mnid':
         return render_mnid_dashboard(
-            filtered=filtered,
-            data_opd=data_opd,
+            filtered=filtered_query,
+            data_opd=filtered_with_range_query,
             delta_days=delta_days,
             config=config,
             facility_code=facility_code or 'Unknown',
@@ -224,17 +224,12 @@ def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json, filt
             scope_meta=scope_meta,
         )
 
-    # Render all non-MNID dashboards with the generic chart builder.
-    filtered = filtered
-    filtered['Residence'] = filtered[HOME_DISTRICT_] + ', TA-' + filtered[TA_] + ', ' + filtered[VILLAGE_]
-    delta_days = 7 if delta_days < 7 else delta_days
-
     if config.get("report_name") in PREMIUM_DASHBOARD_REPORTS:
-        return build_premium_dashboard(filtered, data_opd, delta_days, config, filter_summary=filter_summary)
+        return build_premium_dashboard(filtered_query, filtered_with_range_query, delta_days, config, filter_summary=filter_summary)
 
     # Build metrics from counts section
-    metrics = build_metrics_section(filtered, config["visualization_types"]["counts"], url_object)
-    charts = build_charts_section(filtered, data_opd, delta_days, config["visualization_types"]["charts"]["sections"])
+    metrics = build_metrics_section(filtered_query, config["visualization_types"]["counts"], url_object)
+    charts = build_charts_section(filtered_query, filtered_with_range_query, delta_days, config["visualization_types"]["charts"]["sections"])
 
     return html.Div([
         html.Div(style={"display": "grid","gridTemplateColumns": f"repeat({count_items_per_row}, 1fr)",
