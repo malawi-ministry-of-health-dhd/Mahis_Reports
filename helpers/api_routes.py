@@ -105,13 +105,9 @@ def register_api_routes(server):
             if not report:
                 return jsonify({"error": "Report Not Found"}), 404
 
-            parquet_path = os.path.join(os.getcwd(), "data", "latest_data_opd.parquet")
-            if not os.path.exists(parquet_path):
-                return jsonify({"error": "Data file not found"}), 500
-
             sql = f"""
                 SELECT *
-                FROM 'data/{DATA_FILE_NAME_}'
+                FROM '{DATA_FILE_NAME_}'
                 WHERE {FACILITY_CODE_} = '{facility_id}'
             """
             data = DataStorage.query_duckdb(sql)

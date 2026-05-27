@@ -300,13 +300,7 @@ def update_report_dropdown(urlparams, program):
         ),
     ]
 )
-def update_table(clicks, 
-                 urlparams, 
-                 period_type, 
-                 year_filter, 
-                 month_filter, 
-                 report_filter,
-                 pathname):
+def update_table(clicks, urlparams, period_type, year_filter, month_filter, report_filter,pathname):
     
     ctx = dash.callback_context
     if not ctx.triggered:
