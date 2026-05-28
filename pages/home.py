@@ -628,6 +628,16 @@ def update_dashboard(gen, interval, start_date, end_date, level,
             effective_level = 'facility'
         level = _title_level(effective_level)
 
+        show_district_filter = effective_level == "national"
+        district_group_style = {} if show_district_filter else {"display": "none"}
+        district_disabled = not show_district_filter
+        district_note = ""
+        if not show_district_filter:
+            districts = []
+
+        all_districts = []
+        all_facilities = []
+
 
         
         # def num_days_patient_seen(data):
@@ -784,13 +794,6 @@ def update_dashboard(gen, interval, start_date, end_date, level,
                     facilities_pool[FACILITY_].dropna().sort_values().unique().tolist()
                     if FACILITY_ in facilities_pool.columns else []
                 )
-
-                show_district_filter = effective_level == "national"
-                district_group_style = {} if show_district_filter else {"display": "none"}
-                district_disabled = not show_district_filter
-                district_note = ""
-                if not show_district_filter:
-                    districts = []
 
                 # Keep selected facilities consistent with selected districts
                 if effective_level == "district" and district_col and districts:

@@ -86,10 +86,6 @@ def create_count_from_config(df, filters):
         filters.get("variable9", ""),
         filters.get("variable10", "")
     ]
-    variables_list = list(chain.from_iterable([item] if not isinstance(item, list) else item 
-                            for item in variables if item != ""
-                        )) + [unique_col, DATE_] 
-    df = df[variables_list]
 
     values = [
         parse_filter_value(filters.get("value1", "")),
@@ -286,7 +282,6 @@ def create_line_chart_from_config(data_opd, delta_days, filters):
                 "filter_val3": ""
     """
     date_filter = str(datetime.now() - pd.Timedelta(days=delta_days))
-    filtered_data = data_opd[data_opd['Date'] >= date_filter]
     
     # keys = list(filters.keys())[3:]
     date_col       = filters.get('date_col')
@@ -306,7 +301,7 @@ def create_line_chart_from_config(data_opd, delta_days, filters):
     aggregation   = filters.get('measure') or 'count'
     custom_fields = filters.get('custom_fields') or None
 
-    return create_line_chart(filtered_data, date_col, y_col, 
+    return create_line_chart(data_opd, date_col, y_col, 
                              title, x_title, y_title, unique_column, 
                              legend_title, color, filter_col1, 
                              filter_val1, filter_col2, filter_val2, 
