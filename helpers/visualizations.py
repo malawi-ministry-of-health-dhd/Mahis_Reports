@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-import dash_bootstrap_components as dbc
 import dash
 import operator
 from dash import dash_table, html
