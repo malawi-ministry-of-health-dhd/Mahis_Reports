@@ -95,12 +95,12 @@ def _apply_filter(data, filter_col, filter_value):
        - Stringified list: "['A','B','C']"
        - Wildcards: "*BP", "%Sugar"  → performs substring contains
        - Operator expressions:
-            =value
-            !=value
-            >value
-            <value
-            >=value
-            <=value
+            =data_value
+            !=data_value
+            >data_value
+            <data_value
+            >=data_value
+            <=data_value
        - Logical AND intersection (using "&&"):
             "A && B && C"
          Meaning:
@@ -112,14 +112,14 @@ def _apply_filter(data, filter_col, filter_value):
        Filtering logic on strings:
        - If starts with "*" or "%", uses case-insensitive .str.contains()
        - If contains operators, applies numeric or lexicographical comparisons
-       - If list or multi-value, uses .isin()
+       - If list or multi-data_value, uses .isin()
 
     2. MULTI-COLUMN FILTERING (filter_col is a list)
        ------------------------------------------------
        Two cases:
        a) Length >= 2:
             - filter_value MUST be a list of the same length
-            - Each pair (col[i], value[i]) is applied independently
+            - Each pair (col[i], data_value[i]) is applied independently
             - AND logic across all pairs
        b) Length == 1:
             - Treated like single-column filtering above
@@ -237,29 +237,29 @@ def _apply_filter(data, filter_col, filter_value):
 
             # Try numeric conversion
             if value_str in ["_"]:
-                value = ""
+                data_value = ""
             else:
                 try:
                     if "." in value_str:
-                        value = float(value_str)
+                        data_value = float(value_str)
                     else:
-                        value = int(value_str)
+                        data_value = int(value_str)
                 except:
-                    value = value_str
+                    data_value = value_str
 
 
             if operator == "=":
-                return df[df[filter_col] == value]
+                return df[df[filter_col] == data_value]
             if operator == "!=":
-                return df[df[filter_col] != value]
+                return df[df[filter_col] != data_value]
             if operator == ">":
-                return df[df[filter_col] > value]
+                return df[df[filter_col] > data_value]
             if operator == "<":
-                return df[df[filter_col] < value]
+                return df[df[filter_col] < data_value]
             if operator == ">=":
-                return df[df[filter_col] >= value]
+                return df[df[filter_col] >= data_value]
             if operator == "<=":
-                return df[df[filter_col] <= value]
+                return df[df[filter_col] <= data_value]
 
         # 3. Simple equality
         return df[df[filter_col] == filter_value]
@@ -288,29 +288,29 @@ def _apply_filter_mask(df, filter_col, filter_value):
             value_str = value_str.strip()
             #Empty placeholder
             if value_str == "_":
-                value = ""
+                data_value = ""
             else:
                 # Numeric conversion
                 try:
                     if "." in value_str:
-                        value = float(value_str)
+                        data_value = float(value_str)
                     else:
-                        value = int(value_str)
+                        data_value = int(value_str)
                 except:
-                    value = value_str
+                    data_value = value_str
             series = df[filter_col]
             if operator == "=":
-                return series == value
+                return series == data_value
             if operator == "!=":
-                return series != value
+                return series != data_value
             if operator == ">":
-                return series > value
+                return series > data_value
             if operator == "<":
-                return series < value
+                return series < data_value
             if operator == ">=":
-                return series >= value
+                return series >= data_value
             if operator == "<=":
-                return series <= value
+                return series <= data_value
 
         return df[filter_col] == filter_value
     return df[filter_col] == filter_value
@@ -322,14 +322,14 @@ def build_filter_query(cols, vals, unique_column, isSet, start_date, end_date, q
     
     Args:
         cols (str or list): Column name(s)
-        vals (str, list, or list of lists): Filter value(s)
+        vals (str, list, or list of lists): Filter data_value(s)
         unique_column (str/list): Column to select from
     
     Returns:
         str: SQL SELECT query
     """
     def parse_value(val_str):
-        """Parse a single value for operators, wildcards, or numeric types."""
+        """Parse a single data_value for operators, wildcards, or numeric types."""
         val_str = str(val_str).strip()
         # Handle wildcard/LIKE patterns
         if val_str.startswith(("*", "%")):
@@ -340,12 +340,12 @@ def build_filter_query(cols, vals, unique_column, isSet, start_date, end_date, q
             operator = operator or "="
             value_str = value_str.strip()
             
-            # Parse value
-            value = "" if value_str == "_" else (
+            # Parse data_value
+            data_value = "" if value_str == "_" else (
                 float(value_str) if "." in value_str else int(value_str)
             ) if value_str.replace(".", "", 1).isdigit() else value_str
             
-            return operator, value
+            return operator, data_value
         return "=", val_str
     
     def build_single_condition(col, val):
@@ -358,10 +358,10 @@ def build_filter_query(cols, vals, unique_column, isSet, start_date, end_date, q
             return f"concept_name = 'Appointment date' AND (NOW() - CAST(value_datetime AS TIMESTAMP)) > INTERVAL {val} DAY"
         if col == "days_before_visit_date":
             return f"{DATE_} >= ('{start_date}'::DATE - INTERVAL {int(val)} DAY) AND {DATE_} <= ('{start_date}'::DATE - INTERVAL 1 DAY)"
-        operator, value = parse_value(val)
+        operator, data_value = parse_value(val)
         if operator == "LIKE":
-            return f"{col} LIKE '{value}'"
-        return f"{col} {operator} '{value}'"
+            return f"{col} LIKE '{data_value}'"
+        return f"{col} {operator} '{data_value}'"
     
     # Handle paired lists
     if isinstance(cols, list):
@@ -401,7 +401,10 @@ def create_count(query_fiter, aggregation='count', unique_column=PERSON_ID_, *fi
     joined_query =f"SELECT DISTINCT {unique_column} FROM '{DATA_FILE_NAME_}' WHERE {query_fiter} AND "  + " AND ".join(queries)
     if not queries:
         joined_query = f"SELECT DISTINCT {unique_column} FROM '{DATA_FILE_NAME_}' WHERE {query_fiter}"
-    
+    if aggregation == "time_diff_mins":
+        joined_query = (joined_query.replace(unique_column, 
+                                            f"({unique_column}), DATEDIFF('minute', MIN({DATE_}), MAX({DATE_})) AS patient_session_minutes")
+                                            + f" GROUP BY {unique_column}")
     result = DataStorage.query_duckdb(joined_query)
     if aggregation == 'count':
         return len(result[unique_column].dropna().unique())
@@ -409,6 +412,11 @@ def create_count(query_fiter, aggregation='count', unique_column=PERSON_ID_, *fi
         return len(result[unique_column].dropna().unique())
     elif aggregation == 'list':
         return result[unique_column].dropna().unique().tolist()
+    elif aggregation == 'time_diff_mins':
+        if result.empty:
+            return 0
+        result = result[result["patient_session_minutes"]<=120] #120 minutes is the threshold for a single patient session, we want to exclude outliers that may be caused by data quality issues
+        return int(result["patient_session_minutes"].agg('mean'))
     elif aggregation in ['sum', 'mean', 'min', 'max', 'std', 'var']:
         return int(result[unique_column].agg(aggregation))
     else:
@@ -493,6 +501,8 @@ def create_column_chart(query_fiter, x_col, y_col, title, x_title, y_title,
                         filter_col3=None, filter_value3=None, aggregation='count', custom_fields=None):
     """
     Create a column chart using Plotly Express with legend support.
+    Aggregation is pushed entirely into SQL: only the grouped summary rows
+    are returned to Python, keeping RAM usage minimal.
     """
     isSet = False
     filter_pairs = [
@@ -504,79 +514,85 @@ def create_column_chart(query_fiter, x_col, y_col, title, x_title, y_title,
     for col, val in filter_pairs:
         if col is not None and val is not None:
             col = _normalize_filter_value(col)
-            if isinstance(col,list):
+            if isinstance(col, list):
                 col = col[0]
             val = _normalize_filter_value(val)
             conditions.append(build_filter_query(col, val, unique_column, isSet, None, None))
-
-    if conditions:
-        joined_query = (
-            f"SELECT * FROM '{DATA_FILE_NAME_}' WHERE {query_fiter} AND "
-            + " AND ".join(conditions)
-        )
+ 
+    where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
+ 
+    # Map aggregation name → SQL aggregate expression on y_col.
+    # 'count' and 'nunique' both use COUNT(DISTINCT y_col) to match the
+    # original nunique()/count() behaviour.
+    if aggregation in ('count', 'nunique'):
+        agg_expr = f"COUNT(DISTINCT {y_col})"
+    elif aggregation == 'sum':
+        agg_expr = f"SUM({y_col})"
+    elif aggregation == 'mean':
+        agg_expr = f"AVG({y_col})"
+    elif aggregation == 'min':
+        agg_expr = f"MIN({y_col})"
+    elif aggregation == 'max':
+        agg_expr = f"MAX({y_col})"
     else:
-        joined_query = f"SELECT * FROM '{DATA_FILE_NAME_}' WHERE {query_fiter}"
-    data = DataStorage.query_duckdb(joined_query)
-    data = apply_calculated_fields(data, custom_fields)
-    
-    # if data.empty:
-    #     return go.Figure().update_layout(title=f"No data available for {title}")
-    
+        agg_expr = f"{aggregation}({y_col})"
+ 
     if color:
-        # Group by both x_col and color column
-        if aggregation == 'count':
-            summary = data.groupby([x_col, color])[y_col].nunique().reset_index()
-        elif aggregation == 'nunique':
-            summary = data.groupby([x_col, color])[y_col].nunique().reset_index()
-        else:
-            summary = data.groupby([x_col, color])[y_col].agg(aggregation).reset_index()
-        
-        summary.columns = [x_col, color, 'value']
-        summary['label'] = summary['value'].astype(str)
-        
+        # SELECT x_col, color, AGG(y_col) … GROUP BY x_col, color
+        joined_query = (
+            f"SELECT {x_col}, {color} as Color, {agg_expr} AS data_value"
+            f" FROM '{DATA_FILE_NAME_}'"
+            f" WHERE {where_clause}"
+            f" GROUP BY {x_col}, {color}"
+        )
+        print(joined_query)
+        summary = DataStorage.query_duckdb(joined_query)
+        summary = apply_calculated_fields(summary, custom_fields)
+        summary['label'] = summary['data_value'].astype(str)
+ 
         fig = px.bar(
-            summary, 
-            x=x_col, 
-            y='value', 
-            color=color,
-            title=title, 
+            summary,
+            x=x_col,
+            y='data_value',
+            color="Color",
+            title=title,
             text='label',
             color_discrete_sequence=px.colors.qualitative.Dark2,
             barmode='group'
         )
     else:
-        # Group only by x_col
-        if aggregation == 'count':
-            summary = data.groupby(x_col)[y_col].count().reset_index()
-            # data.to_csv("debug_summary.csv", index=False)
-        elif aggregation == 'nunique':
-            summary = data.groupby(x_col)[y_col].nunique().reset_index()
-        else:
-            summary = data.groupby(x_col)[y_col].agg(aggregation).reset_index()
-        
-        summary.columns = [x_col, 'value']
-        summary = summary.sort_values(by='value', ascending=False)
-        summary['label'] = summary['value'].astype(str)
-        
-        fig = px.bar(summary, x=x_col, y='value', title=title, text='label')
+        # SELECT x_col, AGG(y_col) … GROUP BY x_col ORDER BY data_value DESC
+        joined_query = (
+            f"SELECT {x_col}, {agg_expr} AS data_value"
+            f" FROM '{DATA_FILE_NAME_}'"
+            f" WHERE {where_clause}"
+            f" GROUP BY {x_col}"
+            f" ORDER BY data_value DESC"
+        )
+        print(joined_query)
+        summary = DataStorage.query_duckdb(joined_query)
+        summary = apply_calculated_fields(summary, custom_fields)
+        summary['label'] = summary['data_value'].astype(str)
+ 
+        fig = px.bar(summary, x=x_col, y='data_value', title=title, text='label')
         fig.update_traces(marker_color="#006401")
-    
+ 
     fig.update_layout(
         xaxis_title=x_title,
         yaxis_title=y_title,
         template="plotly_white",
         legend_title=legend_title if legend_title else color,
     )
-    
+ 
     fig.update_traces(
         textposition='auto',
         hovertemplate="<b>X-Axis:</b> %{x}<br>" +
-                      "<b>Count:</b> %{y}<br>" 
+                      "<b>Count:</b> %{y}<br>"
     )
-    
+ 
     return fig
 
-def create_line_chart(query_fiter, date_col, y_col, title, x_title, 
+def create_time_line_chart(query_fiter, date_col, y_col, title, x_title, 
                       y_title, unique_column=PERSON_ID_, 
                       legend_title=None, color=None, filter_col1=None, 
                       filter_value1=None, filter_col2=None, 
@@ -584,6 +600,8 @@ def create_line_chart(query_fiter, date_col, y_col, title, x_title,
                       filter_value3=None, aggregation='count',custom_fields=None):
     """
     Create a time series chart using Plotly Express.
+    date_col is already a date; grouping and aggregation are pushed into SQL
+    so only the summary rows are returned to Python.
     """
     isSet = False
     filter_pairs = [
@@ -594,43 +612,46 @@ def create_line_chart(query_fiter, date_col, y_col, title, x_title,
     conditions = []
     for col, val in filter_pairs:
         if col is not None and val is not None:
+            col = _normalize_filter_value(col)
+            if isinstance(col, list):
+                col = col[0]
+            val = _normalize_filter_value(val)
             conditions.append(build_filter_query(col, val, unique_column, isSet, None, None))
-    if conditions:
+ 
+    where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
+ 
+    if aggregation in ('count', 'nunique'):
+        agg_expr = f"COUNT(DISTINCT {y_col})"
+    elif aggregation == 'sum':
+        agg_expr = f"SUM({y_col})"
+    elif aggregation == 'mean':
+        agg_expr = f"AVG({y_col})"
+    elif aggregation == 'min':
+        agg_expr = f"MIN({y_col})"
+    elif aggregation == 'max':
+        agg_expr = f"MAX({y_col})"
+    else:
+        agg_expr = f"{aggregation}({y_col})"
+ 
+    # date_col is already a date — cast directly, no Python conversion needed
+    if color:
         joined_query = (
-            f"SELECT * FROM '{DATA_FILE_NAME_}' WHERE {query_fiter} AND "
-            + " AND ".join(conditions)
+            f"SELECT CAST({date_col} AS DATE) AS date_only, {color}, {agg_expr} AS count"
+            f" FROM '{DATA_FILE_NAME_}'"
+            f" WHERE {where_clause}"
+            f" GROUP BY CAST({date_col} AS DATE), {color}"
+            f" ORDER BY date_only"
         )
     else:
-        joined_query = f"SELECT * FROM '{DATA_FILE_NAME_}' WHERE {query_fiter}"
-    data = DataStorage.query_duckdb(joined_query)
-    data = apply_calculated_fields(data, custom_fields)
-    
-    # if data.empty:
-    #     return go.Figure().update_layout(title=f"{title}")
-    
-    # Ensure date column is in datetime format
-    if not pd.api.types.is_datetime64_any_dtype(data[date_col]):
-        try:
-            data[date_col] = pd.to_datetime(data[date_col], errors='coerce')
-        except Exception as e:
-            raise ValueError(f"Error converting {date_col} to datetime: {e}")
-    
-    data = data
-    data['date_only'] = pd.to_datetime(data[date_col]).dt.date
-    
-    if color:
-        if aggregation == 'count':
-            summary = data.groupby(['date_only', color])[y_col].nunique().reset_index(name='count')
-        else:
-            summary = data.groupby(['date_only', color])[y_col].agg(aggregation).reset_index(name='count')
-    else:
-        if aggregation == 'count':
-            summary = data.groupby('date_only')[y_col].nunique().reset_index(name='count')
-        else:
-            summary = data.groupby('date_only')[y_col].agg(aggregation).reset_index(name='count')
-    
-    
-    summary = summary.sort_values('date_only').reset_index(drop=True)
+        joined_query = (
+            f"SELECT CAST({date_col} AS DATE) AS date_only, {agg_expr} AS count"
+            f" FROM '{DATA_FILE_NAME_}'"
+            f" WHERE {where_clause}"
+            f" GROUP BY CAST({date_col} AS DATE)"
+            f" ORDER BY date_only"
+        )
+    summary = DataStorage.query_duckdb(joined_query)
+    summary = apply_calculated_fields(summary, custom_fields)
  
     # Identify key points
     try:
@@ -676,10 +697,6 @@ def create_line_chart(query_fiter, date_col, y_col, title, x_title,
         showlegend=False,
         hovertemplate="<b>Date:</b> %{x|%Y-%m-%d}<br><b>Count:</b> %{y}<extra></extra>"
     )
- 
- 
- 
-    
     if not summary.empty:
         avg_val = summary['count'].mean()
         fig.add_hline(
@@ -699,13 +716,15 @@ def create_line_chart(query_fiter, date_col, y_col, title, x_title,
     
     return fig
  
-def create_pie_chart(query_fiter, names_col, values_col, title, 
-                     unique_column=PERSON_ID_, filter_col1=None, 
-                     filter_value1=None, filter_col2=None, 
-                     filter_value2=None, filter_col3=None, 
-                     filter_value3=None, colormap=None, aggregation='count',custom_fields=None):
+def create_pie_chart(query_fiter, names_col, values_col, title,
+                     unique_column=PERSON_ID_, filter_col1=None,
+                     filter_value1=None, filter_col2=None,
+                     filter_value2=None, filter_col3=None,
+                     filter_value3=None, colormap=None, aggregation='count', custom_fields=None):
     """
     Create a pie chart using Plotly Express.
+    Grouping, aggregation and zero-value filtering are pushed into SQL so only
+    the summary rows are returned to Python.
     """
     isSet = False
     filter_pairs = [
@@ -716,58 +735,64 @@ def create_pie_chart(query_fiter, names_col, values_col, title,
     conditions = []
     for col, val in filter_pairs:
         if col is not None and val is not None:
+            col = _normalize_filter_value(col)
+            if isinstance(col, list):
+                col = col[0]
+            val = _normalize_filter_value(val)
             conditions.append(build_filter_query(col, val, unique_column, isSet, None, None))
-    if conditions:
-        joined_query = (
-            f"SELECT * FROM '{DATA_FILE_NAME_}' WHERE {query_fiter} AND "
-            + " AND ".join(conditions)
-        )
+ 
+    where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
+ 
+    if aggregation in ('count', 'nunique'):
+        agg_expr = f"COUNT(DISTINCT {values_col})"
+    elif aggregation == 'sum':
+        agg_expr = f"SUM({values_col})"
+    elif aggregation == 'mean':
+        agg_expr = f"AVG({values_col})"
+    elif aggregation == 'min':
+        agg_expr = f"MIN({values_col})"
+    elif aggregation == 'max':
+        agg_expr = f"MAX({values_col})"
     else:
-        joined_query = f"SELECT * FROM '{DATA_FILE_NAME_}' WHERE {query_fiter}"
-    data = DataStorage.query_duckdb(joined_query)
-    data = apply_calculated_fields(data, custom_fields)
-    
-    # if data.empty:
-    #     return go.Figure().update_layout(title=f"No data available for {title}")
-    
-    if aggregation == 'count':
-        df_summary = data.groupby(names_col)[values_col].nunique().reset_index()
-    elif aggregation == 'nunique':
-        df_summary = data.groupby(names_col)[values_col].nunique().reset_index()
-    else:
-        df_summary = data.groupby(names_col)[values_col].agg(aggregation).reset_index()
-    
-    df_summary.columns = [names_col, 'value']
-    
-    # Filter out zero values
-    df_summary = df_summary[df_summary['value'] > 0]
-    
+        agg_expr = f"{aggregation}({values_col})"
+ 
+    # HAVING data_value > 0 eliminates zero-value categories in SQL
+    joined_query = (
+        f"SELECT {names_col}, {agg_expr} AS data_value"
+        f" FROM '{DATA_FILE_NAME_}'"
+        f" WHERE {where_clause}"
+        f" GROUP BY {names_col}"
+        f" HAVING data_value > 0"
+    )
+    df_summary = DataStorage.query_duckdb(joined_query)
+    df_summary = apply_calculated_fields(df_summary, custom_fields)
+ 
     if df_summary.empty:
         return go.Figure().update_layout(title=f"No data available for {title}")
-    
+ 
     fig = px.pie(
-        df_summary, 
-        names=names_col, 
-        values='value', 
-        title=title, 
-        hole=0.5, 
+        df_summary,
+        names=names_col,
+        values='data_value',
+        title=title,
+        hole=0.5,
         color_discrete_sequence=px.colors.qualitative.Dark2 if colormap is None else None
     )
     colormap = {}
-    
+ 
     if colormap:
-        colors = [colormap.get(cat, px.colors.qualitative.Dark2[i % len(px.colors.qualitative.Dark2)]) 
+        colors = [colormap.get(cat, px.colors.qualitative.Dark2[i % len(px.colors.qualitative.Dark2)])
                   for i, cat in enumerate(df_summary[names_col])]
         fig.update_traces(marker=dict(colors=colors))
-    
+ 
     fig.update_traces(
-        textposition='inside', 
+        textposition='inside',
         textinfo='percent+label',
         hovertemplate="<b>Category:</b> %{label}<br>" +
                       "<b>Value:</b> %{value}<br>" +
-                      "<b>Percent:</b> %{percent}<br>" 
+                      "<b>Percent:</b> %{percent}<br>"
     )
-    
+ 
     return fig
  
 def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, unique_column=PERSON_ID_, aggfunc='sum',
@@ -778,6 +803,8 @@ def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, u
                      rename={}, replace={}, custom_fields=None):
     """
     Create a pivot table from the DataFrame.
+    Aggregation (including STRING_AGG for concat) is pushed into SQL so only
+    the summarised rows are transferred to Python before pivoting.
     """
     isSet = False
     filter_pairs = [
@@ -788,37 +815,65 @@ def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, u
     conditions = []
     for col, val in filter_pairs:
         if col is not None and val is not None:
+            col = _normalize_filter_value(col)
+            if isinstance(col, list):
+                col = col[0]
+            val = _normalize_filter_value(val)
             conditions.append(build_filter_query(col, val, unique_column, isSet, None, None))
-    if conditions:
-        joined_query = (
-            f"SELECT * FROM '{DATA_FILE_NAME_}' WHERE {query_fiter} AND "
-            + " AND ".join(conditions)
+ 
+    where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
+ 
+    # Resolve index and columns as lists for uniform handling
+    index_cols  = list(index_col)  if isinstance(index_col,  (list, tuple)) else [index_col]
+    columns_cols = [columns_col] if (columns_col and columns_col != "") else []
+    group_cols  = index_cols + columns_cols
+    group_sql   = ", ".join(group_cols)
+ 
+    # Map aggfunc → SQL aggregate expression on values_col
+    if aggfunc == 'concat':
+        agg_expr = (
+            f"STRING_AGG(DISTINCT CAST({values_col} AS VARCHAR), ', '"
+            f" ORDER BY CAST({values_col} AS VARCHAR))"
         )
+        value_format = None
+    elif aggfunc == 'count':
+        agg_expr = f"COUNT({values_col})"
+        value_format = ",.0f"
+    elif aggfunc == 'sum':
+        agg_expr = f"SUM({values_col})"
+        value_format = ",.0f"
+    elif aggfunc == 'mean':
+        agg_expr = f"AVG({values_col})"
+        value_format = ",.0f"
+    elif aggfunc == 'min':
+        agg_expr = f"MIN({values_col})"
+        value_format = ",.0f"
+    elif aggfunc == 'max':
+        agg_expr = f"MAX({values_col})"
+        value_format = ",.0f"
     else:
-        joined_query = f"SELECT * FROM '{DATA_FILE_NAME_}' WHERE {query_fiter}"
+        agg_expr = f"COUNT(DISTINCT {values_col})"
+        value_format = ",.0f"
+ 
+    joined_query = (
+        f"SELECT {group_sql}, {agg_expr} AS __value__"
+        f" FROM '{DATA_FILE_NAME_}'"
+        f" WHERE {where_clause}"
+        f" GROUP BY {group_sql}"
+    )
     data = DataStorage.query_duckdb(joined_query)
     data = apply_calculated_fields(data, custom_fields)
  
-    
-    # Determine the actual aggregation function
-    if aggfunc == 'concat':
-        actual_aggfunc = lambda x: ', '.join(sorted(set(str(v) for v in x if str(v) != '')))
-        value_format = None
-    elif aggfunc == 'count':
-        # For count, use nunique on the values_col
-        actual_aggfunc = 'nunique'
-        value_format = ",.0f"
-    else:
-        actual_aggfunc = aggfunc
-        value_format = ",.0f"
-    
-    # Build pivot
+    # Rename the aggregated column back to values_col for pivot_table
+    data = data.rename(columns={"__value__": values_col})
+ 
+    # Build pivot — aggfunc is now 'first' because grouping already happened in SQL
     pivot = data.pivot_table(
         index=index_col,
         columns=columns_col if columns_col != "" else None,
         values=values_col,
-        aggfunc=actual_aggfunc,
-        fill_value=0
+        aggfunc='first',
+        fill_value=0 if aggfunc != 'concat' else ""
     ).reset_index()
     
     num_index_cols = len(index_col) if isinstance(index_col, (list, tuple)) else 1
@@ -883,6 +938,8 @@ def create_crosstab_table(
 ):
     """
     Create a crosstab table with multilayer column headers using Dash DataTable.
+    Only the columns required for the crosstab are fetched. For concat aggfunc,
+    STRING_AGG is pushed into SQL so no Python lambda is needed.
     """
     isSet = False
     filter_pairs = [
@@ -893,16 +950,52 @@ def create_crosstab_table(
     conditions = []
     for col, val in filter_pairs:
         if col is not None and val is not None:
+            col = _normalize_filter_value(col)
+            if isinstance(col, list):
+                col = col[0]
+            val = _normalize_filter_value(val)
             conditions.append(build_filter_query(col, val, unique_column, isSet, None, None))
-    if conditions:
-        joined_query = (
-            f"SELECT * FROM '{DATA_FILE_NAME_}' WHERE {query_fiter} AND "
-            + " AND ".join(conditions)
+ 
+    where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
+ 
+    # Collect only the columns the crosstab actually needs
+    needed = []
+    for c in (index_col if isinstance(index_col, (list, tuple)) else [index_col]):
+        needed.append(c)
+    for c in (columns_col if isinstance(columns_col, (list, tuple)) else [columns_col]):
+        needed.append(c)
+ 
+    if aggfunc == 'concat' and values_col:
+        # Push STRING_AGG into SQL, grouping by index + columns axes
+        group_cols = list(dict.fromkeys(needed))
+        group_sql  = ", ".join(group_cols)
+        agg_expr   = (
+            f"STRING_AGG(DISTINCT CAST({values_col} AS VARCHAR), ', '"
+            f" ORDER BY CAST({values_col} AS VARCHAR))"
         )
+        joined_query = (
+            f"SELECT {group_sql}, {agg_expr} AS {values_col}"
+            f" FROM '{DATA_FILE_NAME_}'"
+            f" WHERE {where_clause}"
+            f" GROUP BY {group_sql}"
+        )
+        data = DataStorage.query_duckdb(joined_query)
+        data = apply_calculated_fields(data, custom_fields)
+        # After SQL aggregation each cell is already the concatenated string;
+        # use 'first' so pd.crosstab just picks the pre-aggregated data_value
+        ct_aggfunc = 'first'
     else:
-        joined_query = f"SELECT * FROM '{DATA_FILE_NAME_}' WHERE {query_fiter}"
-    data = DataStorage.query_duckdb(joined_query)
-    data = apply_calculated_fields(data, custom_fields)
+        if values_col:
+            needed.append(values_col)
+        select_cols = ", ".join(dict.fromkeys(needed))
+        joined_query = (
+            f"SELECT {select_cols}"
+            f" FROM '{DATA_FILE_NAME_}'"
+            f" WHERE {where_clause}"
+        )
+        data = DataStorage.query_duckdb(joined_query)
+        data = apply_calculated_fields(data, custom_fields)
+        ct_aggfunc = aggfunc
  
     # Helper: support multi-axis for crosstab
     def _axis_arg(arg):
@@ -910,7 +1003,7 @@ def create_crosstab_table(
             return [data[c] for c in arg]
         return data[arg]
  
-    index_arg = _axis_arg(index_col)
+    index_arg   = _axis_arg(index_col)
     columns_arg = _axis_arg(columns_col)
  
     # Handle normalization
@@ -924,21 +1017,13 @@ def create_crosstab_table(
     if values_col is None:
         ct = pd.crosstab(index=index_arg, columns=columns_arg, normalize=norm)
     else:
-        if aggfunc == 'concat':
-            ct = pd.crosstab(
-                index=index_arg,
-                columns=columns_arg,
-                values=data[values_col],
-                aggfunc=lambda x: ', '.join(sorted(set(str(v) for v in x if pd.notna(v) and v != '')))
-            )
-        else:
-            ct = pd.crosstab(
-                index=index_arg,
-                columns=columns_arg,
-                values=data[values_col],
-                aggfunc=aggfunc,
-                normalize=norm
-            )
+        ct = pd.crosstab(
+            index=index_arg,
+            columns=columns_arg,
+            values=data[values_col],
+            aggfunc=ct_aggfunc,
+            normalize=norm if ct_aggfunc != 'first' else False
+        )
  
     ct = ct.reset_index()
  
@@ -1025,10 +1110,12 @@ def create_age_gender_histogram(
     filter_col1=None, filter_value1=None,
     filter_col2=None, filter_value2=None,
     filter_col3=None, filter_value3=None,
-    aggregation='count',custom_fields=None
+    aggregation='count', custom_fields=None
 ):
     """
-    Create an age–gender histogram with labeled bins and data labels.
+    Create an age-gender histogram with labeled bins and data labels.
+    A lightweight SQL MIN/MAX query builds the bin boundaries; the main fetch
+    selects only age_col and gender_col with NULL filtering pushed into SQL.
     """
     isSet = False
     filter_pairs = [
@@ -1040,42 +1127,48 @@ def create_age_gender_histogram(
     for col, val in filter_pairs:
         if col is not None and val is not None:
             col = _normalize_filter_value(col)
-            if isinstance(col,list):
+            if isinstance(col, list):
                 col = col[0]
             val = _normalize_filter_value(val)
             conditions.append(build_filter_query(col, val, PERSON_ID_, isSet, None, None))
-    if conditions:
-        joined_query = (
-            f"SELECT * FROM '{DATA_FILE_NAME_}' WHERE {query_fiter} AND "
-            + " AND ".join(conditions)
-        )
-    else:
-        joined_query = f"SELECT * FROM '{DATA_FILE_NAME_}' WHERE {query_fiter}"
-    data = DataStorage.query_duckdb(joined_query)
-    data = apply_calculated_fields(data, custom_fields)
-    
-    # if data.empty:
-    #     return go.Figure().update_layout(title=f"No data available for {title}")
-    
-    # Remove any rows with missing age or gender
-    data = data.dropna(subset=[age_col, gender_col])
-    
-    if data.empty:
+ 
+    where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
+    null_guard   = f"{age_col} IS NOT NULL AND {gender_col} IS NOT NULL"
+ 
+    # Lightweight query to get the age range for bin construction
+    range_query = (
+        f"SELECT MIN(CAST({age_col} AS INTEGER)) AS min_age,"
+        f"       MAX(CAST({age_col} AS INTEGER)) AS max_age"
+        f" FROM '{DATA_FILE_NAME_}'"
+        f" WHERE {where_clause} AND {null_guard}"
+    )
+    range_df = DataStorage.query_duckdb(range_query)
+    if range_df.empty or pd.isna(range_df['min_age'].iloc[0]):
         return go.Figure().update_layout(title=f"{title}")
-    
-    min_age = int(data[age_col].min())
-    max_age = int(data[age_col].max())
-    
-    # Create bins
+ 
+    min_age  = int(range_df['min_age'].iloc[0])
+    max_age  = int(range_df['max_age'].iloc[0])
+ 
+    # Build bins and labels before fetching the main data
     bin_size = int(bin_size)
-    bins = list(range(min_age, max_age + bin_size, bin_size))
-    
-    labels = [
+    bins     = list(range(min_age, max_age + bin_size, bin_size))
+    labels   = [
         f"{bins[i]}-{bins[i+1]-1}" if i < len(bins)-2 else f"{bins[i]}+"
         for i in range(len(bins) - 1)
     ]
-    
-    data = data
+ 
+    # Fetch only the two columns needed; NULLs excluded in SQL
+    joined_query = (
+        f"SELECT {age_col}, {gender_col}"
+        f" FROM '{DATA_FILE_NAME_}'"
+        f" WHERE {where_clause} AND {null_guard}"
+    )
+    data = DataStorage.query_duckdb(joined_query)
+    data = apply_calculated_fields(data, custom_fields)
+ 
+    if data.empty:
+        return go.Figure().update_layout(title=f"{title}")
+ 
     data["age_bin"] = pd.cut(
         data[age_col],
         bins=bins,
@@ -1083,7 +1176,7 @@ def create_age_gender_histogram(
         include_lowest=True,
         right=False
     )
-    
+ 
     fig = px.histogram(
         data,
         x="age_bin",
@@ -1094,25 +1187,28 @@ def create_age_gender_histogram(
         color_discrete_sequence=px.colors.qualitative.Dark2,
         category_orders={"age_bin": labels}
     )
-    
+ 
     fig.update_layout(
         xaxis_title=xtitle,
         yaxis_title=ytitle,
         bargap=0.15
     )
-    
+ 
     fig.update_traces(
         textposition="outside",
         cliponaxis=False
     )
-    
+ 
     return fig
+ 
  
 def create_horizontal_bar_chart(query_fiter, label_col, value_col, title, x_title, y_title, top_n=10,
                                  filter_col1=None, filter_value1=None, filter_col2=None, filter_value2=None,
-                                 filter_col3=None, filter_value3=None, aggregation='count',custom_fields=None):
+                                 filter_col3=None, filter_value3=None, aggregation='count', custom_fields=None):
     """
-    Create a horizontal bar chart showing the top N items by value.
+    Create a horizontal bar chart showing the top N items by data_value.
+    Grouping, zero filtering, ordering and top-N limiting are all pushed into
+    SQL so Python only receives the final rows to plot.
     """
     isSet = False
     filter_pairs = [
@@ -1123,55 +1219,64 @@ def create_horizontal_bar_chart(query_fiter, label_col, value_col, title, x_titl
     conditions = []
     for col, val in filter_pairs:
         if col is not None and val is not None:
+            col = _normalize_filter_value(col)
+            if isinstance(col, list):
+                col = col[0]
+            val = _normalize_filter_value(val)
             conditions.append(build_filter_query(col, val, PERSON_ID_, isSet, None, None))
-    if conditions:
-        joined_query = (
-            f"SELECT * FROM '{DATA_FILE_NAME_}' WHERE {query_fiter} AND "
-            + " AND ".join(conditions)
-        )
+ 
+    where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
+ 
+    if aggregation in ('count', 'nunique'):
+        agg_expr = f"COUNT(DISTINCT {value_col})"
+    elif aggregation == 'sum':
+        agg_expr = f"SUM({value_col})"
+    elif aggregation == 'mean':
+        agg_expr = f"AVG({value_col})"
+    elif aggregation == 'min':
+        agg_expr = f"MIN({value_col})"
+    elif aggregation == 'max':
+        agg_expr = f"MAX({value_col})"
     else:
-        joined_query = f"SELECT * FROM '{DATA_FILE_NAME_}' WHERE {query_fiter}"
-    data = DataStorage.query_duckdb(joined_query)
-    data = apply_calculated_fields(data, custom_fields)
-    
-    # if data.empty:
-    #     return go.Figure().update_layout(title=f"No data available for {title}")
-    
-    if aggregation == 'count':
-        df_grouped = data.groupby(label_col)[value_col].nunique().reset_index()
-    elif aggregation == 'nunique':
-        df_grouped = data.groupby(label_col)[value_col].nunique().reset_index()
-    else:
-        df_grouped = data.groupby(label_col)[value_col].agg(aggregation).reset_index()
-    
-    df_grouped.columns = [label_col, 'value']
-    df_grouped = df_grouped[df_grouped['value'] > 0]
-    df_top = df_grouped.sort_values(by='value', ascending=False).head(int(top_n))
-    
+        agg_expr = f"{aggregation}({value_col})"
+ 
+    # HAVING eliminates zero-value rows; ORDER BY + LIMIT give top N directly
+    joined_query = (
+        f"SELECT {label_col}, {agg_expr} AS data_value"
+        f" FROM '{DATA_FILE_NAME_}'"
+        f" WHERE {where_clause}"
+        f" GROUP BY {label_col}"
+        f" HAVING data_value > 0"
+        f" ORDER BY data_value DESC"
+        f" LIMIT {int(top_n)}"
+    )
+    df_top = DataStorage.query_duckdb(joined_query)
+    df_top = apply_calculated_fields(df_top, custom_fields)
+ 
     if df_top.empty:
         return go.Figure().update_layout(title=f"No data available for {title}")
-    
+ 
     fig = px.bar(
         df_top,
-        x='value',
+        x='data_value',
         y=label_col,
-        text='value',
+        text='data_value',
         orientation='h',
         title=title
     )
-    
+ 
     fig.update_traces(
         textposition='auto',
         texttemplate='%{text}',
         marker_color='steelblue'
     )
-    
+ 
     fig.update_layout(
         xaxis_title=x_title,
         yaxis_title=y_title,
         yaxis=dict(autorange='reversed')
     )
-    
+ 
     return fig
 
 def agg_join(series: pd.Series) -> str:
@@ -1439,7 +1544,7 @@ def create_sankey_diagram(df, source_col, target_col, value_col, title,
         link=dict(
             source=[label_to_id[src] for src in flow_data[source_col]],
             target=[label_to_id[tgt] for tgt in flow_data[target_col]],
-            value=flow_data[value_col]
+            data_value=flow_data[value_col]
         )
     )])
     
@@ -1533,7 +1638,7 @@ def create_sankey_diagram(df, source_col, target_col, value_col, title,
 #                     filter_col2=None, filter_value2=None):
 #     """
 #     Create a box plot showing distribution of numerical values.
-#     Useful for: Age distribution by diagnosis, lab value ranges, etc.
+#     Useful for: Age distribution by diagnosis, lab data_value ranges, etc.
 #     """
 #     data = df
     
@@ -1613,7 +1718,7 @@ def create_sankey_diagram(df, source_col, target_col, value_col, title,
     
 #     return fig
 
-# def create_gauge_chart(value, title, min_val=0, max_val=100, 
+# def create_gauge_chart(data_value, title, min_val=0, max_val=100, 
 #                        threshold_ranges=None, threshold_colors=None):
 #     """
 #     Create a gauge chart for single metric visualization.
@@ -1625,7 +1730,7 @@ def create_sankey_diagram(df, source_col, target_col, value_col, title,
     
 #     fig = go.Figure(go.Indicator(
 #         mode="gauge+number+delta",
-#         value=value,
+#         data_value=data_value,
 #         title={'text': title},
 #         delta={'reference': max_val * 0.8},  # 80% target
 #         gauge={
@@ -1638,7 +1743,7 @@ def create_sankey_diagram(df, source_col, target_col, value_col, title,
 #             'threshold': {
 #                 'line': {'color': "red", 'width': 4},
 #                 'thickness': 0.75,
-#                 'value': max_val * 0.9  # 90% warning
+#                 'data_value': max_val * 0.9  # 90% warning
 #             }
 #         }
 #     ))
@@ -1683,7 +1788,7 @@ def create_sankey_diagram(df, source_col, target_col, value_col, title,
 #     )
     
 #     fig.update_traces(
-#         hovertemplate="<b>%{label}</b><br>Count: %{value}<br>Parent: %{parent}"
+#         hovertemplate="<b>%{label}</b><br>Count: %{data_value}<br>Parent: %{parent}"
 #     )
     
 #     return fig
@@ -1742,7 +1847,7 @@ def create_sankey_diagram(df, source_col, target_col, value_col, title,
 #     fig = go.Figure(go.Funnel(
 #         y=funnel_data[stages_col],
 #         x=funnel_data[values_col],
-#         textinfo="value+percent previous+percent total",
+#         textinfo="data_value+percent previous+percent total",
 #         marker=dict(color=["#006401", "#2E8B57", "#3CB371", "#90EE90"]),
 #         connector=dict(line=dict(color="royalblue", dash="dot", width=3))
 #     ))
@@ -1902,7 +2007,7 @@ def create_sankey_diagram(df, source_col, target_col, value_col, title,
 #                       filter_col2=None, filter_value2=None):
 #     """
 #     Create a 3D scatter plot for multidimensional analysis.
-#     Useful for: Age, BP, BMI correlation; lab value clusters, etc.
+#     Useful for: Age, BP, BMI correlation; lab data_value clusters, etc.
 #     """
 #     data = df
     
@@ -2032,7 +2137,7 @@ def create_sankey_diagram(df, source_col, target_col, value_col, title,
     
 #     fig = go.Figure(go.Indicator(
 #         mode="number+gauge+delta",
-#         value=actual,
+#         data_value=actual,
 #         delta={'reference': target},
 #         title={'text': title},
 #         gauge={
@@ -2047,7 +2152,7 @@ def create_sankey_diagram(df, source_col, target_col, value_col, title,
 #             'threshold': {
 #                 'line': {'color': "red", 'width': 2},
 #                 'thickness': 0.75,
-#                 'value': target
+#                 'data_value': target
 #             }
 #         }
 #     ))

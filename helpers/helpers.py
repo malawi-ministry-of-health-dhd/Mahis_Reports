@@ -6,7 +6,7 @@ from helpers.visualizations import (create_column_chart,
                           create_count,
                           create_count_sets,
                           create_pie_chart,
-                          create_line_chart,
+                          create_time_line_chart,
                           create_age_gender_histogram,
                           create_horizontal_bar_chart,
                           create_pivot_table,
@@ -301,7 +301,7 @@ def create_line_chart_from_config(data_opd, delta_days, filters):
     aggregation   = filters.get('measure') or 'count'
     custom_fields = filters.get('custom_fields') or None
 
-    return create_line_chart(data_opd, date_col, y_col, 
+    return create_time_line_chart(data_opd, date_col, y_col, 
                              title, x_title, y_title, unique_column, 
                              legend_title, color, filter_col1, 
                              filter_val1, filter_col2, filter_val2, 
@@ -577,7 +577,7 @@ def create_crosstab_from_config(filtered, filters):
     custom_fields = filters.get('custom_fields') or None
 
     return create_crosstab_table(
-        df=filtered,
+        query_fiter=filtered,
         index_col=index_col,
         columns_col=columns_col,
         title=title,

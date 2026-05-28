@@ -191,8 +191,8 @@
             "value1": [],
             "variable2": "Encounter",
             "value2": [
-              "REGISTRATION",
-              "ADULTINITIAL"
+              "Registration",
+              "Patient registration"
             ],
             "variable3": "concept_name",
             "value3": [],
@@ -219,8 +219,8 @@
             "value1": [],
             "variable2": "Encounter",
             "value2": [
-              "LAB ORDERS",
-              "LAB RESULTS"
+              "Lab orders",
+              "Lab results"
             ],
             "variable3": "concept_name",
             "value3": [],
@@ -423,7 +423,7 @@
                   "filter_val4": "",
                   "filter_col5": "",
                   "filter_val5": "",
-                  "custom_fields": "[\n {\"column\": \"Age\", \"expr\": \"AgeDays / 365.25\"},\n  {\"column\": \"is_adult\",  \"expr\": \"Age > 18 * 365\"}\n]",
+                  "custom_fields": "",
                   "age_col": "Age",
                   "gender_col": "Gender",
                   "bin_size": "10",
@@ -1044,25 +1044,25 @@
                   "filter_col1": "Program",
                   "filter_val1": "OPD Program",
                   "filter_col2": "obs_value_coded",
-                  "filter_val2": "Malaria",
+                  "filter_val2": "*Malaria",
                   "filter_col3": "Program",
                   "filter_val3": "OPD Program",
                   "filter_col4": "obs_value_coded",
-                  "filter_val4": "Malaria",
+                  "filter_val4": "*Malaria",
                   "filter_col5": "Program",
                   "filter_val5": "OPD Program"
                 }
               },
               {
                 "id": "chart_ef45aexg",
-                "name": "Malaria Drugs Prescribed by Clinician",
+                "name": "Malaria (LA) Drugs Dispensed",
                 "type": "Bar",
                 "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
                   "duration_default": "any",
-                  "title": "Malaria Drugs Prescribed by Clinician",
+                  "title": "Malaria (LA) Drugs Dispensed",
                   "label_col": "Order_Name",
                   "value_col": "encounter_id",
                   "x_title": "Number of Patients",
@@ -1072,25 +1072,25 @@
                   "filter_col1": "Program",
                   "filter_val1": "OPD Program",
                   "filter_col2": "Encounter",
-                  "filter_val2": "TREATMENT",
+                  "filter_val2": "Dispensing",
                   "filter_col3": "Order_Name",
-                  "filter_val3": "Lumefantrine + Arthemether 1 x 6 | Lumefantrine + Arthemether 2 x 6 | Lumefantrine + Arthemether 3 x 6 |Lumefantrine + Arthemether 4 x 6 | ASAQ 100mg/270mg (3 tablets) | ASAQ 100mg/270mg (6 tablets) | ASAQ 25mg/67.5mg (3 tablets) | ASAQ 50mg/135mg (3 tablets)",
+                  "filter_val3": "*Lumefantrine",
                   "filter_col4": "Encounter",
-                  "filter_val4": "TREATMENT",
+                  "filter_val4": "Dispensing",
                   "filter_col5": "Program",
                   "filter_val5": "OPD Program"
                 }
               },
               {
                 "id": "chart_ef45ae8f",
-                "name": "Malaria Drugs Dispensed (Quantities)",
+                "name": "Malaria (ASAQ) Drugs Dispensed",
                 "type": "Bar",
                 "level": "facility",
                 "filters": {
                   "measure": "sum",
                   "unique": "any",
                   "duration_default": "any",
-                  "title": "Malaria Drugs Dispensed (Quantities)",
+                  "title": "Malaria (ASAQ) Drugs Dispensed",
                   "label_col": "DrugName",
                   "value_col": "ValueN",
                   "x_title": "Quantity Dispensed",
@@ -1100,11 +1100,11 @@
                   "filter_col1": "Program",
                   "filter_val1": "OPD Program",
                   "filter_col2": "Encounter",
-                  "filter_val2": "DISPENSING",
-                  "filter_col3": "DrugName",
-                  "filter_val3": "Lumefantrine + Arthemether 1 x 6 | Lumefantrine + Arthemether 2 x 6 | Lumefantrine + Arthemether 3 x 6 |Lumefantrine + Arthemether 4 x 6 | ASAQ 100mg/270mg (3 tablets) | ASAQ 100mg/270mg (6 tablets) | ASAQ 25mg/67.5mg (3 tablets) | ASAQ 50mg/135mg (3 tablets)",
+                  "filter_val2": "Dispensing",
+                  "filter_col3": "Order_Name",
+                  "filter_val3": "*ASAQ",
                   "filter_col4": "Encounter",
-                  "filter_val4": "DISPENSING",
+                  "filter_val4": "Dispensing",
                   "filter_col5": "Program",
                   "filter_val5": "OPD Program"
                 }
