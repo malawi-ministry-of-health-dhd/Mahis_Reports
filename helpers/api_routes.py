@@ -105,38 +105,11 @@ def register_api_routes(server):
             if not report:
                 return jsonify({"error": "Report Not Found"}), 404
 
-            sql = f"""
-                SELECT *
-                FROM '{DATA_FILE_NAME_}'
-                WHERE {FACILITY_CODE_} = '{facility_id}'
-            """
-            data = DataStorage.query_duckdb(sql)
-            data[DATE_] = pd.to_datetime(data[DATE_], format="mixed")
-            data[GENDER_] = data[GENDER_].replace({"M": "Male", "F": "Female"})
-            data["DateValue"] = pd.to_datetime(data[DATE_]).dt.date
-            today = dt.today().date()
-            data["months"] = data["DateValue"].apply(lambda item: (today - item).days // 30)
-
-            filtered = data[
-                (pd.to_datetime(data[DATE_]) >= pd.to_datetime(start_date))
-                & (pd.to_datetime(data[DATE_]) <= pd.to_datetime(end_date))
-            ]
-            filtered["start_date"] = start_date
-            filtered["end_date"] = end_date
-
-            original_data = data[pd.to_datetime(data[DATE_]) <= pd.to_datetime(end_date)]
-            original_data["days_before"] = original_data["DateValue"].apply(lambda item: (start_date - item).days)
-            original_data["start_date"] = start_date
-            original_data["end_date"] = end_date
-            original_data["days_before_visit_date"] = original_data["start_date"].apply(
-                    lambda d: (start_date - d).days
-                )
-
             spec_path = os.path.join(os.getcwd(), "data", "uploads", f"{report['page_name']}.xlsx")
             if not os.path.exists(spec_path):
                 return jsonify({"error": "Report template not found"}), 500
 
-            builder = ReportTableBuilder(spec_path,start_date,end_date, filtered, original_data, dhis2_period=None)
+            builder = ReportTableBuilder(spec_path,start_date,end_date,facility_id, dhis2_period=None)
             builder.load_spec()
             sections = builder.build_section_tables()
             section_ids = builder.build_section_tables_with_ids()

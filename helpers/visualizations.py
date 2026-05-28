@@ -545,7 +545,6 @@ def create_column_chart(query_fiter, x_col, y_col, title, x_title, y_title,
             f" WHERE {where_clause}"
             f" GROUP BY {x_col}, {color}"
         )
-        print(joined_query)
         summary = DataStorage.query_duckdb(joined_query)
         summary = apply_calculated_fields(summary, custom_fields)
         summary['label'] = summary['data_value'].astype(str)

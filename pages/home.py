@@ -923,8 +923,8 @@ def update_dashboard(gen, interval, start_date, end_date, level,
 
             else:
                 # This shall be rendered if not mnid utilizing sql_string as first use case
-                filtered_dates = f"{DATE_} BETWEEN '{start_date}'::DATE AND '{end_date}'::DATE AND {FACILITY_CODE_} = '{location}' "
-                filtered_with_range = f"{DATE_} BETWEEN '{default_start_date}'::DATE AND '{end_date}'::DATE AND {FACILITY_CODE_} = '{location}' "
+                filtered_dates = f"{DATE_} BETWEEN '{start_dt}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP AND {FACILITY_CODE_} = '{location}' "
+                filtered_with_range = f"{DATE_} BETWEEN '{default_start_date}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP AND {FACILITY_CODE_} = '{location}' "
 
                 section = build_charts_from_json(
                     filtered_dates, filtered_with_range, 7, dashboard_json,
