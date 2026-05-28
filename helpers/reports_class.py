@@ -139,8 +139,8 @@ class ReportTableBuilder:
             self._value_cache[filter_name] = result_str
             return result_str
 
-        filtered_dates = f"{DATE_} BETWEEN '{self.start_date}'::DATE AND '{self.end_date}'::DATE AND {FACILITY_CODE_} = '{self.location}' "
-        original_dates = f"{DATE_} <= '{self.end_date}'::DATE AND {FACILITY_CODE_} = '{self.location}' "
+        filtered_dates = f"{DATE_} BETWEEN '{self.start_date}'::TIMESTAMP AND '{self.end_date}'::TIMESTAMP AND {FACILITY_CODE_} = '{self.location}' "
+        original_dates = f"{DATE_} <= '{self.end_date}'::TIMESTAMP AND {FACILITY_CODE_} = '{self.location}' "
 
         if measure == "sum":
             args = [filtered_dates, PERSON_ID_, spec["unique_column"]]

@@ -646,9 +646,6 @@
               "OPD Program"
             ],
             "variable2": "Encounter",
-            "value2": [
-              "Diagnosis"
-            ],
             "variable3": "concept_name",
             "variable4": "obs_value_coded",
             "value4": "*Malaria",
@@ -670,9 +667,6 @@
               "OPD Program"
             ],
             "variable2": "Encounter",
-            "value2": [
-              "Diagnosis"
-            ],
             "variable3": "concept_name",
             "variable4": "obs_value_coded",
             "value4": "*Malaria",
@@ -696,13 +690,10 @@
             ],
             "variable2": "Encounter",
             "value2": [
-              "Outcome"
+              "Patient outcome"
             ],
             "variable3": "concept_name",
-            "value3": [
-              "Admitted",
-              "Patient admission outcome"
-            ],
+            "value3": "*Admitted",
             "variable4": "obs_value_coded",
             "variable5": "ValueN",
             "variable6": "Value",
@@ -723,12 +714,10 @@
             ],
             "variable2": "Encounter",
             "value2": [
-              "Outcome"
+              "Patient outcome"
             ],
             "variable3": "concept_name",
-            "value3": [
-              "Discharged home"
-            ],
+            "value3": "*Discharge",
             "variable4": "obs_value_coded",
             "variable5": "ValueN",
             "variable6": "Value",
@@ -749,7 +738,7 @@
             ],
             "variable2": "Encounter",
             "value2": [
-              "Outcome"
+              "Patient outcome"
             ],
             "variable3": "concept_name",
             "value3": [
@@ -928,7 +917,6 @@
                   "y_title": "Lab Test",
                   "unique_column": "person_id",
                   "legend_title": "Legend",
-                  "color": "Value",
                   "filter_col1": "Program",
                   "filter_val1": "OPD Program",
                   "filter_col2": "Encounter",
