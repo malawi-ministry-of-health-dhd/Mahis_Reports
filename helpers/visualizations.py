@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+import dash_bootstrap_components as dbc
 import dash
 import operator
 from dash import dash_table, html
@@ -467,7 +468,7 @@ def create_count_sets(
         queries.append(query)
 
     intersection_query = " INTERSECT ".join(queries)
-    # print(intersection_query)
+    print(intersection_query)
     result = DataStorage.query_duckdb(intersection_query)
     return result[unique_column].nunique()
 
@@ -498,11 +499,20 @@ def create_column_chart(query_fiter, x_col, y_col, title, x_title, y_title,
                         unique_column=PERSON_ID_, legend_title=None,
                         color=None, filter_col1=None, filter_value1=None,
                         filter_col2=None, filter_value2=None,
-                        filter_col3=None, filter_value3=None, aggregation='count', custom_fields=None):
+                        filter_col3=None, filter_value3=None, aggregation='count', 
+                        custom_fields=None, height=400, responsive=True,
+                        show_values=True, sort_by_value=True, max_categories=None):
     """
-    Create a column chart using Plotly Express with legend support.
+    Create a modern, responsive column chart using Plotly Express with legend support.
     Aggregation is pushed entirely into SQL: only the grouped summary rows
     are returned to Python, keeping RAM usage minimal.
+    
+    Parameters:
+    - height: Chart height in pixels (default: 400)
+    - responsive: Make chart responsive to container width (default: True)
+    - show_values: Show data values on bars (default: True)
+    - sort_by_value: Sort bars by value descending (default: True)
+    - max_categories: Limit number of categories shown (default: None = all)
     """
     isSet = False
     filter_pairs = [
@@ -522,14 +532,14 @@ def create_column_chart(query_fiter, x_col, y_col, title, x_title, y_title,
     where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
  
     # Map aggregation name → SQL aggregate expression on y_col.
-    # 'count' and 'nunique' both use COUNT(DISTINCT y_col) to match the
-    # original nunique()/count() behaviour.
     if aggregation in ('count', 'nunique'):
         agg_expr = f"COUNT(DISTINCT {y_col})"
     elif aggregation == 'sum':
         agg_expr = f"SUM({y_col})"
     elif aggregation == 'mean':
         agg_expr = f"AVG({y_col})"
+    elif aggregation == 'median':
+        agg_expr = f"MEDIAN({y_col})"
     elif aggregation == 'min':
         agg_expr = f"MIN({y_col})"
     elif aggregation == 'max':
@@ -537,6 +547,15 @@ def create_column_chart(query_fiter, x_col, y_col, title, x_title, y_title,
     else:
         agg_expr = f"{aggregation}({y_col})"
  
+    # Modern color palettes
+    modern_palettes = {
+        'corporate': ['#2c3e50', '#34495e', '#3498db', '#2980b9', '#1abc9c'],
+        'vibrant': ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7'],
+        'pastel': ['#B5EAD7', '#C7CEEA', '#E2F0CB', '#FFDAC1', '#FF9AA2'],
+        'professional': ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd'],
+        'modern_blue': ['#0f4c81', '#3182ce', '#4299e1', '#63b3ed', '#90cdf4']
+    }
+    
     if color:
         # SELECT x_col, color, AGG(y_col) … GROUP BY x_col, color
         joined_query = (
@@ -547,48 +566,168 @@ def create_column_chart(query_fiter, x_col, y_col, title, x_title, y_title,
         )
         summary = DataStorage.query_duckdb(joined_query)
         summary = apply_calculated_fields(summary, custom_fields)
-        summary['label'] = summary['data_value'].astype(str)
+        
+        # Apply category limit if specified
+        if max_categories and len(summary[x_col].unique()) > max_categories:
+            top_categories = summary.groupby(x_col)['data_value'].sum().nlargest(max_categories).index
+            summary = summary[summary[x_col].isin(top_categories)]
+        
+        summary['label'] = summary['data_value'].apply(
+            lambda x: f'{int(x):,}' if x == int(x) else f'{x:,.1f}'
+        ) if show_values else ''
  
         fig = px.bar(
             summary,
             x=x_col,
             y='data_value',
             color="Color",
-            title=title,
-            text='label',
-            color_discrete_sequence=px.colors.qualitative.Dark2,
+            title=None,  # Title added in layout
+            text='label' if show_values else None,
+            color_discrete_sequence=modern_palettes['corporate'],
             barmode='group'
         )
     else:
-        # SELECT x_col, AGG(y_col) … GROUP BY x_col ORDER BY data_value DESC
+        # SELECT x_col, AGG(y_col) … GROUP BY x_col
+        order_clause = "ORDER BY data_value DESC" if sort_by_value else ""
         joined_query = (
             f"SELECT {x_col}, {agg_expr} AS data_value"
             f" FROM '{DATA_FILE_NAME_}'"
             f" WHERE {where_clause}"
             f" GROUP BY {x_col}"
-            f" ORDER BY data_value DESC"
+            f" {order_clause}"
         )
-        print(joined_query)
         summary = DataStorage.query_duckdb(joined_query)
         summary = apply_calculated_fields(summary, custom_fields)
-        summary['label'] = summary['data_value'].astype(str)
+        
+        # Apply category limit if specified
+        if max_categories and len(summary) > max_categories:
+            if sort_by_value:
+                summary = summary.head(max_categories)
+            else:
+                summary = summary.iloc[:max_categories]
+        
+        summary['label'] = summary['data_value'].apply(
+            lambda x: f'{int(x):,}' if x == int(x) else f'{x:,.1f}'
+        ) if show_values else ''
  
-        fig = px.bar(summary, x=x_col, y='data_value', title=title, text='label')
-        fig.update_traces(marker_color="#006401")
- 
-    fig.update_layout(
-        xaxis_title=x_title,
-        yaxis_title=y_title,
-        template="plotly_white",
-        legend_title=legend_title if legend_title else color,
+        # Modern gradient color for single-color bars
+        fig = px.bar(
+            summary, 
+            x=x_col, 
+            y='data_value', 
+            title=None,
+            text='label' if show_values else None
+        )
+        
+        # Apply modern gradient color
+        fig.update_traces(
+            marker_color='#2c3e50',
+            marker_line_color='#34495e',
+            marker_line_width=1,
+            opacity=0.85
+        )
+    
+    # Modern layout configuration with responsive settings
+    layout_config = {
+        'title': dict(
+            text=f'<b>{title}</b>',
+            x=0.5,
+            xanchor='center',
+            font=dict(size=18, color='#2c3e50', family='Arial, sans-serif'),
+            y=0.95
+        ),
+        'xaxis_title': dict(
+            text=x_title,
+            font=dict(size=13, color='#34495e', family='Arial, sans-serif'),
+            standoff=10
+        ),
+        'yaxis_title': dict(
+            text=y_title,
+            font=dict(size=13, color='#34495e', family='Arial, sans-serif'),
+            standoff=10
+        ),
+        'template': 'plotly_white',
+        'legend_title': dict(
+            text=legend_title if legend_title else color,
+            font=dict(size=12, color='#2c3e50')
+        ),
+        'plot_bgcolor': '#ffffff',
+        'paper_bgcolor': '#ffffff',
+        'margin': dict(l=50, r=30, t=80, b=50, pad=4),
+        'height': height,
+        'hovermode': 'x unified',
+        'font': dict(family='Arial, sans-serif', size=12, color='#2c3e50'),
+        
+        # Make chart responsive to container width
+        'autosize': responsive,
+        'width': None if responsive else 800,  # None = auto, or set fixed width
+    }
+    
+    fig.update_layout(**layout_config)
+    
+    # Modern axes styling
+    fig.update_xaxes(
+        showgrid=True,
+        gridwidth=0.5,
+        gridcolor='#e8ecef',
+        showline=True,
+        linewidth=1,
+        linecolor='#cbd5e0',
+        tickangle=-45 if len(summary) > 5 else 0,
+        tickfont=dict(size=11, color='#4a5568'),
+        title_standoff=10
     )
- 
+    
+    fig.update_yaxes(
+        showgrid=True,
+        gridwidth=0.5,
+        gridcolor='#e8ecef',
+        showline=True,
+        linewidth=1,
+        linecolor='#cbd5e0',
+        zeroline=True,
+        zerolinewidth=1,
+        zerolinecolor='#e2e8f0',
+        tickfont=dict(size=11, color='#4a5568'),
+        tickformat=',.0f',
+        title_standoff=10
+    )
+    
+    # Modern bar styling
     fig.update_traces(
-        textposition='auto',
-        hovertemplate="<b>X-Axis:</b> %{x}<br>" +
-                      "<b>Count:</b> %{y}<br>"
+        textposition='outside',
+        textfont=dict(size=11, color='#2c3e50', family='Arial, sans-serif'),
+        hovertemplate="<b>%{x}</b><br>" +
+                      f"<b>{y_title}:</b> %{{y:,.0f}}<br>" +
+                      "<extra></extra>",
+        marker=dict(
+            pattern_shape='',
+            cornerradius=4  # Rounded corners for modern look
+        )
     )
- 
+    
+    # Add optional grid lines and improve readability
+    if responsive:
+        # Configure for responsive behavior
+        fig.update_layout(
+            autosize=True,
+            bargap=0.15,  # Gap between bars
+            bargroupgap=0.05  # Gap between bar groups
+        )
+    
+    # Add subtle background pattern or border (optional)
+    fig.update_layout(
+        shapes=[
+            dict(
+                type='rect',
+                xref='paper', yref='paper',
+                x0=0, y0=0, x1=1, y1=1,
+                line=dict(width=1, color='#e2e8f0'),
+                fillcolor='rgba(0,0,0,0)'
+            )
+        ]
+    )
+    
     return fig
 
 def create_time_line_chart(query_fiter, date_col, y_col, title, x_title, 
@@ -596,11 +735,24 @@ def create_time_line_chart(query_fiter, date_col, y_col, title, x_title,
                       legend_title=None, color=None, filter_col1=None, 
                       filter_value1=None, filter_col2=None, 
                       filter_value2=None, filter_col3=None, 
-                      filter_value3=None, aggregation='count',custom_fields=None):
+                      filter_value3=None, aggregation='count', 
+                      custom_fields=None, height=400, responsive=True,
+                      show_avg_line=True, show_trend_line=False,
+                      date_granularity='day', smooth_lines=False,
+                      show_annotations=True, forecast_periods=0):
     """
-    Create a time series chart using Plotly Express.
-    date_col is already a date; grouping and aggregation are pushed into SQL
-    so only the summary rows are returned to Python.
+    Create a modern, responsive time series chart using Plotly Express.
+    Aggregation is pushed into SQL so only summary rows are returned to Python.
+    
+    Parameters:
+    - height: Chart height in pixels (default: 400)
+    - responsive: Make chart responsive to container width (default: True)
+    - show_avg_line: Show average reference line (default: True)
+    - show_trend_line: Show trend line (default: False)
+    - date_granularity: 'day', 'week', 'month', 'quarter', 'year' (default: 'day')
+    - smooth_lines: Use smooth curves instead of straight lines (default: False)
+    - show_annotations: Show key point annotations (default: True)
+    - forecast_periods: Number of periods to forecast (default: 0)
     """
     isSet = False
     filter_pairs = [
@@ -619,99 +771,293 @@ def create_time_line_chart(query_fiter, date_col, y_col, title, x_title,
  
     where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
  
+    # Map aggregation to SQL
     if aggregation in ('count', 'nunique'):
         agg_expr = f"COUNT(DISTINCT {y_col})"
     elif aggregation == 'sum':
         agg_expr = f"SUM({y_col})"
     elif aggregation == 'mean':
         agg_expr = f"AVG({y_col})"
+    elif aggregation == 'median':
+        agg_expr = f"MEDIAN({y_col})"
     elif aggregation == 'min':
         agg_expr = f"MIN({y_col})"
     elif aggregation == 'max':
         agg_expr = f"MAX({y_col})"
     else:
         agg_expr = f"{aggregation}({y_col})"
- 
-    # date_col is already a date — cast directly, no Python conversion needed
+    
+    # Date granularity formatting
+    date_format_map = {
+        'day': f"CAST({date_col} AS DATE)",
+        'week': f"DATE_TRUNC('week', {date_col})",
+        'month': f"DATE_TRUNC('month', {date_col})",
+        'quarter': f"DATE_TRUNC('quarter', {date_col})",
+        'year': f"DATE_TRUNC('year', {date_col})"
+    }
+    date_expr = date_format_map.get(date_granularity, f"CAST({date_col} AS DATE)")
+    
+    # Modern color palettes
+    modern_color_palettes = {
+        'blue_teal': ['#1f77b4', '#17becf', '#2ca02c', '#ff7f0e', '#d62728'],
+        'purple_pink': ['#9467bd', '#e377c2', '#7f7f7f', '#bcbd22', '#8c564b'],
+        'corporate': ['#2c3e50', '#3498db', '#1abc9c', '#e74c3c', '#f39c12'],
+        'vibrant': ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7'],
+        'elegant': ['#0f4c81', '#2e8b57', '#8b4513', '#4b0082', '#cd853f']
+    }
+    
     if color:
         joined_query = (
-            f"SELECT CAST({date_col} AS DATE) AS date_only, {color}, {agg_expr} AS count"
+            f"SELECT {date_expr} AS date_trunc, {color}, {agg_expr} AS metric_value"
             f" FROM '{DATA_FILE_NAME_}'"
             f" WHERE {where_clause}"
-            f" GROUP BY CAST({date_col} AS DATE), {color}"
-            f" ORDER BY date_only"
+            f" GROUP BY {date_expr}, {color}"
+            f" ORDER BY date_trunc"
         )
     else:
         joined_query = (
-            f"SELECT CAST({date_col} AS DATE) AS date_only, {agg_expr} AS count"
+            f"SELECT {date_expr} AS date_trunc, {agg_expr} AS metric_value"
             f" FROM '{DATA_FILE_NAME_}'"
             f" WHERE {where_clause}"
-            f" GROUP BY CAST({date_col} AS DATE)"
-            f" ORDER BY date_only"
+            f" GROUP BY {date_expr}"
+            f" ORDER BY date_trunc"
         )
+    
     summary = DataStorage.query_duckdb(joined_query)
     summary = apply_calculated_fields(summary, custom_fields)
- 
-    # Identify key points
-    try:
-        summary = summary.sort_values('date_only').reset_index(drop=True)
- 
-        idx_start = 0
-        idx_end = len(summary) - 1
-        idx_max = (
-            summary['count'].idxmax()
-            if 'count' in summary and summary['count'].notna().any()
-            else None
+    summary = summary.rename(columns={'metric_value': 'count'})
+    
+    # Create figure
+    if color:
+        fig = px.line(
+            summary,
+            x='date_trunc',
+            y='count',
+            color=color,
+            color_discrete_sequence=modern_color_palettes['corporate'],
+            title=None  # Title added in layout
         )
-        key_indices = {idx_start, idx_end}
-        if idx_max is not None:
-            key_indices.add(idx_max)
- 
-        key_points = summary.loc[list(key_indices)]
- 
-    except Exception:
-        key_points = pd.DataFrame(columns=summary.columns)
- 
-    fig = px.line(
-        summary,
-        x='date_only',
-        y='count',
-        color=color if color else None,
-        color_discrete_sequence=px.colors.qualitative.Dark2,
-        title=title
-    )
- 
+    else:
+        fig = px.line(
+            summary,
+            x='date_trunc',
+            y='count',
+            color_discrete_sequence=['#2c3e50'],
+            title=None
+        )
+    
+    # Line styling
+    line_mode = 'lines+markers' if len(summary) < 50 else 'lines'
+    
     fig.update_traces(
-        mode='lines',
-        hovertemplate="<b>Date:</b> %{x|%Y-%m-%d}<br><b>Count:</b> %{y}<extra></extra>"
+        mode='lines+markers' if smooth_lines else line_mode,
+        line=dict(
+            width=2.5 if not smooth_lines else 3,
+            shape='spline' if smooth_lines else 'linear',
+            smoothing=1.3 if smooth_lines else 0
+        ),
+        marker=dict(
+            size=6,
+            symbol='circle',
+            line=dict(width=1, color='white')
+        ),
+        hovertemplate="<b>%{x|%Y-%m-%d}</b><br>" +
+                      f"<b>{y_title}:</b> %{{y:,.0f}}<br>" +
+                      "<extra></extra>"
     )
- 
-    fig.add_scatter(
-        x=key_points['date_only'],
-        y=key_points['count'],
-        mode='markers+text',
-        text=key_points['count'],
-        textposition='top center',
-        marker=dict(size=10, color='black'),
-        showlegend=False,
-        hovertemplate="<b>Date:</b> %{x|%Y-%m-%d}<br><b>Count:</b> %{y}<extra></extra>"
-    )
-    if not summary.empty:
+    
+    # Add key point annotations
+    if show_annotations and not summary.empty:
+        try:
+            summary = summary.sort_values('date_trunc').reset_index(drop=True)
+            
+            # Identify key points
+            idx_start = 0
+            idx_end = len(summary) - 1
+            idx_max = summary['count'].idxmax() if summary['count'].notna().any() else None
+            idx_min = summary['count'].idxmin() if summary['count'].notna().any() else None
+            
+            key_indices = {idx_start, idx_end}
+            if idx_max is not None:
+                key_indices.add(idx_max)
+            if idx_min is not None:
+                key_indices.add(idx_min)
+            
+            key_points = summary.loc[list(key_indices)]
+            
+            # Add markers for key points
+            fig.add_scatter(
+                x=key_points['date_trunc'],
+                y=key_points['count'],
+                mode='markers+text',
+                text=key_points['count'].apply(lambda x: f'{int(x):,}' if x == int(x) else f'{x:,.1f}'),
+                textposition='top center',
+                marker=dict(size=12, color='#e74c3c', symbol='diamond', 
+                           line=dict(width=2, color='white')),
+                showlegend=False,
+                name='Key Points',
+                textfont=dict(size=10, color='#e74c3c', family='Arial, sans-serif'),
+                hovertemplate="<b>Key Point:</b> %{x|%Y-%m-%d}<br>" +
+                              f"<b>{y_title}:</b> %{{y:,.0f}}<extra></extra>"
+            )
+        except Exception:
+            pass
+    
+    # Add average line
+    if show_avg_line and not summary.empty:
         avg_val = summary['count'].mean()
         fig.add_hline(
             y=avg_val,
             line_dash="dash",
-            line_color="red",
-            annotation_text=f"Average = {avg_val:.0f}",
-            annotation_position="top right"
+            line_color="#0b7903",
+            line_width=1.5,
+            opacity=0.7,
+            annotation_text=f"Average: {avg_val:,.0f}",
+            annotation_position="bottom right",
+            annotation_font_size=11,
+            annotation_font_color="#e74c3c"
         )
     
-    fig.update_layout(
-        yaxis=dict(title=y_title),
-        xaxis=dict(title=x_title),
-        legend_title=legend_title if legend_title else (color if color else ""),
-        template="plotly_white"
+    # Add trend line (simple linear regression)
+    if show_trend_line and len(summary) > 1:
+        from scipy import stats
+        x_numeric = range(len(summary))
+        slope, intercept, r_value, p_value, std_err = stats.linregress(x_numeric, summary['count'])
+        trend_values = [intercept + slope * i for i in x_numeric]
+        
+        fig.add_scatter(
+            x=summary['date_trunc'],
+            y=trend_values,
+            mode='lines',
+            line=dict(width=2, color='#f39c12', dash='dot'),
+            name='Trend Line',
+            opacity=0.8,
+            hovertemplate=f"<b>Trend:</b> %{{y:,.0f}}<extra></extra>"
+        )
+    
+    # Add simple forecast
+    if forecast_periods > 0 and len(summary) > 2:
+        from scipy import stats
+        x_numeric = range(len(summary))
+        slope, intercept, r_value, p_value, std_err = stats.linregress(x_numeric, summary['count'])
+        
+        last_date = summary['date_trunc'].iloc[-1]
+        date_range = pd.date_range(start=last_date, periods=forecast_periods + 1, freq='D')[1:]
+        
+        forecast_values = [intercept + slope * (len(summary) + i) for i in range(forecast_periods)]
+        
+        fig.add_scatter(
+            x=date_range,
+            y=forecast_values,
+            mode='lines+markers',
+            line=dict(width=2, color='#0b7903', dash='dash'),
+            marker=dict(size=6, symbol='diamond'),
+            name='Forecast',
+            opacity=0.7,
+            hovertemplate="<b>Forecast:</b> %{x|%Y-%m-%d}<br>" +
+                          f"<b>{y_title}:</b> %{{y:,.0f}}<extra></extra>"
+        )
+    
+    # Modern layout configuration
+    layout_config = {
+        'title': dict(
+            text=f'<b>{title}</b>',
+            x=0.5,
+            xanchor='center',
+            font=dict(size=18, color='#2c3e50', family='Arial, sans-serif'),
+            y=0.95
+        ),
+        'xaxis_title': dict(
+            text=x_title,
+            font=dict(size=13, color='#34495e', family='Arial, sans-serif'),
+            standoff=10
+        ),
+        'yaxis_title': dict(
+            text=y_title,
+            font=dict(size=13, color='#34495e', family='Arial, sans-serif'),
+            standoff=10
+        ),
+        'template': 'plotly_white',
+        'legend_title': dict(
+            text=legend_title if legend_title else (color if color else ""),
+            font=dict(size=12, color='#2c3e50')
+        ),
+        'legend': dict(
+            orientation='h',
+            yanchor='bottom',
+            y=1.02,
+            xanchor='right',
+            x=1,
+            bgcolor='rgba(255,255,255,0.9)',
+            bordercolor='#e2e8f0',
+            borderwidth=1
+        ),
+        'plot_bgcolor': '#ffffff',
+        'paper_bgcolor': '#ffffff',
+        'margin': dict(l=60, r=40, t=80, b=50, pad=4),
+        'height': height,
+        'hovermode': 'x unified',
+        'font': dict(family='Arial, sans-serif', size=12, color='#2c3e50'),
+        'autosize': responsive,
+        'width': None if responsive else 900,
+    }
+    
+    fig.update_layout(**layout_config)
+    
+    # Modern axes styling
+    fig.update_xaxes(
+        title_standoff=10,
+        showgrid=True,
+        gridwidth=0.5,
+        gridcolor='#e8ecef',
+        showline=True,
+        linewidth=1,
+        linecolor='#cbd5e0',
+        tickangle=-45 if len(summary) > 10 else 0,
+        tickfont=dict(size=11, color='#4a5568'),
+        tickformat='%b %d, %Y' if date_granularity == 'day' else '%b %Y',
+        rangeslider=dict(visible=False),  # Can be enabled if needed
+        rangeselector=dict(
+            buttons=list([
+                dict(count=7, label="1w", step="day", stepmode="backward"),
+                dict(count=1, label="1m", step="month", stepmode="backward"),
+                dict(count=3, label="3m", step="month", stepmode="backward"),
+                dict(count=6, label="6m", step="month", stepmode="backward"),
+                dict(step="all", label="All")
+            ]),
+            bgcolor='white',
+            bordercolor='#cbd5e0',
+            borderwidth=1,
+            font=dict(size=10, color='#2c3e50')
+        ) if len(summary) > 30 else None
     )
+    
+    fig.update_yaxes(
+        title_standoff=10,
+        showgrid=True,
+        gridwidth=0.5,
+        gridcolor='#e8ecef',
+        showline=True,
+        linewidth=1,
+        linecolor='#cbd5e0',
+        zeroline=True,
+        zerolinewidth=1,
+        zerolinecolor='#e2e8f0',
+        tickfont=dict(size=11, color='#4a5568'),
+        tickformat=',.0f'
+    )
+    
+    # Add range slider for long time series
+    if len(summary) > 60:
+        fig.update_xaxes(rangeslider=dict(visible=True, thickness=0.05))
+    
+    # Add fill below line for single series
+    if not color and len(summary) > 0:
+        fig.update_traces(
+            fill='tozeroy',
+            fillcolor='rgba(44, 62, 80, 0.1)',
+            selector=dict(mode='lines+markers')
+        )
     
     return fig
  
@@ -719,11 +1065,23 @@ def create_pie_chart(query_fiter, names_col, values_col, title,
                      unique_column=PERSON_ID_, filter_col1=None,
                      filter_value1=None, filter_col2=None,
                      filter_value2=None, filter_col3=None,
-                     filter_value3=None, colormap=None, aggregation='count', custom_fields=None):
+                     filter_value3=None, colormap=None, aggregation='count',
+                     custom_fields=None, height=400, responsive=True,
+                     hole_size=0.5, show_legend=True, legend_title=None,
+                     sort_by_value=True, max_slices=None):
     """
-    Create a pie chart using Plotly Express.
-    Grouping, aggregation and zero-value filtering are pushed into SQL so only
-    the summary rows are returned to Python.
+    Create a modern, responsive donut/pie chart using Plotly Express.
+    Aggregation is pushed into SQL: only the grouped summary rows
+    are returned to Python, keeping RAM usage minimal.
+
+    Parameters:
+    - height: Chart height in pixels (default: 400)
+    - responsive: Make chart responsive to container width (default: True)
+    - hole_size: Donut hole ratio 0–1; 0 = full pie (default: 0.5)
+    - show_legend: Show the external legend (default: True)
+    - legend_title: Override legend header text (default: names_col)
+    - sort_by_value: Sort slices largest-first (default: True)
+    - max_slices: Collapse tail slices into "Other" (default: None = all)
     """
     isSet = False
     filter_pairs = [
@@ -739,71 +1097,150 @@ def create_pie_chart(query_fiter, names_col, values_col, title,
                 col = col[0]
             val = _normalize_filter_value(val)
             conditions.append(build_filter_query(col, val, unique_column, isSet, None, None))
- 
+
     where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
- 
+
     if aggregation in ('count', 'nunique'):
         agg_expr = f"COUNT(DISTINCT {values_col})"
     elif aggregation == 'sum':
         agg_expr = f"SUM({values_col})"
     elif aggregation == 'mean':
         agg_expr = f"AVG({values_col})"
+    elif aggregation == 'median':
+        agg_expr = f"MEDIAN({values_col})"
     elif aggregation == 'min':
         agg_expr = f"MIN({values_col})"
     elif aggregation == 'max':
         agg_expr = f"MAX({values_col})"
     else:
         agg_expr = f"{aggregation}({values_col})"
- 
-    # HAVING data_value > 0 eliminates zero-value categories in SQL
+
+    order_clause = "ORDER BY data_value DESC" if sort_by_value else ""
     joined_query = (
         f"SELECT {names_col}, {agg_expr} AS data_value"
         f" FROM '{DATA_FILE_NAME_}'"
         f" WHERE {where_clause}"
         f" GROUP BY {names_col}"
         f" HAVING data_value > 0"
+        f" {order_clause}"
     )
     df_summary = DataStorage.query_duckdb(joined_query)
     df_summary = apply_calculated_fields(df_summary, custom_fields)
- 
+
     if df_summary.empty:
-        return go.Figure().update_layout(title=f"No data available for {title}")
- 
+        return go.Figure().update_layout(
+            title=dict(
+                text=f'<b>No data available for {title}</b>',
+                x=0.5, xanchor='center',
+                font=dict(size=18, color='#2c3e50', family='Arial, sans-serif')
+            ),
+            paper_bgcolor='#ffffff',
+            height=height
+        )
+
+    # Collapse tail slices into "Other"
+    if max_slices and len(df_summary) > max_slices:
+        top = df_summary.head(max_slices - 1)
+        other_val = df_summary.iloc[max_slices - 1:]['data_value'].sum()
+        other_row = pd.DataFrame({names_col: ['Other'], 'data_value': [other_val]})
+        df_summary = pd.concat([top, other_row], ignore_index=True)
+
+    # Modern color palette aligned with column/timeline charts
+    modern_palettes = {
+        'corporate': [
+            '#2c3e50', '#3498db', '#1abc9c', '#e74c3c', '#f39c12',
+            '#9b59b6', '#e67e22', '#16a085', '#2980b9', '#8e44ad'
+        ]
+    }
+
+    color_sequence = (
+        list(colormap.values()) if colormap
+        else modern_palettes['corporate']
+    )
+
     fig = px.pie(
         df_summary,
         names=names_col,
         values='data_value',
-        title=title,
-        hole=0.5,
-        color_discrete_sequence=px.colors.qualitative.Dark2 if colormap is None else None
+        hole=hole_size,
+        color_discrete_sequence=color_sequence,
+        title=None  # Title added in layout below
     )
-    colormap = {}
- 
-    if colormap:
-        colors = [colormap.get(cat, px.colors.qualitative.Dark2[i % len(px.colors.qualitative.Dark2)])
-                  for i, cat in enumerate(df_summary[names_col])]
-        fig.update_traces(marker=dict(colors=colors))
- 
+
+    # Modern trace styling
     fig.update_traces(
         textposition='inside',
         textinfo='percent+label',
-        hovertemplate="<b>Category:</b> %{label}<br>" +
-                      "<b>Value:</b> %{value}<br>" +
-                      "<b>Percent:</b> %{percent}<br>"
+        textfont=dict(size=11, color='white', family='Arial, sans-serif'),
+        hovertemplate=(
+            "<b>%{label}</b><br>"
+            "<b>Value:</b> %{value:,.0f}<br>"
+            "<b>Share:</b> %{percent}<br>"
+            "<extra></extra>"
+        ),
+        marker=dict(
+            line=dict(color='#ffffff', width=2)   # clean white gap between slices
+        ),
+        pull=[0.03] + [0] * (len(df_summary) - 1)  # slight pull on the largest slice
     )
- 
+
+    # Shared modern layout (mirrors column/timeline)
+    fig.update_layout(
+        title=dict(
+            text=f'<b>{title}</b>',
+            x=0.5,
+            xanchor='center',
+            font=dict(size=18, color='#2c3e50', family='Arial, sans-serif'),
+            y=0.97
+        ),
+        template='plotly_white',
+        plot_bgcolor='#ffffff',
+        paper_bgcolor='#ffffff',
+        margin=dict(l=30, r=30, t=80, b=30, pad=4),
+        height=height,
+        autosize=responsive,
+        width=None if responsive else 800,
+        font=dict(family='Arial, sans-serif', size=12, color='#2c3e50'),
+        showlegend=show_legend,
+        legend=dict(
+            title=dict(
+                text=legend_title if legend_title else names_col,
+                font=dict(size=12, color='#2c3e50')
+            ),
+            orientation='v',
+            yanchor='middle',
+            y=0.5,
+            xanchor='left',
+            x=1.02,
+            bgcolor='rgba(255,255,255,0.9)',
+            bordercolor='#e2e8f0',
+            borderwidth=1,
+            font=dict(size=11, color='#4a5568')
+        ),
+        # Subtle outer border (same as column chart)
+        shapes=[
+            dict(
+                type='rect',
+                xref='paper', yref='paper',
+                x0=0, y0=0, x1=1, y1=1,
+                line=dict(width=1, color='#e2e8f0'),
+                fillcolor='rgba(0,0,0,0)'
+            )
+        ]
+    )
+
     return fig
  
-def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, unique_column=PERSON_ID_, aggfunc='sum',
+def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, unique_column='PERSON_ID_', aggfunc='sum',
                      filter_col1=None, filter_value1=None, 
                      filter_col2=None, filter_value2=None,
                      filter_col3=None, filter_value3=None,
                      aggregation='count',
-                     rename={}, replace={}, custom_fields=None):
+                     rename={}, replace={}, custom_fields=None,
+                     page_size=10, current_page=0):
     """
-    Create a pivot table from the DataFrame.
-    Aggregation (including STRING_AGG for concat) is pushed into SQL so only
-    the summarised rows are transferred to Python before pivoting.
+    Create a pivot table with modern styling and pagination (10 items per page).
+    Returns a Plotly figure.
     """
     isSet = False
     filter_pairs = [
@@ -822,37 +1259,32 @@ def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, u
  
     where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
  
-    # Resolve index and columns as lists for uniform handling
-    index_cols  = list(index_col)  if isinstance(index_col,  (list, tuple)) else [index_col]
+    index_cols = list(index_col) if isinstance(index_col, (list, tuple)) else [index_col]
     columns_cols = [columns_col] if (columns_col and columns_col != "") else []
-    group_cols  = index_cols + columns_cols
-    group_sql   = ", ".join(group_cols)
+    group_cols = index_cols + columns_cols
+    group_sql = ", ".join(group_cols)
  
-    # Map aggfunc → SQL aggregate expression on values_col
     if aggfunc == 'concat':
-        agg_expr = (
-            f"STRING_AGG(DISTINCT CAST({values_col} AS VARCHAR), ', '"
-            f" ORDER BY CAST({values_col} AS VARCHAR))"
-        )
+        agg_expr = f"STRING_AGG(DISTINCT CAST({values_col} AS VARCHAR), ', ' ORDER BY CAST({values_col} AS VARCHAR))"
         value_format = None
     elif aggfunc == 'count':
         agg_expr = f"COUNT({values_col})"
-        value_format = ",.0f"
+        value_format = ',.0f'
     elif aggfunc == 'sum':
         agg_expr = f"SUM({values_col})"
-        value_format = ",.0f"
+        value_format = ',.0f'
     elif aggfunc == 'mean':
         agg_expr = f"AVG({values_col})"
-        value_format = ",.0f"
+        value_format = ',.2f'
     elif aggfunc == 'min':
         agg_expr = f"MIN({values_col})"
-        value_format = ",.0f"
+        value_format = ',.0f'
     elif aggfunc == 'max':
         agg_expr = f"MAX({values_col})"
-        value_format = ",.0f"
+        value_format = ',.0f'
     else:
         agg_expr = f"COUNT(DISTINCT {values_col})"
-        value_format = ",.0f"
+        value_format = ',.0f'
  
     joined_query = (
         f"SELECT {group_sql}, {agg_expr} AS __value__"
@@ -862,11 +1294,8 @@ def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, u
     )
     data = DataStorage.query_duckdb(joined_query)
     data = apply_calculated_fields(data, custom_fields)
- 
-    # Rename the aggregated column back to values_col for pivot_table
     data = data.rename(columns={"__value__": values_col})
  
-    # Build pivot — aggfunc is now 'first' because grouping already happened in SQL
     pivot = data.pivot_table(
         index=index_col,
         columns=columns_col if columns_col != "" else None,
@@ -875,50 +1304,83 @@ def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, u
         fill_value=0 if aggfunc != 'concat' else ""
     ).reset_index()
     
-    num_index_cols = len(index_col) if isinstance(index_col, (list, tuple)) else 1
+    pivot = pivot.rename(columns=rename).replace(replace)
     
-    align_list = (['left'] * num_index_cols) + (['center'] * (len(pivot.columns) - num_index_cols))
+    # Pagination: slice the dataframe
+    start_idx = current_page * page_size
+    end_idx = start_idx + page_size
+    total_pages = (len(pivot) + page_size - 1) // page_size
+    pivot_paginated = pivot.iloc[start_idx:end_idx]
+    
+    num_index_cols = len(index_cols)
+    
+    align_list = ['left'] * num_index_cols + ['center'] * (len(pivot_paginated.columns) - num_index_cols)
     
     if value_format is None:
-        format_list = [None] * len(pivot.columns)
+        format_list = [None] * len(pivot_paginated.columns)
     else:
-        format_list = ([None] * num_index_cols) + ([value_format] * (len(pivot.columns) - num_index_cols))
+        format_list = [None] * num_index_cols + [value_format] * (len(pivot_paginated.columns) - num_index_cols)
     
-    pivot = pivot.rename(columns=rename).replace(replace)
+    # Modern color palette (solid colors only - Plotly compatible)
+    header_color = "#8A8A8A"  # Dark slate blue (modern professional)
+    header_text_color = 'white'
+    
+    # Create alternating row colors for better readability
+    row_colors = ['#ffffff', '#f8f9fa']  # White and light gray
     
     fig = go.Figure(data=[go.Table(
         header=dict(
-            values=["<b>" + str(col) + "</b>" for col in pivot.columns],
-            fill_color='grey',
+            values=["<b>" + str(col) + "</b>" for col in pivot_paginated.columns],
+            fill_color=header_color,
             align=align_list,
-            font=dict(size=12, color='white')
+            font=dict(size=13, color=header_text_color, family='Arial, sans-serif'),
+            height=40,
+            line=dict(width=1, color="#7d7d7d")
         ),
         cells=dict(
-            values=[pivot[col] for col in pivot.columns],
-            fill_color='white',
+            values=[pivot_paginated[col] for col in pivot_paginated.columns],
+            fill_color=[[row_colors[i % 2] for i in range(len(pivot_paginated))]],
             align=align_list,
-            height=30,
+            height=35,
             format=format_list,
-            font=dict(size=11, color='darkslategray')
+            font=dict(size=12, color='#2c3e50', family='Arial, sans-serif'),
+            line=dict(width=0.5, color='#dee2e6')
         )
     )])
     
-    row_height = 30
-    extra_space = 100
-    dynamic_height = row_height * len(pivot) + extra_space
+    # Dynamic height calculation
+    row_height = 38
+    header_height = 60
+    pagination_info_height = 40
+    dynamic_height = header_height + (row_height * min(page_size, len(pivot))) + pagination_info_height
     
     layout_updates = {
         'title': dict(
-            text='<b>' + title + '</b>',
+            text=f'<b>{title}</b>',
             x=0.5,
             xanchor='center',
-            font=dict(size=18, color='black'),
+            font=dict(size=18, color='#2c3e50', family='Arial, sans-serif bold'),
         ),
-        'margin': dict(l=20, r=20, b=20, t=90),
-        'height': dynamic_height + 300
+        'margin': dict(l=30, r=30, b=80, t=80),
+        'height': dynamic_height + 300,
+        'paper_bgcolor': 'white',
+        'plot_bgcolor': 'white',
+        'annotations': [
+            dict(
+                text=f"Showing {start_idx + 1} - {min(end_idx, len(pivot))} of {len(pivot)} rows • Page {current_page + 1} of {max(1, total_pages)}",
+                xref="paper",
+                yref="paper",
+                x=0.5,
+                y=-0.15,
+                showarrow=False,
+                font=dict(size=11, color='#7f8c8d', family='Arial'),
+                xanchor='center'
+            )
+        ]
     }
     
     fig.update_layout(**layout_updates)
+    
     return fig
  
 def create_crosstab_table(
@@ -933,7 +1395,7 @@ def create_crosstab_table(
     filter_col1=None, filter_value1=None,
     filter_col2=None, filter_value2=None,
     filter_col3=None, filter_value3=None,
-    rename={}, replace={},custom_fields=None
+    rename={}, replace={}, custom_fields=None
 ):
     """
     Create a crosstab table with multilayer column headers using Dash DataTable.
@@ -954,18 +1416,16 @@ def create_crosstab_table(
                 col = col[0]
             val = _normalize_filter_value(val)
             conditions.append(build_filter_query(col, val, unique_column, isSet, None, None))
- 
+
     where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
- 
-    # Collect only the columns the crosstab actually needs
+
     needed = []
     for c in (index_col if isinstance(index_col, (list, tuple)) else [index_col]):
         needed.append(c)
     for c in (columns_col if isinstance(columns_col, (list, tuple)) else [columns_col]):
         needed.append(c)
- 
+
     if aggfunc == 'concat' and values_col:
-        # Push STRING_AGG into SQL, grouping by index + columns axes
         group_cols = list(dict.fromkeys(needed))
         group_sql  = ", ".join(group_cols)
         agg_expr   = (
@@ -980,8 +1440,6 @@ def create_crosstab_table(
         )
         data = DataStorage.query_duckdb(joined_query)
         data = apply_calculated_fields(data, custom_fields)
-        # After SQL aggregation each cell is already the concatenated string;
-        # use 'first' so pd.crosstab just picks the pre-aggregated data_value
         ct_aggfunc = 'first'
     else:
         if values_col:
@@ -995,24 +1453,21 @@ def create_crosstab_table(
         data = DataStorage.query_duckdb(joined_query)
         data = apply_calculated_fields(data, custom_fields)
         ct_aggfunc = aggfunc
- 
-    # Helper: support multi-axis for crosstab
+
     def _axis_arg(arg):
         if isinstance(arg, (list, tuple)):
             return [data[c] for c in arg]
         return data[arg]
- 
+
     index_arg   = _axis_arg(index_col)
     columns_arg = _axis_arg(columns_col)
- 
-    # Handle normalization
+
     norm = False
     if normalize is True:
         norm = 'all'
     elif normalize in ('all', 'index', 'columns'):
         norm = normalize
- 
-    # Build the crosstab
+
     if values_col is None:
         ct = pd.crosstab(index=index_arg, columns=columns_arg, normalize=norm)
     else:
@@ -1023,11 +1478,10 @@ def create_crosstab_table(
             aggfunc=ct_aggfunc,
             normalize=norm if ct_aggfunc != 'first' else False
         )
- 
+
     ct = ct.reset_index()
- 
     ct = ct.rename(columns=rename).replace(replace)
- 
+
     dash_columns = []
     for col in ct.columns:
         if isinstance(col, tuple):
@@ -1040,29 +1494,27 @@ def create_crosstab_table(
                 "name": [str(col)],
                 "id": str(col)
             })
- 
-    ct_flat = ct
+
+    ct_flat = ct.copy()
     ct_flat.columns = [
         "|".join(str(c) for c in col) if isinstance(col, tuple) else str(col)
         for col in ct.columns
     ]
- 
-    # Format options
-    percent_format = "{:.1%}"
-    int_format = "{:,.0f}"
- 
-    # Data formatting
+
     data_records = ct_flat.to_dict("records")
- 
- 
+
     table = html.Div(
         [
             html.H4(
                 title,
                 style={
                     "textAlign": "center",
-                    "marginBottom": "15px",
-                    "marginTop": "10px",
+                    "marginBottom": "16px",
+                    "marginTop": "12px",
+                    "fontFamily": "Arial, sans-serif",
+                    "fontSize": "18px",
+                    "fontWeight": "bold",
+                    "color": "#2c3e50",
                 },
             ),
             html.Div(
@@ -1071,37 +1523,73 @@ def create_crosstab_table(
                     columns=dash_columns,
                     data=data_records,
                     merge_duplicate_headers=True,
- 
+                    page_size=20,
+
                     style_header={
-                        "backgroundColor": "rgb(120,120,120)",
-                        "color": "white",
+                        "backgroundColor": "#2c3e50",
+                        "color": "#ffffff",
                         "fontWeight": "bold",
+                        "fontFamily": "Arial, sans-serif",
                         "textAlign": "center",
-                        "fontSize": "16px",
-                        "height": "40px",
-                        "lineHeight": "40px",
+                        "fontSize": "13px",
+                        "height": "42px",
+                        "lineHeight": "42px",
                         "whiteSpace": "normal",
+                        "borderBottom": "2px solid #34495e",
                     },
- 
+
                     style_cell={
-                        "padding": "6px",
+                        "padding": "10px 14px",
                         "textAlign": "center",
-                        "fontSize": "14px",
+                        "fontSize": "13px",
+                        "fontFamily": "Arial, sans-serif",
+                        "color": "#2c3e50",
                         "whiteSpace": "normal",
+                        "border": "1px solid #e8ecef",
+                        "backgroundColor": "#ffffff",
                     },
- 
+
+                    style_data_conditional=[
+                        # Zebra striping
+                        {
+                            "if": {"row_index": "odd"},
+                            "backgroundColor": "#f8fafc",
+                        },
+                        # Hover highlight
+                        {
+                            "if": {"state": "active"},
+                            "backgroundColor": "#ebf5fb",
+                            "border": "1px solid #3498db",
+                            "color": "#2c3e50",
+                        },
+                        # First column (index) styled as a header
+                        {
+                            "if": {"column_id": dash_columns[0]["id"]},
+                            "fontWeight": "bold",
+                            "backgroundColor": "#f1f5f9",
+                            "color": "#2c3e50",
+                        },
+                    ],
+
                     style_table={
                         "overflowX": "auto",
-                        "marginTop": "10px",
+                        "marginTop": "8px",
+                        "borderRadius": "8px",
+                        "border": "1px solid #e2e8f0",
+                        "boxShadow": "0 1px 3px rgba(0,0,0,0.06)",
                     },
- 
-                    page_size=20,
                 )
             ),
         ],
-        style={"width": "100%"},
+        style={
+            "width": "100%",
+            "fontFamily": "Arial, sans-serif",
+            "backgroundColor": "#ffffff",
+            "padding": "8px",
+            "borderRadius": "8px",
+        },
     )
- 
+
     return table
  
 def create_age_gender_histogram(
@@ -1109,12 +1597,17 @@ def create_age_gender_histogram(
     filter_col1=None, filter_value1=None,
     filter_col2=None, filter_value2=None,
     filter_col3=None, filter_value3=None,
-    aggregation='count', custom_fields=None
+    aggregation='count', custom_fields=None,
+    height=400, responsive=True
 ):
     """
-    Create an age-gender histogram with labeled bins and data labels.
+    Create a modern age-gender histogram with labeled bins and data labels.
     A lightweight SQL MIN/MAX query builds the bin boundaries; the main fetch
     selects only age_col and gender_col with NULL filtering pushed into SQL.
+
+    Parameters:
+    - height: Chart height in pixels (default: 400)
+    - responsive: Make chart responsive to container width (default: True)
     """
     isSet = False
     filter_pairs = [
@@ -1130,11 +1623,10 @@ def create_age_gender_histogram(
                 col = col[0]
             val = _normalize_filter_value(val)
             conditions.append(build_filter_query(col, val, PERSON_ID_, isSet, None, None))
- 
+
     where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
     null_guard   = f"{age_col} IS NOT NULL AND {gender_col} IS NOT NULL"
- 
-    # Lightweight query to get the age range for bin construction
+
     range_query = (
         f"SELECT MIN(CAST({age_col} AS INTEGER)) AS min_age,"
         f"       MAX(CAST({age_col} AS INTEGER)) AS max_age"
@@ -1143,20 +1635,26 @@ def create_age_gender_histogram(
     )
     range_df = DataStorage.query_duckdb(range_query)
     if range_df.empty or pd.isna(range_df['min_age'].iloc[0]):
-        return go.Figure().update_layout(title=f"{title}")
- 
+        return go.Figure().update_layout(
+            title=dict(
+                text=f'<b>{title}</b>',
+                x=0.5, xanchor='center',
+                font=dict(size=18, color='#2c3e50', family='Arial, sans-serif')
+            ),
+            paper_bgcolor='#ffffff',
+            height=height
+        )
+
     min_age  = int(range_df['min_age'].iloc[0])
     max_age  = int(range_df['max_age'].iloc[0])
- 
-    # Build bins and labels before fetching the main data
+
     bin_size = int(bin_size)
     bins     = list(range(min_age, max_age + bin_size, bin_size))
     labels   = [
-        f"{bins[i]}-{bins[i+1]-1}" if i < len(bins)-2 else f"{bins[i]}+"
+        f"{bins[i]}-{bins[i+1]-1}" if i < len(bins) - 2 else f"{bins[i]}+"
         for i in range(len(bins) - 1)
     ]
- 
-    # Fetch only the two columns needed; NULLs excluded in SQL
+
     joined_query = (
         f"SELECT {age_col}, {gender_col}"
         f" FROM '{DATA_FILE_NAME_}'"
@@ -1164,10 +1662,18 @@ def create_age_gender_histogram(
     )
     data = DataStorage.query_duckdb(joined_query)
     data = apply_calculated_fields(data, custom_fields)
- 
+
     if data.empty:
-        return go.Figure().update_layout(title=f"{title}")
- 
+        return go.Figure().update_layout(
+            title=dict(
+                text=f'<b>{title}</b>',
+                x=0.5, xanchor='center',
+                font=dict(size=18, color='#2c3e50', family='Arial, sans-serif')
+            ),
+            paper_bgcolor='#ffffff',
+            height=height
+        )
+
     data["age_bin"] = pd.cut(
         data[age_col],
         bins=bins,
@@ -1175,39 +1681,132 @@ def create_age_gender_histogram(
         include_lowest=True,
         right=False
     )
- 
+
+    # Modern palette aligned with the rest of the chart suite
+    gender_palette = ['#2c3e50', '#3498db', '#1abc9c', '#e74c3c', '#f39c12']
+
     fig = px.histogram(
         data,
         x="age_bin",
         color=gender_col,
         barmode="group",
-        title=title,
+        title=None,          # Title added in layout
         text_auto=True,
-        color_discrete_sequence=px.colors.qualitative.Dark2,
+        color_discrete_sequence=gender_palette,
         category_orders={"age_bin": labels}
     )
- 
-    fig.update_layout(
-        xaxis_title=xtitle,
-        yaxis_title=ytitle,
-        bargap=0.15
-    )
- 
+
+    # Modern trace styling
     fig.update_traces(
         textposition="outside",
-        cliponaxis=False
+        cliponaxis=False,
+        textfont=dict(size=11, color='#2c3e50', family='Arial, sans-serif'),
+        marker_line_color='#ffffff',
+        marker_line_width=1,
+        opacity=0.85,
+        hovertemplate="<b>Age group:</b> %{x}<br><b>Count:</b> %{y:,.0f}<extra></extra>"
     )
- 
+
+    # Shared modern layout
+    fig.update_layout(
+        title=dict(
+            text=f'<b>{title}</b>',
+            x=0.5,
+            xanchor='center',
+            font=dict(size=18, color='#2c3e50', family='Arial, sans-serif'),
+            y=0.97
+        ),
+        xaxis_title=dict(
+            text=xtitle,
+            font=dict(size=13, color='#34495e', family='Arial, sans-serif'),
+            standoff=10
+        ),
+        yaxis_title=dict(
+            text=ytitle,
+            font=dict(size=13, color='#34495e', family='Arial, sans-serif'),
+            standoff=10
+        ),
+        template='plotly_white',
+        plot_bgcolor='#ffffff',
+        paper_bgcolor='#ffffff',
+        margin=dict(l=50, r=30, t=80, b=50, pad=4),
+        height=height,
+        hovermode='x unified',
+        font=dict(family='Arial, sans-serif', size=12, color='#2c3e50'),
+        autosize=responsive,
+        width=None if responsive else 800,
+        bargap=0.15,
+        bargroupgap=0.05,
+        legend=dict(
+            title=dict(text=gender_col, font=dict(size=12, color='#2c3e50')),
+            orientation='h',
+            yanchor='bottom',
+            y=1.02,
+            xanchor='right',
+            x=1,
+            bgcolor='rgba(255,255,255,0.9)',
+            bordercolor='#e2e8f0',
+            borderwidth=1,
+            font=dict(size=11, color='#4a5568')
+        ),
+        shapes=[
+            dict(
+                type='rect',
+                xref='paper', yref='paper',
+                x0=0, y0=0, x1=1, y1=1,
+                line=dict(width=1, color='#e2e8f0'),
+                fillcolor='rgba(0,0,0,0)'
+            )
+        ]
+    )
+
+    fig.update_xaxes(
+        showgrid=True,
+        gridwidth=0.5,
+        gridcolor='#e8ecef',
+        showline=True,
+        linewidth=1,
+        linecolor='#cbd5e0',
+        tickfont=dict(size=11, color='#4a5568'),
+        title_standoff=10
+    )
+
+    fig.update_yaxes(
+        showgrid=True,
+        gridwidth=0.5,
+        gridcolor='#e8ecef',
+        showline=True,
+        linewidth=1,
+        linecolor='#cbd5e0',
+        zeroline=True,
+        zerolinewidth=1,
+        zerolinecolor='#e2e8f0',
+        tickfont=dict(size=11, color='#4a5568'),
+        tickformat=',.0f',
+        title_standoff=10
+    )
+
     return fig
  
  
-def create_horizontal_bar_chart(query_fiter, label_col, value_col, title, x_title, y_title, top_n=10,
-                                 filter_col1=None, filter_value1=None, filter_col2=None, filter_value2=None,
-                                 filter_col3=None, filter_value3=None, aggregation='count', custom_fields=None):
+def create_horizontal_bar_chart(
+    query_fiter, label_col, value_col, title, x_title, y_title, top_n=10,
+    filter_col1=None, filter_value1=None,
+    filter_col2=None, filter_value2=None,
+    filter_col3=None, filter_value3=None,
+    aggregation='count', custom_fields=None,
+    height=400, responsive=True, show_values=True, color=None
+):
     """
-    Create a horizontal bar chart showing the top N items by data_value.
+    Create a modern horizontal bar chart showing the top N items by value.
     Grouping, zero filtering, ordering and top-N limiting are all pushed into
     SQL so Python only receives the final rows to plot.
+
+    Parameters:
+    - height: Chart height in pixels (default: 400)
+    - responsive: Make chart responsive to container width (default: True)
+    - show_values: Show data labels on bars (default: True)
+    - color: Optional column to group bars by color (default: None)
     """
     isSet = False
     filter_pairs = [
@@ -1223,23 +1822,24 @@ def create_horizontal_bar_chart(query_fiter, label_col, value_col, title, x_titl
                 col = col[0]
             val = _normalize_filter_value(val)
             conditions.append(build_filter_query(col, val, PERSON_ID_, isSet, None, None))
- 
+
     where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
- 
+
     if aggregation in ('count', 'nunique'):
         agg_expr = f"COUNT(DISTINCT {value_col})"
     elif aggregation == 'sum':
         agg_expr = f"SUM({value_col})"
     elif aggregation == 'mean':
         agg_expr = f"AVG({value_col})"
+    elif aggregation == 'median':
+        agg_expr = f"MEDIAN({value_col})"
     elif aggregation == 'min':
         agg_expr = f"MIN({value_col})"
     elif aggregation == 'max':
         agg_expr = f"MAX({value_col})"
     else:
         agg_expr = f"{aggregation}({value_col})"
- 
-    # HAVING eliminates zero-value rows; ORDER BY + LIMIT give top N directly
+
     joined_query = (
         f"SELECT {label_col}, {agg_expr} AS data_value"
         f" FROM '{DATA_FILE_NAME_}'"
@@ -1251,31 +1851,129 @@ def create_horizontal_bar_chart(query_fiter, label_col, value_col, title, x_titl
     )
     df_top = DataStorage.query_duckdb(joined_query)
     df_top = apply_calculated_fields(df_top, custom_fields)
- 
+
     if df_top.empty:
-        return go.Figure().update_layout(title=f"No data available for {title}")
- 
+        return go.Figure().update_layout(
+            title=dict(
+                text=f'<b>No data available for {title}</b>',
+                x=0.5, xanchor='center',
+                font=dict(size=18, color='#2c3e50', family='Arial, sans-serif')
+            ),
+            paper_bgcolor='#ffffff',
+            height=height
+        )
+
+    # Format labels for display
+    df_top['label'] = df_top['data_value'].apply(
+        lambda x: f'{int(x):,}' if x == int(x) else f'{x:,.1f}'
+    ) if show_values else ''
+
+    modern_palettes = {
+        'corporate': ['#2c3e50', '#34495e', '#3498db', '#2980b9', '#1abc9c'],
+    }
+
+    # Reverse rows so largest bar sits at the top
+    df_top = df_top.iloc[::-1].reset_index(drop=True)
+
     fig = px.bar(
         df_top,
         x='data_value',
         y=label_col,
-        text='data_value',
+        text='label' if show_values else None,
+        color=color if color else None,
+        color_discrete_sequence=modern_palettes['corporate'],
         orientation='h',
-        title=title
+        title=None
     )
- 
+
+    if not color:
+        fig.update_traces(
+            marker_color='#2c3e50',
+            marker_line_color='#34495e',
+            marker_line_width=1,
+            opacity=0.85,
+        )
+
+    # Modern trace styling
     fig.update_traces(
-        textposition='auto',
-        texttemplate='%{text}',
-        marker_color='steelblue'
+        textposition='outside',
+        cliponaxis=False,
+        textfont=dict(size=11, color='#2c3e50', family='Arial, sans-serif'),
+        hovertemplate=(
+            "<b>%{y}</b><br>"
+            f"<b>{x_title}:</b> %{{x:,.0f}}<br>"
+            "<extra></extra>"
+        ),
     )
- 
+
+    # Auto-scale height to number of bars for readability
+    computed_height = max(height, len(df_top) * 40 + 120)
+
+    # Shared modern layout
     fig.update_layout(
-        xaxis_title=x_title,
-        yaxis_title=y_title,
-        yaxis=dict(autorange='reversed')
+        title=dict(
+            text=f'<b>{title}</b>',
+            x=0.5,
+            xanchor='center',
+            font=dict(size=18, color='#2c3e50', family='Arial, sans-serif'),
+            y=0.97
+        ),
+        xaxis_title=dict(
+            text=x_title,
+            font=dict(size=13, color='#34495e', family='Arial, sans-serif'),
+            standoff=10
+        ),
+        yaxis_title=dict(
+            text=y_title,
+            font=dict(size=13, color='#34495e', family='Arial, sans-serif'),
+            standoff=10
+        ),
+        template='plotly_white',
+        plot_bgcolor='#ffffff',
+        paper_bgcolor='#ffffff',
+        margin=dict(l=20, r=80, t=80, b=50, pad=4),  # extra right margin for outside labels
+        height=computed_height,
+        hovermode='y unified',
+        font=dict(family='Arial, sans-serif', size=12, color='#2c3e50'),
+        autosize=responsive,
+        width=None if responsive else 800,
+        bargap=0.2,
+        shapes=[
+            dict(
+                type='rect',
+                xref='paper', yref='paper',
+                x0=0, y0=0, x1=1, y1=1,
+                line=dict(width=1, color='#e2e8f0'),
+                fillcolor='rgba(0,0,0,0)'
+            )
+        ]
     )
- 
+
+    fig.update_xaxes(
+        showgrid=True,
+        gridwidth=0.5,
+        gridcolor='#e8ecef',
+        showline=True,
+        linewidth=1,
+        linecolor='#cbd5e0',
+        zeroline=True,
+        zerolinewidth=1,
+        zerolinecolor='#e2e8f0',
+        tickfont=dict(size=11, color='#4a5568'),
+        tickformat=',.0f',
+        title_standoff=10
+    )
+
+    fig.update_yaxes(
+        showgrid=False,         # No horizontal grid on a horizontal bar chart
+        showline=True,
+        linewidth=1,
+        linecolor='#cbd5e0',
+        tickfont=dict(size=11, color='#4a5568'),
+        title_standoff=10,
+        autorange=True          # Reversed order already handled by iloc[::-1]
+    )
+
     return fig
 
 def agg_join(series: pd.Series) -> str:

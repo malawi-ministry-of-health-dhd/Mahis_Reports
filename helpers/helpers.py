@@ -32,20 +32,27 @@ from config import (actual_keys_in_data,
                     DRUG_NAME_,
                     VALUE_NAME_, VALUE_DATETIME_)
 
-def build_metrics_section(filtered, counts_config, url_object=None):
+def build_metrics_section(filtered,filtered_data_range,delta_days, counts_config, url_object=None):
     """Build metric cards from counts configuration"""
     metrics = []
     for count_config in counts_config:
         href = count_config.get("href", "") +"?"+ url_object if url_object else ""
-        metric = html.Div(className=f'mnid-kpi', children=[ 
+        flag = count_config.get("flag", "")
+        display_average = count_config.get("display_average", False)
+        if not display_average:
+            display = "none"
+        else:
+            display = "block"
+            
+        metric = html.Div(className=f'mnid-kpi {flag}', children=[ 
         html.Div(style={'display': 'flex', 'justifyContent': 'space-between',
                         'alignItems': 'flex-start', 'gap': '6px'}, children=[
             html.Div([
                 html.Div(count_config["name"], className='kpi-lbl'),
                 html.Div(create_count_from_config(filtered, count_config["filters"]), className='kpi-val'),
-                html.Div(html.A(count_config.get("href_name") or "", href=href),className='kpi-sub')
+                html.Div(html.A(count_config.get("href_name") or "", href=href),className='kpi-sub'),
             ]),
-            html.Div(),
+            html.Div(f"(Avg: {int(create_count_from_config(filtered_data_range, count_config['filters'])/delta_days)})",style={"marginTop":"15px","fontFamily": "Arial", "fontSize": "12px","fontWeight": "bold","color":"#15803D", "display": display}),
         ]),
         html.Div()])
         metrics.append(metric) 
@@ -125,7 +132,7 @@ def build_charts_section(filtered, data_opd, delta_days, sections_config):
     for section_config in sections_config:
         chart_items_per_row = section_config.get('chart_items_per_row') or 3 #default number of charts per section
         section = html.Div([
-            html.H2(section_config["section_name"], style={'textAlign': 'left', 'color': 'black'}),
+            html.H3(section_config["section_name"].upper(), style={'textAlign': 'left', 'color': 'grey'}),
             build_section_items(filtered, data_opd, delta_days, section_config["items"], chart_items_per_row)
         ])
         sections.append(section)

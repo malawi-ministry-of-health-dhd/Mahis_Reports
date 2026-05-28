@@ -3,7 +3,7 @@
     "report_id": "report_148ad953",
     "report_name": "General Summary",
     "date_created": "2026-01-24",
-    "count_items_per_row": 6,
+    "count_items_per_row": 5,
     "visualization_types": {
       "counts": [
         {
@@ -12,6 +12,8 @@
           "href": "program_reports",
           "href_name": "view patients",
           "level": "facility",
+          "flag":"ok",
+          "display_average": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -67,42 +69,6 @@
             "variable7": "Gender",
             "value7": "Female",
             "variable8": "Age_Group"
-          }
-        },
-        {
-          "id": "count_eeb5378a",
-          "name": "Attendance Under 5",
-          "level": "facility",
-          "filters": {
-            "measure": "nunique",
-            "unique": "person_id",
-            "variable1": "Program",
-            "variable2": "Encounter",
-            "variable3": "concept_name",
-            "variable4": "obs_value_coded",
-            "variable5": "ValueN",
-            "variable6": "Value",
-            "variable7": "Gender",
-            "variable8": "Age_Group",
-            "value8": "Under 5"
-          }
-        },
-        {
-          "id": "count_cde8771b",
-          "name": "Attendance Over 5",
-          "level": "facility",
-          "filters": {
-            "measure": "nunique",
-            "unique": "person_id",
-            "variable1": "Program",
-            "variable2": "Encounter",
-            "variable3": "concept_name",
-            "variable4": "obs_value_coded",
-            "variable5": "ValueN",
-            "variable6": "Value",
-            "variable7": "Gender",
-            "variable8": "Age_Group",
-            "value8": "Over 5"
           }
         },
         {
@@ -282,8 +248,9 @@
       ],
       "charts": {
         "sections": [
-          {
+            {
             "section_name": "Facility Summary",
+            "chart_items_per_row": 1,
             "items": [
               {
                 "id": "chart_pivot_summary",
@@ -296,11 +263,12 @@
                   "duration_default": "any",
                   "index_col1": [
                     "District",
-                    "Facility"
+                    "Facility",
+                    "Program"
                   ],
                   "columns": "",
                   "values_col": "person_id",
-                  "title": "Attendance by Health Facility",
+                  "title": "Attendance by Health Facility and Program",
                   "unique_column": "person_id",
                   "aggfunc": "nunique",
                   "filter_col1": "",
@@ -312,28 +280,30 @@
                   "x_title": "",
                   "y_title": "",
                   "rename": {
-                    "person_id_key": "Number of Patients"
+                    "person_id": "Number of Patients"
                   }
                 }
-              },
+              }
+            ]},
+            {
+            "section_name": "Encounters and Trend",
+            "chart_items_per_row": 2,
+            "items": [
               {
                 "id": "chart_10b29018",
-                "name": "Attendance By Program",
+                "name": "Patient Encounters",
                 "type": "Column",
                 "level": "facility",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
                   "duration_default": "any",
-                  "title": "Attendance By Program",
-                  "x_col": "Program",
+                  "title": "Patient Encounters at the Facility",
+                  "x_col": "Encounter",
                   "y_col": "person_id",
-                  "x_title": "Program",
+                  "x_title": "Encounters at the Facility",
                   "y_title": "Number of patients",
-                  "unique_column": [
-                    "person_id",
-                    "Program"
-                  ],
+                  "unique_column": "person_id",
                   "legend_title": "Legend",
                   "color": "",
                   "filter_col1": "",
@@ -375,33 +345,12 @@
                   "legend_title": "Legend",
                   "color": ""
                 }
-              },
-              {
-                "id": "chart_a8acf21a",
-                "name": "Patient Visit Type",
-                "type": "Pie",
-                "level": "facility",
-                "filters": {
-                  "measure": "nunique",
-                  "unique": "any",
-                  "duration_default": "any",
-                  "title": "Patient Visit Type",
-                  "names_col": "new_revisit",
-                  "values_col": "person_id",
-                  "unique_column": "person_id",
-                  "colormap": "{}",
-                  "filter_col1": "",
-                  "filter_val1": "",
-                  "filter_col2": "",
-                  "filter_val2": "",
-                  "filter_col3": "",
-                  "filter_val3": "",
-                  "filter_col4": "",
-                  "filter_val4": "",
-                  "filter_col5": "",
-                  "filter_val5": ""
-                }
-              },
+              }]
+            },
+            {
+            "section_name": "Gender and Age Groups",
+            "chart_items_per_row": 2,
+            "items": [
               {
                 "id": "chart_bbce8169",
                 "name": "Age Gender Disaggregation",
@@ -443,7 +392,7 @@
                   "names_col": "Gender",
                   "values_col": "person_id",
                   "unique_column": "person_id",
-                  "colormap": "{}",
+                  "colormap": {},
                   "filter_col1": "",
                   "filter_val1": "",
                   "filter_col2": "",
@@ -460,10 +409,11 @@
           },
           {
             "section_name": "User Analytics",
+            "chart_items_per_row": 2,
             "items": [
               {
                 "id": "chart_79405336",
-                "name": "Active Users",
+                "name": "Active Facility Users (Calculated per encounter)",
                 "type": "Bar",
                 "level": "facility",
                 "filters": {
@@ -473,7 +423,7 @@
                   "title": "Active Users - Top 10",
                   "label_col": "User",
                   "value_col": "person_id",
-                  "x_title": "Number of patients created",
+                  "x_title": "Number of patient encounters",
                   "y_title": "User",
                   "unique_column": "person_id",
                   "top_n": "10",
@@ -534,6 +484,8 @@
           "id": "count_8065b921",
           "name": "All Attendance",
           "level": "facility",
+          "flag":"ok",
+          "display_average": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -681,6 +633,8 @@
           "id": "count_d6d78d50",
           "name": "Admissions",
           "level": "facility",
+          "flag":"warn",
+          "display_average": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -705,6 +659,8 @@
           "id": "count_39f11f5e",
           "name": "Discharged Home",
           "level": "facility",
+          "flag":"ok",
+          "display_average": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -729,6 +685,8 @@
           "id": "count_fa751a13",
           "name": "Died",
           "level": "facility",
+          "flag":"danger",
+          "display_average": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -1111,8 +1069,10 @@
       "counts": [
         {
           "id": "count_ncd_1",
-          "name": "Total Attendance",
+          "name": "Total NCD Attendance",
           "level": "facility",
+          "flag":"ok",
+          "display_average": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -1148,101 +1108,105 @@
         },
         {
           "id": "count_ncd_4",
-          "name": "Attendance Under 5",
+          "name": "New NCD Patients",
           "level": "facility",
+          "display_average": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "NCD PROGRAM",
-            "variable2": "Age_Group",
-            "value2": "Under 5"
+            "variable2": "obs_value_coded",
+            "value2": "New patient"
           }
         },
         {
           "id": "count_ncd_5",
-          "name": "Attendance Over 5",
+          "name": "Patient transferred in",
           "level": "facility",
+          "display_average":"True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "NCD PROGRAM",
-            "variable2": "Age_Group",
-            "value2": "Over 5"
+            "variable2": "obs_value_coded",
+            "value2": "Patient transferred in"
           }
         },
         {
           "id": "count_ncd_6",
-          "name": "Diabetes Cases",
+          "name": "New Diabetes Cases",
           "level": "facility",
           "filters": {
-            "measure": "nunique",
+            "measure": "count_set",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "NCD PROGRAM",
-            "variable2": "Encounter",
-            "value2": "Diagnosis",
+            "variable2": "obs_value_coded",
+            "value2": "*diabetes",
             "variable3": "obs_value_coded",
-            "value3": "Type 1 diabetes | Type 2 diabetes"
+            "value3": "New patient"
           }
         },
         {
           "id": "count_ncd_7",
-          "name": "Diabetes Type 1 Cases",
+          "name": "New Diabetes Type 1 Cases",
           "level": "facility",
           "filters": {
-            "measure": "nunique",
+            "measure": "count_set",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "NCD PROGRAM",
-            "variable2": "Encounter",
-            "value2": "Diagnosis",
+            "variable2": "obs_value_coded",
+            "value2": "Type 1 diabetes",
             "variable3": "obs_value_coded",
-            "value3": "Type 1 diabetes"
+            "value3": "New patient"
           }
         },
         {
           "id": "count_ncd_8",
-          "name": "Diabetes Type 2 Cases",
+          "name": "New Diabetes Type 2 Cases",
           "level": "facility",
           "filters": {
-            "measure": "nunique",
+            "measure": "count_set",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "NCD PROGRAM",
-            "variable2": "Encounter",
-            "value2": "Diagnosis",
+            "variable2": "obs_value_coded",
+            "value2": "Type 2 diabetes",
             "variable3": "obs_value_coded",
-            "value3": "Type 2 diabetes"
+            "value3": "New patient"
           }
         },
         {
           "id": "count_ncd_9",
-          "name": "Hypertension Cases",
+          "name": "New Hypertension Cases",
           "level": "facility",
           "filters": {
-            "measure": "nunique",
+            "measure": "count_set",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": "NCD PROGRAM",
+            "variable2": "obs_value_coded",
+            "value2": "HTN",
+            "variable3": "obs_value_coded",
+            "value3": "New patient"
+          }
+        },
+        {
+          "id": "count_ncd_10",
+          "name": "Total New Patients",
+          "level": "facility",
+          "filters": {
+            "measure": "count_set",
             "unique": "person_id",
             "variable1": "Program",
             "value1": "NCD PROGRAM",
             "variable2": "Encounter",
             "value2": "Diagnosis",
             "variable3": "obs_value_coded",
-            "value3": "HTN"
-          }
-        },
-        {
-          "id": "count_ncd_10",
-          "name": "All cases registered in NCD Program",
-          "level": "facility",
-          "filters": {
-            "measure": "nunique",
-            "unique": "person_id",
-            "variable1": "Program",
-            "value1": "NCD PROGRAM",
-            "variable2": "Encounter",
-            "value2": "Diagnosis"
+            "value3": "New patient"
           }
         }
       ],
@@ -1302,7 +1266,7 @@
                   "custom_fields": "",
                   "age_col": "Age",
                   "gender_col": "Gender",
-                  "bin_size": "5",
+                  "bin_size": "10",
                   "color": ""
                 }
               },

@@ -228,7 +228,7 @@ def build_charts_from_json(filtered_query, filtered_with_range_query, delta_days
         return build_premium_dashboard(filtered_query, filtered_with_range_query, delta_days, config, filter_summary=filter_summary)
 
     # Build metrics from counts section
-    metrics = build_metrics_section(filtered_query, config["visualization_types"]["counts"], url_object)
+    metrics = build_metrics_section(filtered_query,filtered_with_range_query, delta_days, config["visualization_types"]["counts"], url_object)
     charts = build_charts_section(filtered_query, filtered_with_range_query, delta_days, config["visualization_types"]["charts"]["sections"])
 
     return html.Div([
@@ -638,8 +638,6 @@ def update_dashboard(gen, interval, start_date, end_date, level,
         all_districts = []
         all_facilities = []
 
-
-        
         # def num_days_patient_seen(data):
         #     try:
         #         visit_counts = data.groupby(PERSON_ID_)[DATE_].nunique()
@@ -923,8 +921,12 @@ def update_dashboard(gen, interval, start_date, end_date, level,
 
             else:
                 # This shall be rendered if not mnid utilizing sql_string as first use case
-                filtered_dates = f"{DATE_} BETWEEN '{start_dt}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP AND {FACILITY_CODE_} = '{location}' "
-                filtered_with_range = f"{DATE_} BETWEEN '{default_start_date}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP AND {FACILITY_CODE_} = '{location}' "
+                if requested_level == "national":
+                    filtered_dates = f"{DATE_} BETWEEN '{start_dt}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP "
+                    filtered_with_range = f"{DATE_} BETWEEN '{default_start_date}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP "
+                else:
+                    filtered_dates = f"{DATE_} BETWEEN '{start_dt}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP AND {FACILITY_CODE_} = '{location}' "
+                    filtered_with_range = f"{DATE_} BETWEEN '{default_start_date}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP AND {FACILITY_CODE_} = '{location}' "
 
                 section = build_charts_from_json(
                     filtered_dates, filtered_with_range, 7, dashboard_json,
