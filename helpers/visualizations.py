@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Union, Callable
 import json
 import ast
+from io import BytesIO
+import base64
 import duckdb
 from data_storage import DataStorage
 
@@ -1231,15 +1233,15 @@ def create_pie_chart(query_fiter, names_col, values_col, title,
     return fig
  
 def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, unique_column='PERSON_ID_', aggfunc='sum',
-                     filter_col1=None, filter_value1=None, 
+                     filter_col1=None, filter_value1=None,
                      filter_col2=None, filter_value2=None,
                      filter_col3=None, filter_value3=None,
                      aggregation='count',
                      rename={}, replace={}, custom_fields=None,
                      page_size=10, current_page=0):
     """
-    Create a pivot table with modern styling and pagination (10 items per page).
-    Returns a Plotly figure.
+    Create a pivot table with native pagination and sortable column headers.
+    Returns a Dash html.Div containing a dash_table.DataTable.
     """
     isSet = False
     filter_pairs = [
@@ -1255,36 +1257,29 @@ def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, u
                 col = col[0]
             val = _normalize_filter_value(val)
             conditions.append(build_filter_query(col, val, unique_column, isSet, None, None))
- 
+
     where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
- 
+
     index_cols = list(index_col) if isinstance(index_col, (list, tuple)) else [index_col]
     columns_cols = [columns_col] if (columns_col and columns_col != "") else []
     group_cols = index_cols + columns_cols
     group_sql = ", ".join(group_cols)
- 
+
     if aggfunc == 'concat':
         agg_expr = f"STRING_AGG(DISTINCT CAST({values_col} AS VARCHAR), ', ' ORDER BY CAST({values_col} AS VARCHAR))"
-        value_format = None
     elif aggfunc == 'count':
         agg_expr = f"COUNT({values_col})"
-        value_format = ',.0f'
     elif aggfunc == 'sum':
         agg_expr = f"SUM({values_col})"
-        value_format = ',.0f'
     elif aggfunc == 'mean':
         agg_expr = f"AVG({values_col})"
-        value_format = ',.2f'
     elif aggfunc == 'min':
         agg_expr = f"MIN({values_col})"
-        value_format = ',.0f'
     elif aggfunc == 'max':
         agg_expr = f"MAX({values_col})"
-        value_format = ',.0f'
     else:
         agg_expr = f"COUNT(DISTINCT {values_col})"
-        value_format = ',.0f'
- 
+
     joined_query = (
         f"SELECT {group_sql}, {agg_expr} AS __value__"
         f" FROM '{DATA_FILE_NAME_}'"
@@ -1294,7 +1289,7 @@ def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, u
     data = DataStorage.query_duckdb(joined_query)
     data = apply_calculated_fields(data, custom_fields)
     data = data.rename(columns={"__value__": values_col})
- 
+
     pivot = data.pivot_table(
         index=index_col,
         columns=columns_col if columns_col != "" else None,
@@ -1302,85 +1297,95 @@ def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, u
         aggfunc='first',
         fill_value=0 if aggfunc != 'concat' else ""
     ).reset_index()
-    
+
     pivot = pivot.rename(columns=rename).replace(replace)
-    
-    # Pagination: slice the dataframe
-    start_idx = current_page * page_size
-    end_idx = start_idx + page_size
-    total_pages = (len(pivot) + page_size - 1) // page_size
-    pivot_paginated = pivot.iloc[start_idx:end_idx]
-    
+    pivot.columns = [str(c) for c in pivot.columns]
+
     num_index_cols = len(index_cols)
-    
-    align_list = ['left'] * num_index_cols + ['center'] * (len(pivot_paginated.columns) - num_index_cols)
-    
-    if value_format is None:
-        format_list = [None] * len(pivot_paginated.columns)
-    else:
-        format_list = [None] * num_index_cols + [value_format] * (len(pivot_paginated.columns) - num_index_cols)
-    
-    # Modern color palette (solid colors only - Plotly compatible)
-    header_color = "#8A8A8A"  # Dark slate blue (modern professional)
-    header_text_color = 'white'
-    
-    # Create alternating row colors for better readability
-    row_colors = ['#ffffff', '#f8f9fa']  # White and light gray
-    
-    fig = go.Figure(data=[go.Table(
-        header=dict(
-            values=["<b>" + str(col) + "</b>" for col in pivot_paginated.columns],
-            fill_color=header_color,
-            align=align_list,
-            font=dict(size=13, color=header_text_color, family='Arial, sans-serif'),
-            height=40,
-            line=dict(width=1, color="#7d7d7d")
-        ),
-        cells=dict(
-            values=[pivot_paginated[col] for col in pivot_paginated.columns],
-            fill_color=[[row_colors[i % 2] for i in range(len(pivot_paginated))]],
-            align=align_list,
-            height=35,
-            format=format_list,
-            font=dict(size=12, color='#2c3e50', family='Arial, sans-serif'),
-            line=dict(width=0.5, color='#dee2e6')
-        )
-    )])
-    
-    # Dynamic height calculation
-    row_height = 38
-    header_height = 60
-    pagination_info_height = 40
-    dynamic_height = header_height + (row_height * min(page_size, len(pivot))) + pagination_info_height
-    
-    layout_updates = {
-        'title': dict(
-            text=f'<b>{title}</b>',
-            x=0.5,
-            xanchor='center',
-            font=dict(size=18, color='#2c3e50', family='Arial, sans-serif bold'),
-        ),
-        'margin': dict(l=30, r=30, b=80, t=80),
-        'height': dynamic_height + 300,
-        'paper_bgcolor': 'white',
-        'plot_bgcolor': 'white',
-        'annotations': [
-            dict(
-                text=f"Showing {start_idx + 1} - {min(end_idx, len(pivot))} of {len(pivot)} rows • Page {current_page + 1} of {max(1, total_pages)}",
-                xref="paper",
-                yref="paper",
-                x=0.5,
-                y=-0.15,
-                showarrow=False,
-                font=dict(size=11, color='#7f8c8d', family='Arial'),
-                xanchor='center'
-            )
-        ]
-    }
-    
-    fig.update_layout(**layout_updates)
-    
-    return fig
+    index_col_ids = [str(c) for c in pivot.columns[:num_index_cols]]
+
+    dash_columns = [{"name": col, "id": col} for col in pivot.columns]
+    data_records = pivot.to_dict("records")
+
+    style_data_conditional = [
+        {"if": {"row_index": "odd"}, "backgroundColor": "#f8fafc"},
+        {"if": {"state": "active"}, "backgroundColor": "#ebf5fb", "border": "1px solid #3498db", "color": "#2c3e50"},
+    ]
+    for col_id in index_col_ids:
+        style_data_conditional.append({
+            "if": {"column_id": col_id},
+            "fontWeight": "bold",
+            "backgroundColor": "#f1f5f9",
+            "color": "#2c3e50",
+            "textAlign": "left",
+        })
+
+    table = html.Div(
+        [
+            html.H4(
+                title,
+                style={
+                    "textAlign": "center",
+                    "marginBottom": "16px",
+                    "marginTop": "12px",
+                    "fontFamily": "Arial, sans-serif",
+                    "fontSize": "18px",
+                    "fontWeight": "bold",
+                    "color": "#2c3e50",
+                },
+            ),
+            html.Div(
+                dash_table.DataTable(
+                    columns=dash_columns,
+                    data=data_records,
+                    page_size=page_size,
+                    page_action="native",
+                    sort_action="native",
+                    sort_mode="multi",
+                    style_header={
+                        "backgroundColor": "#8A8A8A",
+                        "color": "#ffffff",
+                        "fontWeight": "bold",
+                        "fontFamily": "Arial, sans-serif",
+                        "textAlign": "center",
+                        "fontSize": "13px",
+                        "height": "42px",
+                        "lineHeight": "42px",
+                        "whiteSpace": "normal",
+                        "borderBottom": "2px solid #7d7d7d",
+                        "cursor": "pointer",
+                    },
+                    style_cell={
+                        "padding": "10px 14px",
+                        "textAlign": "center",
+                        "fontSize": "13px",
+                        "fontFamily": "Arial, sans-serif",
+                        "color": "#2c3e50",
+                        "whiteSpace": "normal",
+                        "border": "1px solid #dee2e6",
+                        "backgroundColor": "#ffffff",
+                    },
+                    style_data_conditional=style_data_conditional,
+                    style_table={
+                        "overflowX": "auto",
+                        "marginTop": "8px",
+                        "borderRadius": "8px",
+                        "border": "1px solid #e2e8f0",
+                        "boxShadow": "0 1px 3px rgba(0,0,0,0.06)",
+                    },
+                )
+            ),
+        ],
+        style={
+            "width": "100%",
+            "fontFamily": "Arial, sans-serif",
+            "backgroundColor": "#ffffff",
+            "padding": "8px",
+            "borderRadius": "8px",
+        },
+    )
+
+    return table
  
 def create_crosstab_table(
     query_fiter,
