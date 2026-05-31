@@ -67,6 +67,7 @@ class DataStorage:
         os.makedirs(self.filepath, exist_ok=True)
 
         self.dropdown_filepath = os.path.join(self.data_dir, 'dcc_dropdown_json', 'dropdowns.json')
+        self.facillities_dropdown_filepath = os.path.join(self.data_dir, 'dcc_dropdown_json', 'facilities_dropdowns.json')
 
     def fetch_transactional_data(self, date_column, incremental_id_column):
         """Fetch fresh data from DB and save to Parquet."""
@@ -90,6 +91,8 @@ class DataStorage:
         encounter_types_dict = encounter_types.set_index('encounter_type_id')['name'].to_dict()
 
         locations = pd.read_csv(os.path.join(self.script_dir,self.tables_dir, "locations_data.csv"))
+        locations_dict = (locations[(locations['county_district'].notna())&(locations['name'].notna())]
+                          .groupby('county_district')['name'].apply(list).to_dict())
     
         # check if facilities or locations can be used to map facility names, if not create empty dicts and log a warning
         facilities_path = os.path.join(self.script_dir,self.tables_dir, "facilities_data.csv")
@@ -190,10 +193,13 @@ class DataStorage:
                             "concept_answers":sorted(df.obs_value_coded.dropna().unique().tolist()),
                             "gender":sorted(df.Gender.dropna().unique().tolist()),
                             #  "age_group":sorted(df.Age_Group.dropna().unique().tolist()),
-                            "DrugName":sorted(drugs.name.dropna().unique().tolist())
+                            "DrugName":sorted(drugs.name.dropna().unique().tolist()),
                             }
                 with open(self.dropdown_filepath, 'w') as r:
                     json.dump(dropdown_json, r, indent=2)
+                with open(self.facillities_dropdown_filepath, 'w') as f:
+                    json.dump(locations_dict, f, indent=2)
+                
             else:
                 logging.warning("No data fetched from database.")
         except Exception as e:

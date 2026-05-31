@@ -19,10 +19,25 @@ pd.options.mode.chained_assignment = None
 
 from config import PERSON_ID_, ENCOUNTER_ID_, DATE_, CONCEPT_NAME_,DATA_FILE_NAME_
 
-"""
-MAIN USE CASE OF THIS FILE IS TO PROVIDE VISUALIZATION FUNCTIONS FOR PATIENT DATA
 
-"""
+THEME = {
+    # Multi-series: dark green → mid greens → warm amber → teal → slate
+    "primary":  ["#006401", "#2e8b2e", "#57b957", "#f59e0b", "#0d9488"],
+    # Single-series or color group: progressive green shades
+    "greens":   ["#006401", "#1a7a1a", "#2e8f2e", "#43a443", "#57b957", "#80cc80"],
+    # Gender/binary split (green + amber)
+    "gender":   ["#006401", "#f59e0b", "#0d9488", "#7c3aed", "#dc2626"],
+    # Single bar / line (no color grouping)
+    "single":   "#006401",
+    # Table accent colours
+    "table_header":       "#525E52",
+    "table_header_text":  "#ffffff",
+    "table_row_alt":      "#f2f9f2",
+    "table_index_bg":     "#e8f5e8",
+    "table_active_bg":    "#d4edda",
+    "table_active_border":"#006401",
+}
+
 def _prepare_data_for_visualization(df, unique_column, apply_deduplication=True):
     """
     Prepare data for visualization by applying consistent deduplication logic.
@@ -548,15 +563,6 @@ def create_column_chart(query_fiter, x_col, y_col, title, x_title, y_title,
     else:
         agg_expr = f"{aggregation}({y_col})"
  
-    # Modern color palettes
-    modern_palettes = {
-        'corporate': ['#2c3e50', '#34495e', '#3498db', '#2980b9', '#1abc9c'],
-        'vibrant': ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7'],
-        'pastel': ['#B5EAD7', '#C7CEEA', '#E2F0CB', '#FFDAC1', '#FF9AA2'],
-        'professional': ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd'],
-        'modern_blue': ['#0f4c81', '#3182ce', '#4299e1', '#63b3ed', '#90cdf4']
-    }
-    
     if color:
         # SELECT x_col, color, AGG(y_col) … GROUP BY x_col, color
         joined_query = (
@@ -567,16 +573,16 @@ def create_column_chart(query_fiter, x_col, y_col, title, x_title, y_title,
         )
         summary = DataStorage.query_duckdb(joined_query)
         summary = apply_calculated_fields(summary, custom_fields)
-        
+
         # Apply category limit if specified
         if max_categories and len(summary[x_col].unique()) > max_categories:
             top_categories = summary.groupby(x_col)['data_value'].sum().nlargest(max_categories).index
             summary = summary[summary[x_col].isin(top_categories)]
-        
+
         summary['label'] = summary['data_value'].apply(
             lambda x: f'{int(x):,}' if x == int(x) else f'{x:,.1f}'
         ) if show_values else ''
- 
+
         fig = px.bar(
             summary,
             x=x_col,
@@ -584,7 +590,7 @@ def create_column_chart(query_fiter, x_col, y_col, title, x_title, y_title,
             color="Color",
             title=None,  # Title added in layout
             text='label' if show_values else None,
-            color_discrete_sequence=modern_palettes['corporate'],
+            color_discrete_sequence=THEME["primary"],
             barmode='group'
         )
     else:
@@ -620,14 +626,14 @@ def create_column_chart(query_fiter, x_col, y_col, title, x_title, y_title,
             text='label' if show_values else None
         )
         
-        # Apply modern gradient color
+        # Apply theme single-color
         fig.update_traces(
-            marker_color='#2c3e50',
-            marker_line_color='#34495e',
+            marker_color=THEME["single"],
+            marker_line_color="#004a01",
             marker_line_width=1,
             opacity=0.85
         )
-    
+
     # Modern layout configuration with responsive settings
     layout_config = {
         'title': dict(
@@ -798,15 +804,6 @@ def create_time_line_chart(query_fiter, date_col, y_col, title, x_title,
     }
     date_expr = date_format_map.get(date_granularity, f"CAST({date_col} AS DATE)")
     
-    # Modern color palettes
-    modern_color_palettes = {
-        'blue_teal': ['#1f77b4', '#17becf', '#2ca02c', '#ff7f0e', '#d62728'],
-        'purple_pink': ['#9467bd', '#e377c2', '#7f7f7f', '#bcbd22', '#8c564b'],
-        'corporate': ['#2c3e50', '#3498db', '#1abc9c', '#e74c3c', '#f39c12'],
-        'vibrant': ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7'],
-        'elegant': ['#0f4c81', '#2e8b57', '#8b4513', '#4b0082', '#cd853f']
-    }
-    
     if color:
         joined_query = (
             f"SELECT {date_expr} AS date_trunc, {color}, {agg_expr} AS metric_value"
@@ -823,11 +820,11 @@ def create_time_line_chart(query_fiter, date_col, y_col, title, x_title,
             f" GROUP BY {date_expr}"
             f" ORDER BY date_trunc"
         )
-    
+
     summary = DataStorage.query_duckdb(joined_query)
     summary = apply_calculated_fields(summary, custom_fields)
     summary = summary.rename(columns={'metric_value': 'count'})
-    
+
     # Create figure
     if color:
         fig = px.line(
@@ -835,7 +832,7 @@ def create_time_line_chart(query_fiter, date_col, y_col, title, x_title,
             x='date_trunc',
             y='count',
             color=color,
-            color_discrete_sequence=modern_color_palettes['corporate'],
+            color_discrete_sequence=THEME["primary"],
             title=None  # Title added in layout
         )
     else:
@@ -843,7 +840,7 @@ def create_time_line_chart(query_fiter, date_col, y_col, title, x_title,
             summary,
             x='date_trunc',
             y='count',
-            color_discrete_sequence=['#2c3e50'],
+            color_discrete_sequence=[THEME["single"]],
             title=None
         )
     
@@ -1146,17 +1143,9 @@ def create_pie_chart(query_fiter, names_col, values_col, title,
         other_row = pd.DataFrame({names_col: ['Other'], 'data_value': [other_val]})
         df_summary = pd.concat([top, other_row], ignore_index=True)
 
-    # Modern color palette aligned with column/timeline charts
-    modern_palettes = {
-        'corporate': [
-            '#2c3e50', '#3498db', '#1abc9c', '#e74c3c', '#f39c12',
-            '#9b59b6', '#e67e22', '#16a085', '#2980b9', '#8e44ad'
-        ]
-    }
-
     color_sequence = (
         list(colormap.values()) if colormap
-        else modern_palettes['corporate']
+        else THEME["gender"]
     )
 
     fig = px.pie(
@@ -1238,7 +1227,7 @@ def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, u
                      filter_col3=None, filter_value3=None,
                      aggregation='count',
                      rename={}, replace={}, custom_fields=None,
-                     page_size=10, current_page=0):
+                     page_size=5, current_page=0):
     """
     Create a pivot table with native pagination and sortable column headers.
     Returns a Dash html.Div containing a dash_table.DataTable.
@@ -1308,14 +1297,14 @@ def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, u
     data_records = pivot.to_dict("records")
 
     style_data_conditional = [
-        {"if": {"row_index": "odd"}, "backgroundColor": "#f8fafc"},
-        {"if": {"state": "active"}, "backgroundColor": "#ebf5fb", "border": "1px solid #3498db", "color": "#2c3e50"},
+        {"if": {"row_index": "odd"}, "backgroundColor": THEME["table_row_alt"]},
+        {"if": {"state": "active"}, "backgroundColor": THEME["table_active_bg"], "border": f"1px solid {THEME['table_active_border']}", "color": "#2c3e50"},
     ]
     for col_id in index_col_ids:
         style_data_conditional.append({
             "if": {"column_id": col_id},
             "fontWeight": "bold",
-            "backgroundColor": "#f1f5f9",
+            "backgroundColor": THEME["table_index_bg"],
             "color": "#2c3e50",
             "textAlign": "left",
         })
@@ -1331,7 +1320,7 @@ def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, u
                     "fontFamily": "Arial, sans-serif",
                     "fontSize": "18px",
                     "fontWeight": "bold",
-                    "color": "#2c3e50",
+                    "color": THEME["table_header"],
                 },
             ),
             html.Div(
@@ -1343,8 +1332,8 @@ def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, u
                     sort_action="native",
                     sort_mode="multi",
                     style_header={
-                        "backgroundColor": "#8A8A8A",
-                        "color": "#ffffff",
+                        "backgroundColor": THEME["table_header"],
+                        "color": THEME["table_header_text"],
                         "fontWeight": "bold",
                         "fontFamily": "Arial, sans-serif",
                         "textAlign": "center",
@@ -1352,7 +1341,7 @@ def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, u
                         "height": "42px",
                         "lineHeight": "42px",
                         "whiteSpace": "normal",
-                        "borderBottom": "2px solid #7d7d7d",
+                        "borderBottom": "2px solid #004a01",
                         "cursor": "pointer",
                     },
                     style_cell={
@@ -1370,8 +1359,8 @@ def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, u
                         "overflowX": "auto",
                         "marginTop": "8px",
                         "borderRadius": "8px",
-                        "border": "1px solid #e2e8f0",
-                        "boxShadow": "0 1px 3px rgba(0,0,0,0.06)",
+                        "border": f"1px solid {THEME['table_active_border']}",
+                        "boxShadow": "0 1px 3px rgba(0,100,1,0.10)",
                     },
                 )
             ),
@@ -1518,7 +1507,7 @@ def create_crosstab_table(
                     "fontFamily": "Arial, sans-serif",
                     "fontSize": "18px",
                     "fontWeight": "bold",
-                    "color": "#2c3e50",
+                    "color": THEME["table_header"],
                 },
             ),
             html.Div(
@@ -1527,11 +1516,11 @@ def create_crosstab_table(
                     columns=dash_columns,
                     data=data_records,
                     merge_duplicate_headers=True,
-                    page_size=20,
+                    page_size=5,
 
                     style_header={
-                        "backgroundColor": "#2c3e50",
-                        "color": "#ffffff",
+                        "backgroundColor": THEME["table_header"],
+                        "color": THEME["table_header_text"],
                         "fontWeight": "bold",
                         "fontFamily": "Arial, sans-serif",
                         "textAlign": "center",
@@ -1539,7 +1528,7 @@ def create_crosstab_table(
                         "height": "42px",
                         "lineHeight": "42px",
                         "whiteSpace": "normal",
-                        "borderBottom": "2px solid #34495e",
+                        "borderBottom": "2px solid #004a01",
                     },
 
                     style_cell={
@@ -1554,23 +1543,20 @@ def create_crosstab_table(
                     },
 
                     style_data_conditional=[
-                        # Zebra striping
                         {
                             "if": {"row_index": "odd"},
-                            "backgroundColor": "#f8fafc",
+                            "backgroundColor": THEME["table_row_alt"],
                         },
-                        # Hover highlight
                         {
                             "if": {"state": "active"},
-                            "backgroundColor": "#ebf5fb",
-                            "border": "1px solid #3498db",
+                            "backgroundColor": THEME["table_active_bg"],
+                            "border": f"1px solid {THEME['table_active_border']}",
                             "color": "#2c3e50",
                         },
-                        # First column (index) styled as a header
                         {
                             "if": {"column_id": dash_columns[0]["id"]},
                             "fontWeight": "bold",
-                            "backgroundColor": "#f1f5f9",
+                            "backgroundColor": THEME["table_index_bg"],
                             "color": "#2c3e50",
                         },
                     ],
@@ -1579,8 +1565,8 @@ def create_crosstab_table(
                         "overflowX": "auto",
                         "marginTop": "8px",
                         "borderRadius": "8px",
-                        "border": "1px solid #e2e8f0",
-                        "boxShadow": "0 1px 3px rgba(0,0,0,0.06)",
+                        "border": f"1px solid {THEME['table_active_border']}",
+                        "boxShadow": "0 1px 3px rgba(0,100,1,0.10)",
                     },
                 )
             ),
@@ -1634,8 +1620,11 @@ def create_age_gender_histogram(
     range_query = (
         f"SELECT MIN(CAST({age_col} AS INTEGER)) AS min_age,"
         f"       MAX(CAST({age_col} AS INTEGER)) AS max_age"
-        f" FROM '{DATA_FILE_NAME_}'"
-        f" WHERE {where_clause} AND {null_guard}"
+        f" FROM ("
+        f"   SELECT {age_col} FROM '{DATA_FILE_NAME_}'"
+        f"   WHERE {where_clause} AND {null_guard}"
+        f"   QUALIFY ROW_NUMBER() OVER (PARTITION BY {PERSON_ID_} ORDER BY {age_col}) = 1"
+        f" )"
     )
     range_df = DataStorage.query_duckdb(range_query)
     if range_df.empty or pd.isna(range_df['min_age'].iloc[0]):
@@ -1663,6 +1652,7 @@ def create_age_gender_histogram(
         f"SELECT {age_col}, {gender_col}"
         f" FROM '{DATA_FILE_NAME_}'"
         f" WHERE {where_clause} AND {null_guard}"
+        f" QUALIFY ROW_NUMBER() OVER (PARTITION BY {PERSON_ID_} ORDER BY {age_col}) = 1"
     )
     data = DataStorage.query_duckdb(joined_query)
     data = apply_calculated_fields(data, custom_fields)
@@ -1686,9 +1676,6 @@ def create_age_gender_histogram(
         right=False
     )
 
-    # Modern palette aligned with the rest of the chart suite
-    gender_palette = ['#2c3e50', '#3498db', '#1abc9c', '#e74c3c', '#f39c12']
-
     fig = px.histogram(
         data,
         x="age_bin",
@@ -1696,7 +1683,7 @@ def create_age_gender_histogram(
         barmode="group",
         title=None,          # Title added in layout
         text_auto=True,
-        color_discrete_sequence=gender_palette,
+        color_discrete_sequence=THEME["gender"],
         category_orders={"age_bin": labels}
     )
 
@@ -1792,7 +1779,6 @@ def create_age_gender_histogram(
 
     return fig
  
- 
 def create_horizontal_bar_chart(
     query_fiter, label_col, value_col, title, x_title, y_title, top_n=10,
     filter_col1=None, filter_value1=None,
@@ -1872,10 +1858,6 @@ def create_horizontal_bar_chart(
         lambda x: f'{int(x):,}' if x == int(x) else f'{x:,.1f}'
     ) if show_values else ''
 
-    modern_palettes = {
-        'corporate': ['#2c3e50', '#34495e', '#3498db', '#2980b9', '#1abc9c'],
-    }
-
     # Reverse rows so largest bar sits at the top
     df_top = df_top.iloc[::-1].reset_index(drop=True)
 
@@ -1885,15 +1867,15 @@ def create_horizontal_bar_chart(
         y=label_col,
         text='label' if show_values else None,
         color=color if color else None,
-        color_discrete_sequence=modern_palettes['corporate'],
+        color_discrete_sequence=THEME["primary"],
         orientation='h',
         title=None
     )
 
     if not color:
         fig.update_traces(
-            marker_color='#2c3e50',
-            marker_line_color='#34495e',
+            marker_color=THEME["single"],
+            marker_line_color="#004a01",
             marker_line_width=1,
             opacity=0.85,
         )

@@ -9,30 +9,21 @@
         {
           "id": "count_5f0a560b",
           "name": "All Attendance",
+          "level": "facility",
+          "flag": "ok",
+          "display_average": "True",
           "href": "program_reports",
           "href_name": "view patients",
-          "level": "facility",
-          "flag":"ok",
-          "display_average": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
-            "value1": [],
             "variable2": "Encounter",
-            "value2": [],
             "variable3": "concept_name",
-            "value3": [],
             "variable4": "obs_value_coded",
-            "value4": "",
             "variable5": "ValueN",
-            "value5": "",
             "variable6": "Value",
-            "value6": "",
-            "variable7": "Gender",
-            "value7": "",
-            "variable8": "Age_Group",
-            "value8": ""
+            "variable7": "Gender"
           }
         },
         {
@@ -248,7 +239,7 @@
       ],
       "charts": {
         "sections": [
-            {
+          {
             "section_name": "Facility Summary",
             "chart_items_per_row": 1,
             "items": [
@@ -284,8 +275,9 @@
                   }
                 }
               }
-            ]},
-            {
+            ]
+          },
+          {
             "section_name": "Encounters and Trend",
             "chart_items_per_row": 2,
             "items": [
@@ -345,9 +337,10 @@
                   "legend_title": "Legend",
                   "color": ""
                 }
-              }]
-            },
-            {
+              }
+            ]
+          },
+          {
             "section_name": "Gender and Age Groups",
             "chart_items_per_row": 2,
             "items": [
@@ -484,7 +477,7 @@
           "id": "count_8065b921",
           "name": "All Attendance",
           "level": "facility",
-          "flag":"ok",
+          "flag": "ok",
           "display_average": "True",
           "filters": {
             "measure": "nunique",
@@ -633,7 +626,7 @@
           "id": "count_d6d78d50",
           "name": "Admissions",
           "level": "facility",
-          "flag":"warn",
+          "flag": "warn",
           "display_average": "True",
           "filters": {
             "measure": "nunique",
@@ -659,7 +652,7 @@
           "id": "count_39f11f5e",
           "name": "Discharged Home",
           "level": "facility",
-          "flag":"ok",
+          "flag": "ok",
           "display_average": "True",
           "filters": {
             "measure": "nunique",
@@ -685,7 +678,7 @@
           "id": "count_fa751a13",
           "name": "Died",
           "level": "facility",
-          "flag":"danger",
+          "flag": "danger",
           "display_average": "True",
           "filters": {
             "measure": "nunique",
@@ -1071,7 +1064,7 @@
           "id": "count_ncd_1",
           "name": "Total NCD Attendance",
           "level": "facility",
-          "flag":"ok",
+          "flag": "ok",
           "display_average": "True",
           "filters": {
             "measure": "nunique",
@@ -1124,7 +1117,7 @@
           "id": "count_ncd_5",
           "name": "Patient transferred in",
           "level": "facility",
-          "display_average":"True",
+          "display_average": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -5230,5 +5223,34 @@
     "mnid_categories": [
       "Newborn"
     ]
+  },
+  {
+    "report_id": "report_b5bd2b19",
+    "report_name": "New Dashboard",
+    "date_created": "2026-05-30",
+    "visualization_types": {
+      "counts": [
+        {
+          "id": "count_db07d81c",
+          "name": "gghjhvvjhk",
+          "level": "facility",
+          "flag": "warn",
+          "display_average": "True",
+          "filters": {
+            "measure": "nunique",
+            "unique": "person_id",
+            "variable1": "Age_Group",
+            "value1": "*Under",
+            "variable2": "DrugName",
+            "value2": "bbkkn",
+            "variable3": "Village",
+            "value3": "vjjvjbjn"
+          }
+        }
+      ],
+      "charts": {
+        "sections": []
+      }
+    }
   }
 ]

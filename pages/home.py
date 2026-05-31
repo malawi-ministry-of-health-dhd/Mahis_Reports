@@ -29,7 +29,7 @@ from helpers.navigation_callbacks import DEMO_UUID, DEMO_LOCATION
 from config import (actual_keys_in_data, 
                     DATA_FILE_NAME_, 
                     DATE_, PERSON_ID_, ENCOUNTER_ID_,
-                    FACILITY_, AGE_GROUP_, AGE_,
+                    FACILITY_,DISTRICT_, AGE_GROUP_, AGE_,
                     GENDER_, ENCOUNTER_, PROGRAM_,
                     NEW_REVISIT_, 
                     HOME_DISTRICT_, 
@@ -92,12 +92,11 @@ def _load_user_registry() -> pd.DataFrame:
         user_data = pd.read_csv(user_data_path)
     else:
         user_data = pd.DataFrame(columns=['uuid', 'role'])
-
     demo_row = {
         'uuid': DEMO_UUID,
         'role': 'reports_admin',
         'user_level': 'national',
-        'district': None,
+        'district': ["Salima"],
         'facility_name': None,
         'facility_code': DEMO_LOCATION,
     }
@@ -612,6 +611,7 @@ def update_dashboard(gen, interval, start_date, end_date, level,
                 [],[],False,"",[],[],clicked_name)
 
         user_level = scope['level']
+        user_districts = scope.get('districts') or []
         if user_level == 'facility' and scope.get('facility_code'):
             location = scope['facility_code']
             mnid_location = scope['facility_code']
@@ -635,8 +635,30 @@ def update_dashboard(gen, interval, start_date, end_date, level,
         if not show_district_filter:
             districts = []
 
-        all_districts = []
-        all_facilities = []
+        # locations
+        facilities_path = os.path.join(path, 'data', 'dcc_dropdown_json', 'facilities_dropdowns.json')
+        with open(facilities_path, 'r') as f:
+            facilities_dict = json.load(f)
+        if requested_level == "national":
+            all_districts = sorted(facilities_dict.keys())
+            all_facilities = sorted(set(
+                            facility
+                            for district in user_districts
+                            if district in all_districts
+                            for facility in facilities_dict.get(district, [])
+                        ))
+        elif requested_level == "district":
+            all_districts = sorted(set(user_districts) | set(user_districts))
+            all_facilities = sorted(set(
+                            facility
+                            for district in all_districts
+                            if district in all_districts
+                            for facility in facilities_dict.get(district, [])
+                        )) 
+        else:
+            all_districts = sorted(set(user_districts) | set(user_districts))
+            all_facilities = scope['facilities'] if scope.get('facilities') else []
+        
 
         # def num_days_patient_seen(data):
         #     try:
@@ -924,6 +946,12 @@ def update_dashboard(gen, interval, start_date, end_date, level,
                 if requested_level == "national":
                     filtered_dates = f"{DATE_} BETWEEN '{start_dt}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP "
                     filtered_with_range = f"{DATE_} BETWEEN '{default_start_date}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP "
+                elif requested_level == "district":
+                    filtered_dates = f"""
+                                        {DATE_} BETWEEN '{start_dt}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP
+                                        AND {DISTRICT_} IN ({', '.join(f"'{d}'" for d in user_districts)})
+                                    """
+                    filtered_with_range = f"{DATE_} BETWEEN '{default_start_date}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP AND {FACILITY_CODE_} = '{location}' "
                 else:
                     filtered_dates = f"{DATE_} BETWEEN '{start_dt}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP AND {FACILITY_CODE_} = '{location}' "
                     filtered_with_range = f"{DATE_} BETWEEN '{default_start_date}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP AND {FACILITY_CODE_} = '{location}' "

@@ -10,11 +10,11 @@ import base64
 import io
 import warnings
 warnings.filterwarnings("ignore")
-from helpers.modal_functions import (validate_excel_file, load_reports_data, save_reports_data, 
+from helpers.modal_functions import (validate_excel_file, load_reports_data, save_reports_data,
                         check_existing_report, get_next_report_id, update_or_create_report,load_excel_file,
                         save_excel_file, update_report_metadata, archive_report, load_preview_data,
                         create_count_item,create_chart_item, create_section,create_chart_fields, create_mnid_indicator_item, validate_dashboard_json,
-                        upload_dashboard_json,validate_prog_reports_json,upload_prog_reports_json,CHART_TEMPLATES)
+                        upload_dashboard_json,validate_prog_reports_json,upload_prog_reports_json,CHART_TEMPLATES,render_filter_rows)
 from config import actual_keys_in_data
 from helpers.navigation_callbacks import DEMO_UUID
 
@@ -982,43 +982,49 @@ def create_edit_modal():
                         html.Div(
                             style={
                                 "display": "flex",
-                                "gap": "24px",
-                                "width": "100%"
+                                "gap": "20px",
+                                "width": "100%",
+                                "height": "100%",
                             },
                             children=[
-                                # Left Column: Dashboard Selection/Creation & Items List
+                                # ── LEFT PANEL: Setup + Items list ──────────────
                                 html.Div(
-                                    className="dashboard-left-panel",
+                                    style={
+                                        "flex": "0 0 360px",
+                                        "display": "flex",
+                                        "flexDirection": "column",
+                                        "gap": "16px",
+                                        "height": "100%",
+                                        "overflow": "hidden",
+                                    },
                                     children=[
-                                        # Dashboard Selection Card
-                                        html.Div(className="dashboard-card", children=[
+                                        # Dashboard Setup Card
+                                        html.Div(className="dashboard-card", style={"flexShrink": "0"}, children=[
                                             html.Div(className="dashboard-card-header", children=[
                                                 html.H4("Dashboard Setup", className="dashboard-card-title"),
                                             ]),
-                                            html.Div(className="dashboard-card-body", children=[
+                                            html.Div(className="dashboard-card-body", style={"overflowY": "auto", "maxHeight": "380px"}, children=[
                                                 html.Div(className="form-group", children=[
                                                     html.Label("Select Dashboard:", className="form-label"),
                                                     dcc.Dropdown(
                                                         id="dashboard-selector",
-                                                        options=[{"label": f"{d.get('report_name', 'Unnamed')}", 
-                                                                "value": i} for i, d in enumerate(dashboards_data)] + 
-                                                                [{"label": "➕ Create New Dashboard", "value": "new"}],
+                                                        options=[{"label": d.get("report_name", "Unnamed"),
+                                                                  "value": i} for i, d in enumerate(dashboards_data)] +
+                                                                 [{"label": "➕ Create New Dashboard", "value": "new"}],
                                                         value="new" if not dashboards_data else 0,
                                                         className="modern-dropdown",
-                                                        clearable=False
+                                                        clearable=False,
                                                     ),
                                                 ]),
-                                                
                                                 html.Div(className="form-group", children=[
                                                     html.Label("Report Name *", className="form-label"),
                                                     dcc.Input(
                                                         id="report-name-input",
                                                         type="text",
                                                         placeholder="Enter report name...",
-                                                        className="modern-input"
+                                                        className="modern-input",
                                                     ),
                                                 ]),
-                                                
                                                 html.Div(className="form-row", children=[
                                                     html.Div(className="form-group", style={"flex": "1"}, children=[
                                                         html.Label("Report ID:", className="form-label-disabled"),
@@ -1027,7 +1033,7 @@ def create_edit_modal():
                                                             type="text",
                                                             placeholder="auto-generated",
                                                             disabled=True,
-                                                            className="modern-input-disabled"
+                                                            className="modern-input-disabled",
                                                         ),
                                                     ]),
                                                     html.Div(className="form-group", style={"flex": "1"}, children=[
@@ -1036,142 +1042,174 @@ def create_edit_modal():
                                                             id="date-created-input",
                                                             type="text",
                                                             disabled=True,
-                                                            className="modern-input-disabled"
+                                                            className="modern-input-disabled",
                                                         ),
                                                     ]),
                                                 ]),
-                                                html.Div(className="form-group", children=[
-                                                    html.Label("Dashboard Type", className="form-label"),
-                                                    dcc.Dropdown(
-                                                        id="dashboard-type-selector",
-                                                        options=[
-                                                            {"label": "Standard", "value": "standard"},
-                                                            {"label": "MNID Outlook", "value": "mnid"},
-                                                        ],
-                                                        value="standard",
-                                                        clearable=False,
-                                                        className="modern-dropdown",
-                                                    ),
-                                                ]),
-                                                html.Div(className="form-group", children=[
-                                                    html.Label("MNID Categories", className="form-label"),
-                                                    dcc.Dropdown(
-                                                        id="mnid-categories-selector",
-                                                        options=[
-                                                            {"label": item, "value": item}
-                                                            for item in ["ANC", "Labour", "PNC", "Newborn"]
-                                                        ],
-                                                        value=[],
-                                                        multi=True,
-                                                        placeholder="Select MNID program areas",
-                                                        className="modern-dropdown",
-                                                    ),
-                                                ]),
-                                                html.Div(className="form-group", children=[
-                                                    html.Label("MNID Indicators JSON", className="form-label"),
-                                                    html.Div(style={"display": "flex", "justifyContent": "space-between", "alignItems": "center", "marginBottom": "8px"}, children=[
-                                                        html.Span("Build MNID indicators visually, then review the generated JSON below.", style={"fontSize": "12px", "color": "#6b7280"}),
-                                                        html.Button(
-                                                            "➕ Add MNID Indicator",
-                                                            id="add-mnid-indicator-btn",
-                                                            n_clicks=0,
-                                                            className="btn-primary-modern"
-                                                        )
+                                                html.Div(style={"display": "flex", "gap": "12px"}, children=[
+                                                    html.Div(className="form-group", style={"flex": "1"}, children=[
+                                                        html.Label("Dashboard Type", className="form-label"),
+                                                        dcc.Dropdown(
+                                                            id="dashboard-type-selector",
+                                                            options=[
+                                                                {"label": "Standard", "value": "standard"},
+                                                                {"label": "MNID Outlook", "value": "mnid"},
+                                                            ],
+                                                            value="standard",
+                                                            clearable=False,
+                                                            className="modern-dropdown",
+                                                        ),
                                                     ]),
-                                                    html.Div(
-                                                        id="mnid-indicators-container",
-                                                        className="dashboard-card-body",
-                                                        style={"maxHeight": "340px", "overflowY": "auto", "marginBottom": "10px", "padding": "8px", "border": "1px solid #e5e7eb", "borderRadius": "8px", "background": "#fafafa"}
-                                                    ),
-                                                    dcc.Textarea(
-                                                        id="mnid-indicators-input",
-                                                        value="",
-                                                        placeholder='[{"id":"mnid_x_001","label":"Indicator name","category":"ANC","target":80,"status":"tracked","numerator_filters":{"unique":"person_id"},"denominator_filters":{"unique":"person_id"}}]',
-                                                        className="modern-input",
-                                                        style={"minHeight": "160px", "resize": "vertical"},
-                                                    ),
+                                                    html.Div(className="form-group", style={"flex": "0 0 110px"}, children=[
+                                                        html.Label("Counts/Row", className="form-label"),
+                                                        dcc.Input(
+                                                            id="count-items-per-row-input",
+                                                            type="number",
+                                                            min=1, max=8,
+                                                            value=5,
+                                                            placeholder="5",
+                                                            className="modern-input",
+                                                        ),
+                                                    ]),
                                                 ]),
+                                                # MNID fields — hidden unless type == "mnid"
+                                                html.Div(
+                                                    id="mnid-section",
+                                                    style={"display": "none"},
+                                                    children=[
+                                                        html.Div(className="form-group", children=[
+                                                            html.Label("MNID Categories", className="form-label"),
+                                                            dcc.Dropdown(
+                                                                id="mnid-categories-selector",
+                                                                options=[{"label": item, "value": item}
+                                                                         for item in ["ANC", "Labour", "PNC", "Newborn"]],
+                                                                value=[],
+                                                                multi=True,
+                                                                placeholder="Select MNID program areas",
+                                                                className="modern-dropdown",
+                                                            ),
+                                                        ]),
+                                                        html.Div(className="form-group", children=[
+                                                            html.Label("MNID Indicators", className="form-label"),
+                                                            html.Div(
+                                                                style={"display": "flex", "justifyContent": "space-between",
+                                                                       "alignItems": "center", "marginBottom": "8px"},
+                                                                children=[
+                                                                    html.Span("Build indicators, review JSON below.",
+                                                                              style={"fontSize": "12px", "color": "#6b7280"}),
+                                                                    html.Button("➕ Add Indicator",
+                                                                                id="add-mnid-indicator-btn",
+                                                                                n_clicks=0,
+                                                                                className="btn-primary-modern"),
+                                                                ],
+                                                            ),
+                                                            html.Div(
+                                                                id="mnid-indicators-container",
+                                                                className="dashboard-card-body",
+                                                                style={"maxHeight": "260px", "overflowY": "auto",
+                                                                       "marginBottom": "8px", "padding": "8px",
+                                                                       "border": "1px solid #e5e7eb", "borderRadius": "8px",
+                                                                       "background": "#fafafa"},
+                                                            ),
+                                                            dcc.Textarea(
+                                                                id="mnid-indicators-input",
+                                                                value="",
+                                                                placeholder='[{"id":"mnid_x_001","label":"...","category":"ANC",...}]',
+                                                                className="modern-input",
+                                                                style={"minHeight": "100px", "resize": "vertical"},
+                                                            ),
+                                                        ]),
+                                                    ],
+                                                ),
                                             ]),
                                         ]),
-                                        
-                                        # Dashboard Items List
-                                        html.Div(className="dashboard-card",style={
-                                            "flex": "1",  # Take remaining space
-                                            "display": "flex",
-                                            "flexDirection": "column",
-                                            "minHeight": "0"
-                                        }, children=[
-                                            html.Div(
-                                                id="dashboard-items-container",
-                                                className="dashboard-card-body",
-                                                children=[
-                                                    list_items_html,
-                                                ]
-                                            )
-                                        ]),
+
+                                        # Dashboard Items Card (takes remaining height)
+                                        html.Div(
+                                            className="dashboard-card",
+                                            style={"flex": "1", "display": "flex", "flexDirection": "column", "minHeight": "0"},
+                                            children=[
+                                                html.Div(
+                                                    className="dashboard-card-header",
+                                                    style={"display": "flex", "alignItems": "center",
+                                                           "justifyContent": "space-between", "flexShrink": "0"},
+                                                    children=[
+                                                        html.H4("Dashboard Items", className="dashboard-card-title"),
+                                                        html.Div(style={"display": "flex", "gap": "6px"}, children=[
+                                                            html.Button("➕ Metric",
+                                                                        id="add-count-btn",
+                                                                        n_clicks=0,
+                                                                        className="btn-primary-modern btn-small",
+                                                                        title="Add a new metric/count"),
+                                                            html.Button("➕ Section",
+                                                                        id="add-section-btn",
+                                                                        n_clicks=0,
+                                                                        className="btn-primary-modern btn-small",
+                                                                        title="Add a new chart section"),
+                                                        ]),
+                                                    ],
+                                                ),
+                                                html.Div(
+                                                    id="dashboard-items-container",
+                                                    className="dashboard-card-body",
+                                                    style={"overflowY": "auto", "flex": "1"},
+                                                    children=[list_items_html],
+                                                ),
+                                            ],
+                                        ),
                                     ],
-                                    style={
-                                        "flex": "0.4",
-                                        "display": "flex",
-                                        "flexDirection": "column",
-                                        "gap": "20px",
-                                        "minHeight": "0",  # Critical for scrolling
-                                        "height": "100%",   # Take full height
-                                        "overflow": "hidden"  # Prevent overflow
-                                    },
                                 ),
-                                
-                                # Right Column: Metrics & Charts
+
+                                # ── RIGHT PANEL: Edit Forms ──────────────────────
                                 html.Div(
-                                    className="dashboard-right-panel",
-                                    children=[
-                                        # Metrics Section
-                                        html.Div(className="dashboard-card", children=[
-                                            html.Div(className="dashboard-card-header", children=[
-                                                html.Div(className="card-header-flex", children=[
-                                                    html.H4("🔢 Metrics", className="dashboard-card-title"),
-                                                    html.Button(
-                                                        "➕ Add Metric", 
-                                                        id="add-count-btn", 
-                                                        n_clicks=0, 
-                                                        className="btn-primary-modern"
-                                                    )
-                                                ])
-                                            ]),
-                                            html.Div(
-                                                id="counts-container", 
-                                                className="dashboard-card-body",
-                                                style={"maxHeight": "300px", "overflowY": "auto"}
-                                            ),
-                                        ]),
-                                        
-                                        # Charts & Sections Section
-                                        html.Div(className="dashboard-card", children=[
-                                            html.Div(className="dashboard-card-header", children=[
-                                                html.Div(className="card-header-flex", children=[
-                                                    html.H4("📈 Charts & Sections", className="dashboard-card-title"),
-                                                    html.Button(
-                                                        "➕ Add Section", 
-                                                        id="add-section-btn", 
-                                                        n_clicks=0, 
-                                                        className="btn-primary-modern"
-                                                    )
-                                                ])
-                                            ]),
-                                            html.Div(
-                                                id="sections-container", 
-                                                className="dashboard-card-body",
-                                                style={"display": "flex", "overflowY": "auto"}
-                                            ),
-                                        ]),
-                                    ],
                                     style={
-                                        "flex": "0.6",
+                                        "flex": "1",
                                         "display": "flex",
                                         "flexDirection": "column",
-                                        "gap": "20px"
-                                    }
-                                )
+                                        "gap": "16px",
+                                        "height": "100%",
+                                        "overflow": "hidden",
+                                    },
+                                    children=[
+                                        # Panel header
+                                        html.Div(
+                                            className="dashboard-card",
+                                            style={"flexShrink": "0", "padding": "12px 16px"},
+                                            children=[
+                                                html.Div(style={"display": "flex", "alignItems": "center", "gap": "10px"}, children=[
+                                                    html.Span("✏️", style={"fontSize": "18px"}),
+                                                    html.Div(children=[
+                                                        html.H4("Edit Panel", className="dashboard-card-title",
+                                                                style={"margin": "0"}),
+                                                        html.Span("Click an item on the left to open its form here.",
+                                                                  style={"fontSize": "12px", "color": "#6b7280"}),
+                                                    ]),
+                                                ]),
+                                            ],
+                                        ),
+                                        # Count / metric edit area
+                                        html.Div(
+                                            id="counts-container",
+                                            style={
+                                                "flexShrink": "0",
+                                                "overflowY": "auto",
+                                                "maxHeight": "45%",
+                                            },
+                                        ),
+                                        # Sections / charts edit area (scrollable, vertical)
+                                        html.Div(
+                                            id="sections-container",
+                                            style={
+                                                "flex": "1",
+                                                "overflowY": "auto",
+                                                "display": "flex",
+                                                "flexDirection": "column",
+                                                "gap": "12px",
+                                                "minHeight": "0",
+                                            },
+                                        ),
+                                    ],
+                                ),
                             ]
                         )
                     ]
@@ -1386,6 +1424,17 @@ def update_dashboard_items(selected_dashboard, refresh):
 )
 def sync_current_dashboard_index(selector_value):
     return selector_value if isinstance(selector_value, int) else -1
+
+@callback(
+    Output("mnid-section", "style"),
+    Input("dashboard-type-selector", "value"),
+    prevent_initial_call=False,
+)
+def toggle_mnid_section(dashboard_type):
+    if dashboard_type == "mnid":
+        return {"display": "block"}
+    return {"display": "none"}
+
 # validate admins
 @callback(
         [Output('sidebar', 'children'),
@@ -2207,7 +2256,8 @@ def toggle_preview_popup(preview_clicks, close_clicks):
      Output("mnid-indicators-container", "children", allow_duplicate=True),
      Output("mnid-indicators-input", "value", allow_duplicate=True),
      Output("counts-container", "children", allow_duplicate=True),
-     Output("sections-container", "children", allow_duplicate=True)],
+     Output("sections-container", "children", allow_duplicate=True),
+     Output("count-items-per-row-input", "value", allow_duplicate=True)],
     [Input("add-dashboard", "n_clicks"),
      Input("cancel-btn", "n_clicks"),
      Input("save-btn", "n_clicks"),
@@ -2218,7 +2268,7 @@ def toggle_modal(open_clicks, cancel_clicks, save_clicks, n_intervals):
     ctx = dash.callback_context
     if not ctx.triggered:
         return dash.no_update
-    
+
     def load_dashboards_from_file():
         try:
             with open(dashboards_json_path, 'r') as f:
@@ -2227,22 +2277,22 @@ def toggle_modal(open_clicks, cancel_clicks, save_clicks, n_intervals):
         except (FileNotFoundError, json.JSONDecodeError):
             return []
 
-    
+
     trigger = ctx.triggered[0]['prop_id'].split('.')[0]
-    
+
     if trigger == "add-dashboard" and open_clicks > 0:
         # Load current dashboards from file
         dashboards_data = load_dashboards_from_file()
-        
+
         # Update dropdown options
-        options = [{"label": f"📋 {d.get('report_name', 'Unnamed')})", 
+        options = [{"label": f"📋 {d.get('report_name', 'Unnamed')})",
                    "value": i} for i, d in enumerate(dashboards_data)] + \
                   [{"label": "➕ Create New Dashboard", "value": "new"}]
-        
-        
+
+
         # Return empty form for new dashboard
         return (
-            {"display": "block"}, 
+            {"display": "block"},
             {"display": "block"},
             "new",  # Select "new" in dropdown
             options,
@@ -2254,17 +2304,18 @@ def toggle_modal(open_clicks, cancel_clicks, save_clicks, n_intervals):
             [],
             "",
             [],  # Empty counts
-            []   # Empty sections
+            [],  # Empty sections
+            5    # Default counts per row
         )
-    
+
     elif trigger == "cancel-btn":
         # Just close the modal
-        return {"display": "none"}, {"display": "none"}, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
-    
+        return {"display": "none"}, {"display": "none"}, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+
     elif trigger == "save-btn":
         # Just close the modal
-        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
-    
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+
     return dash.no_update
 
 
@@ -2277,7 +2328,8 @@ def toggle_modal(open_clicks, cancel_clicks, save_clicks, n_intervals):
      Output("mnid-indicators-container", "children", allow_duplicate=True),
      Output("mnid-indicators-input", "value", allow_duplicate=True),
      Output("counts-container", "children", allow_duplicate=True),
-     Output("sections-container", "children", allow_duplicate=True)],
+     Output("sections-container", "children", allow_duplicate=True),
+     Output("count-items-per-row-input", "value", allow_duplicate=True)],
     [Input("dashboard-selector", "value"),
      Input({"type": "count-edit", "index": dash.ALL}, "n_clicks"),
      Input({"type": "section-edit", "index": dash.ALL}, "n_clicks"),
@@ -2315,6 +2367,7 @@ def load_dashboard(selector_value, count_clicks, section_clicks, chart_clicks):
                 "",
                 [],
                 [],
+                5,
             )
         dashboards_data = load_dashboards_from_file()
         if isinstance(selector_value, int) and 0 <= selector_value < len(dashboards_data):
@@ -2330,9 +2383,10 @@ def load_dashboard(selector_value, count_clicks, section_clicks, chart_clicks):
                 json.dumps(priority_indicators, indent=2) if priority_indicators else "",
                 [],  # clear containers on dashboard switch
                 [],
+                dashboard.get("count_items_per_row", 5),
             )
         return (dash.no_update, dash.no_update, dash.no_update, dash.no_update,
-                dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update)
+                dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update)
 
     # ── 2. An edit button was clicked ────────────────────────────────────────
     dashboards_data = load_dashboards_from_file()
@@ -2362,7 +2416,7 @@ def load_dashboard(selector_value, count_clicks, section_clicks, chart_clicks):
             count_form = create_count_item(counts[clicked_index], clicked_index)
         except (IndexError, Exception):
             count_form = []
-        return (*meta, count_form, dash.no_update)
+        return (*meta, count_form, dash.no_update, dash.no_update)
 
     # ── section-edit ──────────────────────────────────────────────────────────
     if isinstance(triggered_id, dict) and triggered_id.get("type") == "section-edit":
@@ -2373,20 +2427,44 @@ def load_dashboard(selector_value, count_clicks, section_clicks, chart_clicks):
             section_form = create_section(sections[clicked_index], clicked_index)
         except (IndexError, Exception):
             section_form = []
-        return (*meta, dash.no_update, section_form)
+        return (*meta, dash.no_update, section_form, dash.no_update)
 
     # ── chart-edit ────────────────────────────────────────────────────────────
     if isinstance(triggered_id, dict) and triggered_id.get("type") == "chart-edit":
         if not any(c for c in (chart_clicks or []) if c and c > 0):
             raise PreventUpdate
         section_idx = triggered_id["section"]
+        chart_idx   = triggered_id["chart"]
         try:
-            section_form = create_section(sections[section_idx], section_idx)
+            section_form = create_section(sections[section_idx], section_idx, active_chart_index=chart_idx)
         except (IndexError, Exception):
             section_form = []
-        return (*meta, dash.no_update, section_form)
+        return (*meta, dash.no_update, section_form, dash.no_update)
 
     raise PreventUpdate
+
+
+# ── Close buttons for edit forms ─────────────────────────────────────────────
+@callback(
+    Output("counts-container", "children", allow_duplicate=True),
+    Input({"type": "close-count-form", "index": dash.ALL}, "n_clicks"),
+    prevent_initial_call=True,
+)
+def close_count_form(n_clicks):
+    if not any(c for c in (n_clicks or []) if c and c > 0):
+        raise PreventUpdate
+    return []
+
+
+@callback(
+    Output("sections-container", "children", allow_duplicate=True),
+    Input({"type": "close-section-form", "index": dash.ALL}, "n_clicks"),
+    prevent_initial_call=True,
+)
+def close_section_form(n_clicks):
+    if not any(c for c in (n_clicks or []) if c and c > 0):
+        raise PreventUpdate
+    return []
 
 
 # ── Count: add / save / delete ────────────────────────────────────────────────
@@ -2403,36 +2481,30 @@ def load_dashboard(selector_value, count_clicks, section_clicks, chart_clicks):
      State({"type": "count-name",   "index": dash.ALL}, "value"),
      State({"type": "count-aggregations","index": dash.ALL}, "value"),
      State({"type": "count-unique", "index": dash.ALL}, "value"),
-     State({"type": "count-var1",   "index": dash.ALL}, "value"),
-     State({"type": "count-val1",   "index": dash.ALL}, "value"),
-     State({"type": "count-var2",   "index": dash.ALL}, "value"),
-     State({"type": "count-val2",   "index": dash.ALL}, "value"),
-     State({"type": "count-var3",   "index": dash.ALL}, "value"),
-     State({"type": "count-val3",   "index": dash.ALL}, "value"),
-     State({"type": "count-var4",   "index": dash.ALL}, "value"),
-     State({"type": "count-val4",   "index": dash.ALL}, "value"),
-     State({"type": "count-var5",   "index": dash.ALL}, "value"),
-     State({"type": "count-val5",   "index": dash.ALL}, "value"),
-     State({"type": "count-var6",   "index": dash.ALL}, "value"),
-     State({"type": "count-val6",   "index": dash.ALL}, "value"),
-     State({"type": "count-var7",   "index": dash.ALL}, "value"),
-     State({"type": "count-val7",   "index": dash.ALL}, "value"),
-     State({"type": "count-var8",   "index": dash.ALL}, "value"),
-     State({"type": "count-val8",   "index": dash.ALL}, "value"),
+     State({"type": "count-level",          "index": dash.ALL}, "value"),
+     State({"type": "count-flag",           "index": dash.ALL}, "value"),
+     State({"type": "count-display-average","index": dash.ALL}, "value"),
+     State({"type": "count-href",           "index": dash.ALL}, "value"),
+     State({"type": "count-href-name",      "index": dash.ALL}, "value"),
+     State({"type": "count-var", "count": dash.ALL, "filter": dash.ALL}, "value"),
+     State({"type": "count-val", "count": dash.ALL, "filter": dash.ALL}, "value"),
      State("counts-container", "children")],
     prevent_initial_call=True
 )
 def manage_counts(add_clicks, save_clicks, remove_clicks,
                   selector_value, report_id, report_name, date_created,
-                  count_ids, count_names,count_aggr, count_uniques,
-                  vars1, vals1, vars2, vals2, vars3, vals3,
-                  vars4, vals4, vars5, vals5, vars6, vals6,
-                  vars7, vals7, vars8, vals8,
+                  count_ids, count_names, count_aggr, count_uniques,
+                  count_levels, count_flags, count_display_averages,
+                  count_hrefs, count_href_names,
+                  count_var_values, count_val_values,
                   current_counts):
     if not ctx.triggered:
         raise PreventUpdate
 
     triggered_id = ctx.triggered_id
+    # Dash returns a dict (not a list) when the container has exactly one child
+    if isinstance(current_counts, dict):
+        current_counts = [current_counts]
     current_counts = current_counts or []
 
     # ── Add new blank count to the UI only (saved on "Save Count") ────────────
@@ -2451,31 +2523,46 @@ def manage_counts(add_clicks, save_clicks, remove_clicks,
             selector_value, report_id, report_name, date_created
         )
         counts = dashboard.get("visualization_types", {}).get("counts", [])
-        count_id = count_ids[ui_index] if ui_index < len(count_ids) else f"count_{uuid.uuid4().hex[:8]}"
+        count_id = count_ids[0] if count_ids else f"count_{uuid.uuid4().hex[:8]}"
+
+        # ── Build filter pairs from pattern-matched states ────────────────────
+        var_state_list = ctx.states_list[-3]  # count-var states
+        val_state_list = ctx.states_list[-2]  # count-val states
+
+        # Group by filter index for this specific count (ui_index is the count's actual index)
+        pairs = {}
+        for s in var_state_list:
+            if s["id"]["count"] == ui_index:
+                pairs.setdefault(s["id"]["filter"], ["", ""])[0] = s["value"] or ""
+        for s in val_state_list:
+            if s["id"]["count"] == ui_index:
+                pairs.setdefault(s["id"]["filter"], ["", ""])[1] = s["value"] or ""
+
+        filter_dict = {
+            "measure":  count_aggr[0]    if len(count_aggr)    > 0 else "nunique",
+            "unique":   count_uniques[0] if len(count_uniques) > 0 else "person_id",
+        }
+        for i, fi in enumerate(sorted(pairs.keys()), start=1):
+            var, val = pairs[fi]
+            if var:
+                filter_dict[f"variable{i}"] = var
+                if val not in (None, ""):
+                    filter_dict[f"value{i}"] = val
+
         updated = {
             "id":   count_id,
-            "name": count_names[ui_index] if ui_index < len(count_names) else "",
-            "filters": {
-                "measure":  count_aggr[ui_index] if ui_index < len(count_aggr) else "count",
-                "unique":    count_uniques[ui_index] if ui_index < len(count_uniques) else "person_id",
-                "variable1": vars1[ui_index] if ui_index < len(vars1) else "Program",
-                "value1":    _normalize_filter_value(vals1[ui_index] if ui_index < len(vals1) else []),
-                "variable2": vars2[ui_index] if ui_index < len(vars2) else "Encounter",
-                "value2":    _normalize_filter_value(vals2[ui_index] if ui_index < len(vals2) else []),
-                "variable3": vars3[ui_index] if ui_index < len(vars3) else "concept_name",
-                "value3":    _normalize_filter_value(vals3[ui_index] if ui_index < len(vals3) else []),
-                "variable4": vars4[ui_index] if ui_index < len(vars4) else "obs_value_coded",
-                "value4":    _normalize_filter_value(vals4[ui_index] if ui_index < len(vals4) else ""),
-                "variable5": vars5[ui_index] if ui_index < len(vars5) else "ValueN",
-                "value5":    _normalize_filter_value(vals5[ui_index] if ui_index < len(vals5) else ""),
-                "variable6": vars6[ui_index] if ui_index < len(vars6) else "Value",
-                "value6":    _normalize_filter_value(vals6[ui_index] if ui_index < len(vals6) else ""),
-                "variable7": vars7[ui_index] if ui_index < len(vars7) else "Gender",
-                "value7":    _normalize_filter_value(vals7[ui_index] if ui_index < len(vals7) else ""),
-                "variable8": vars8[ui_index] if ui_index < len(vars8) else "Age",
-                "value8":    _normalize_filter_value(vals8[ui_index] if ui_index < len(vals8) else ""),
-            }
+            "name": count_names[0] if len(count_names) > 0 else "",
+            "level":           count_levels[0]           if len(count_levels)           > 0 else "facility",
+            "flag":            count_flags[0]             if len(count_flags)            > 0 else None,
+            "display_average": count_display_averages[0]  if len(count_display_averages) > 0 else None,
+            "href":            count_hrefs[0]             if len(count_hrefs)            > 0 else "",
+            "href_name":       count_href_names[0]        if len(count_href_names)       > 0 else "",
+            "filters":         filter_dict,
         }
+        # Remove None/empty optional top-level fields
+        for k in ["flag", "display_average", "href", "href_name"]:
+            if updated[k] in (None, ""):
+                updated.pop(k)
 
         # Find and replace by id, or append if new
         matched = False
@@ -2488,7 +2575,7 @@ def manage_counts(add_clicks, save_clicks, remove_clicks,
             if updated["name"] !="":
                 counts.append(updated)
 
-        dashboard["visualization_types"]["counts"] = counts
+        dashboard["visualization_types"]["counts"] = counts 
         dashboards_data[dashboard_index] = dashboard
         save_dashboards_to_file(dashboards_data)
         return [create_count_item(c, i) for i, c in enumerate(counts)]
@@ -2503,7 +2590,7 @@ def manage_counts(add_clicks, save_clicks, remove_clicks,
         )
         counts = dashboard.get("visualization_types", {}).get("counts", [])
 
-        count_id = count_ids[ui_index] if ui_index < len(count_ids) else None
+        count_id = count_ids[0] if count_ids else None
         if count_id:
             counts = [c for c in counts if c.get("id") != count_id]
         else:
@@ -2517,6 +2604,35 @@ def manage_counts(add_clicks, save_clicks, remove_clicks,
         return [create_count_item(c, i) for i, c in enumerate(counts)]
 
     raise PreventUpdate
+
+
+@callback(
+    Output({"type": "count-filters-container", "count": MATCH}, "children"),
+    [Input({"type": "count-add-filter",    "count": MATCH}, "n_clicks"),
+     Input({"type": "count-remove-filter", "count": MATCH, "filter": ALL}, "n_clicks")],
+    [State({"type": "count-var", "count": MATCH, "filter": ALL}, "value"),
+     State({"type": "count-val", "count": MATCH, "filter": ALL}, "value")],
+    prevent_initial_call=True,
+)
+def manage_count_filters(add_clicks, remove_clicks, var_values, val_values):
+    if not ctx.triggered:
+        raise PreventUpdate
+    triggered_id = ctx.triggered_id
+    count_idx = triggered_id["count"]
+    current_pairs = list(zip(
+        [v or "" for v in (var_values or [])],
+        [v or "" for v in (val_values or [])],
+    ))
+    if not current_pairs:
+        current_pairs = [("", "")]
+    if triggered_id.get("type") == "count-add-filter":
+        current_pairs.append(("", ""))
+    elif triggered_id.get("type") == "count-remove-filter":
+        fi = triggered_id["filter"]
+        if len(current_pairs) > 1:
+            current_pairs = [p for i, p in enumerate(current_pairs) if i != fi]
+    return render_filter_rows(count_idx, current_pairs)
+
 
 @callback(
     [Output("mnid-indicators-container", "children", allow_duplicate=True),
@@ -2711,13 +2827,15 @@ def manage_mnid_indicators(add_clicks, save_clicks, remove_clicks,
      State({"type": "chart-filter_val4",    "section": dash.ALL, "index": dash.ALL}, "value"),
      State({"type": "chart-filter_col5",    "section": dash.ALL, "index": dash.ALL}, "value"),
      State({"type": "chart-filter_val5",    "section": dash.ALL, "index": dash.ALL}, "value"),
+     State({"type": "section-chart-items-per-row", "index": dash.ALL}, "value"),
+     State({"type": "chart-level", "section": dash.ALL, "index": dash.ALL}, "value"),
      State("sections-container", "children")],
     prevent_initial_call=True
 )
 def manage_sections(add_section_clicks, remove_section_clicks,
                     add_chart_clicks, save_chart_clicks, remove_chart_clicks,
                     selector_value, report_id, report_name, date_created, section_names,
-                    chart_ids, chart_names, chart_types, 
+                    chart_ids, chart_names, chart_types,
                     # chart_titles,
                     chart_date_cols, chart_y_cols, chart_x_cols,
                     chart_x_titles, chart_y_titles,
@@ -2732,6 +2850,7 @@ def manage_sections(add_section_clicks, remove_section_clicks,
                     chart_filter_col3s, chart_filter_val3s,
                     chart_filter_col4s, chart_filter_val4s,
                     chart_filter_col5s, chart_filter_val5s,
+                    section_chart_items_per_row_values, chart_levels,
                     current_sections):
     
     if not ctx.triggered:
@@ -2827,11 +2946,14 @@ def manage_sections(add_section_clicks, remove_section_clicks,
             "id": chart_id,
             "name": get(chart_names, flat_idx, ""),
             "type": chart_type,
+            "level": get(chart_levels, flat_idx, "facility"),
             "filters": filters
         }
 
-    def render_sections(sections):
-        return [create_section(s, i) for i, s in enumerate(sections)]
+    def render_sections(sections, active_state=None):
+        """Render sections; active_state = {section_idx: chart_idx} controls which chart is open."""
+        active_state = active_state or {}
+        return [create_section(s, i, active_chart_index=active_state.get(i)) for i, s in enumerate(sections)]
 
     # Handle triggers
     if triggered_id == "add-section-btn":
@@ -2840,55 +2962,58 @@ def manage_sections(add_section_clicks, remove_section_clicks,
                 selector_value, report_id, report_name, date_created
             )
             sections = dashboard.get("visualization_types", {}).get("charts", {}).get("sections", [])
-            
+
             new_section_index = len(sections)
             new_section = {
                 "section_name": f"Section {new_section_index + 1}",
+                "chart_items_per_row": 2,
                 "items": [
                     {
                         "id": f"chart_{uuid.uuid4().hex[:8]}",
                         "name": "",
                         "type": "Bar",
+                        "level": "facility",
                         "filters": {}
                     }
                 ]
             }
-            
+
             sections.append(new_section)
             dashboard["visualization_types"]["charts"]["sections"] = sections
             dashboards_data[dashboard_index] = dashboard
             save_dashboards_to_file(dashboards_data)
-            return render_sections(sections)
+            # Open the blank chart that was just created in the new section
+            return render_sections(sections, {new_section_index: 0})
         raise PreventUpdate
 
     if isinstance(triggered_id, dict) and triggered_id.get("type") == "remove-section":
         if not any(c for c in (remove_section_clicks or []) if c and c > 0):
             raise PreventUpdate
-        
+
         section_ui_idx = triggered_id["index"]
         dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
             selector_value, report_id, report_name, date_created
         )
         sections = dashboard.get("visualization_types", {}).get("charts", {}).get("sections", [])
-        
+
         if 0 <= section_ui_idx < len(sections):
             sections.pop(section_ui_idx)
             dashboard["visualization_types"]["charts"]["sections"] = sections
             dashboards_data[dashboard_index] = dashboard
             save_dashboards_to_file(dashboards_data)
-        
+
         return render_sections(sections)
- 
+
     if isinstance(triggered_id, dict) and triggered_id.get("type") == "add-chart-btn":
         if not any(c for c in (add_chart_clicks or []) if c and c > 0):
             raise PreventUpdate
-        
+
         section_ui_idx = triggered_id["index"]
         dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
             selector_value, report_id, report_name, date_created
         )
         sections = dashboard.get("visualization_types", {}).get("charts", {}).get("sections", [])
-        
+
         if 0 <= section_ui_idx < len(sections):
             new_chart = {
                 "id": f"chart_{uuid.uuid4().hex[:8]}",
@@ -2900,80 +3025,87 @@ def manage_sections(add_section_clicks, remove_section_clicks,
             dashboard["visualization_types"]["charts"]["sections"] = sections
             dashboards_data[dashboard_index] = dashboard
             save_dashboards_to_file(dashboards_data)
-        
+            # Show only the new blank chart; hide any previously open chart
+            new_chart_idx = len(sections[section_ui_idx]["items"]) - 1
+            return render_sections(sections, {section_ui_idx: new_chart_idx})
+
         return render_sections(sections)
- 
+
     if isinstance(triggered_id, dict) and triggered_id.get("type") == "save-chart":
         if not any(c for c in (save_chart_clicks or []) if c and c > 0):
             raise PreventUpdate
-        
+
         section_ui_idx = triggered_id["section"]
         chart_ui_idx = triggered_id["index"]
-        
+
         dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
             selector_value, report_id, report_name, date_created
         )
         sections = dashboard.get("visualization_types", {}).get("charts", {}).get("sections", [])
-        
+
         # Validate section and chart
         if section_ui_idx >= len(sections):
             raise PreventUpdate
-        
+
         items = sections[section_ui_idx].get("items", [])
         if chart_ui_idx >= len(items):
             raise PreventUpdate
-        
-        
+
         # Calculate flat index
         flat_idx = calculate_flat_index(section_ui_idx, chart_ui_idx)
         if flat_idx is None:
             raise PreventUpdate
-        
+
         # Update section name
         section_name = get(section_names, section_ui_idx, "")
         if section_name and section_name.strip():
             sections[section_ui_idx]["section_name"] = section_name
-        
+
+        # Update section chart_items_per_row
+        raw_cipr = get(section_chart_items_per_row_values, section_ui_idx, 2)
+        sections[section_ui_idx]["chart_items_per_row"] = int(raw_cipr or 2)
+
         # Build and save chart
         form_data = items[chart_ui_idx]
         chart_id = form_data.get("id", f"chart_{uuid.uuid4().hex[:8]}")
-        updated_chart = build_chart_data_from_index(section_ui_idx, chart_id, flat_idx,form_data )
-        
+        updated_chart = build_chart_data_from_index(section_ui_idx, chart_id, flat_idx, form_data)
+
         if updated_chart:
             items[chart_ui_idx] = updated_chart
             sections[section_ui_idx]["items"] = items
             dashboard["visualization_types"]["charts"]["sections"] = sections
             dashboards_data[dashboard_index] = dashboard
             save_dashboards_to_file(dashboards_data)
-        
-        return render_sections(sections)
- 
+
+        # Keep the saved chart open after save
+        return render_sections(sections, {section_ui_idx: chart_ui_idx})
+
     if isinstance(triggered_id, dict) and triggered_id.get("type") == "remove-chart":
         if not any(c for c in (remove_chart_clicks or []) if c and c > 0):
             raise PreventUpdate
-        
+
         section_ui_idx = triggered_id["section"]
         chart_ui_idx = triggered_id["index"]
-        
+
         dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
             selector_value, report_id, report_name, date_created
         )
         sections = dashboard.get("visualization_types", {}).get("charts", {}).get("sections", [])
-        
+
         if section_ui_idx < len(sections):
             items = sections[section_ui_idx].get("items", [])
             if 0 <= chart_ui_idx < len(items):
                 items.pop(chart_ui_idx)
-            
+
             if len(items) == 0:
                 sections.pop(section_ui_idx)
             else:
                 sections[section_ui_idx]["items"] = items
-            
+
             dashboard["visualization_types"]["charts"]["sections"] = sections
             dashboards_data[dashboard_index] = dashboard
             save_dashboards_to_file(dashboards_data)
-        
+
         return render_sections(sections)
  
     raise PreventUpdate
@@ -3423,6 +3555,7 @@ def update_chart_fields(chart_type, selector_value, report_id):
      State("dashboard-type-selector", "value"),
      State("mnid-categories-selector", "value"),
      State("mnid-indicators-input", "value"),
+     State("count-items-per-row-input", "value"),
      State({"type": "mnid-indicator-id", "index": dash.ALL}, "value"),
      State({"type": "mnid-indicator-label", "index": dash.ALL}, "value"),
      State({"type": "mnid-indicator-category", "index": dash.ALL}, "value"),
@@ -3450,6 +3583,7 @@ def update_chart_fields(chart_type, selector_value, report_id):
 )
 def save_dashboard_config(save_clicks, selector_value, report_id, report_name, date_created,
                           dashboard_type, mnid_categories, mnid_indicators_raw,
+                          count_items_per_row,
                           indicator_ids, indicator_labels, indicator_categories, indicator_targets,
                           indicator_statuses, indicator_uniques, indicator_notes,
                           n_var1, n_val1, n_var2, n_val2, n_var3, n_val3, n_var4, n_val4,
@@ -3496,6 +3630,7 @@ def save_dashboard_config(save_clicks, selector_value, report_id, report_name, d
     dashboard["report_id"] = report_id or dashboard.get("report_id") or f"report_{uuid.uuid4().hex[:8]}"
     dashboard["report_name"] = report_name or dashboard.get("report_name") or "New Dashboard"
     dashboard["date_created"] = date_created or dashboard.get("date_created") or datetime.now().strftime("%Y-%m-%d")
+    dashboard["count_items_per_row"] = int(count_items_per_row or 5)
     dashboard.setdefault("visualization_types", {})
     dashboard["visualization_types"].setdefault("counts", [])
     dashboard["visualization_types"].setdefault("charts", {})
