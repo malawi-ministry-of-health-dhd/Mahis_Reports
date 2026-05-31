@@ -40,7 +40,7 @@ def _prewarm_mnid_cache():
         import pandas as pd
         from data_storage import DataStorage
         from mnid.app import _network_df_cache, _prepare_mnid_dataframe
-        sql = f"SELECT * FROM 'data/{DATA_FILE_NAME_}'"
+        sql = f"SELECT * FROM '{DATA_FILE_NAME_}'"
         df = DataStorage.query_duckdb(sql)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         key = (len(df), tuple(df.columns.tolist()))

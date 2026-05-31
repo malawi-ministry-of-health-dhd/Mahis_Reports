@@ -1327,6 +1327,12 @@ layout = html.Div(
                             n_clicks=0,
                             className="nav-btn-modern"
                         ),
+                        html.Button(
+                            "Configure Users",
+                            id="configure-users-btn",
+                            n_clicks=0,
+                            className="nav-btn-modern"
+                        ),
                     ]
                 ),
                 
@@ -1348,6 +1354,7 @@ layout = html.Div(
             children=[
                 # Main Content Area
                 html.Div(
+                    id="main-content-area",
                     className="content-area-modern",
                     children=[
                         # Instructions Section
@@ -1385,6 +1392,211 @@ layout = html.Div(
                     id='configurations-interval-update-today',
                     interval=10*60*1000,
                     n_intervals=0
+                ),
+
+                # ── User Configuration Panel ─────────────────────────────────
+                html.Div(
+                    id="user-config-panel",
+                    style={"display": "none"},
+                    children=[
+                        html.Div(
+                            className="dashboard-card",
+                            style={"margin": "16px 0"},
+                            children=[
+                                html.Div(
+                                    className="dashboard-card-header",
+                                    style={"display": "flex", "justifyContent": "space-between",
+                                           "alignItems": "center"},
+                                    children=[
+                                        html.H4("Configure Users", className="dashboard-card-title"),
+                                        html.Button("✕ Close", id="close-user-config-btn", n_clicks=0,
+                                                    className="btn-secondary btn-small"),
+                                    ],
+                                ),
+                                html.Div(
+                                    className="dashboard-card-body",
+                                    children=[
+                                        html.Div(
+                                            style={"display": "flex", "gap": "24px", "alignItems": "flex-start"},
+                                            children=[
+
+                                                # ── Left: search only ─────────────────────
+                                                html.Div(
+                                                    style={"flex": "0 0 260px"},
+                                                    children=[
+                                                        html.Label("Search & Select User",
+                                                                   className="form-label"),
+                                                        dcc.Dropdown(
+                                                            id="user-search-dropdown",
+                                                            options=[],
+                                                            placeholder="Type to search username...",
+                                                            className="modern-dropdown",
+                                                            clearable=True,
+                                                            searchable=True,
+                                                        ),
+                                                    ],
+                                                ),
+
+                                                # ── Right: form + saved users table ───────
+                                                html.Div(
+                                                    style={"flex": "1", "display": "flex",
+                                                           "flexDirection": "column", "gap": "16px"},
+                                                    children=[
+
+                                                        # Placeholder (no user selected)
+                                                        html.Div(
+                                                            id="user-form-placeholder",
+                                                            style={"color": "#9ca3af", "fontSize": "14px",
+                                                                   "padding": "24px 0"},
+                                                            children="Select a user from the left to configure their access properties.",
+                                                        ),
+
+                                                        # Property editor form
+                                                        html.Div(
+                                                            id="user-property-form",
+                                                            style={"display": "none"},
+                                                            children=[
+                                                                # Row 1: username / uuid / facility_code / role / level
+                                                                html.Div(
+                                                                    style={"display": "flex", "gap": "12px",
+                                                                           "flexWrap": "wrap",
+                                                                           "marginBottom": "12px"},
+                                                                    children=[
+                                                                        html.Div(style={"flex": "1", "minWidth": "160px"}, children=[
+                                                                            html.Label("Username", className="form-label"),
+                                                                            dcc.Input(id="uc-username", disabled=True,
+                                                                                      className="modern-input-disabled",
+                                                                                      style={"width": "100%"}),
+                                                                        ]),
+                                                                        html.Div(style={"flex": "2", "minWidth": "240px"}, children=[
+                                                                            html.Label("UUID", className="form-label"),
+                                                                            dcc.Input(id="uc-uuid", disabled=True,
+                                                                                      className="modern-input-disabled",
+                                                                                      style={"width": "100%"}),
+                                                                        ]),
+                                                                        html.Div(style={"flex": "1", "minWidth": "120px"}, children=[
+                                                                            html.Label("Facility Code", className="form-label"),
+                                                                            dcc.Input(id="uc-facility-code", disabled=True,
+                                                                                      className="modern-input-disabled",
+                                                                                      style={"width": "100%"},
+                                                                                      placeholder="from CSV"),
+                                                                        ]),
+                                                                        html.Div(style={"flex": "1", "minWidth": "160px"}, children=[
+                                                                            html.Label("Role", className="form-label"),
+                                                                            dcc.Dropdown(
+                                                                                id="uc-role",
+                                                                                options=[],
+                                                                                placeholder="Select role",
+                                                                                className="modern-dropdown",
+                                                                                clearable=False,
+                                                                            ),
+                                                                        ]),
+                                                                        html.Div(style={"flex": "1", "minWidth": "150px"}, children=[
+                                                                            html.Label("User Level", className="form-label"),
+                                                                            dcc.Dropdown(
+                                                                                id="uc-user-level",
+                                                                                options=[
+                                                                                    {"label": "Facility",  "value": "facility"},
+                                                                                    {"label": "District",  "value": "district"},
+                                                                                    {"label": "National",  "value": "national"},
+                                                                                ],
+                                                                                value="facility",
+                                                                                clearable=False,
+                                                                                className="modern-dropdown",
+                                                                            ),
+                                                                        ]),
+                                                                    ],
+                                                                ),
+
+                                                                # Row 2: district + facility (district level only)
+                                                                html.Div(
+                                                                    id="uc-district-facility-section",
+                                                                    style={"display": "none",
+                                                                           "marginBottom": "12px"},
+                                                                    children=[
+                                                                        html.Div(
+                                                                            style={"display": "flex", "gap": "12px",
+                                                                                   "flexWrap": "wrap"},
+                                                                            children=[
+                                                                                html.Div(style={"flex": "1", "minWidth": "220px"}, children=[
+                                                                                    html.Label("District(s)", className="form-label"),
+                                                                                    dcc.Dropdown(
+                                                                                        id="uc-district",
+                                                                                        options=[],
+                                                                                        multi=True,
+                                                                                        placeholder="Select district(s)",
+                                                                                        className="modern-dropdown",
+                                                                                    ),
+                                                                                ]),
+                                                                                html.Div(style={"flex": "1", "minWidth": "220px"}, children=[
+                                                                                    html.Label("Facility Name(s)", className="form-label"),
+                                                                                    dcc.Dropdown(
+                                                                                        id="uc-facility-name",
+                                                                                        options=[],
+                                                                                        multi=True,
+                                                                                        placeholder="Select facility/facilities (optional)",
+                                                                                        className="modern-dropdown",
+                                                                                    ),
+                                                                                ]),
+                                                                            ],
+                                                                        ),
+                                                                    ],
+                                                                ),
+
+                                                                # Action buttons
+                                                                html.Div(
+                                                                    style={"display": "flex", "gap": "10px",
+                                                                           "alignItems": "center",
+                                                                           "marginBottom": "4px"},
+                                                                    children=[
+                                                                        html.Button("💾 Save User",
+                                                                                    id="uc-save-btn",
+                                                                                    n_clicks=0,
+                                                                                    className="btn-save"),
+                                                                        html.Button("🗑️ Remove User",
+                                                                                    id="uc-remove-btn",
+                                                                                    n_clicks=0,
+                                                                                    className="btn-danger btn-small"),
+                                                                        html.Span(id="uc-save-status",
+                                                                                  style={"fontSize": "13px",
+                                                                                         "color": "#006401",
+                                                                                         "fontWeight": "500"}),
+                                                                    ],
+                                                                ),
+                                                            ],
+                                                        ),
+
+                                                        # Configured users table (always visible)
+                                                        html.Div(children=[
+                                                            html.Div(
+                                                                style={"display": "flex",
+                                                                       "alignItems": "center",
+                                                                       "gap": "8px",
+                                                                       "margin": "8px 0 6px"},
+                                                                children=[
+                                                                    html.Span("Configured Users",
+                                                                              style={"fontWeight": "600",
+                                                                                     "fontSize": "14px",
+                                                                                     "color": "#374151"}),
+                                                                ],
+                                                            ),
+                                                            html.Div(
+                                                                id="configured-users-table",
+                                                                style={"overflowX": "auto",
+                                                                       "borderRadius": "8px",
+                                                                       "border": "1px solid #e5e7eb"},
+                                                            ),
+                                                        ]),
+
+                                                    ],
+                                                ),
+                                            ],
+                                        ),
+                                    ],
+                                ),
+                            ],
+                        ),
+                    ],
                 ),
             ],
         ),
@@ -3730,3 +3942,318 @@ def toggle_confirmation_modal(show_confirmation):
         return {"display": "block", "position": "fixed", "top": "50%", "left": "50%", "transform": "translate(-50%, -50%)", "zIndex": "1000", "background": "white", "padding": "20px", "borderRadius": "5px", "boxShadow": "0 2px 10px rgba(0,0,0,0.1)"}
     else:
         return {"display": "none"}
+
+
+# ── Configure Users callbacks ─────────────────────────────────────────────────
+
+_users_csv_path        = os.path.join(path, 'data', 'single_tables', 'users_data.csv')
+_user_props_path       = os.path.join(path, 'data', 'dcc_dropdown_json', 'user_properties.json')
+_facilities_json_path  = os.path.join(path, 'data', 'dcc_dropdown_json', 'facilities_dropdowns.json')
+
+def _load_user_csv():
+    if not os.path.exists(_users_csv_path):
+        return pd.DataFrame(columns=['User', 'uuid', 'role'])
+    df = pd.read_csv(_users_csv_path)
+    df = df.dropna(subset=['User']).drop_duplicates(subset=['User'])
+    return df
+
+def _load_user_props():
+    if not os.path.exists(_user_props_path):
+        return {"users": []}
+    try:
+        with open(_user_props_path) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return {"users": []}
+
+def _save_user_props(data):
+    os.makedirs(os.path.dirname(_user_props_path), exist_ok=True)
+    with open(_user_props_path, 'w') as f:
+        json.dump(data, f, indent=2)
+
+def _load_facilities():
+    try:
+        with open(_facilities_json_path) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+# 1. Toggle panel visibility — show user config, hide main content area (and vice-versa)
+@callback(
+    [Output("user-config-panel",  "style"),
+     Output("main-content-area",  "style")],
+    [Input("configure-users-btn",  "n_clicks"),
+     Input("close-user-config-btn","n_clicks")],
+    prevent_initial_call=True,
+)
+def toggle_user_config_panel(open_clicks, close_clicks):
+    if ctx.triggered_id == "configure-users-btn":
+        return {"display": "block"}, {"display": "none"}
+    return {"display": "none"}, {"display": "block"}
+
+
+# 2. Populate user search dropdown when panel opens
+@callback(
+    Output("user-search-dropdown", "options"),
+    Input("user-config-panel", "style"),
+)
+def populate_user_dropdown(panel_style):
+    if not panel_style or panel_style.get("display") == "none":
+        raise PreventUpdate
+    df = _load_user_csv()
+    return [{"label": row["User"], "value": row["User"]} for _, row in df.iterrows()]
+
+
+# 3. Load user properties into the form when a user is selected
+@callback(
+    [Output("user-property-form",    "style"),
+     Output("user-form-placeholder", "style"),
+     Output("uc-username",           "value"),
+     Output("uc-uuid",               "value"),
+     Output("uc-facility-code",      "value"),
+     Output("uc-role",               "options"),
+     Output("uc-role",               "value"),
+     Output("uc-user-level",         "value"),
+     Output("uc-district",           "value"),
+     Output("uc-facility-name",      "value")],
+    Input("user-search-dropdown", "value"),
+    prevent_initial_call=True,
+)
+def load_user_into_form(username):
+    placeholder_shown  = {"display": "block", "color": "#9ca3af",
+                          "fontSize": "14px", "padding": "24px 0"}
+    placeholder_hidden = {"display": "none"}
+
+    if not username:
+        return ({"display": "none"}, placeholder_shown,
+                "", "", "", [], None, "facility", [], [])
+
+    df = _load_user_csv()
+    user_row = df[df["User"] == username]
+    csv_uuid = ""
+    csv_location = ""
+    csv_roles = []
+    if not user_row.empty:
+        row = user_row.iloc[0]
+        csv_uuid     = str(row.get("uuid",        "") or "")
+        csv_location = str(row.get("location_id", "") or "")
+        raw_role     = str(row.get("role",        "") or "")
+        csv_roles    = [r.strip() for r in raw_role.replace(";", ",").split(",") if r.strip()]
+
+    all_roles    = list(dict.fromkeys(csv_roles + ["reports_admin"]))
+    role_options = [{"label": r, "value": r} for r in all_roles]
+    default_role = all_roles[0] if all_roles else "reports_admin"
+
+    # Overlay with any existing saved properties
+    props_data = _load_user_props()
+    existing   = next((u for u in props_data.get("users", []) if u.get("username") == username), None)
+    if existing:
+        p            = existing.get("properties", {})
+        saved_uuid   = p.get("uuid",          csv_uuid)     or csv_uuid
+        saved_fcode  = p.get("facility_code", csv_location) or csv_location
+        saved_role   = p.get("role",          default_role)
+        saved_level  = p.get("user_level",    "facility")
+        saved_dist   = p.get("district")      or []
+        saved_fac    = p.get("facility_name") or []
+        if isinstance(saved_dist, str):
+            saved_dist = [saved_dist]
+        if isinstance(saved_fac, str):
+            saved_fac = [saved_fac]
+    else:
+        saved_uuid  = csv_uuid
+        saved_fcode = csv_location
+        saved_role  = default_role
+        saved_level = "facility"
+        saved_dist  = []
+        saved_fac   = []
+
+    return (
+        {"display": "block"},
+        placeholder_hidden,
+        username,
+        saved_uuid,
+        saved_fcode,
+        role_options,
+        saved_role,
+        saved_level,
+        saved_dist,
+        saved_fac,
+    )
+
+
+# 4. Show/hide district+facility section based on user level
+@callback(
+    Output("uc-district-facility-section", "style"),
+    Input("uc-user-level", "value"),
+)
+def toggle_district_section(level):
+    if level == "district":
+        return {"display": "block"}
+    return {"display": "none"}
+
+
+# 5. Populate district options (always from facilities_dropdowns.json)
+@callback(
+    Output("uc-district", "options"),
+    Input("uc-user-level", "value"),
+)
+def populate_districts(level):
+    facilities = _load_facilities()
+    return [{"label": d, "value": d} for d in sorted(facilities.keys())]
+
+
+# 6. Cascade: update facility options based on selected districts
+@callback(
+    Output("uc-facility-name", "options"),
+    Input("uc-district", "value"),
+)
+def update_facility_options(districts):
+    if not districts:
+        return []
+    facilities = _load_facilities()
+    opts = []
+    for d in (districts or []):
+        for fac in facilities.get(d, []):
+            opts.append({"label": f"{fac} ({d})", "value": fac})
+    return opts
+
+
+# 7. Save user properties
+@callback(
+    [Output("uc-save-status",         "children"),
+     Output("configured-users-table", "children")],
+    Input("uc-save-btn", "n_clicks"),
+    [State("uc-username",      "value"),
+     State("uc-uuid",          "value"),
+     State("uc-facility-code", "value"),
+     State("uc-role",          "value"),
+     State("uc-user-level",    "value"),
+     State("uc-district",      "value"),
+     State("uc-facility-name", "value")],
+    prevent_initial_call=True,
+)
+def save_user_properties(n_clicks, username, uuid_val, facility_code, role, user_level, districts, facilities):
+    if not n_clicks or not username:
+        raise PreventUpdate
+
+    props_data = _load_user_props()
+    users = props_data.get("users", [])
+
+    new_entry = {
+        "username": username,
+        "properties": {
+            "uuid":          uuid_val      or "",
+            "role":          role          or "facility",
+            "user_level":    user_level    or "facility",
+            "district":      districts      if user_level == "district" else None,
+            "facility_name": facilities     if (user_level == "district" and facilities) else None,
+            "facility_code": facility_code or None,
+        },
+    }
+
+    idx = next((i for i, u in enumerate(users) if u.get("username") == username), None)
+    if idx is not None:
+        users[idx] = new_entry
+    else:
+        users.append(new_entry)
+
+    props_data["users"] = users
+    _save_user_props(props_data)
+
+    return "✓ Saved", _build_users_table(users)
+
+
+# 8. Remove user
+@callback(
+    [Output("uc-save-status",         "children", allow_duplicate=True),
+     Output("configured-users-table", "children", allow_duplicate=True),
+     Output("user-property-form",     "style",    allow_duplicate=True),
+     Output("user-form-placeholder",  "style",    allow_duplicate=True),
+     Output("user-search-dropdown",   "value")],
+    Input("uc-remove-btn", "n_clicks"),
+    State("uc-username", "value"),
+    prevent_initial_call=True,
+)
+def remove_user(n_clicks, username):
+    if not n_clicks or not username:
+        raise PreventUpdate
+    props_data = _load_user_props()
+    props_data["users"] = [u for u in props_data.get("users", []) if u.get("username") != username]
+    _save_user_props(props_data)
+    placeholder_style = {"display": "block", "color": "#9ca3af", "fontSize": "14px",
+                          "padding": "40px", "textAlign": "center"}
+    return "✓ Removed", _build_users_table(props_data["users"]), {"display": "none"}, placeholder_style, None
+
+
+# 9. Populate configured-users-table when panel opens
+@callback(
+    Output("configured-users-table", "children", allow_duplicate=True),
+    Input("user-config-panel", "style"),
+    prevent_initial_call=True,
+)
+def refresh_users_table(panel_style):
+    if not panel_style or panel_style.get("display") == "none":
+        raise PreventUpdate
+    data = _load_user_props()
+    return _build_users_table(data.get("users", []))
+
+
+def _build_users_table(users):
+    if not users:
+        return html.Div(
+            "No users configured yet.",
+            style={"padding": "16px", "color": "#9ca3af", "fontSize": "13px",
+                   "textAlign": "center"},
+        )
+
+    th_style = {
+        "padding": "10px 14px", "textAlign": "left",
+        "background": "#006401", "color": "#fff",
+        "fontSize": "12px", "fontWeight": "600",
+        "whiteSpace": "nowrap",
+    }
+    header = html.Thead(html.Tr([
+        html.Th("Username",      style=th_style),
+        html.Th("UUID",          style={**th_style, "maxWidth": "160px", "overflow": "hidden",
+                                        "textOverflow": "ellipsis"}),
+        html.Th("Facility Code", style=th_style),
+        html.Th("Role",          style=th_style),
+        html.Th("Level",         style=th_style),
+        html.Th("District(s)",   style=th_style),
+        html.Th("Facility Name(s)", style=th_style),
+    ]))
+
+    body_rows = []
+    for i, u in enumerate(users):
+        p        = u.get("properties", {})
+        bg       = "#f2f9f2" if i % 2 == 0 else "#ffffff"
+        td       = {"padding": "8px 14px", "fontSize": "12px",
+                    "background": bg, "borderBottom": "1px solid #e5e7eb",
+                    "whiteSpace": "nowrap"}
+
+        dist     = p.get("district")      or []
+        fac      = p.get("facility_name") or []
+        dist_str = ", ".join(dist) if isinstance(dist, list) else (dist or "—")
+        fac_str  = ", ".join(fac)  if isinstance(fac,  list) else (fac  or "—")
+        uuid_val = p.get("uuid", "") or ""
+        uuid_short = (uuid_val[:18] + "…") if len(uuid_val) > 20 else uuid_val
+
+        body_rows.append(html.Tr([
+            html.Td(u.get("username", ""),    style={**td, "fontWeight": "500",
+                                                     "color": "#006401"}),
+            html.Td(uuid_short,               style={**td, "fontFamily": "monospace",
+                                                     "fontSize": "11px"},
+                    title=uuid_val),
+            html.Td(p.get("facility_code", "") or "—", style=td),
+            html.Td(p.get("role", "")         or "—", style=td),
+            html.Td(p.get("user_level", "")   or "—", style=td),
+            html.Td(dist_str,                  style=td),
+            html.Td(fac_str,                   style=td),
+        ]))
+
+    return html.Table(
+        [header, html.Tbody(body_rows)],
+        style={"width": "100%", "borderCollapse": "collapse",
+               "fontSize": "13px", "tableLayout": "auto"},
+    )

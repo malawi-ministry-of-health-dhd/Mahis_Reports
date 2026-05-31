@@ -139,17 +139,49 @@ def _title_level(value: str) -> str:
     return {'national': 'National', 'district': 'District', 'facility': 'Facility'}.get(value, 'Facility')
 
 
+def _load_user_properties() -> list:
+    props_path = os.path.join(os.getcwd(), 'data', 'dcc_dropdown_json', 'user_properties.json')
+    try:
+        with open(props_path) as f:
+            return json.load(f).get('users', [])
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        return []
+
+
 def _resolve_user_scope(urlparams, user_data: pd.DataFrame):
     requested_uuid = urlparams.get('uuid', [None])[0] if urlparams else None
+
+    # Check user_properties.json first (GUI-configured overrides)
+    for entry in _load_user_properties():
+        p = entry.get('properties', {})
+        if p.get('uuid') == requested_uuid:
+            level     = _normalize_level(p.get('user_level'))
+            districts = p.get('district')
+            if isinstance(districts, str):
+                districts = [districts] if districts else []
+            facilities = p.get('facility_name')
+            if isinstance(facilities, str):
+                facilities = [facilities] if facilities else []
+            scope = {
+                'level':      level,
+                'districts':  districts  or [],
+                'facilities': facilities or [],
+            }
+            # Still return a dataframe row so callers that use row.get(...) don't break
+            user_info = user_data[user_data['uuid'] == requested_uuid]
+            row = user_info.iloc[0] if not user_info.empty else None
+            return row, scope
+
+    # Fall back to users_data dataframe
     user_info = user_data[user_data['uuid'] == requested_uuid]
     if user_info.empty:
         return None, {}
-    row = user_info.iloc[0]
+    row   = user_info.iloc[0]
     level = _normalize_level(row.get('user_level'))
     scope = {
-        'level': level,
-        'districts': row.get('district'),
-        'facilities': row.get('facility_name')
+        'level':      level,
+        'districts':  row.get('district'),
+        'facilities': row.get('facility_name'),
     }
     return row, scope
 
@@ -951,7 +983,10 @@ def update_dashboard(gen, interval, start_date, end_date, level,
                                         {DATE_} BETWEEN '{start_dt}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP
                                         AND {DISTRICT_} IN ({', '.join(f"'{d}'" for d in user_districts)})
                                     """
-                    filtered_with_range = f"{DATE_} BETWEEN '{default_start_date}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP AND {FACILITY_CODE_} = '{location}' "
+                    filtered_with_range = f"""
+                                        {DATE_} BETWEEN '{default_start_date}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP
+                                        AND {DISTRICT_} IN ({', '.join(f"'{d}'" for d in user_districts)})
+                                    """
                 else:
                     filtered_dates = f"{DATE_} BETWEEN '{start_dt}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP AND {FACILITY_CODE_} = '{location}' "
                     filtered_with_range = f"{DATE_} BETWEEN '{default_start_date}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP AND {FACILITY_CODE_} = '{location}' "
