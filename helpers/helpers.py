@@ -2,7 +2,7 @@ import dash
 from dash import html, dcc
 import pandas as pd
 from itertools import chain
-from helpers.visualizations import (create_column_chart, 
+from helpers.visualizations import (create_column_chart,
                           create_count,
                           create_count_sets,
                           create_pie_chart,
@@ -10,9 +10,10 @@ from helpers.visualizations import (create_column_chart,
                           create_age_gender_histogram,
                           create_horizontal_bar_chart,
                           create_pivot_table,
-                          create_crosstab_table, 
+                          create_crosstab_table,
                           create_line_list,
-                          create_sankey_diagram)
+                          create_sankey_diagram,
+                          create_new_returning_chart)
 from datetime import datetime
 from config import (actual_keys_in_data, 
                     FIRST_NAME_, LAST_NAME_,
@@ -180,11 +181,13 @@ def build_single_chart(filtered, data_opd, delta_days, item_config,user_role=Non
         figure = create_linelist_from_config(filtered, item_config, user_role)
     elif chart_type == "Sankey":
         figure = create_sankey_from_config(filtered, filters)
+    elif chart_type == "NewReturningSplit":
+        figure = create_new_returning_from_config(filtered, filters)
     else:
         # Default empty figure for unknown chart types
         figure = create_empty_figure()
     figure = apply_figure_theme(figure, chart_type, theme_name)
-    if chart_type in ["Line","Pie","Column","Bar","Histogram"]:
+    if chart_type in ["Line","Pie","Column","Bar","Histogram","NewReturningSplit"]:
         return dcc.Graph(
             id=item_config["filters"]["unique"],
             figure=figure,
@@ -482,9 +485,48 @@ def create_histogram_from_config(filtered, filters):
 
     return create_age_gender_histogram(
         filtered, age_col, gender_col, title, x_title, y_title, bin_size,
-        filter_col1, filter_val1, filter_col2, filter_val2, filter_col3, 
-        filter_val3,aggregation, custom_fields
+        filter_col1, filter_val1, filter_col2, filter_val2, filter_col3,
+        filter_val3, aggregation, custom_fields
     )
+
+
+def create_new_returning_from_config(filtered, filters):
+    """
+    Build a New-vs-Returning chart from config.
+    Uses a CTE to check whether each person_id has any record
+    *before* the current date range start — not just the new_revisit column.
+
+    Config keys:
+        "chart_mode": "pie" | "line"   (default "pie")
+        "title":      str
+        "date_col":   str              (default "Date")
+        "unique_column": str           (default "person_id")
+        "filter_col1/2/3", "filter_val1/2/3": optional extra filters
+        "custom_fields": optional
+    """
+    title          = filters.get('title', 'New vs Returning Patients')
+    chart_mode     = filters.get('chart_mode', 'pie')
+    date_col       = filters.get('date_col') or 'Date'
+    unique_column  = filters.get('unique_column') or 'person_id'
+    filter_col1    = filters.get('filter_col1') or None
+    filter_val1    = parse_filter_value(filters.get('filter_val1'))
+    filter_col2    = filters.get('filter_col2') or None
+    filter_val2    = parse_filter_value(filters.get('filter_val2'))
+    filter_col3    = filters.get('filter_col3') or None
+    filter_val3    = parse_filter_value(filters.get('filter_val3'))
+    custom_fields  = filters.get('custom_fields') or None
+
+    return create_new_returning_chart(
+        filtered, title,
+        chart_mode=chart_mode,
+        date_col=date_col,
+        unique_column=unique_column,
+        filter_col1=filter_col1, filter_value1=filter_val1,
+        filter_col2=filter_col2, filter_value2=filter_val2,
+        filter_col3=filter_col3, filter_value3=filter_val3,
+        custom_fields=custom_fields,
+    )
+
 
 def create_pivot_table_from_config(filtered, filters):
     """

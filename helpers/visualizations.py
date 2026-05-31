@@ -1058,7 +1058,156 @@ def create_time_line_chart(query_fiter, date_col, y_col, title, x_title,
         )
     
     return fig
- 
+
+
+def create_new_returning_chart(
+    query_fiter,
+    title,
+    chart_mode='pie',           # 'pie' | 'line'
+    date_col=DATE_,
+    unique_column=PERSON_ID_,
+    filter_col1=None, filter_value1=None,
+    filter_col2=None, filter_value2=None,
+    filter_col3=None, filter_value3=None,
+    custom_fields=None,
+    height=400,
+    hole_size=0.45,
+):
+    """
+    Classify patients in the filtered window as 'New' or 'Returning'.
+
+    'New'       = the person_id has no record anywhere in the dataset before
+                  the earliest date found in the current filtered window.
+    'Returning' = the person_id has at least one earlier record.
+
+    Uses a CTE so only two DuckDB passes are needed:
+      1. Find prior patients (Date < range start, no scope filter needed).
+      2. LEFT JOIN against the filtered window, count distinct person_ids.
+    """
+    isSet = False
+    filter_pairs = [
+        (filter_col1, filter_value1),
+        (filter_col2, filter_value2),
+        (filter_col3, filter_value3),
+    ]
+    conditions = []
+    for col, val in filter_pairs:
+        if col is not None and val is not None:
+            col = _normalize_filter_value(col)
+            if isinstance(col, list):
+                col = col[0]
+            val = _normalize_filter_value(val)
+            conditions.append(build_filter_query(col, val, unique_column, isSet, None, None))
+
+    where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
+
+    # ── CTE: find patients with any record before the current range start ─────
+    prior_cte = f"""
+        WITH range_start AS (
+            SELECT MIN({date_col}) AS min_date
+            FROM '{DATA_FILE_NAME_}'
+            WHERE {where_clause}
+        ),
+        prior_patients AS (
+            SELECT DISTINCT {unique_column}
+            FROM '{DATA_FILE_NAME_}', range_start
+            WHERE {date_col} < range_start.min_date
+        )
+    """
+
+    if chart_mode == 'line':
+        sql = prior_cte + f"""
+        SELECT
+            CAST(f.{date_col} AS DATE)                                       AS date_trunc,
+            CASE WHEN p.{unique_column} IS NOT NULL THEN 'Returning'
+                 ELSE 'New' END                                               AS patient_type,
+            COUNT(DISTINCT f.{unique_column})                                 AS metric_value
+        FROM '{DATA_FILE_NAME_}' f
+        LEFT JOIN prior_patients p ON f.{unique_column} = p.{unique_column}
+        WHERE {where_clause}
+        GROUP BY date_trunc, patient_type
+        ORDER BY date_trunc
+        """
+        df = DataStorage.query_duckdb(sql)
+        df = apply_calculated_fields(df, custom_fields)
+        if df.empty:
+            return go.Figure().update_layout(title=dict(text=f'<b>{title}</b>', x=0.5),
+                                             height=height, paper_bgcolor='#ffffff')
+
+        fig = px.line(
+            df, x='date_trunc', y='metric_value', color='patient_type',
+            color_discrete_map={'New': THEME['primary'][0], 'Returning': THEME['primary'][3]},
+            title=None,
+        )
+        fig.update_traces(
+            mode='lines+markers',
+            line=dict(width=2.5),
+            marker=dict(size=5, symbol='circle', line=dict(width=1, color='white')),
+        )
+        fig.update_layout(
+            title=dict(text=f'<b>{title}</b>', x=0.5, xanchor='center',
+                       font=dict(size=16, color='#2c3e50', family='Arial, sans-serif')),
+            xaxis=dict(title='Date', showgrid=False, linecolor='#dee2e6', tickangle=-30),
+            yaxis=dict(title='Patients', gridcolor='#f0f0f0', zeroline=False),
+            legend=dict(title='Patient Type', orientation='h', y=1.05, x=0),
+            height=height, paper_bgcolor='#ffffff', plot_bgcolor='#ffffff',
+            margin=dict(l=50, r=30, t=70, b=60),
+        )
+
+    else:  # pie / donut
+        sql = prior_cte + f"""
+        SELECT
+            CASE WHEN p.{unique_column} IS NOT NULL THEN 'Returning'
+                 ELSE 'New' END                       AS patient_type,
+            COUNT(DISTINCT f.{unique_column})          AS metric_value
+        FROM '{DATA_FILE_NAME_}' f
+        LEFT JOIN prior_patients p ON f.{unique_column} = p.{unique_column}
+        WHERE {where_clause}
+        GROUP BY patient_type
+        """
+        df = DataStorage.query_duckdb(sql)
+        df = apply_calculated_fields(df, custom_fields)
+        if df.empty:
+            return go.Figure().update_layout(title=dict(text=f'<b>{title}</b>', x=0.5),
+                                             height=height, paper_bgcolor='#ffffff')
+
+        total = df['metric_value'].sum()
+        df['pct'] = (df['metric_value'] / total * 100).round(1).astype(str) + '%'
+
+        fig = px.pie(
+            df, names='patient_type', values='metric_value',
+            hole=hole_size,
+            color='patient_type',
+            color_discrete_map={'New': THEME['primary'][0], 'Returning': THEME['primary'][3]},
+            title=None,
+        )
+        fig.update_traces(
+            textposition='outside',
+            textinfo='label+percent',
+            textfont=dict(size=12, color='#2c3e50'),
+            marker=dict(line=dict(color='white', width=2)),
+            pull=[0.04] * len(df),
+        )
+        # Centre annotation
+        new_row = df[df['patient_type'] == 'New']
+        if not new_row.empty:
+            new_pct = round(new_row['metric_value'].iloc[0] / total * 100, 1)
+            fig.add_annotation(
+                text=f"<b>{new_pct}%</b><br>New",
+                x=0.5, y=0.5, font=dict(size=13, color=THEME['primary'][0]),
+                showarrow=False,
+            )
+        fig.update_layout(
+            title=dict(text=f'<b>{title}</b>', x=0.5, xanchor='center',
+                       font=dict(size=16, color='#2c3e50', family='Arial, sans-serif')),
+            legend=dict(orientation='h', y=-0.15, x=0.5, xanchor='center'),
+            height=height, paper_bgcolor='#ffffff', plot_bgcolor='#ffffff',
+            margin=dict(l=30, r=30, t=70, b=60),
+        )
+
+    return fig
+
+
 def create_pie_chart(query_fiter, names_col, values_col, title,
                      unique_column=PERSON_ID_, filter_col1=None,
                      filter_value1=None, filter_col2=None,
