@@ -254,10 +254,9 @@
                   "duration_default": "any",
                   "index_col1": [
                     "District",
-                    "Facility",
-                    "Program"
+                    "Facility"
                   ],
-                  "columns": "",
+                  "columns": "Program",
                   "values_col": "person_id",
                   "title": "Attendance by Health Facility and Program",
                   "unique_column": "person_id",

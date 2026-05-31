@@ -1343,6 +1343,7 @@ def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, u
                         "whiteSpace": "normal",
                         "borderBottom": "2px solid #004a01",
                         "cursor": "pointer",
+                        "textTransform": "uppercase",
                     },
                     style_cell={
                         "padding": "10px 14px",
