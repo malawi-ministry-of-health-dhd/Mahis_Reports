@@ -66,17 +66,15 @@ except Exception:
     _MNID_UI_DISK_CACHE = None
 
 
-def _remember_ui_payload(prefix: str, records: list[dict]) -> str:
-    cache_key = f'{prefix}:{uuid.uuid4().hex}'
+def _remember_ui_payload(prefix: str, records_or_fn, stable_key: str | None = None) -> str:
+    cache_key = f'{prefix}:{stable_key}' if stable_key else f'{prefix}:{uuid.uuid4().hex}'
+    if cache_key in _MNID_UI_CACHE:
+        return cache_key
+    records = records_or_fn() if callable(records_or_fn) else records_or_fn
     _MNID_UI_CACHE[cache_key] = records
     while len(_MNID_UI_CACHE) > _MNID_UI_CACHE_MAX:
         oldest_key = next(iter(_MNID_UI_CACHE))
         _MNID_UI_CACHE.pop(oldest_key, None)
-    if _MNID_UI_DISK_CACHE is not None:
-        try:
-            _MNID_UI_DISK_CACHE.set(cache_key, records, expire=_MNID_UI_CACHE_TTL_SECONDS)
-        except Exception:
-            pass
     return cache_key
 
 
@@ -84,16 +82,18 @@ def _restore_ui_dataframe(cache_key: str | None) -> pd.DataFrame:
     if not cache_key:
         return pd.DataFrame()
 
-    records = _MNID_UI_CACHE.get(cache_key)
-    if records is None and _MNID_UI_DISK_CACHE is not None:
+    obj = _MNID_UI_CACHE.get(cache_key)
+    if obj is None and _MNID_UI_DISK_CACHE is not None:
         try:
-            records = _MNID_UI_DISK_CACHE.get(cache_key)
+            obj = _MNID_UI_DISK_CACHE.get(cache_key)
         except Exception:
-            records = None
-        if records is not None:
-            _MNID_UI_CACHE[cache_key] = records
+            obj = None
+        if obj is not None:
+            _MNID_UI_CACHE[cache_key] = obj
 
-    return _deserialize_store_df(records)
+    if isinstance(obj, pd.DataFrame):
+        return obj
+    return _deserialize_store_df(obj)
 
 
 def clear_runtime_caches() -> None:
@@ -130,7 +130,48 @@ def _monthly(df, n_cfg, d_cfg, n=6):
     except: return []
 
 
-def _css(pct, tgt): return 'ok' if pct>=tgt else ('warn' if pct>=tgt*0.85 else 'danger')
+def _target_mode(ind_or_mode) -> str:
+    if isinstance(ind_or_mode, dict):
+        mode = str(ind_or_mode.get('target_mode') or 'max').strip().lower()
+    else:
+        mode = str(ind_or_mode or 'max').strip().lower()
+    return mode if mode in {'max', 'min'} else 'max'
+
+
+def _is_inverse_indicator(ind: dict) -> bool:
+    return _target_mode(ind) == 'min'
+
+
+def _css(pct, tgt, mode='max'):
+    mode = _target_mode(mode)
+    if mode == 'min':
+        warn_threshold = tgt * 1.15 if tgt else 0
+        return 'ok' if pct <= tgt else ('warn' if pct <= warn_threshold else 'danger')
+    return 'ok' if pct >= tgt else ('warn' if pct >= tgt * 0.85 else 'danger')
+
+
+def _on_target(pct, tgt, mode='max') -> bool:
+    return _css(pct, tgt, mode) == 'ok'
+
+
+def _target_attainment_pct(pct, tgt, mode='max') -> float:
+    mode = _target_mode(mode)
+    pct = float(pct or 0.0)
+    tgt = float(tgt or 0.0)
+    if mode == 'min':
+        if pct <= tgt:
+            return 100.0
+        if pct <= 0:
+            return 100.0
+        return max(0.0, min(100.0, (tgt / pct) * 100.0))
+    if tgt <= 0:
+        return 0.0
+    return max(0.0, min(100.0, (pct / tgt) * 100.0))
+
+
+def _target_label(ind: dict) -> str:
+    prefix = '<=' if _is_inverse_indicator(ind) else ''
+    return f'Target {prefix}{ind["target"]}%'
 _CLR = {'ok': OK_C, 'warn': WARN_C, 'danger': DANGER_C, 'info': INFO_C}
 
 
@@ -391,6 +432,26 @@ def _program_based_priority_indicators(categories: list[str] | None = None) -> l
                 'numerator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Danger signs present'},
                 'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
             },
+            {
+                'id': 'mnid_anc_prog_006',
+                'label': 'ANC clients tested for HIV',
+                'category': 'ANC',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC', 'variable2': 'mnid_anc_hiv_test_done', 'value2': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
+                'note': 'Direct ANC HIV-testing coverage using person-level HIV test completion flags.',
+            },
+            {
+                'id': 'mnid_anc_prog_007',
+                'label': 'ANC clients with blood pressure measured',
+                'category': 'ANC',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC', 'variable2': 'mnid_anc_bp_screened', 'value2': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
+                'note': 'Direct ANC blood-pressure measurement coverage using recorded systolic or diastolic values.',
+            },
         ])
 
     if 'Labour' in wanted:
@@ -401,8 +462,19 @@ def _program_based_priority_indicators(categories: list[str] | None = None) -> l
                 'category': 'Labour',
                 'target': 80,
                 'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Encounter_Source', 'value1': 'LABOUR ASSESSMENT'},
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour', 'variable2': 'mnid_labour_assessment_documented', 'value2': 'Yes'},
                 'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
+                'note': 'Tracked from normalized labour-assessment encounter-source rows in the real parquet.',
+            },
+            {
+                'id': 'mnid_lab_prog_001b',
+                'label': 'Labour visit documented',
+                'category': 'Labour',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour', 'variable2': 'mnid_labour_visit_documented', 'value2': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
+                'note': 'Tracked from normalized labour-and-delivery visit encounter rows in the real parquet.',
             },
             {
                 'id': 'mnid_lab_prog_002',
@@ -410,8 +482,9 @@ def _program_based_priority_indicators(categories: list[str] | None = None) -> l
                 'category': 'Labour',
                 'target': 80,
                 'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Encounter_Source', 'value1': 'Delivery Details'},
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour', 'variable2': 'concept_name', 'value2': 'Mode of delivery'},
                 'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
+                'note': 'Uses presence of a delivery-mode record as the delivery-details documentation marker in the current extract.',
             },
             {
                 'id': 'mnid_lab_prog_003',
@@ -428,17 +501,38 @@ def _program_based_priority_indicators(categories: list[str] | None = None) -> l
                 'category': 'Labour',
                 'target': 80,
                 'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Vitamin K given', 'variable2': 'obs_value_coded', 'value2': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Vitamin K given'},
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour', 'variable2': 'concept_name', 'value2': 'Vitamin K given', 'variable3': 'obs_value_coded', 'value3': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour', 'variable2': 'concept_name', 'value2': 'Vitamin K given'},
             },
             {
                 'id': 'mnid_lab_prog_005',
                 'label': 'Breastfeeding in first hour',
                 'category': 'Labour',
                 'target': 80,
+                'status': 'awaiting_baseline',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour', 'variable2': 'concept_name', 'value2': 'Breast feeding', 'variable3': 'obs_value_coded', 'value3': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour', 'variable2': 'concept_name', 'value2': 'Breast feeding'},
+                'note': 'Breastfeeding status is present, but the current extract does not expose the required within-1-hour timing field.',
+            },
+            {
+                'id': 'mnid_lab_prog_006',
+                'label': 'Births delivered by caesarean section',
+                'category': 'Labour',
+                'target': 15,
                 'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Breast feeding', 'variable2': 'obs_value_coded', 'value2': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Breast feeding'},
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_csection', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
+                'note': 'Direct caesarean-section share among labour and delivery clients. This is a monitoring rate, not a higher-is-better coverage indicator.',
+            },
+            {
+                'id': 'mnid_lab_prog_007',
+                'label': 'Estimated blood loss recorded after delivery',
+                'category': 'Labour',
+                'target': 70,
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour', 'variable2': 'mnid_labour_estimated_blood_loss_recorded', 'value2': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
+                'note': 'Operational proxy using the real Estimated blood loss concept where it is recorded in labour and delivery data.',
             },
         ])
 
@@ -450,8 +544,9 @@ def _program_based_priority_indicators(categories: list[str] | None = None) -> l
                 'category': 'PNC',
                 'target': 80,
                 'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Encounter_Source', 'value1': 'PNC VISIT'},
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'PNC', 'variable2': 'mnid_pnc_visit_documented', 'value2': 'Yes'},
                 'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'PNC'},
+                'note': 'Tracked from normalized PNC-visit encounter-source rows in the real parquet.',
             },
             {
                 'id': 'mnid_pnc_prog_002',
@@ -468,7 +563,7 @@ def _program_based_priority_indicators(categories: list[str] | None = None) -> l
                 'category': 'PNC',
                 'target': 95,
                 'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Status of the mother', 'variable2': 'obs_value_coded', 'value2': 'Alive'},
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Status of the mother', 'variable2': 'obs_value_coded', 'value2': ['Alive', 'Discharged alive']},
                 'denominator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Status of the mother'},
             },
             {
@@ -516,7 +611,7 @@ def _program_based_priority_indicators(categories: list[str] | None = None) -> l
                 'category': 'Newborn',
                 'target': 80,
                 'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Encounter_Source', 'value1': 'NEONATAL ENROLMENT'},
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'Encounter_Source', 'value1': 'NEONATAL PROGRAM'},
                 'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn'},
             },
             {
@@ -543,8 +638,8 @@ def _program_based_priority_indicators(categories: list[str] | None = None) -> l
                 'category': 'Newborn',
                 'target': 80,
                 'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Vitamin K given', 'variable2': 'obs_value_coded', 'value2': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Vitamin K given'},
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn', 'variable2': 'concept_name', 'value2': 'Vitamin K given', 'variable3': 'obs_value_coded', 'value3': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn', 'variable2': 'concept_name', 'value2': 'Vitamin K given'},
             },
             {
                 'id': 'mnid_nb_prog_005',
@@ -570,16 +665,42 @@ def _program_based_priority_indicators(categories: list[str] | None = None) -> l
                 'category': 'Newborn',
                 'target': 80,
                 'status': 'tracked',
-                'numerator_filters': {
-                    'unique': 'person_id',
-                    'variable1': 'concept_name', 'value1': ['Management given to newborn', 'Prematurity/Kangaroo'],
-                    'variable2': 'obs_value_coded', 'value2': ['Kangaroo mother care', 'Yes'],
-                },
-                'denominator_filters': {
-                    'unique': 'person_id',
-                    'variable1': 'concept_name', 'value1': ['Management given to newborn', 'Prematurity/Kangaroo'],
-                },
-                'note': 'Tracked from KMC-related concepts already present in the current parquet.',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_kmc', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn'},
+                'note': 'Tracked from newborn KMC support concepts already present in the current parquet.',
+            },
+            {
+                'id': 'mnid_nb_prog_008',
+                'label': 'Low birthweight newborns',
+                'category': 'Newborn',
+                'target': 12,
+                'target_mode': 'min',
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_low_birthweight', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Birth weight'},
+                'note': 'Direct low-birthweight rate from recorded birth weight bands. This is a burden rate, not a higher-is-better coverage indicator.',
+            },
+            {
+                'id': 'mnid_nb_prog_009',
+                'label': 'Birth asphyxia among newborn admissions',
+                'category': 'Newborn',
+                'target': 10,
+                'target_mode': 'min',
+                'status': 'awaiting_baseline',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_birth_asphyxia', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn'},
+                'note': 'Needs a newborn-admission diagnosis signal for birth asphyxia in the current extract before it can be treated as a core tracked indicator.',
+            },
+            {
+                'id': 'mnid_nb_prog_010',
+                'label': 'Neonatal sepsis among newborn admissions',
+                'category': 'Newborn',
+                'target': 10,
+                'target_mode': 'min',
+                'status': 'awaiting_baseline',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_sepsis', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn'},
+                'note': 'Needs a newborn-admission diagnosis signal for sepsis in the current extract before it can be treated as a core tracked indicator.',
             },
         ])
 
@@ -598,63 +719,69 @@ def _program_based_overlay_fallbacks(categories: list[str] | None = None) -> lis
                 'category': 'ANC',
                 'target': 80,
                 'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_anc_hb_screened', 'value1': 'Yes'},
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC', 'variable2': 'mnid_anc_hb_screened', 'value2': 'Yes'},
                 'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
                 'note': 'Tracked from ANC haemoglobin screening concepts in MAHIS, including Hb(g/dL) and equivalent haemoglobin-result fields.',
             },
             {
                 'id': 'mnid_anc_pdf_002',
+                'label': 'ANC screened for syphilis',
+                'category': 'ANC',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC', 'variable2': 'mnid_anc_syphilis_tested', 'value2': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
+                'note': 'Tracked from ANC syphilis-result concepts already present in MAHIS, including VDRL and equivalent syphilis test result fields.',
+            },
+            {
+                'id': 'mnid_anc_pdf_003',
+                'label': 'ANC clients with urinalysis performed',
+                'category': 'ANC',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC', 'variable2': 'mnid_anc_urinalysis_done', 'value2': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
+                'note': 'Tracked from ANC urine-test status, urine-test-conducted, and urinalysis result concepts already present in the parquet.',
+            },
+            {
+                'id': 'mnid_anc_pdf_004',
                 'label': 'ANC screened for infection',
                 'category': 'ANC',
                 'target': 80,
                 'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_anc_infection_screened', 'value1': 'Yes'},
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC', 'variable2': 'mnid_anc_infection_screened', 'value2': 'Yes'},
                 'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
                 'note': 'Tracked with an ANC infection-screening proxy built from HIV, syphilis, and malaria test fields already present in MAHIS.',
             },
             {
-                'id': 'mnid_anc_pdf_003',
+                'id': 'mnid_anc_pdf_005',
                 'label': 'ANC screened for high blood pressure',
                 'category': 'ANC',
                 'target': 80,
                 'status': 'tracked',
-                'numerator_filters': {
-                    'unique': 'person_id',
-                    'variable1': 'Service_Area', 'value1': 'ANC',
-                    'variable2': 'concept_name', 'value2': ['Systolic blood pressure', 'Diastolic blood pressure'],
-                },
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC', 'variable2': 'mnid_anc_bp_screened', 'value2': 'Yes'},
                 'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
                 'note': 'Tracked using ANC clients with blood-pressure vitals recorded in the current parquet.',
             },
             {
-                'id': 'mnid_anc_pdf_004',
+                'id': 'mnid_anc_pdf_006',
                 'label': 'HIV-tested and screened for anaemia and high blood pressure',
                 'category': 'ANC',
                 'target': 80,
                 'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_anc_hiv_anaemia_bp_screened', 'value1': 'Yes'},
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC', 'variable2': 'mnid_anc_hiv_anaemia_bp_screened', 'value2': 'Yes'},
                 'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
                 'note': 'Tracked as a combined ANC coverage indicator using person-level HIV test, haemoglobin screening, and blood-pressure screening flags.',
             },
             {
-                'id': 'mnid_anc_pdf_005',
+                'id': 'mnid_anc_pdf_007',
                 'label': 'POCUS with gestational age',
                 'category': 'ANC',
                 'target': 50,
                 'status': 'tracked',
-                'numerator_filters': {
-                    'unique': 'person_id',
-                    'variable1': 'Service_Area', 'value1': 'ANC',
-                    'variable2': 'new_revisit', 'value2': 'New',
-                    'variable3': 'concept_name', 'value3': 'Gestational age recorded',
-                    'variable4': 'obs_value_coded', 'value4': 'GA by ultrasound',
-                },
-                'denominator_filters': {
-                    'unique': 'person_id',
-                    'variable1': 'Service_Area', 'value1': 'ANC',
-                    'variable2': 'new_revisit', 'value2': 'New',
-                },
-                'note': 'Restricted to first ANC visits. Numerator: gestational age recorded by ultrasound. Denominator: all first ANC visits.',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC', 'variable2': 'mnid_anc_pocus_with_ga', 'value2': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
+                'note': 'Numerator uses gestational-age-by-ultrasound plus ultrasound-status aliases where the real parquet exposes them. Denominator falls back to all ANC clients because first-visit markers are not reliable in the source extract.',
             },
         ])
 
@@ -662,6 +789,16 @@ def _program_based_overlay_fallbacks(categories: list[str] | None = None) -> lis
         indicators.extend([
             {
                 'id': 'mnid_lab_pdf_001',
+                'label': 'Women receiving prophylactic uterotonic immediately after birth',
+                'category': 'Labour',
+                'target': 80,
+                'status': 'awaiting_baseline',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_uterotonic_given', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
+                'note': 'Uses oxytocin and misoprostol administration concepts already present in labour records, but timing immediately after birth is not explicit in the source extract.',
+            },
+            {
+                'id': 'mnid_lab_pdf_002',
                 'label': 'Quality intrapartum care and management of complications according to guidelines',
                 'category': 'Labour',
                 'target': 80,
@@ -671,7 +808,7 @@ def _program_based_overlay_fallbacks(categories: list[str] | None = None) -> lis
                 'note': 'Tracked with a labour-management proxy using documented partograph use until a fuller guideline bundle is exposed in reports data.',
             },
             {
-                'id': 'mnid_lab_pdf_002',
+                'id': 'mnid_lab_pdf_003',
                 'label': 'Digital intrapartum monitoring in labour',
                 'category': 'Labour',
                 'target': 80,
@@ -685,7 +822,18 @@ def _program_based_overlay_fallbacks(categories: list[str] | None = None) -> lis
                 'note': 'Awaiting a dedicated electronic fetal monitoring concept (CTG / Moyo device) in MAHIS. Partograph use is already tracked under quality intrapartum care.',
             },
             {
-                'id': 'mnid_lab_pdf_003',
+                'id': 'mnid_lab_pdf_004',
+                'label': 'Deliveries complicated by maternal sepsis',
+                'category': 'Labour',
+                'target': 10,
+                'target_mode': 'min',
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_maternal_sepsis', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
+                'note': 'Tracked directly from labour records with the Maternal sepsis concept. This is a burden indicator, so lower is better.',
+            },
+            {
+                'id': 'mnid_lab_pdf_005',
                 'label': 'Eligible women with pre-term labour who received antenatal corticosteroids',
                 'category': 'Labour',
                 'target': 80,
@@ -695,7 +843,7 @@ def _program_based_overlay_fallbacks(categories: list[str] | None = None) -> lis
                 'note': 'Tracked using a person-level proxy for preterm labour plus antenatal corticosteroids already captured in MAHIS labour care.',
             },
             {
-                'id': 'mnid_lab_pdf_004',
+                'id': 'mnid_lab_pdf_006',
                 'label': 'Women in labour who received prophylactic azithromycin',
                 'category': 'Labour',
                 'target': 80,
@@ -705,7 +853,7 @@ def _program_based_overlay_fallbacks(categories: list[str] | None = None) -> lis
                 'note': 'Tracked if azithromycin-specific labour prophylaxis observations are present in the reports extract.',
             },
             {
-                'id': 'mnid_lab_pdf_005',
+                'id': 'mnid_lab_pdf_007',
                 'label': 'Women with early-detected PPH who received the WHO treatment bundle',
                 'category': 'Labour',
                 'target': 80,
@@ -816,7 +964,8 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
             'status': 'tracked',
             'numerator_filters': {
                 'unique': 'person_id',
-                'variable1': 'mnid_anc_hb_screened', 'value1': 'Yes',
+                'variable1': 'Service_Area', 'value1': 'ANC',
+                'variable2': 'mnid_anc_hb_screened', 'value2': 'Yes',
             },
             'denominator_filters': {
                 'unique': 'person_id',
@@ -825,23 +974,23 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
             'note': 'Tracked from ANC haemoglobin screening concepts in MAHIS, including Hb(g/dL) and equivalent haemoglobin-result fields.',
         },
         'ANC screened for infection': {
-            'status': 'tracked',
+            'status': 'awaiting_baseline',
             'numerator_filters': {
                 'unique': 'person_id',
-                'variable1': 'mnid_anc_infection_screened', 'value1': 'Yes',
+                'variable1': 'Service_Area', 'value1': 'ANC',
+                'variable2': 'mnid_anc_infection_screened', 'value2': 'Yes',
             },
             'denominator_filters': {
                 'unique': 'person_id',
                 'variable1': 'Service_Area', 'value1': 'ANC',
             },
-            'note': 'Tracked with an ANC infection-screening proxy built from HIV, syphilis, and malaria test fields already present in MAHIS.',
+            'note': 'This is still a composite proxy built from HIV, syphilis, and malaria testing signals. Keep out of the core tracked set until a single agreed infection-screening definition is confirmed.',
         },
         'ANC screened for high blood pressure': {
             'status': 'tracked',
             'numerator_filters': {
                 'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'ANC',
-                'variable2': 'concept_name', 'value2': ['Systolic blood pressure', 'Diastolic blood pressure'],
+                'variable1': 'mnid_anc_bp_screened', 'value1': 'Yes',
             },
             'denominator_filters': {
                 'unique': 'person_id',
@@ -854,22 +1003,20 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
             'numerator_filters': {
                 'unique': 'person_id',
                 'variable1': 'Service_Area', 'value1': 'ANC',
-                'variable2': 'new_revisit', 'value2': 'New',
-                'variable3': 'concept_name', 'value3': 'Gestational age recorded',
-                'variable4': 'obs_value_coded', 'value4': 'GA by ultrasound',
+                'variable2': 'mnid_anc_pocus_with_ga', 'value2': 'Yes',
             },
             'denominator_filters': {
                 'unique': 'person_id',
                 'variable1': 'Service_Area', 'value1': 'ANC',
-                'variable2': 'new_revisit', 'value2': 'New',
             },
-            'note': 'Restricted to first ANC visits. Numerator: gestational age recorded by ultrasound. Denominator: all first ANC visits.',
+            'note': 'Tracked using real-parquet gestational-age-by-ultrasound rows plus ultrasound-status aliases where they are exposed.',
         },
         'HIV-tested and screened for anaemia and high blood pressure': {
             'status': 'tracked',
             'numerator_filters': {
                 'unique': 'person_id',
-                'variable1': 'mnid_anc_hiv_anaemia_bp_screened', 'value1': 'Yes',
+                'variable1': 'Service_Area', 'value1': 'ANC',
+                'variable2': 'mnid_anc_hiv_anaemia_bp_screened', 'value2': 'Yes',
             },
             'denominator_filters': {
                 'unique': 'person_id',
@@ -881,13 +1028,28 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
             'status': 'tracked',
             'numerator_filters': {
                 'unique': 'person_id',
-                'variable1': 'mnid_newborn_asphyxia_resuscitated', 'value1': 'Yes',
+                'variable1': 'mnid_newborn_resuscitation_eligible_received', 'value1': 'Yes',
             },
             'denominator_filters': {
                 'unique': 'person_id',
-                'variable1': 'mnid_newborn_birth_asphyxia', 'value1': 'Yes',
+                'variable1': 'mnid_newborn_resuscitation_eligible', 'value1': 'Yes',
             },
-            'note': 'Numerator: babies with birth asphyxia who received resuscitation. Denominator: all babies with birth asphyxia diagnosis.',
+            'note': 'Numerator: eligible newborns with a recorded resuscitation intervention. Denominator: all newborns marked eligible for resuscitation.',
+        },
+        'Breastfeeding in first hour': {
+            'status': 'awaiting_baseline',
+            'numerator_filters': {
+                'unique': 'person_id',
+                'variable1': 'Service_Area', 'value1': 'Labour',
+                'variable2': 'concept_name', 'value2': 'Breast feeding',
+                'variable3': 'obs_value_coded', 'value3': 'Yes',
+            },
+            'denominator_filters': {
+                'unique': 'person_id',
+                'variable1': 'Service_Area', 'value1': 'Labour',
+                'variable2': 'concept_name', 'value2': 'Breast feeding',
+            },
+            'note': 'Breastfeeding status is present, but the required within-1-hour timing field is not exposed in the current extract.',
         },
         'ANC 2+ tetanus doses': {
             'status': 'tracked',
@@ -928,8 +1090,7 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
             'status': 'tracked',
             'numerator_filters': {
                 'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Place of delivery',
-                'variable2': 'obs_value_coded', 'value2': ['This facility', 'this facility'],
+                'variable1': 'mnid_labour_facility_birth', 'value1': 'Yes',
             },
             'denominator_filters': {
                 'unique': 'person_id',
@@ -937,7 +1098,7 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
             },
         },
         'Quality intrapartum care and management of complications according to guidelines': {
-            'status': 'tracked',
+            'status': 'awaiting_baseline',
             'numerator_filters': {
                 'unique': 'person_id',
                 'variable1': 'mnid_labour_partograph_used', 'value1': 'Yes',
@@ -946,7 +1107,7 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
                 'unique': 'person_id',
                 'variable1': 'Service_Area', 'value1': 'Labour',
             },
-            'note': 'Tracked with a labour-management proxy using documented partograph use until a fuller guideline bundle is exposed in reports data.',
+            'note': 'Partograph use alone is too weak to stand in for the full intrapartum guideline bundle. Keep visible only as a placeholder until the bundle is modeled explicitly.',
         },
         'Digital intrapartum monitoring in labour': {
             'status': 'awaiting_baseline',
@@ -974,7 +1135,7 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
             'note': 'Tracked using a person-level proxy for preterm labour plus antenatal corticosteroids already captured in MAHIS labour care.',
         },
         'Women in labour who received prophylactic azithromycin': {
-            'status': 'tracked',
+            'status': 'awaiting_baseline',
             'numerator_filters': {
                 'unique': 'person_id',
                 'variable1': 'mnid_labour_azithromycin', 'value1': 'Yes',
@@ -983,10 +1144,10 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
                 'unique': 'person_id',
                 'variable1': 'Service_Area', 'value1': 'Labour',
             },
-            'note': 'Tracked if azithromycin-specific labour prophylaxis observations are present in the reports extract.',
+            'note': 'Keep pending until azithromycin prophylaxis is confirmed to land consistently in the reports extract.',
         },
         'Women with early-detected PPH who received the WHO treatment bundle': {
-            'status': 'tracked',
+            'status': 'awaiting_baseline',
             'numerator_filters': {
                 'unique': 'person_id',
                 'variable1': 'mnid_labour_pph_bundle_received', 'value1': 'Yes',
@@ -995,18 +1156,20 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
                 'unique': 'person_id',
                 'variable1': 'mnid_labour_pph', 'value1': 'Yes',
             },
-            'note': 'Tracked with a treatment-bundle proxy combining documented PPH plus multiple uterotonic/TXA care components already modeled in MAHIS.',
+            'note': 'Current data supports only a treatment-bundle proxy. This needs explicit uterotonic, TXA, and timing fields before it should be treated as a core tracked indicator.',
         },
         'Vitamin K given at birth': {
             'status': 'tracked',
             'numerator_filters': {
                 'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Vitamin K given',
-                'variable2': 'obs_value_coded', 'value2': 'Yes',
+                'variable1': 'Service_Area', 'value1': 'Labour',
+                'variable2': 'concept_name', 'value2': 'Vitamin K given',
+                'variable3': 'obs_value_coded', 'value3': 'Yes',
             },
             'denominator_filters': {
                 'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Vitamin K given',
+                'variable1': 'Service_Area', 'value1': 'Labour',
+                'variable2': 'concept_name', 'value2': 'Vitamin K given',
             },
         },
         'Birth weight recorded': {
@@ -1024,7 +1187,8 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
             'status': 'tracked',
             'numerator_filters': {
                 'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Gestation in weeks',
+                'variable1': 'Service_Area', 'value1': 'Newborn',
+                'variable2': 'concept_name', 'value2': 'Gestation in weeks',
             },
             'denominator_filters': {
                 'unique': 'person_id',
@@ -1035,12 +1199,14 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
             'status': 'tracked',
             'numerator_filters': {
                 'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Vitamin K given',
-                'variable2': 'obs_value_coded', 'value2': 'Yes',
+                'variable1': 'Service_Area', 'value1': 'Newborn',
+                'variable2': 'concept_name', 'value2': 'Vitamin K given',
+                'variable3': 'obs_value_coded', 'value3': 'Yes',
             },
             'denominator_filters': {
                 'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Vitamin K given',
+                'variable1': 'Service_Area', 'value1': 'Newborn',
+                'variable2': 'concept_name', 'value2': 'Vitamin K given',
             },
         },
         'Thermal care recorded': {
@@ -1128,7 +1294,7 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
             'note': 'Tracked as an eligibility proxy using low-birth-weight bands plus KMC-related newborn care concepts already modeled in MAHIS.',
         },
         'Babies between 1000-1499g who receive prophylactic CPAP': {
-            'status': 'awaiting_baseline',
+            'status': 'tracked',
             'numerator_filters': {
                 'unique': 'person_id',
                 'variable1': 'mnid_newborn_cpap_1000_1499', 'value1': 'Yes',
@@ -1137,10 +1303,10 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
                 'unique': 'person_id',
                 'variable1': 'mnid_birth_weight_band', 'value1': '1000-1499g',
             },
-            'note': 'The current parquet exposes low-birth-weight bands, but no reliable neonatal CPAP treatment observations yet. Keep visible pending an improved extract.',
+            'note': 'Tracked from birth-weight bands plus newborn CPAP treatment observations already normalized into the parquet.',
         },
         'Eligible babies between 1500 and 1999g who receive CPAP': {
-            'status': 'awaiting_baseline',
+            'status': 'tracked',
             'numerator_filters': {
                 'unique': 'person_id',
                 'variable1': 'mnid_newborn_cpap_1500_1999', 'value1': 'Yes',
@@ -1149,7 +1315,7 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
                 'unique': 'person_id',
                 'variable1': 'mnid_birth_weight_band', 'value1': '1500-1999g',
             },
-            'note': 'The current parquet exposes the 1500-1999g denominator cohort, but not reliable neonatal CPAP treatment observations yet.',
+            'note': 'Tracked from birth-weight bands plus newborn CPAP treatment observations already normalized into the parquet. This remains a weight-band proxy because RDS is not modeled separately.',
         },
         'Babies with clinical jaundice who receive phototherapy': {
             'status': 'awaiting_baseline',
@@ -1173,10 +1339,10 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
                 'unique': 'person_id',
                 'variable1': 'mnid_newborn_sepsis', 'value1': 'Yes',
             },
-            'note': 'Sepsis-like diagnosis concepts are present, but parenteral-antibiotic treatment is not yet exposed cleanly enough in the current parquet.',
+            'note': 'Needs a linked newborn sepsis diagnosis signal in the current extract before the antibiotic-treatment ratio is dependable.',
         },
         'Babies not hypothermic on admission to the neonatal unit': {
-            'status': 'awaiting_baseline',
+            'status': 'tracked',
             'numerator_filters': {
                 'unique': 'person_id',
                 'variable1': 'mnid_newborn_not_hypothermic_admission', 'value1': 'Yes',
@@ -1185,7 +1351,7 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
                 'unique': 'person_id',
                 'variable1': 'Service_Area', 'value1': 'Newborn',
             },
-            'note': 'Thermal care is present in neonatal workflows, but the specific thermal-status-on-admission concept is not yet exposed in the parquet.',
+            'note': 'Tracked directly from the neonatal thermal-status-on-admission concept.',
         },
         'Babies not hypothermic at any time in the neonatal unit': {
             'status': 'awaiting_baseline',
@@ -1388,7 +1554,8 @@ def update_trend_chart(n_clicks_list, toggle_clicks, selected_ind_ids, stored_tr
 
 def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None = None,
                     default_cat: str | None = None,
-                    scope_meta: dict | None = None) -> html.Div:
+                    scope_meta: dict | None = None,
+                    payload_key: str | None = None) -> html.Div:
     tracked = [i for i in indicators if i.get('status') == 'tracked']
     cat_order = _resolve_category_order(tracked, categories)
     default_cat = default_cat if default_cat in cat_order else (cat_order[0] if cat_order else 'ANC')
@@ -1397,7 +1564,7 @@ def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None 
     default_fig = _location_trend_fig(df, default_inds, default_cat, 'line', scope_meta)
     trend_store = {
         'tracked': tracked,
-        'data_key': _remember_ui_payload('trend', _serialize_store_df(df)),
+        'data_key': _remember_ui_payload('trend', df, stable_key=payload_key),
         'scope_meta': scope_meta or {},
     }
 
@@ -3948,16 +4115,17 @@ def _ind_card(ind: dict, df: pd.DataFrame) -> html.Div:
                 html.Span('-', className='mnid-ind-pct info'),
                 html.Span('Awaiting baseline', className='mnid-tag mnid-tag-amber'),
             ], className='mnid-ind-top'),
-            html.Div(f'Target {ind["target"]}%', className='mnid-ind-sub'),
+            html.Div(_target_label(ind), className='mnid-ind-sub'),
         ])
 
     num, den, pct = _cov(df, ind['numerator_filters'], ind['denominator_filters'])
     target = ind['target']
-    cls = _css(pct, target)
+    mode = _target_mode(ind)
+    cls = _css(pct, target, mode)
 
-    if pct >= target:
+    if _on_target(pct, target, mode):
         badge = html.Span('On target',    className='mnid-tag mnid-tag-green')
-    elif pct >= target * 0.85:
+    elif cls == 'warn':
         badge = html.Span('Performing',  className='mnid-tag mnid-tag-blue')
     else:
         badge = html.Span('Needs review', className='mnid-tag mnid-tag-red')
@@ -3968,7 +4136,7 @@ def _ind_card(ind: dict, df: pd.DataFrame) -> html.Div:
             html.Span(f'{_display_pct(pct):.0f}%', className=f'mnid-ind-pct {cls}'),
             badge,
         ], className='mnid-ind-top'),
-        html.Div(f'{num} / {den}  -  Target {target}%', className='mnid-ind-sub'),
+        html.Div(f'{num} / {den}  -  {_target_label(ind)}', className='mnid-ind-sub'),
     ])
 
 
@@ -4014,10 +4182,13 @@ def _phase_gauge_row(by_cat: dict, df: pd.DataFrame) -> html.Div:
         inds = [i for i in by_cat.get(cat_key, []) if i.get('status') == 'tracked']
         if not inds:
             continue
-        computed = [_cov(df, i['numerator_filters'], i['denominator_filters'])
-                    for i in inds]
-        avg_pct = round(sum(c[2] for c in computed) / len(computed), 1) if computed else 0.0
-        on_tgt  = sum(1 for c, i in zip(computed, inds) if c[2] >= i['target'])
+        computed = []
+        for i in inds:
+            num, den, pct = _cov(df, i['numerator_filters'], i['denominator_filters'])
+            attained = _target_attainment_pct(pct, i.get('target', 0), i)
+            computed.append({'num': num, 'den': den, 'pct': pct, 'attained': attained})
+        avg_pct = round(sum(c['attained'] for c in computed) / len(computed), 1) if computed else 0.0
+        on_tgt  = sum(1 for c, i in zip(computed, inds) if _on_target(c['pct'], i['target'], i))
         color   = _cov_color(avg_pct)
 
         fig = _phase_gauge_fig(avg_pct, color)
@@ -4087,7 +4258,7 @@ def _coverage_phase_fig(title: str, indicators: list, df: pd.DataFrame) -> go.Fi
                          'sub': 'Awaiting baseline'})
         else:
             num, den, pct = _cov(df, ind['numerator_filters'], ind['denominator_filters'])
-            cls = _css(pct, ind['target'])
+            cls = _css(pct, ind['target'], ind)
             rows.append({'label': ind['label'][:36], 'pct': pct,
                          'target': ind['target'], 'cls': cls,
                          'sub': f'{num}/{den}'})
@@ -4733,7 +4904,8 @@ def _build_compare_heatmap(title: str, df: 'pd.DataFrame', tracked: list) -> go.
 # comparative analysis section
 
 def _comparative_analysis_section(indicators: list, facility_code: str,
-                                  mch_full: pd.DataFrame) -> html.Div:
+                                  mch_full: pd.DataFrame,
+                                  payload_key: str | None = None) -> html.Div:
     """Time-aware comparison across selected facilities or districts and indicators."""
     tracked = [i for i in indicators if i.get('status') == 'tracked']
     all_facs  = sorted(mch_full['Facility_CODE'].dropna().astype(str).unique().tolist()) if len(mch_full) and 'Facility_CODE' in mch_full.columns else sorted(_ALL_FACILITIES[:])
@@ -4836,7 +5008,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
     return html.Div(id='mnid-comparative', children=[
         dcc.Store(id='mnid-compare-store', data={
             'tracked':    tracked,
-            'data_key':   _remember_ui_payload('compare', _serialize_store_df(mch_full)),
+            'data_key':   _remember_ui_payload('compare', mch_full, stable_key=payload_key),
             'facility_options': fac_opts,
             'district_options': dist_opts,
             'current_fac': facility_code,
@@ -4859,13 +5031,13 @@ _TH = {
 
 # # MNID hero indicator donut row
 
-def _hero_donut_card(label, pct, target, color):
+def _hero_donut_card(label, pct, target, color, mode='max'):
     """Large CSS conic-gradient donut card for a single indicator."""
     p = max(0.0, min(float(pct), 100.0))
     r_v = int(color[1:3], 16)
     g_v = int(color[3:5], 16)
     b_v = int(color[5:7], 16)
-    cls = _css(p, target)
+    cls = _css(p, target, mode)
     badge_map = {
         'ok':     ('#F0FDF4', '#14532D', '#BBF7D0', 'On target'),
         'warn':   ('#FFFBEB', '#92400E', '#FDE68A', 'Performing'),
@@ -4895,7 +5067,7 @@ def _hero_donut_card(label, pct, target, color):
                     'fontSize': '24px', 'fontWeight': '800',
                     'color': color, 'lineHeight': '1',
                 }),
-                html.Span(f'Target {target}%', style={
+                html.Span(f'Target {"<=" if _target_mode(mode) == "min" else ""}{target}%', style={
                     'fontSize': '8px', 'color': MUTED,
                     'lineHeight': '1.3', 'marginTop': '3px',
                 }),
@@ -4924,8 +5096,9 @@ def _hero_donut_row(computed, preferred_cat: str = 'ANC', section_title: str | N
 
     cards = []
     for ind in heroes:
-        color = _cov_color(ind['pct'])
-        cards.append(_hero_donut_card(ind['label'], ind['pct'], ind['target'], color))
+        attained = _target_attainment_pct(ind['pct'], ind['target'], ind)
+        color = _cov_color(attained)
+        cards.append(_hero_donut_card(ind['label'], ind['pct'], ind['target'], color, ind))
 
     return html.Div(style={'marginBottom': '12px'}, children=[
         html.Div(section_title, className='mnid-section-lbl'),
@@ -4940,10 +5113,13 @@ def _priority_table(computed):
     if not computed:
         return html.Div()
 
-    sorted_c = sorted(computed, key=lambda x: (
-        0 if x['pct'] < x['target'] * 0.85 else (1 if x['pct'] < x['target'] else 2),
-        -x['pct'],
-    ))
+    sorted_c = sorted(
+        computed,
+        key=lambda x: (
+            {'danger': 0, 'warn': 1, 'ok': 2}.get(_css(x['pct'], x['target'], x), 0),
+            -x.get('attained_pct', _target_attainment_pct(x['pct'], x['target'], x)),
+        ),
+    )
 
     def _badge(cls):
         conf = {
@@ -4958,9 +5134,9 @@ def _priority_table(computed):
             'padding': '2px 8px', 'borderRadius': '10px', 'whiteSpace': 'nowrap',
         })
 
-    def _prog(pct, target):
-        fill = min(pct, 100)
-        col  = {'ok': OK_C, 'warn': WARN_C, 'danger': DANGER_C}.get(_css(pct, target), MUTED)
+    def _prog(pct, target, mode='max'):
+        fill = min(_target_attainment_pct(pct, target, mode), 100)
+        col  = {'ok': OK_C, 'warn': WARN_C, 'danger': DANGER_C}.get(_css(pct, target, mode), MUTED)
         return html.Div(style={
             'position': 'relative', 'height': '6px',
             'background': GRID_C, 'borderRadius': '3px', 'minWidth': '90px',
@@ -4972,7 +5148,7 @@ def _priority_table(computed):
             }),
             html.Div(style={
                 'position': 'absolute', 'top': '-3px',
-                'left': f'{min(target, 100)}%',
+                'left': f'{min(100 if _target_mode(mode) == "min" else target, 100)}%',
                 'height': '12px', 'width': '1.5px',
                 'background': '#94A3B8', 'transform': 'translateX(-50%)',
                 'borderRadius': '1px',
@@ -4988,7 +5164,7 @@ def _priority_table(computed):
 
     rows = []
     for ind in sorted_c:
-        cls = _css(ind['pct'], ind['target'])
+        cls = _css(ind['pct'], ind['target'], ind)
         val_col = {'ok': OK_C, 'warn': WARN_C, 'danger': DANGER_C}.get(cls, TEXT)
         dot_col = cat_dot.get(ind.get('category', ''), MUTED)
         rows.append(html.Tr(style={'borderBottom': f'1px solid {GRID_C}'}, children=[
@@ -5005,11 +5181,11 @@ def _priority_table(computed):
                 'fontSize': '14px', 'fontWeight': '700', 'color': val_col,
                 'padding': '8px 10px', 'textAlign': 'center',
             }),
-            html.Td(f"{ind['target']}%", style={
+            html.Td(f'{"<=" if _is_inverse_indicator(ind) else ""}{ind["target"]}%', style={
                 'fontSize': '11px', 'color': MUTED,
                 'padding': '8px 10px', 'textAlign': 'center',
             }),
-            html.Td(_prog(ind['pct'], ind['target']),
+            html.Td(_prog(ind['pct'], ind['target'], ind),
                     style={'padding': '8px 10px', 'minWidth': '100px'}),
             html.Td(_badge(cls), style={'padding': '8px 10px'}),
         ]))
@@ -5419,10 +5595,10 @@ def _kpi(label, value, sub, cls, bottom_bar=None, ring=None):
 
 def _kpi_row(computed):
     n    = len(computed)
-    on   = [c for c in computed if c['pct'] >= c['target']]
-    mon  = [c for c in computed if c['target'] * .85 <= c['pct'] < c['target']]
-    crit = [c for c in computed if c['pct'] < c['target'] * .85]
-    avg  = round(sum(c['pct'] for c in computed) / n, 1) if n else 0.0
+    on   = [c for c in computed if _css(c['pct'], c['target'], c) == 'ok']
+    mon  = [c for c in computed if _css(c['pct'], c['target'], c) == 'warn']
+    crit = [c for c in computed if _css(c['pct'], c['target'], c) == 'danger']
+    avg  = round(sum(c.get('attained_pct', _target_attainment_pct(c['pct'], c['target'], c)) for c in computed) / n, 1) if n else 0.0
     avg_color = _cov_color(avg)
     return html.Div(className='mnid-kpi-row', children=[
         _kpi('Available Indicators', str(n), 'live indicators', 'info',
@@ -5593,10 +5769,16 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     for ind in tracked:
         num, den, pct = _cov(facility_df, ind['numerator_filters'],
                               ind['denominator_filters'])
-        computed.append({**ind, 'pct': pct, 'numerator': num, 'denominator': den})
+        computed.append({
+            **ind,
+            'pct': pct,
+            'numerator': num,
+            'denominator': den,
+            'attained_pct': _target_attainment_pct(pct, ind.get('target', 0), ind),
+        })
 
-    below  = [(c['label'], c['pct']) for c in computed if c['pct'] < c['target']]
-    strong = [c['label'] for c in computed if c['pct'] >= c['target']]
+    below  = [(c['label'], c['pct']) for c in computed if not _on_target(c['pct'], c['target'], c)]
+    strong = [c['label'] for c in computed if _on_target(c['pct'], c['target'], c)]
 
     by_cat = {}
     for ind in all_inds:
@@ -5619,9 +5801,11 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
     ]
     analysis_acc = [a for a in analysis_acc if a]
 
+    _payload_key = f'{hash(_opd_key)}_{start_date}_{end_date}'
+
     performance_div, heatmap_div = _coverage_heatmap_section(all_inds, facility_code, facility_df)
     service_table_div = _service_table_switcher(facility_df, category_order, default_cat, scope_meta)
-    comparative_div  = _comparative_analysis_section(all_inds, facility_code, facility_df)
+    comparative_div  = _comparative_analysis_section(all_inds, facility_code, facility_df, payload_key=_payload_key)
 
     def _sec_header(title, count=None, desc=None, eyebrow=None):
         return html.Div(className=f'mnid-section-header{" mnid-section-header-newborn" if dashboard_theme == "newborn" else ""}', children=[
@@ -5667,7 +5851,7 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
         _sec_header('Patient Trends & Outcomes' if dashboard_theme == 'newborn' else 'Coverage Trends',
                     desc='Monthly trends for neonatal admissions and outcome-related indicators, with target references where applicable.' if dashboard_theme == 'newborn' else '12-month rolling - dotted line = target',
                     eyebrow='Trends' if dashboard_theme == 'newborn' else None),
-        _trend_switcher(facility_df, all_inds, scope_meta=scope_meta),
+        _trend_switcher(facility_df, all_inds, scope_meta=scope_meta, payload_key=_payload_key),
 
         _section_anchor('mnid-performance'),
         _sec_header('District Performance' if dashboard_theme == 'newborn' else 'Facility Performance',

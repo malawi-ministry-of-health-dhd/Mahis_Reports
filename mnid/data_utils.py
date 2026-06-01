@@ -48,6 +48,7 @@ _CONCEPT_ALIASES = {
     'Type of resuscitation': 'Neonatal resuscitation provided',
     'Breast feeding in the first hour of birth': 'Breast feeding',
     'Gestation age to be used': 'Gestational age recorded',
+    'Ultrasound scan status': 'POCUS completed',
     'Antenatal corticosteroids': 'Antenatal corticosteroids given',
     'Jaundice': 'Clinical jaundice',
     'Is the visit within': 'Postnatal check period',
@@ -65,6 +66,7 @@ _OBS_VALUE_ALIASES = {
     'ga by ultrasound': 'GA by ultrasound',
     'Ga by palpation': 'GA by palpation',
     'Caesarean Section': 'Caesarean section',
+    'Ultrasound scan not done': 'No',
     'if within phototherapy level of bilirubin – phototherapy': 'Phototherapy',
 }
 
@@ -92,6 +94,10 @@ def _derive_contextual_concepts(out: pd.DataFrame) -> pd.DataFrame:
 
     oxygen_cpap = concept_series.eq('Oxygen Therapy') & combined_value.str.contains('cpap', case=False, na=False)
     out.loc[oxygen_cpap, 'concept_name'] = 'CPAP support'
+
+    ultrasound_reason = concept_series.eq('Reason ultrasound not done') & combined_value.ne('')
+    out.loc[ultrasound_reason, 'concept_name'] = 'POCUS completed'
+    out.loc[ultrasound_reason, 'obs_value_coded'] = 'No'
 
     return out
 
@@ -145,17 +151,23 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
     concept = out['concept_name'].fillna('').astype(str).str.strip() if 'concept_name' in out.columns else pd.Series('', index=out.index)
     obs = out['obs_value_coded'].fillna('').astype(str).str.strip() if 'obs_value_coded' in out.columns else pd.Series('', index=out.index)
     value = out['Value'].fillna('').astype(str).str.strip() if 'Value' in out.columns else pd.Series('', index=out.index)
+    value_n = pd.to_numeric(out['ValueN'], errors='coerce') if 'ValueN' in out.columns else pd.Series(np.nan, index=out.index)
     service = out['Service_Area'].fillna('').astype(str).str.strip() if 'Service_Area' in out.columns else pd.Series('', index=out.index)
+    encounter = out['Encounter'].fillna('').astype(str).str.strip() if 'Encounter' in out.columns else pd.Series('', index=out.index)
+    program = out['Program'].fillna('').astype(str).str.strip().str.upper() if 'Program' in out.columns else pd.Series('', index=out.index)
     combined = obs.where(obs.ne(''), value)
     concept_lower = concept.str.lower()
     combined_lower = combined.str.lower()
+    encounter_upper = encounter.str.upper()
+    encounter_source = out['Encounter_Source'].fillna('').astype(str).str.strip() if 'Encounter_Source' in out.columns else encounter
+    encounter_source_lower = encounter_source.str.lower()
 
     person_ctx = pd.DataFrame({'person_id': out['person_id'].dropna().astype(str).unique()})
 
     def _assign_flag(name: str, mask: pd.Series) -> None:
         if len(mask) != len(out):
             return
-        people = out.loc[mask.fillna(False), 'person_id'].dropna().astype(str).unique().tolist()
+        people = set(out.loc[mask.fillna(False), 'person_id'].dropna().astype(str))
         person_ctx[name] = person_ctx['person_id'].isin(people).map({True: 'Yes', False: ''})
 
     def _ctx_series(name: str) -> pd.Series:
@@ -167,85 +179,179 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
     labour_mask = service.eq('Labour')
     pnc_mask = service.eq('PNC')
     newborn_mask = service.eq('Newborn')
+    labour_like_mask = (
+        labour_mask
+        | encounter_upper.str.contains('LABOUR|DELIVERY|BIRTH', na=False)
+        | program.isin(['LABOUR AND DELIVERY PROGRAM'])
+    )
+
+    # Pre-compute all str.contains/regex patterns once — each is expensive (~215-340ms on
+    # 100k rows) so materializing them before the _assign_flag calls eliminates repeated
+    # pandas string engine overhead when they are used in chained boolean expressions.
+    _cp_hiv = (concept.isin(['HIV Test', 'HIV status', 'HIV Positive', 'Mother HIV Status', 'New HIV status'])
+               | concept_lower.str.contains('hiv', na=False))
+    _cp_hb = (concept.isin(['Hb(g/dL)', 'Last HB result', 'Hemoglobin', 'Haemoglobin', 'Anemia screening'])
+              | concept_lower.str.contains('hb\\(g/dl\\)|hemoglobin|haemoglobin|anemia screening', regex=True, na=False))
+    _cp_syphilis = (concept.isin(['Syphilis Test Result', 'Mother VDRL/Syphilis result'])
+                    | concept_lower.str.contains('syphilis', na=False))
+    _cp_mrdt = (concept.isin(['mRDT results', 'Malaria Test Result', 'Malaria Parasites Result'])
+                | concept_lower.str.contains('mrdt|malaria test result|malaria parasites result', regex=True, na=False))
+    _cp_partograph_exact = concept.isin(['Was a partograph used', 'Was a partograph used?'])
+    _cp_partograph_fuzzy = concept_lower.str.contains('partograph', na=False)
+    _cp_obs_complications = concept.isin(['Obstetric complications'])
+    _cp_preterm_fuzzy = concept_lower.str.contains('preterm labour', na=False)
+    _cp_corticosteroid = (concept.isin(['Antenatal corticosteroids', 'Antenatal corticosteroids given', 'Corticosteroids'])
+                          | concept_lower.str.contains('corticosteroid', na=False))
+    _cp_obstetric_comp_fuzzy = concept_lower.str.contains('obstetric complication', na=False)
+    _cv_pph = combined_lower.str.contains('post partum haemorrhage|pph', regex=True, na=False)
+    _cp_obstetric_care = (concept.isin(['Obstetric Care', 'Obstetric Care provided'])
+                          | concept_lower.str.contains('obstetric care', na=False))
+    _cp_azithromycin = (concept.isin(['Prophylactic azithromycin given'])
+                        | concept_lower.str.contains('azithromycin', na=False)
+                        | combined_lower.str.contains('azithromycin', na=False))
+    _cp_kmc = (concept.isin(['iKMC initiated', 'Prematurity/Kangaroo', 'Management given to newborn'])
+               | concept_lower.str.contains('kmc|kangaroo', regex=True, na=False)
+               | combined_lower.str.contains('kangaroo mother care|continuous kmc|intermittent kmc|admit to kmc', regex=True, na=False))
+    _cp_cpap = (concept.isin(['CPAP support'])
+                | concept_lower.str.contains('cpap', na=False)
+                | combined_lower.str.contains('cpap', na=False))
+    _cp_phototherapy = (concept.isin(['Phototherapy given'])
+                        | concept_lower.str.contains('phototherapy', na=False)
+                        | combined_lower.str.contains('phototherapy', na=False))
+    _cp_jaundice = (concept.isin(['Clinical jaundice'])
+                    | concept_lower.str.contains('jaundice', na=False)
+                    | combined_lower.str.contains('jaundice', na=False))
+    _cv_asphyxia = combined_lower.str.contains('asphyxia', na=False)
+    _cp_sepsis = (concept.isin(['Neonatal Sepsis - Early Onset', 'Neonatal Sepsis - Late Onset'])
+                  | concept_lower.str.contains('sepsis', na=False))
+    _cp_antibiotics = (concept.isin(['Parenteral antibiotics given', 'Management given to newborn'])
+                       | concept_lower.str.contains('antibiotic', na=False)
+                       | combined_lower.str.contains('antibiotic', na=False))
 
     _assign_flag(
         'mnid_anc_hiv_test_done',
-        anc_mask & (
-            concept.isin(['HIV Test', 'HIV status', 'HIV Positive', 'Mother HIV Status', 'New HIV status'])
-            | concept_lower.eq('hiv test')
-            | concept_lower.str.contains('hiv', na=False)
-        ) & ~combined_lower.isin(['', 'not done', 'unknown', 'negative', 'non-reactive']),
+        anc_mask & _cp_hiv & ~combined_lower.isin(['', 'not done', 'unknown']),
     )
     _assign_flag(
         'mnid_anc_hb_screened',
         anc_mask & (
-            concept.isin(['Hb(g/dL)', 'Last HB result', 'Hemoglobin', 'Haemoglobin'])
-            | concept_lower.str.contains('hb\\(g/dl\\)|hemoglobin|haemoglobin', regex=True, na=False)
-        ) & ~combined_lower.isin(['', 'not done']),
+            (concept.eq('Anemia screening') & combined_lower.eq('yes'))
+            | (_cp_hb & ~concept.eq('Anemia screening') & ~combined_lower.isin(['', 'not done']))
+        ),
     )
     _assign_flag(
         'mnid_anc_syphilis_tested',
+        anc_mask & _cp_syphilis & ~combined_lower.isin(['', 'not done', 'unknown']),
+    )
+    _assign_flag(
+        'mnid_anc_urinalysis_done',
         anc_mask & (
-            concept.isin(['Syphilis Test Result', 'Mother VDRL/Syphilis result'])
-            | concept_lower.str.contains('syphilis', na=False)
-        ) & ~combined_lower.isin(['', 'not done', 'unknown']),
+            (concept.eq('Urine test status') & combined_lower.eq('urine test conducted'))
+            | concept.eq('Urine Test Conducted')
+            | concept.isin(['Urine protein', 'Urinalysis protein', 'Urinalysis glucose', 'Urinalysis leucocytes', 'Urinalysis nitrites'])
+        ),
     )
     _assign_flag(
         'mnid_anc_mrdt_tested',
-        anc_mask & (
-            concept.isin(['mRDT results', 'Malaria Test Result', 'Malaria Parasites Result'])
-            | concept_lower.str.contains('mrdt|malaria test result|malaria parasites result', regex=True, na=False)
-        ) & ~combined_lower.isin(['', 'not done', 'unknown']),
+        anc_mask & _cp_mrdt & ~combined_lower.isin(['', 'not done', 'unknown']),
     )
     _assign_flag(
         'mnid_anc_bp_screened',
-        anc_mask & concept.isin(['Systolic blood pressure', 'Diastolic blood pressure', 'Systolic', 'Diastolic', 'Blood Pressure']),
+        anc_mask & (
+            concept.isin(['Systolic blood pressure', 'Diastolic blood pressure', 'Systolic', 'Diastolic', 'Blood Pressure'])
+            | (concept.eq('High blood pressure screening') & combined_lower.eq('yes'))
+        ),
+    )
+    _assign_flag(
+        'mnid_anc_pocus_completed',
+        anc_mask & concept.eq('POCUS completed') & combined_lower.isin(['yes', 'done', 'completed']),
+    )
+    _assign_flag(
+        'mnid_anc_ga_ultrasound',
+        anc_mask & concept.eq('Gestational age recorded') & combined_lower.eq('ga by ultrasound'),
     )
 
     _assign_flag(
         'mnid_labour_partograph_used',
-        labour_mask & (
-            (concept.isin(['Was a partograph used', 'Was a partograph used?']) & combined_lower.eq('yes'))
-            | concept_lower.str.contains('partograph', na=False)
-        ),
+        labour_mask & ((_cp_partograph_exact & combined_lower.eq('yes')) | _cp_partograph_fuzzy),
     )
     _assign_flag(
         'mnid_labour_preterm',
-        labour_mask & (
-            (concept.isin(['Obstetric complications']) & combined_lower.eq('preterm labour'))
-            | concept_lower.str.contains('preterm labour', na=False)
-        ),
+        labour_mask & ((_cp_obs_complications & combined_lower.eq('preterm labour')) | _cp_preterm_fuzzy),
     )
     _assign_flag(
         'mnid_labour_corticosteroids',
-        labour_mask & (
-            concept.isin(['Antenatal corticosteroids', 'Antenatal corticosteroids given', 'Corticosteroids'])
-            | concept_lower.str.contains('corticosteroid', na=False)
-        ) & combined_lower.ne(''),
+        labour_mask & _cp_corticosteroid & combined_lower.ne(''),
     )
     _assign_flag(
         'mnid_labour_pph',
         labour_mask & (
             (concept.isin(['PPH']) & ~combined_lower.isin(['', 'no', 'negative']))
-            | ((concept.isin(['Obstetric complications']) | concept_lower.str.contains('obstetric complication', na=False))
-               & combined_lower.str.contains('post partum haemorrhage|pph', regex=True, na=False))
+            | ((_cp_obs_complications | _cp_obstetric_comp_fuzzy) & _cv_pph)
         ),
     )
-    obstetric_care = labour_mask & (
-        concept.isin(['Obstetric Care', 'Obstetric Care provided'])
-        | concept_lower.str.contains('obstetric care', na=False)
-    )
-    _assign_flag('mnid_labour_pph_oxytocin', obstetric_care & combined_lower.eq('oxytocin'))
-    _assign_flag('mnid_labour_pph_txa', obstetric_care & combined_lower.eq('tranexamic acid'))
-    _assign_flag('mnid_labour_pph_misoprostol', obstetric_care & combined_lower.eq('misoprostol'))
     _assign_flag(
-        'mnid_labour_azithromycin',
-        labour_mask & (
-            concept.isin(['Prophylactic azithromycin given'])
-            | concept_lower.str.contains('azithromycin', na=False)
-            | combined_lower.str.contains('azithromycin', na=False)
-        ),
+        'mnid_labour_facility_birth',
+        labour_mask & concept.eq('Place of delivery') & combined_lower.eq('this facility'),
     )
+    _assign_flag(
+        'mnid_labour_csection',
+        labour_mask & concept.eq('Mode of delivery') & combined_lower.eq('caesarean section'),
+    )
+    _assign_flag(
+        'mnid_labour_eclampsia',
+        labour_mask & _cp_obs_complications & combined_lower.eq('eclampsia'),
+    )
+    _assign_flag(
+        'mnid_labour_obstructed_labour',
+        labour_mask & _cp_obs_complications & combined_lower.eq('obstructed labour'),
+    )
+    _assign_flag(
+        'mnid_labour_stillbirth',
+        labour_mask
+        & concept.eq('Outcome of the delivery')
+        & combined_lower.isin(['fresh still birth', 'macerated still birth']),
+    )
+    _assign_flag(
+        'mnid_labour_estimated_blood_loss_recorded',
+        (labour_like_mask | program.isin(['ANC PROGRAM']))
+        & concept.eq('Estimated blood loss')
+        & (~combined_lower.isin(['', 'none', 'nan']) | value_n.notna()),
+    )
+    _assign_flag(
+        'mnid_labour_assessment_documented',
+        labour_mask & encounter_source_lower.eq('labour assessment'),
+    )
+    _assign_flag(
+        'mnid_labour_visit_documented',
+        labour_mask & encounter_source_lower.eq('labour and delivery visit'),
+    )
+    _assign_flag(
+        'mnid_labour_maternal_sepsis',
+        labour_like_mask
+        & concept.eq('Maternal sepsis')
+        & combined_lower.eq('yes'),
+    )
+    _assign_flag(
+        'mnid_labour_pph_oxytocin',
+        labour_like_mask
+        & concept.isin(['Oxytocin 10 iu given', 'Oxytocin 20iu in 1000ml ns or rl over 4 hrs'])
+        & combined_lower.eq('yes'),
+    )
+    _assign_flag(
+        'mnid_labour_pph_txa',
+        labour_like_mask
+        & concept.eq('1g Tranexamic Acid IV slow push over 10 minutes')
+        & combined_lower.eq('yes'),
+    )
+    _assign_flag(
+        'mnid_labour_pph_misoprostol',
+        labour_like_mask
+        & concept_lower.str.contains('misoprostol', na=False)
+        & combined_lower.eq('yes'),
+    )
+    obstetric_care = labour_mask & _cp_obstetric_care
+    _assign_flag('mnid_labour_azithromycin', labour_mask & _cp_azithromycin)
 
     _assign_flag(
         'mnid_pnc_hiv_test_positive',
@@ -254,48 +360,42 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
             | (concept.eq('New HIV status') & combined_lower.eq('positive'))
         ),
     )
+    _assign_flag(
+        'mnid_pnc_visit_documented',
+        pnc_mask & encounter_source_lower.eq('pnc visit'),
+    )
+    _assign_flag(
+        'mnid_pnc_maternal_death',
+        pnc_mask & concept.eq('Status of the mother') & combined_lower.isin(['death', 'died', 'dead']),
+    )
 
     _assign_flag(
         'mnid_newborn_kmc',
-        (
-            concept.isin(['iKMC initiated', 'Prematurity/Kangaroo', 'Management given to newborn'])
-            | concept_lower.str.contains('kmc|kangaroo', regex=True, na=False)
-            | combined_lower.str.contains('kangaroo mother care|continuous kmc|intermittent kmc|admit to kmc', regex=True, na=False)
+        newborn_mask & (
+            (concept.eq('iKMC initiated') & combined_lower.eq('yes'))
+            | (concept.eq('Prematurity/Kangaroo') & combined_lower.isin(['kmc', 'kangaroo mother care']))
+            | (concept.eq('Management given to newborn') & combined_lower.isin(['kmc', 'kangaroo mother care']))
         ),
     )
     _assign_flag(
         'mnid_newborn_cpap',
         newborn_mask & (
-            concept.isin(['CPAP support'])
-            | concept_lower.str.contains('cpap', na=False)
-            | combined_lower.str.contains('cpap', na=False)
+            concept.eq('CPAP support')
+            & combined_lower.isin(['bubble cpap', 'cpap'])
         ),
     )
     _assign_flag(
         'mnid_newborn_phototherapy',
-        newborn_mask & (
-            concept.isin(['Phototherapy given'])
-            | concept_lower.str.contains('phototherapy', na=False)
-            | combined_lower.str.contains('phototherapy', na=False)
-        ),
+        newborn_mask & concept.eq('Phototherapy given') & combined_lower.eq('yes'),
     )
-    _assign_flag(
-        'mnid_newborn_jaundice',
-        newborn_mask & (
-            concept.isin(['Clinical jaundice'])
-            | concept_lower.str.contains('jaundice', na=False)
-            | combined_lower.str.contains('jaundice', na=False)
-        ),
-    )
+    _assign_flag('mnid_newborn_jaundice', newborn_mask & _cp_jaundice)
     _assign_flag(
         'mnid_newborn_birth_asphyxia',
         newborn_mask & (
-            # Primary signal: explicit asphyxia-suspected concept = Yes
             (concept.eq('Birth asphyxia suspected') & combined_lower.eq('yes'))
-            # Secondary: other diagnosis concepts containing 'asphyxia' with a non-No value
             | (concept.isin(['Known medical condition', 'Primary diagnosis', 'Secondary diagnosis',
                              'Presenting complaint', 'Neonatal admission diagnosis', 'Diagnosis'])
-               & combined_lower.str.contains('asphyxia', na=False)
+               & _cv_asphyxia
                & ~combined_lower.isin(['no', 'none', '']))
         ),
     )
@@ -312,18 +412,18 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
         ),
     )
     _assign_flag(
-        'mnid_newborn_sepsis',
-        newborn_mask & (
-            concept.isin(['Neonatal Sepsis - Early Onset', 'Neonatal Sepsis - Late Onset'])
-            | concept_lower.str.contains('sepsis', na=False)
-        ),
+        'mnid_newborn_resuscitation_eligible',
+        newborn_mask
+        & concept.eq('Eligible for neonatal resuscitation')
+        & combined_lower.eq('yes'),
     )
+    _assign_flag('mnid_newborn_sepsis', newborn_mask & _cp_sepsis)
     _assign_flag(
         'mnid_newborn_parenteral_antibiotics',
-        newborn_mask & (
-            concept.isin(['Parenteral antibiotics given', 'Management given to newborn'])
-            | concept_lower.str.contains('antibiotic', na=False)
-            | combined_lower.str.contains('antibiotic', na=False)
+        newborn_mask
+        & (
+            (concept.eq('Parenteral antibiotics given') & combined_lower.eq('yes'))
+            | ((concept.eq('Management given to newborn')) & combined_lower.eq('antibiotics'))
         ),
     )
     _assign_flag(
@@ -360,6 +460,10 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
         & _ctx_series('mnid_anc_hb_screened').eq('Yes')
         & _ctx_series('mnid_anc_bp_screened').eq('Yes')
     ).map({True: 'Yes', False: ''})
+    person_ctx['mnid_anc_pocus_with_ga'] = (
+        _ctx_series('mnid_anc_ga_ultrasound').eq('Yes')
+        | _ctx_series('mnid_anc_pocus_completed').eq('Yes')
+    ).map({True: 'Yes', False: ''})
     person_ctx['mnid_labour_preterm_corticosteroids'] = (
         _ctx_series('mnid_labour_preterm').eq('Yes')
         & _ctx_series('mnid_labour_corticosteroids').eq('Yes')
@@ -368,8 +472,16 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
         _ctx_series('mnid_labour_pph').eq('Yes')
         & _ctx_series('mnid_labour_pph_bundle_proxy').eq('Yes')
     ).map({True: 'Yes', False: ''})
+    person_ctx['mnid_labour_uterotonic_given'] = (
+        _ctx_series('mnid_labour_pph_oxytocin').eq('Yes')
+        | _ctx_series('mnid_labour_pph_misoprostol').eq('Yes')
+    ).map({True: 'Yes', False: ''})
     person_ctx['mnid_newborn_asphyxia_resuscitated'] = (
         _ctx_series('mnid_newborn_birth_asphyxia').eq('Yes')
+        & _ctx_series('mnid_newborn_resuscitation_given').eq('Yes')
+    ).map({True: 'Yes', False: ''})
+    person_ctx['mnid_newborn_resuscitation_eligible_received'] = (
+        _ctx_series('mnid_newborn_resuscitation_eligible').eq('Yes')
         & _ctx_series('mnid_newborn_resuscitation_given').eq('Yes')
     ).map({True: 'Yes', False: ''})
     person_ctx['mnid_newborn_jaundice_phototherapy'] = (
@@ -381,12 +493,24 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
         & _ctx_series('mnid_newborn_parenteral_antibiotics').eq('Yes')
     ).map({True: 'Yes', False: ''})
 
-    birth_weight_rows = out.loc[concept.eq('Birth weight'), ['person_id']]
-    value_numeric = out['ValueN'] if 'ValueN' in out.columns else pd.Series([None] * len(out), index=out.index)
-    birth_weight_rows['mnid_birth_weight_g'] = [
-        _normalize_birth_weight_g(_first_numeric(pd.Series([vn, ov, vv])))
-        for vn, ov, vv in zip(value_numeric.loc[birth_weight_rows.index], obs.loc[birth_weight_rows.index], value.loc[birth_weight_rows.index])
-    ]
+    # Vectorized birth weight extraction — avoids a Python-level loop that created a
+    # pd.Series object per row (very slow at scale).
+    birth_weight_rows = out.loc[concept.eq('Birth weight'), ['person_id']].copy()
+    if not birth_weight_rows.empty:
+        value_numeric = out['ValueN'] if 'ValueN' in out.columns else pd.Series([None] * len(out), index=out.index)
+        bw_vn = pd.to_numeric(value_numeric.loc[birth_weight_rows.index], errors='coerce')
+        needs_parse = bw_vn.isna()
+        if needs_parse.any():
+            str_vals = obs.loc[birth_weight_rows.index].where(
+                obs.loc[birth_weight_rows.index].ne(''),
+                value.loc[birth_weight_rows.index],
+            )
+            parsed = str_vals.str.extract(r'(\d+(?:\.\d+)?)')[0]
+            bw_vn = bw_vn.fillna(pd.to_numeric(parsed, errors='coerce'))
+        birth_weight_rows['mnid_birth_weight_g'] = bw_vn.apply(_normalize_birth_weight_g)
+    else:
+        birth_weight_rows['mnid_birth_weight_g'] = pd.Series(dtype=float)
+
     birth_weight_map = (
         birth_weight_rows.dropna(subset=['mnid_birth_weight_g'])
         .groupby('person_id', as_index=False)['mnid_birth_weight_g']
@@ -411,6 +535,9 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
     person_ctx['mnid_newborn_kmc_eligible'] = (
         _ctx_series('mnid_newborn_kmc').eq('Yes')
         & _ctx_series('mnid_birth_weight_band').isin(['1000-1499g', '1500-1999g'])
+    ).map({True: 'Yes', False: ''})
+    person_ctx['mnid_newborn_low_birthweight'] = (
+        _ctx_series('mnid_birth_weight_band').isin(['1000-1499g', '1500-1999g', '2000-2499g'])
     ).map({True: 'Yes', False: ''})
 
     person_ctx['person_id'] = person_ctx['person_id'].astype(str)

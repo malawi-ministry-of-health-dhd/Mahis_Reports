@@ -62,6 +62,12 @@ SERVICE_DEFINITIONS = {
             ("Insecticide treated net given", "value", ["Yes", "No"], None),
             ("Number of tetanus doses", "coded", ["one dose", "two doses", "three doses", "four doses"], None),
             ("Danger signs present", "coded", ["Yes", "No"], None),
+            ("Anemia screening", "coded", ["Yes", "No"], None),
+            ("High blood pressure screening", "coded", ["Yes", "No"], None),
+            ("Systolic blood pressure", "numeric", None, (90, 170)),
+            ("Diastolic blood pressure", "numeric", None, (50, 110)),
+            ("Gestational age recorded", "coded", ["GA by LNMP", "GA by palpation", "GA by ultrasound"], None),
+            ("POCUS completed", "coded", ["Yes", "No"], None),
             ("Gestation in weeks", "numeric", None, (12, 40)),
         ],
     },
@@ -77,9 +83,13 @@ SERVICE_DEFINITIONS = {
             ("Vitamin K given", "coded", ["Yes", "No"], None),
             ("Breast feeding", "coded", ["Yes", "No", "Exclusive"], None),
             ("Outcome of the delivery", "coded", ["Live birth", "Fresh still birth", "Macerated still birth"], None),
-            ("Obstetric complications", "coded", ["PPH", "Eclampsia", "Obstructed labour", "None"], None),
+            ("Obstetric complications", "coded", ["PPH", "Eclampsia", "Obstructed labour", "Preterm labour", "None"], None),
             ("Newborn baby complications", "coded", ["Birth asphyxia", "Prematurity", "Sepsis", "None"], None),
             ("Management given to newborn", "coded", ["Resuscitation", "Thermal care", "KMC", "Antibiotics"], None),
+            ("Antenatal corticosteroids given", "coded", ["Yes", "No"], None),
+            ("Digital intrapartum monitoring", "coded", ["Used", "Not used"], None),
+            ("Prophylactic azithromycin given", "coded", ["Yes", "No"], None),
+            ("PPH treatment bundle", "coded", ["Yes", "No"], None),
         ],
     },
     "PNC": {
@@ -118,7 +128,57 @@ SERVICE_DEFINITIONS = {
             ("Thermal status on admission", "coded", ["Not hypothermic", "Hypothermic"], None),
             ("Neonatal resuscitation provided", "coded", ["Stimulation only", "Bag and mask", "Yes"], None),
             ("Eligible for neonatal resuscitation", "coded", ["Yes", "No"], None),
+            ("Admission outcome", "coded", ["Discharged", "Admitted", "Referred"], None),
         ],
+    },
+}
+
+CONCEPT_RULES = {
+    "ANC": {
+        "HIV Test": {"weights": [0.44, 0.06, 0.01, 0.49]},
+        "Anemia screening": {"include_probability": 0.90, "weights": [0.82, 0.18]},
+        "High blood pressure screening": {"include_probability": 0.92, "weights": [0.86, 0.14]},
+        "Systolic blood pressure": {"include_probability": 0.84},
+        "Diastolic blood pressure": {"include_probability": 0.84},
+        "Gestational age recorded": {"include_probability": 0.88, "weights": [0.40, 0.24, 0.36]},
+        "POCUS completed": {"weights": [0.34, 0.66]},
+        "Danger signs present": {"weights": [0.18, 0.82]},
+        "Pregnancy planned": {"weights": [0.52, 0.48]},
+    },
+    "Labour": {
+        "Mode of delivery": {"weights": [0.60, 0.18, 0.22]},
+        "Vitamin K given": {"weights": [0.88, 0.12]},
+        "Breast feeding": {"weights": [0.24, 0.11, 0.65]},
+        "Outcome of the delivery": {"weights": [0.90, 0.05, 0.05]},
+        "Obstetric complications": {"weights": [0.09, 0.06, 0.08, 0.07, 0.70]},
+        "Newborn baby complications": {"weights": [0.11, 0.10, 0.09, 0.70]},
+        "Antenatal corticosteroids given": {"weights": [0.72, 0.28]},
+        "Digital intrapartum monitoring": {"weights": [0.58, 0.42]},
+        "Prophylactic azithromycin given": {"weights": [0.42, 0.58]},
+        "PPH treatment bundle": {"weights": [0.61, 0.39]},
+        "Management given to newborn": {"weights": [0.16, 0.26, 0.21, 0.37]},
+    },
+    "PNC": {
+        "Status of the mother": {"weights": [0.72, 0.20, 0.08]},
+        "Status of baby": {"weights": [0.69, 0.17, 0.14]},
+        "Mother HIV Status": {"weights": [0.67, 0.19, 0.14]},
+        "Counselling on family planning": {"weights": [0.78, 0.22]},
+        "Immunisation given": {"weights": [0.31, 0.35, 0.34]},
+        "Breast feeding": {"weights": [0.46, 0.29, 0.25]},
+        "Prematurity/Kangaroo": {"weights": [0.29, 0.42, 0.29]},
+    },
+    "Newborn": {
+        "Birth weight": {"include_probability": 0.97},
+        "Gestation in weeks": {"include_probability": 0.93},
+        "Vitamin K given": {"weights": [0.85, 0.15]},
+        "thermal care": {"include_probability": 0.90, "weights": [0.74, 0.26]},
+        "iKMC initiated": {"weights": [0.48, 0.52]},
+        "CPAP support": {"weights": [0.13, 0.19, 0.68]},
+        "Phototherapy given": {"weights": [0.22, 0.78]},
+        "Parenteral antibiotics given": {"weights": [0.28, 0.72]},
+        "Thermal status on admission": {"weights": [0.62, 0.38]},
+        "Neonatal resuscitation provided": {"include_probability": 0.90, "weights": [0.27, 0.13, 0.60]},
+        "Eligible for neonatal resuscitation": {"weights": [0.49, 0.51]},
     },
 }
 
@@ -237,6 +297,10 @@ def concept_value(concept_type: str, values: list[str] | None, numeric_range: tu
     return None, None, None
 
 
+def concept_rule(service_area: str, concept_name: str) -> dict:
+    return CONCEPT_RULES.get(service_area, {}).get(concept_name, {})
+
+
 def build_demo_rows(template_columns: list[str], person_start: int, encounter_start: int,
                     visit_start: int, start_date: str, end_date: str) -> tuple[dict[str, list[dict]], int]:
     rows_by_month: dict[str, list[dict]] = {}
@@ -277,8 +341,19 @@ def build_demo_rows(template_columns: list[str], person_start: int, encounter_st
                         local_idx + facility_idx * 100,
                     )
                     for concept_name, concept_type, values, numeric_range in spec["concepts"]:
+                        rule = concept_rule(service_area, concept_name)
+                        include_probability = float(rule.get("include_probability", 1.0))
+                        if random.random() > include_probability:
+                            continue
                         row = base_row.copy()
                         coded_value, text_value, numeric_value = concept_value(concept_type, values, numeric_range)
+                        weights = rule.get("weights")
+                        if weights and values and concept_type in {"coded", "value"} and len(weights) == len(values):
+                            chosen = random.choices(values, weights=weights, k=1)[0]
+                            if concept_type == "coded":
+                                coded_value, text_value, numeric_value = chosen, None, None
+                            else:
+                                coded_value, text_value, numeric_value = None, chosen, None
                         row["concept_name"] = concept_name
                         row["obs_value_coded"] = coded_value
                         row["Value"] = text_value
