@@ -110,9 +110,9 @@ def get_biannual_start_end(period, year):
     
     return start_date, end_date
 
-def get_relative_date_range(option):
+def get_relative_date_range(option, current_date=None):
     from datetime import datetime, timedelta
-    today = datetime.today().date()
+    today = current_date or datetime.today().date()
     
     if option == 'Today':
         return today, today

@@ -8,6 +8,7 @@ sections such as trends, comparison views, heatmaps, and readiness panels.
 import dash_mantine_components as dmc
 import diskcache
 import json
+import logging
 import os
 import pandas as pd
 pd.options.mode.chained_assignment = None
@@ -60,6 +61,8 @@ _ANALYSIS_PALETTE = ['#2563EB', '#0F766E', '#7C3AED', '#C2410C', '#DB2777', '#08
 _MNID_UI_CACHE = {}
 _MNID_UI_CACHE_MAX = 16
 _MNID_UI_CACHE_TTL_SECONDS = 3600
+_MNID_WARNED_MESSAGES = set()
+_LOGGER = logging.getLogger(__name__)
 try:
     _MNID_UI_DISK_CACHE = diskcache.Cache(os.path.join('.', 'cache', 'mnid_ui'))
 except Exception:
@@ -105,13 +108,46 @@ def clear_runtime_caches() -> None:
         except Exception:
             pass
 
+
+def _warn_once(message: str) -> None:
+    if message in _MNID_WARNED_MESSAGES:
+        return
+    _MNID_WARNED_MESSAGES.add(message)
+    _LOGGER.warning(message)
+
+
+def _filter_columns_missing(df: pd.DataFrame, cfg: dict | None) -> list[str]:
+    if not cfg:
+        return []
+    missing = []
+    for i in range(1, 11):
+        var = cfg.get(f'variable{i}')
+        val = cfg.get(f'value{i}')
+        if not var or not val:
+            continue
+        if var not in df.columns:
+            missing.append(str(var))
+    return missing
+
 # MNID data helpers
 
 def _cov(df, n_cfg, d_cfg):
-    try:   num = int(create_count_from_config(df, n_cfg) or 0)
-    except: num = 0
-    try:   den = int(create_count_from_config(df, d_cfg) or 0)
-    except: den = 0
+    num_missing = _filter_columns_missing(df, n_cfg)
+    den_missing = _filter_columns_missing(df, d_cfg)
+    if num_missing:
+        _warn_once(f"MNID numerator filter references missing columns: {', '.join(num_missing)}")
+    if den_missing:
+        _warn_once(f"MNID denominator filter references missing columns: {', '.join(den_missing)}")
+    try:
+        num = int(create_count_from_config(df, n_cfg) or 0)
+    except Exception as exc:
+        _warn_once(f"MNID numerator count failed for config {n_cfg}: {exc}")
+        num = 0
+    try:
+        den = int(create_count_from_config(df, d_cfg) or 0)
+    except Exception as exc:
+        _warn_once(f"MNID denominator count failed for config {d_cfg}: {exc}")
+        den = 0
     if den:
         pct = round(min(num / den * 100, 100.0), 1)
     else:
@@ -127,7 +163,9 @@ def _monthly(df, n_cfg, d_cfg, n=6):
         return [{'x': datetime(m.year, m.month, 1),
                  'pct': _cov(df[periods == m], n_cfg, d_cfg)[2]}
                 for m in months]
-    except: return []
+    except Exception as exc:
+        _warn_once(f"MNID monthly series build failed for numerator {n_cfg} / denominator {d_cfg}: {exc}")
+        return []
 
 
 def _target_mode(ind_or_mode) -> str:
@@ -233,6 +271,23 @@ def _value_counts(df, concept, col='obs_value_coded', unique_col='person_id'):
     if not len(sub): return pd.DataFrame(columns=['label','n'])
     out = sub.groupby(col)[unique_col].nunique().reset_index()
     out.columns = ['label','n']
+    return out.sort_values('n', ascending=False)
+
+
+def _flag_value_counts(df, flag_col: str, unique_col: str = 'person_id',
+                       yes_label: str = 'Screened', no_label: str = 'Not screened'):
+    if flag_col not in df.columns or unique_col not in df.columns or not len(df):
+        return pd.DataFrame(columns=['label', 'n'])
+    people = (
+        df[[unique_col, flag_col]]
+        .dropna(subset=[unique_col])
+        .assign(**{flag_col: lambda x: x[flag_col].fillna('').astype(str).str.strip()})
+        .drop_duplicates(subset=[unique_col])
+    )
+    if people.empty:
+        return pd.DataFrame(columns=['label', 'n'])
+    labels = people[flag_col].eq('Yes').map({True: yes_label, False: no_label})
+    out = labels.value_counts().rename_axis('label').reset_index(name='n')
     return out.sort_values('n', ascending=False)
 
 
@@ -2630,6 +2685,7 @@ def _mask(df: pd.DataFrame, cfg: dict) -> pd.Series:
         if not var or not val:
             break
         if var not in df.columns:
+            _warn_once(f"MNID filter mask references missing column '{var}' in config {cfg}")
             return pd.Series(False, index=df.index)
         mask &= df[var].isin(val) if isinstance(val, list) else (df[var] == val)
     return mask
@@ -3556,53 +3612,55 @@ def _build_malawi_panel(stored: dict, view: str, year: str,
     ]
 
 
-clientside_callback(
-    """
-    function(_tick) {
-        const sections = [
-            '#mnid-summary',
-            '#mnid-data-tables',
-            '#mnid-trends',
-            '#mnid-performance',
-            '#mnid-heatmap',
-            '#mnid-coverage',
-            '#mnid-comparative',
-            '#mnid-analysis',
-            '#mnid-readiness'
-        ];
+_MNID_SCROLLSPY_CLIENTSIDE = """
+function(_tick) {
+    const sections = [
+        '#mnid-summary',
+        '#mnid-data-tables',
+        '#mnid-trends',
+        '#mnid-performance',
+        '#mnid-heatmap',
+        '#mnid-coverage',
+        '#mnid-comparative',
+        '#mnid-analysis',
+        '#mnid-readiness'
+    ];
 
-        let active = '#mnid-summary';
-        const activationLine = 124;
-        let bestPassed = null;
-        let nextUpcoming = null;
+    let active = '#mnid-summary';
+    const activationLine = 124;
+    let bestPassed = null;
+    let nextUpcoming = null;
 
-        for (const selector of sections) {
-            const el = document.querySelector(selector);
-            if (!el) {
-                continue;
-            }
-
-            const rect = el.getBoundingClientRect();
-            const top = rect.top;
-
-            if (top <= activationLine) {
-                if (bestPassed === null || top > bestPassed.top) {
-                    bestPassed = { selector, top };
-                }
-            } else if (nextUpcoming === null || top < nextUpcoming.top) {
-                nextUpcoming = { selector, top };
-            }
+    for (const selector of sections) {
+        const el = document.querySelector(selector);
+        if (!el) {
+            continue;
         }
 
-        if (bestPassed !== null) {
-            active = bestPassed.selector;
-        } else if (nextUpcoming !== null) {
-            active = nextUpcoming.selector;
-        }
+        const rect = el.getBoundingClientRect();
+        const top = rect.top;
 
-        return active;
+        if (top <= activationLine) {
+            if (bestPassed === null || top > bestPassed.top) {
+                bestPassed = { selector, top };
+            }
+        } else if (nextUpcoming === null || top < nextUpcoming.top) {
+            nextUpcoming = { selector, top };
+        }
     }
-    """,
+
+    if (bestPassed !== null) {
+        active = bestPassed.selector;
+    } else if (nextUpcoming !== null) {
+        active = nextUpcoming.selector;
+    }
+
+    return active;
+}
+"""
+
+clientside_callback(
+    _MNID_SCROLLSPY_CLIENTSIDE,
     Output('mnid-scrollspy-out', 'data'),
     Input('mnid-scrollspy-tick', 'n_intervals'),
 )
@@ -3873,6 +3931,106 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
     toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
     toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
     return fig, entity_options, entities, ind_options, selected_ind_ids, chart_type, toggle_class, toggle_text
+
+
+def register_mnid_callbacks(app) -> None:
+    if getattr(app, '_mnid_callbacks_registered', False):
+        return
+
+    app.clientside_callback(
+        _MNID_SCROLLSPY_CLIENTSIDE,
+        Output('mnid-scrollspy-out', 'data'),
+        Input('mnid-scrollspy-tick', 'n_intervals'),
+    )
+
+    app.callback(
+        Output('mnid-trend-graph', 'figure'),
+        Output('mnid-trend-active-cat', 'data'),
+        Output({'type': 'trend-cat-btn', 'index': ALL}, 'className'),
+        Output('mnid-trend-indicators', 'options'),
+        Output('mnid-trend-indicators', 'value'),
+        Output('mnid-trend-chart-type-store', 'data'),
+        Output('mnid-trend-chart-toggle', 'className'),
+        Output('mnid-trend-chart-toggle-text', 'children'),
+        Input({'type': 'trend-cat-btn', 'index': ALL}, 'n_clicks'),
+        Input('mnid-trend-chart-toggle', 'n_clicks'),
+        Input('mnid-trend-indicators', 'value'),
+        State('mnid-trend-store', 'data'),
+        State('mnid-trend-active-cat', 'data'),
+        State('mnid-trend-chart-type-store', 'data'),
+        State('mnid-trend-cats-store', 'data'),
+        prevent_initial_call=False,
+    )(update_trend_chart)
+
+    app.callback(
+        Output('mnid-service-table-content', 'children'),
+        Output('mnid-service-table-active-cat', 'data'),
+        Output({'type': 'service-table-btn', 'index': ALL}, 'className'),
+        Output('mnid-service-table-view-store', 'data'),
+        Output('mnid-service-table-toggle', 'className'),
+        Output('mnid-service-table-toggle-text', 'children'),
+        Input('mnid-service-table-toggle', 'n_clicks'),
+        Input({'type': 'service-table-btn', 'index': ALL}, 'n_clicks'),
+        State('mnid-service-table-store', 'data'),
+        State('mnid-service-table-active-cat', 'data'),
+        State('mnid-service-table-cats-store', 'data'),
+        State('mnid-service-table-view-store', 'data'),
+        prevent_initial_call=False,
+    )(update_service_table)
+
+    app.callback(
+        Output({'type': 'mnid-nav-btn', 'index': ALL}, 'className'),
+        Input('mnid-scrollspy-out', 'data'),
+        State({'type': 'mnid-nav-btn', 'index': ALL}, 'id'),
+        prevent_initial_call=False,
+    )(sync_mnid_nav_active_state)
+
+    app.callback(
+        Output('mnid-heatmap-graph', 'figure'),
+        Output('mnid-heatmap-right', 'children'),
+        Output('mnid-heatmap-district-wrap', 'style'),
+        Input('mnid-heatmap-view', 'value'),
+        Input('mnid-heatmap-district', 'value'),
+        Input('mnid-heatmap-indicators', 'value'),
+        State('mnid-heatmap-store', 'data'),
+        prevent_initial_call=True,
+    )(update_heatmap_view)
+
+    app.callback(
+        Output('mnid-heatmap-district', 'value'),
+        Input('mnid-malawi-treemap', 'clickData'),
+        State('mnid-heatmap-store', 'data'),
+        prevent_initial_call=True,
+    )(sync_district_focus_from_treemap)
+
+    app.callback(
+        Output('mnid-performance-heatmap-table', 'children'),
+        Output('mnid-performance-aggregate', 'children'),
+        Output('mnid-performance-attention', 'children'),
+        Input('mnid-performance-indicators', 'value'),
+        State('mnid-heatmap-store', 'data'),
+        prevent_initial_call=True,
+    )(update_performance_heatmap)
+
+    app.callback(
+        Output('mnid-compare-bar-chart', 'figure'),
+        Output('mnid-compare-entities', 'options'),
+        Output('mnid-compare-entities', 'value'),
+        Output('mnid-compare-indicators', 'options'),
+        Output('mnid-compare-indicators', 'value'),
+        Output('mnid-compare-chart-type-store', 'data'),
+        Output('mnid-compare-chart-toggle', 'className'),
+        Output('mnid-compare-chart-toggle-text', 'children'),
+        Input('mnid-compare-mode', 'value'),
+        Input('mnid-compare-entities', 'value'),
+        Input('mnid-compare-time-grain', 'value'),
+        Input('mnid-compare-indicators', 'value'),
+        Input('mnid-compare-chart-toggle', 'n_clicks'),
+        State('mnid-compare-store', 'data'),
+        State('mnid-compare-chart-type-store', 'data'),
+    )(update_compare_charts)
+
+    app._mnid_callbacks_registered = True
 
 
 # # MNID main heatmap section layout
@@ -4449,14 +4607,20 @@ def _anc_charts(df):
 
     for concept, title in [
         ('Anemia screening',            'Anaemia Screening'),
-        ('Infection screening',         'Infection Screening'),
         ('High blood pressure screening','Blood Pressure Screening'),
     ]:
         vc = _value_counts(df, concept)
         fig = _donut(vc, title, color_map={
+            'Yes': '#2563EB', 'No': '#94A3B8',
             'Screened': '#2563EB', 'Not screened': '#94A3B8',
         })
         if fig: charts.append(_chart_card('', fig))
+
+    vc = _flag_value_counts(df, 'mnid_anc_infection_screened')
+    fig = _donut(vc, 'Infection Screening', color_map={
+        'Screened': '#2563EB', 'Not screened': '#94A3B8',
+    })
+    if fig: charts.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'POCUS completed')
     fig = _donut(vc, 'POCUS Completed', color_map={'Yes': '#0F766E', 'No': '#94A3B8'})
@@ -4464,7 +4628,9 @@ def _anc_charts(df):
 
     vc = _value_counts(df, 'HIV Test')
     fig = _donut(vc, 'HIV Testing Status', color_map={
-        'Non-reactive': '#2563EB', 'Reactive': '#DB2777',
+        'Negative': '#2563EB', 'Non-reactive': '#2563EB',
+        'Reactive': '#DB2777', 'Positive': '#DB2777',
+        'Not done': '#94A3B8',
     })
     if fig: charts.append(_chart_card('', fig))
 
@@ -4503,8 +4669,11 @@ def _labour_charts(df):
 
     vc = _value_counts(df, 'Outcome of the delivery')
     fig = _donut(vc, 'Birth Outcome', color_map={
+        'Live birth': '#0F766E',
         'Live births': '#0F766E',
+        'Fresh still birth': '#DB2777',
         'Fresh stillbirth': '#DB2777',
+        'Macerated still birth': '#7C3AED',
         'Macerated stillbirth': '#7C3AED',
     })
     if fig: charts.append(_chart_card('', fig))
@@ -4539,20 +4708,39 @@ def _pnc_charts(df):
 
     vc = _value_counts(df, 'Breast feeding')
     fig = _donut(vc, 'Breastfeeding Mode', color_map={
-        'Exclusive': '#2563EB', 'exclusive breastfeeding': '#2563EB',
-        'Mixed': '#0F766E', 'Not breastfeeding': '#7C3AED',
+        'Exclusive': '#2563EB',
+        'exclusive breastfeeding': '#2563EB',
+        'Breastfed exclusively': '#0891B2',
+        'Mixed': '#C2410C',
+        'Yes': '#0F766E',
+        'No': '#DB2777',
+        'Not breastfeeding': '#DB2777',
     })
     if fig: charts.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'Status of the mother')
     fig = _donut(vc, 'Mother Final Status', color_map={
-        'Stable': '#2563EB', 'Referred': '#C2410C', 'Death': '#DB2777',
+        'Alive': '#0F766E',
+        'Discharged alive': '#2563EB',
+        'Stable': '#0891B2',
+        'Admitted': '#C2410C',
+        'Referred': '#7C3AED',
+        'Death': '#DB2777',
+        'Dead': '#DB2777',
+        'Died': '#DB2777',
     })
     if fig: charts.append(_chart_card('', fig))
 
     vc = _value_counts(df, 'Status of baby')
     fig = _donut(vc, 'Baby Final Status', color_map={
-        'Stable': '#2563EB', 'Referred': '#C2410C', 'Died': '#DB2777',
+        'Alive': '#0F766E',
+        'Stable': '#0891B2',
+        'Admitted': '#2563EB',
+        'Discharged': '#7C3AED',
+        'Referred': '#C2410C',
+        'Died': '#DB2777',
+        'Death': '#DB2777',
+        'Dead': '#DB2777',
     })
     if fig: charts.append(_chart_card('', fig))
 
@@ -4612,8 +4800,7 @@ def _newborn_charts(df):
         'Thermal status on admission',
         [
             ('Not hypothermic', ['Not hypothermic'], '#2563EB'),
-            ('Mild hypothermia', ['Mild hypothermia'], '#0F766E'),
-            ('Moderate/Severe', ['Moderate hypothermia', 'Severe hypothermia'], '#DB2777'),
+            ('Hypothermic', ['Hypothermic', 'Mild hypothermia', 'Moderate hypothermia', 'Severe hypothermia'], '#DB2777'),
         ],
         'Thermal Status Mix Over Time',
     )
@@ -4634,6 +4821,7 @@ def _newborn_charts(df):
     vc = _value_counts(df, 'Thermal status on admission')
     fig = _donut(vc, 'Thermal Status on Admission', color_map={
         'Not hypothermic': '#2563EB',
+        'Hypothermic': '#DB2777',
         'Mild hypothermia': '#0F766E',
         'Moderate hypothermia': '#C2410C',
         'Severe hypothermia': '#DB2777',
@@ -4655,7 +4843,7 @@ def _newborn_charts(df):
 
     vc = _value_counts(df, 'CPAP support')
     fig = _donut(vc, 'CPAP Support Type', color_map={
-        'Bubble CPAP': '#2563EB', 'Nasal oxygen': '#0F766E', 'None': '#94A3B8',
+        'Bubble CPAP': '#2563EB', 'Nasal oxygen': '#0F766E', 'No CPAP': '#94A3B8', 'None': '#94A3B8',
     })
     cpap_donut = _chart_card('', fig) if fig else None
 
@@ -4688,15 +4876,18 @@ def _newborn_charts(df):
 
     mortality_vc, mortality_concept = _first_available_value_counts(
         df,
-        ['Status of baby', 'Baby Final Status', 'Outcome of the delivery'],
+        ['Admission outcome', 'Status of baby', 'Baby Final Status', 'Outcome of the delivery'],
         col='obs_value_coded',
     )
     mortality_chart = None
     if len(mortality_vc):
         mortality_fig = _donut(mortality_vc, 'Outcome Status', color_map={
-            'Stable': '#2563EB', 'Alive': '#2563EB', 'Live births': '#2563EB',
+            'Admitted': '#2563EB',
+            'Discharged': '#0F766E',
+            'Stable': '#2563EB', 'Alive': '#0F766E', 'Live birth': '#0F766E', 'Live births': '#0F766E',
             'Referred': '#C2410C', 'Died': '#DB2777', 'Death': '#DB2777',
-            'Fresh stillbirth': '#DB2777', 'Macerated stillbirth': '#7C3AED',
+            'Fresh still birth': '#DB2777', 'Fresh stillbirth': '#DB2777',
+            'Macerated still birth': '#7C3AED', 'Macerated stillbirth': '#7C3AED',
         })
         if mortality_fig:
             mortality_chart = _chart_card('', mortality_fig)
@@ -4760,28 +4951,44 @@ def _system_readiness(df, supply_inds, wf_inds, dq_inds):
     if not (supply_inds or wf_inds or dq_inds):
         return html.Div()
 
-    def _rows(inds, tgt_key='target_pct'):
+    def _placeholder_card(title: str):
+        return html.Div(className='mnid-card', children=[
+            html.Div(title, className='mnid-card-title'),
+            html.Div('No configured indicators', className='mnid-ind-note',
+                     style={'padding': '18px 0', 'textAlign': 'center'}),
+        ])
+
+    def _rows(inds):
         rows = []
         for ind in inds:
+            if ind.get('status') == 'unavailable':
+                rows.append(html.Div(className='mnid-stat-row info', children=[
+                    html.Span(ind['label'], className='mnid-stat-lbl'),
+                    html.Div(style={'display': 'flex', 'gap': '8px', 'alignItems': 'center',
+                                    'flexWrap': 'wrap', 'justifyContent': 'flex-end'}, children=[
+                        html.Span('Not configured', className='mnid-stat-meta info'),
+                    ]),
+                ]))
+                continue
             num, den, pct = _cov(df, ind['numerator_filters'], ind['denominator_filters'])
-            rows.append(_stat_row(ind['label'], num, den, pct, ind.get(tgt_key)))
+            rows.append(_stat_row(ind['label'], num, den, pct, ind.get('target', ind.get('target_pct'))))
         return rows
 
     return html.Div([
         html.Div('SYSTEM READINESS', className='mnid-section-lbl'),
         html.Div(className='mnid-grid3', children=[
-            html.Div(className='mnid-card', children=[
+            (html.Div(className='mnid-card', children=[
                 html.Div('Equipment & Supplies', className='mnid-card-title'),
                 *_rows(supply_inds),
-            ]),
-            html.Div(className='mnid-card', children=[
+            ]) if supply_inds else _placeholder_card('Equipment & Supplies')),
+            (html.Div(className='mnid-card', children=[
                 html.Div('Workforce Competency', className='mnid-card-title'),
                 *_rows(wf_inds),
-            ]),
-            html.Div(className='mnid-card', children=[
+            ]) if wf_inds else _placeholder_card('Workforce Competency')),
+            (html.Div(className='mnid-card', children=[
                 html.Div('Data Quality', className='mnid-card-title'),
-                *_rows(dq_inds, 'target_pct'),
-            ]),
+                *_rows(dq_inds),
+            ]) if dq_inds else _placeholder_card('Data Quality')),
         ]),
     ])
 
@@ -4801,6 +5008,17 @@ def _compare_status_counts(df: pd.DataFrame, tracked: list) -> dict:
             else:
                 below += 1
     return {'On target': on_tgt, 'Below target': below, 'No data': no_dat}
+
+
+def _validate_indicator_configs(df: pd.DataFrame, indicators: list[dict]) -> None:
+    for ind in indicators or []:
+        label = str(ind.get('label') or ind.get('id') or 'Unnamed indicator')
+        num_missing = _filter_columns_missing(df, ind.get('numerator_filters'))
+        den_missing = _filter_columns_missing(df, ind.get('denominator_filters'))
+        if num_missing:
+            _warn_once(f"MNID indicator '{label}' has numerator filters referencing missing columns: {', '.join(num_missing)}")
+        if den_missing:
+            _warn_once(f"MNID indicator '{label}' has denominator filters referencing missing columns: {', '.join(den_missing)}")
 
 
 def _build_compare_pie(title: str, counts: dict) -> go.Figure:
@@ -5377,7 +5595,8 @@ def _pph_cascade(df):
                               'toImageButtonOptions': {'format': 'png', 'scale': 2}},
                       style={'height': '280px'}),
         ])
-    except Exception:
+    except Exception as exc:
+        _warn_once(f"MNID PPH cascade rendering failed: {exc}")
         return None
 
 
@@ -5627,7 +5846,7 @@ def _section_anchor(anchor_id):
 _network_df_cache: dict = {}
 
 
-def render_mnid_dashboard(filtered, data_opd, delta_days, config,
+def render_mnid_dashboard(data_opd, config,
                           facility_code, start_date, end_date,
                           scope_meta: dict | None = None):
     dataset_version = (scope_meta or {}).get('dataset_version')
@@ -5667,7 +5886,6 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
 
     selected_program = (scope_meta or {}).get('mnid_categories')
     selected_program = selected_program[0] if selected_program else 'All'
-    facility_df = facility_df
     facility_df.attrs['mnid_program'] = selected_program
     network_df.attrs['mnid_program'] = selected_program
     if network_df.empty:
@@ -5692,6 +5910,7 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
         facility_df,
         effective_categories,
     )
+    _validate_indicator_configs(facility_df, all_inds)
     category_order = _resolve_category_order(all_inds, effective_categories)
     if category_order:
         allowed = set(category_order)
@@ -5714,55 +5933,6 @@ def render_mnid_dashboard(filtered, data_opd, delta_days, config,
         dashboard_subtitle = 'Clean view of performance, comparison, coverage, and readiness.'
         dashboard_theme = 'default'
 
-    if dashboard_theme == 'newborn' and not (supply_inds or wf_inds or dq_inds):
-        zero_filters = {
-            'unique': 'person_id',
-            'variable1': 'concept_name',
-            'value1': '__mnid_unavailable__',
-        }
-        _unavail = {'unique': 'person_id', 'variable1': 'concept_name', 'value1': '__mnid_unavailable__'}
-        wf_inds = [
-            {
-                'label': 'SSNC competency assessed',
-                'target_pct': 80,
-                'numerator_filters': dict(_unavail),
-                'denominator_filters': dict(_unavail),
-            },
-        ]
-        supply_inds = [
-            {
-                'label': 'CPAP equipment available',
-                'target_pct': 80,
-                'numerator_filters': dict(_unavail),
-                'denominator_filters': dict(_unavail),
-            },
-            {
-                'label': 'Phototherapy unit available',
-                'target_pct': 80,
-                'numerator_filters': dict(_unavail),
-                'denominator_filters': dict(_unavail),
-            },
-            {
-                'label': 'Neonatal resuscitation equipment available',
-                'target_pct': 80,
-                'numerator_filters': dict(_unavail),
-                'denominator_filters': dict(_unavail),
-            },
-        ]
-        dq_inds = [
-            {
-                'label': 'Record completeness',
-                'target_pct': 95,
-                'numerator_filters': dict(_unavail),
-                'denominator_filters': dict(_unavail),
-            },
-            {
-                'label': 'Data entered within 7 days',
-                'target_pct': 90,
-                'numerator_filters': dict(_unavail),
-                'denominator_filters': dict(_unavail),
-            },
-        ]
     hero_title = 'KEY NEONATAL INDICATORS' if dashboard_theme == 'newborn' else f'KEY {_CAT_LABELS.get(default_cat, str(default_cat or "Program")).upper()} INDICATORS'
 
     computed = []

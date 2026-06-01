@@ -54,12 +54,29 @@ _mnid_disk_cache = diskcache.Cache('./cache/mnid')
 _mnid_full_data_cache: dict = {}
 DEFAULT_DASHBOARD_DAYS = 7
 DEFAULT_RELATIVE_PERIOD = 'Today'
+_LATEST_DATA_DATE_CACHE: dict[str, pd.Timestamp | None] = {}
+
+
+def _latest_available_date() -> pd.Timestamp | None:
+    cache_key = f'{DATA_FILE_NAME_}:{_dataset_version_token()}'
+    if cache_key in _LATEST_DATA_DATE_CACHE:
+        return _LATEST_DATA_DATE_CACHE[cache_key]
+    try:
+        latest = DataStorage.query_duckdb(f"SELECT MAX(Date) AS max_date FROM '{DATA_FILE_NAME_}'")
+        max_date = pd.to_datetime(latest.loc[0, 'max_date'], errors='coerce') if len(latest) else pd.NaT
+    except Exception:
+        max_date = pd.NaT
+    resolved = None if pd.isna(max_date) else max_date.normalize()
+    _LATEST_DATA_DATE_CACHE.clear()
+    _LATEST_DATA_DATE_CACHE[cache_key] = resolved
+    return resolved
 
 
 def _default_date_window():
-    today = datetime.now().date()
-    start = today - pd.Timedelta(days=29)
-    return start, today
+    latest = _latest_available_date()
+    anchor = latest.date() if latest is not None else datetime.now().date()
+    start = anchor - pd.Timedelta(days=29)
+    return start, anchor
 
 
 def _dataset_version_token() -> str:
@@ -133,7 +150,7 @@ def _normalize_level(value: str | None) -> str:
     value = str(value or '').strip().lower()
     if value in {'national', 'district', 'facility'}:
         return value
-    return 'facility'
+    return 'national'
 
 
 def _title_level(value: str) -> str:
@@ -214,9 +231,7 @@ def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json, filt
     # Route MNID dashboard configs to the dedicated MNID renderer.
     if config.get('dashboard_type') == 'mnid':
         return render_mnid_dashboard(
-            filtered=filtered,
             data_opd=data_opd,
-            delta_days=delta_days,
             config=config,
             facility_code=facility_code or 'Unknown',
             start_date=str(start_date)[:10] if start_date else '',
@@ -634,7 +649,7 @@ def update_dashboard(gen, interval, start_date, end_date, level,
         url_object = f"Location={location}&uuid={urlparams.get('uuid', [None])[0]}&user_level={user_level}"
 
         # Default level based on user_level
-        requested_level = user_level
+        requested_level = _normalize_level(level) if level else user_level
         if user_level == 'national':
             effective_level = requested_level if requested_level in {'national', 'district', 'facility'} else 'national'
         elif user_level == 'district':
@@ -1021,14 +1036,14 @@ def sync_picker_with_logic(period_type, n):
     ctx = callback_context
     triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else ""
     default_start, default_end = _default_date_window()
+    anchor = default_end
 
     if "dashboard-interval-update-today" in triggered_id:
         if period_type == "Today":
-            today = datetime.now().date()
-            return today, today
+            return anchor, anchor
         raise PreventUpdate
     if period_type:
-        s, e = get_relative_date_range(period_type)
+        s, e = get_relative_date_range(period_type, current_date=anchor)
         if s and e:
             return s, e
     return default_start, default_end

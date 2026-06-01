@@ -63,6 +63,7 @@ _OBS_VALUE_ALIASES = {
     'Continuous KMC': 'Kangaroo mother care',
     'Intermittent KMC': 'Kangaroo mother care',
     'Admit to KMC': 'Kangaroo mother care',
+    'this facility': 'This facility',
     'ga by ultrasound': 'GA by ultrasound',
     'Ga by palpation': 'GA by palpation',
     'Caesarean Section': 'Caesarean section',

@@ -77,7 +77,7 @@ SERVICE_DEFINITIONS = {
         "encounter": "LABOUR AND DELIVERY",
         "daily_range": (1, 2),
         "concepts": [
-            ("Place of delivery", "coded", ["This facility", "this facility"], None),
+            ("Place of delivery", "coded", ["This facility", "Home"], None),
             ("Mode of delivery", "coded", ["Spontaneous vertex delivery", "Caesarean section", "Assisted delivery"], None),
             ("Staff conducting delivery", "value", ["Midwife", "Nurse", "Clinical officer", "Doctor"], None),
             ("Vitamin K given", "coded", ["Yes", "No"], None),
