@@ -640,9 +640,10 @@ def create_crosstab_from_config(filtered, filters):
         rename=rename, replace=replace, custom_fields=custom_fields
     )
 
-def create_linelist_from_config(filtered, filters,user_role=None, **kwargs):
+def create_linelist_from_config(query_fiter, filters, user_role=None, **kwargs):
     """
     Convert JSON config into arguments for create_line_list().
+    Accepts a SQL WHERE-clause string (query_fiter) instead of a DataFrame.
     Accepts dynamic group_cols, group_filters, group_aggr, merge methods, rename, cols_order etc.
     """
 
@@ -651,64 +652,54 @@ def create_linelist_from_config(filtered, filters,user_role=None, **kwargs):
             return [s.strip() for s in v.split('|') if s.strip()]
         return v
 
-    unique_col     = _as_list_or_str(filters.get("unique_col") or filters.get("unique"))
-    cols_order     = _as_list_or_str(filters.get("cols_order") or [])
-    merge_methods  = _as_list_or_str(filters.get("merge_methods") or [])
-    rename         = filters.get("rename") or {}
-    title          = filters.get("report_name")
-    authorized_user= filters.get("authorized_user") or "Any"
-    message= filters.get("message") or None
-    custom_fields = filters.get('custom_fields') or None
+    unique_col      = _as_list_or_str(filters.get("unique_col") or filters.get("unique"))
+    cols_order      = _as_list_or_str(filters.get("cols_order") or [])
+    merge_methods   = _as_list_or_str(filters.get("merge_methods") or [])
+    rename          = filters.get("rename") or {}
+    title           = filters.get("report_name")
+    authorized_user = filters.get("authorized_user") or "Any"
+    message         = filters.get("message") or None
+    custom_fields   = filters.get('custom_fields') or None
 
     if message:
         message = message + str(authorized_user)
 
+    # Resolve whether this user should have name columns masked
+    mask_names = False
     if authorized_user != "Any":
         if isinstance(authorized_user, list):
-            if user_role not in authorized_user:
-                if FIRST_NAME_ in filtered.columns:
-                    filtered[FIRST_NAME_] = 'fname_xxxx'
-                if LAST_NAME_ in filtered.columns:
-                    filtered[LAST_NAME_] = 'lname_xxxx'
+            mask_names = user_role not in authorized_user
         elif isinstance(authorized_user, str):
-            if user_role != authorized_user:
-                if FIRST_NAME_ in filtered.columns:
-                    filtered[FIRST_NAME_] = 'fname_xxxx'
-                if LAST_NAME_ in filtered.columns:
-                    filtered[LAST_NAME_] = 'lname_xxxx'
+            mask_names = user_role != authorized_user
 
     group_kwargs = {}
-
     for i in range(1, 30 + 1):
-        # group_colsN
-        c = filters.get(f"group_cols{i}")
+        c  = filters.get(f"group_cols{i}")
         if c:
             group_kwargs[f"group_cols{i}"] = c
-        # groupN_filters
         gf = filters.get(f"group{i}_filters")
         if gf:
             group_kwargs[f"group{i}_filters"] = gf
-        # groupN_aggr
         ga = filters.get(f"group{i}_aggr") or filters.get(f"group{i}_aggregations")
         if ga:
             group_kwargs[f"group{i}_aggr"] = ga
-
         gr = filters.get(f"group{i}_rename")
         if gr:
             group_kwargs[f"group{i}_rename"] = gr
-    # Merge any extra **kwargs the user passes
+
     group_kwargs.update(kwargs)
 
     return create_line_list(
-        df=filtered,
+        query_fiter=query_fiter,
         unique_col=unique_col,
         cols_order=cols_order,
         title=title,
-        message = message,
+        message=message,
         merge_methods=merge_methods,
         rename=rename,
-        custom_fields = custom_fields,
-        **group_kwargs
+        custom_fields=custom_fields,
+        mask_names=mask_names,
+        **group_kwargs,
     )
 
 def create_sankey_from_config(filtered, filters):

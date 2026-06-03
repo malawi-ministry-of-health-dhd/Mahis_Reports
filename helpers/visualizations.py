@@ -17,7 +17,7 @@ from data_storage import DataStorage
 
 pd.options.mode.chained_assignment = None
 
-from config import PERSON_ID_, ENCOUNTER_ID_, DATE_, CONCEPT_NAME_,DATA_FILE_NAME_
+from config import PERSON_ID_, ENCOUNTER_ID_, DATE_, CONCEPT_NAME_,DATA_FILE_NAME_,FIRST_NAME_, LAST_NAME_
 
 
 THEME = {
@@ -2119,231 +2119,221 @@ def agg_join(series: pd.Series) -> str:
 AGG_MAP: Dict[str, Union[str, Callable]] = {
     'first': 'first',
     'last': 'last',
-    'min': 'min',
-    'max': 'max',
-    'sum': 'sum',
-    'mean': 'mean',
-    'count': 'count',
-    'join': agg_join
+    'min': 'MIN',
+    'max': 'MAX',
+    'sum': 'SUM',
+    'mean': 'AVG',
+    'count': 'COUNT',
+    'join': 'STRING_AGG'
 }
 
 def create_line_list(
-    title: str,
-    df: pd.DataFrame,
-    unique_col: Union[str, List[str]] = PERSON_ID_,
-    rename: Optional[dict] = None,
-    cols_order: Optional[List[str]] = None,
-    merge_methods: Optional[List[str]] = None,
-    message = None,
-    custom_fields=None,
-    **kwargs
-) -> pd.DataFrame:
-    """
-    Creates a line list by aggregating data with consistent deduplication.
-    Supports group-specific renaming via group{i}_rename parameter.
-    """
-    ops = {
-        "==": operator.eq, "!=": operator.ne, ">": operator.gt, "<": operator.lt,
-        ">=": operator.ge, "<=": operator.le
-    }
-    DEFAULT_MERGE = 'inner'
-    
-    unique_col_list = [unique_col] if isinstance(unique_col, str) else unique_col
-    if not unique_col_list:
-        raise ValueError("unique_col must specify at least one column.")
-    
-    df_base = df
-    df_base = apply_calculated_fields(df_base, custom_fields)
-    
-    group_dfs = []
-    
-    for i in range(1, 31): #rows extended to 30
+        title: str,
+        query_fiter: str,
+        unique_col: Union[str, List[str]] = PERSON_ID_,
+        rename: Optional[dict] = None,
+        cols_order: Optional[List[str]] = None,
+        merge_methods: Optional[List[str]] = None,
+        message=None,
+        custom_fields=None,
+        mask_names: bool = False,
+        **kwargs):
+
+    # ── helper: strip date filter for cohort (all-time history) queries ──────
+    import re as _re
+    def _cohort_where(base_where: str) -> str:
+        """
+        Remove the 'Date BETWEEN ... AND ...' clause from the WHERE string,
+        leaving only scope conditions (facility, district, etc.).
+        Used by join_cohort so the query covers the full patient history.
+        """
+        stripped = _re.sub(
+            rf"{_re.escape(DATE_)}\s+BETWEEN\s+'[^']+'::[A-Za-z]+\s+AND\s+'[^']+'::[A-Za-z]+"
+            rf"(\s+AND\s+)?",
+            "",
+            base_where,
+            flags=_re.IGNORECASE,
+        ).strip().lstrip("AND").strip()
+        return stripped if stripped else "1=1"
+
+    queries = []
+    for i in range(1, 31):
         group_cols = kwargs.get(f"group_cols{i}", []) or []
         group_filters = kwargs.get(f"group{i}_filters", {}) or {}
         group_aggr = kwargs.get(f"group{i}_aggr", {}) or {}
         group_rename_map = kwargs.get(f"group{i}_rename", {}) or {}
-        
+
         if not group_cols:
             continue
-        
-        aggr_cols_needed = list(group_aggr.keys())
-        all_required_cols = list(set(group_cols + unique_col_list + aggr_cols_needed))
-        # print(all_required_cols)
-        
-        df_group_filtered = df_base
-        filter_mask = pd.Series(True, index=df_group_filtered.index)
-        
-        for col, raw_val in group_filters.items():
-            if col not in df_group_filtered.columns:
-                print(f"Warning: Filter column '{col}' for group {i} not found. Skipping filter.")
-                continue
-            val = str(raw_val).strip()
-            current_filter = None
-            if val.startswith(("in:", "!in:")):
-                is_in = val.startswith("in:")
-                prefix_len = 3 if is_in else 4
-                items = [x.strip() for x in val[prefix_len:].split(",")]
-                current_filter = df_group_filtered[col].isin(items) if is_in else ~df_group_filtered[col].isin(items)
-            else:
-                applied = False
-                for symbol, func in ops.items():
-                    if val.startswith(symbol):
-                        comp_val = val[len(symbol):].strip()
-                        try:
-                            comp_val = float(comp_val)
-                        except ValueError:
-                            pass 
-                        current_filter = func(df_group_filtered[col], comp_val)
-                        applied = True
-                        break
-                if not applied:
-                    current_filter = (df_group_filtered[col] == raw_val)
-            if current_filter is not None:
-                filter_mask = filter_mask & current_filter
-        
-        df_group_filtered = df_group_filtered[filter_mask]
-        
-        if df_group_filtered.empty:
-            continue
-        
-        missing_output_cols = [c for c in all_required_cols if c not in df_group_filtered.columns]
-        if missing_output_cols:
-            print(f"Warning: Group {i} skipped. Required columns not found: {missing_output_cols}")
-            continue
-        
-        # Apply deduplication by unique_col and DATE_
-        if DATE_ in df_group_filtered.columns:
-            df_group_filtered = df_group_filtered.drop_duplicates(subset=unique_col_list + [DATE_])
-        
-        df_group = df_group_filtered[all_required_cols]
-        
-        count_col_name = f'unique_count_{i}'
 
-        # Calculate unique count per group
-        try:
-            if not df_group.empty and len(df_group) > 0:
-                df_group[count_col_name] = (
-                    df_group.groupby(group_cols)[unique_col_list].transform("nunique").sum(axis=1)
-                )
-            else:
-                df_group[count_col_name] = 0
-        except Exception as e:
-            print(f"Warning: Could not calculate unique count for group {i}: {e}")
-            df_group[count_col_name] = 0
-        
-        # Build aggregation dictionary
-        agg_dict = {
-            col: AGG_MAP.get(method.lower(), 'first')
-            for col, method in group_aggr.items()
-        }
-        
-        aggr_columns = list(set(agg_dict.keys()))
-        
-        for col in group_cols + unique_col_list:
-            if col not in aggr_columns:
-                agg_dict[col] = 'first' 
-        
-        agg_dict[count_col_name] = 'first'
-        
-        df_group = (
-            df_group.groupby(unique_col_list, dropna=False, as_index=False)
-            .agg(agg_dict)
-            .reset_index(drop=True)
-        )
-        
-        # APPLY GROUP-SPECIFIC RENAME BEFORE APPENDING
-        if group_rename_map:
-            df_group = df_group.rename(columns=group_rename_map)
-            # print(f"Applied rename for group {i}: {group_rename_map}")
-        
-        # Remove any duplicate columns that might have been created
-        df_group = df_group.loc[:, ~df_group.columns.duplicated()]
+        # Apply rename aliases to group_cols for SELECT clause
+        renamed_cols = [
+            f"{col} AS {group_rename_map[col]}" if col in group_rename_map else col
+            for col in group_cols
+        ]
+        if DATE_ in renamed_cols:
+            renamed_cols = [
+                f"CAST({col} AS DATE) AS {DATE_}" if col == DATE_ else col
+                for col in renamed_cols
+            ]
 
-        # print(group_filters, df_group)
-        
-        group_dfs.append(df_group)
-    
-    if not group_dfs:
-        return html.Div(f"No data available for {title}")
-    
-    merge_methods_list = merge_methods or []
-    final_df = group_dfs[0]
-    
-    for idx, right_df in enumerate(group_dfs[1:]):
-        try:
-            merge_how = merge_methods_list[idx] if idx < len(merge_methods_list) else DEFAULT_MERGE
-            
-            # Before merging, ensure unique_col_list columns exist in both dataframes
-            # If group rename changed the unique_col names, we need to handle that
-            merge_on = unique_col_list
-            for col in unique_col_list:
-                if col not in final_df.columns:
-                    print(f"Warning: Unique column '{col}' not found in left DataFrame after group {idx+1}")
-                if col not in right_df.columns:
-                    print(f"Warning: Unique column '{col}' not found in right DataFrame for group {idx+2}")
-            
-            final_df = pd.merge(
-                final_df, 
-                right_df, 
-                on=merge_on,
-                how=merge_how,
-                suffixes=('', f'_dup_{idx+2}')  # Avoid duplicate column names
+        where_clause = query_fiter
+        if group_filters:
+            for col, val in group_filters.items():
+                clause = build_filter_query(col, val, unique_col, False, None, None)
+                where_clause += f" AND {clause}"
+
+        if group_aggr:
+            # Only cols NOT being aggregated appear as plain SELECT columns and in GROUP BY
+            aggr_col_set    = set(group_aggr.keys())
+            non_aggr_cols   = [c for c in group_cols if c not in aggr_col_set]
+            non_aggr_select = [
+                f"STRFTIME(CAST({c} AS DATE), '%Y-%m-%d') AS {c}"
+                if c == DATE_ else c
+                for c in non_aggr_cols
+            ]
+
+            # join_cohort: any column using this func makes the whole group
+            # query ignore the date filter so we capture full patient history.
+            is_cohort = any(
+                (f or "").lower() == "join_cohort"
+                for f in group_aggr.values()
             )
-        except ValueError as e:
-            print(f"Error during merge between group {idx+1} and group {idx+2} using method '{merge_how}'. Details: {e}")
-            raise
-    # Remove any duplicate columns created during merge
-    final_df = final_df.loc[:, ~final_df.columns.duplicated()]
-    
-    # Apply main rename (only for columns that haven't been renamed yet)
-    if rename:
-        # Only rename columns that exist in the DataFrame
-        rename_dict = {k: v for k, v in rename.items() if k in final_df.columns}
-        if rename_dict:
-            final_df = final_df.rename(columns=rename_dict)
-            # print(f"Applied main rename: {rename_dict}")
-    
-    # Apply column ordering
-    if cols_order and isinstance(cols_order, list):
-        # Only keep columns that exist in the final DataFrame
-        ordered_cols = [col for col in cols_order if col in final_df.columns]
-        final_df = final_df[ordered_cols]
-    elif isinstance(cols_order, str):
-        raise ValueError("cols_order must be a list.")
-    
-    final_df = final_df.fillna('')
-    
-    if not final_df.empty and final_df.columns[0] in final_df.columns:
+            effective_where = _cohort_where(where_clause) if is_cohort else where_clause
+
+            aggr_clauses = []
+            for col, func in group_aggr.items():
+                alias    = group_rename_map.get(col, col)
+                agg_func = (func or "first").lower()
+                if agg_func in ("join", "concat", "list", "string_agg", "join_cohort"):
+                    # join_cohort is identical to join in the SELECT expression;
+                    # the date-filter removal is already handled via effective_where.
+                    aggr_clauses.append(
+                        f"STRING_AGG(DISTINCT CAST({col} AS VARCHAR), ', '"
+                        f" ORDER BY CAST({col} AS VARCHAR)) AS {alias}"
+                    )
+                elif agg_func == "nunique":
+                    aggr_clauses.append(f"COUNT(DISTINCT {col}) AS {alias}")
+                elif agg_func in ("first", "any"):
+                    aggr_clauses.append(f"ANY_VALUE({col}) AS {alias}")
+                elif agg_func == "last":
+                    aggr_clauses.append(f"MAX({col}) AS {alias}")
+                else:
+                    aggr_clauses.append(f"{agg_func.upper()}({col}) AS {alias}")
+
+            # SELECT: unique_col + non-aggregated cols + aggregate expressions
+            # GROUP BY: unique_col + non-aggregated cols only (never the aggregated cols)
+            select_cols = [unique_col] + non_aggr_select + aggr_clauses
+            group_by    = ", ".join([unique_col] + non_aggr_cols)
+            query = (
+                f"SELECT {', '.join(select_cols)}"
+                f" FROM '{DATA_FILE_NAME_}'"
+                f" WHERE {effective_where}"
+                f" GROUP BY {group_by}"
+            )
+            
+        else:
+            query = (
+                f"SELECT DISTINCT {unique_col}, {', '.join(renamed_cols)}"
+                f" FROM '{DATA_FILE_NAME_}'"
+                f" WHERE {where_clause}"
+            )
+        print(f"Query number {i}",query)
+        queries.append(query)
+
+    # Join all subquery results on unique_col using configured merge_methods
+    merge_methods_list = list(merge_methods or [])
+
+    if not queries:
+        final_df = pd.DataFrame()
+    elif len(queries) == 1:
+        final_df = DataStorage.query_duckdb(queries[0])
+    else:
+        # Build a single SQL expression: each subquery joined to the first
+        join_type_map = {"inner": "JOIN", "left": "LEFT JOIN",
+                         "right": "RIGHT JOIN", "outer": "FULL OUTER JOIN"}
+        base  = f"({queries[0]}) t1"
+        joins = []
+        for idx, q in enumerate(queries[1:], start=2):
+            raw_how  = (merge_methods_list[idx - 2]
+                        if (idx - 2) < len(merge_methods_list) else "inner")
+            sql_join = join_type_map.get(raw_how.lower(), "JOIN")
+            joins.append(
+                f"{sql_join} ({q}) t{idx}"
+                f" ON t1.{unique_col} = t{idx}.{unique_col}"
+            )
+        final_query = f"SELECT * FROM {base} {' '.join(joins)}"
+        # print(final_query)
+        final_df    = DataStorage.query_duckdb(final_query)
+
+    # Apply top-level rename (e.g. given_name → First Name)
+    if rename and not final_df.empty:
+        final_df = final_df.rename(columns={
+            k: v for k, v in rename.items() if k in final_df.columns
+        })
+
+    # Apply column ordering — use only cols that actually exist after rename
+    if cols_order and isinstance(cols_order, list) and not final_df.empty:
+        ordered  = [c for c in cols_order if c in final_df.columns]
+        final_df = final_df[ordered]
+
+    if not final_df.empty:
         final_df = final_df.sort_values(by=final_df.columns[0])
-    
+
+    # Mask personal name columns for unauthorised users
+    if mask_names and not final_df.empty:
+        for name_col in (FIRST_NAME_, LAST_NAME_):
+            if name_col in final_df.columns:
+                final_df[name_col] = "****"
+
+    final_df = final_df.fillna("") if not final_df.empty else final_df
     table = html.Div([
-        html.H3(title, style={"textAlign": "center"}),
-        html.P(message, style={"textAlign": "center", "color": "red"}) if message else None,
+        html.H3(title, style={"textAlign": "center", "color": THEME["table_header"],
+                               "fontFamily": "Arial, sans-serif"}),
+        (html.P(message, style={"textAlign": "center", "color": "red"})
+         if message else None),
         dash_table.DataTable(
             id="linelist-table",
             columns=[{"name": col, "id": col} for col in final_df.columns],
-            data=final_df.to_dict('records'),
-            merge_duplicate_headers=False,
+            data=final_df.to_dict("records"),
+            sort_action="native",
+            filter_action="native",
+            page_size=10,
+            page_action="native",
             style_header={
-                "backgroundColor": "rgb(70,70,70)",
-                "color": "white",
-                "fontWeight": "bold",
-                "textAlign": "left",
-                "fontSize": "13px",
+                "backgroundColor": THEME["table_header"],
+                "color":           THEME["table_header_text"],
+                "fontWeight":      "bold",
+                "textAlign":       "left",
+                "fontSize":        "13px",
+                "borderBottom":    "2px solid #004a01",
             },
             style_cell={
-                "padding": "6px",
-                "textAlign": "left",
-                "fontSize": "12px",
+                "padding":    "8px 10px",
+                "textAlign":  "left",
+                "fontSize":   "12px",
                 "whiteSpace": "normal",
-                "height": "auto",
+                "height":     "auto",
+                "border":     "1px solid #dee2e6",
             },
-            style_table={"overflowX": "scroll"},
-            page_size=20,
-        )
+            style_data_conditional=[
+                {"if": {"row_index": "odd"},
+                 "backgroundColor": THEME["table_row_alt"]},
+                {"if": {"state": "active"},
+                 "backgroundColor": THEME["table_active_bg"],
+                 "border": "1px solid " + THEME["table_active_border"]},
+            ],
+            style_table={
+                "overflowX":    "auto",
+                "borderRadius": "8px",
+                "border":       "1px solid " + THEME["table_active_border"],
+                "boxShadow":    "0 1px 4px rgba(0,100,1,0.10)",
+            },
+        ),
     ])
-    
+
     return table
+
 
 def create_sankey_diagram(df, source_col, target_col, value_col, title,
                           unique_column=PERSON_ID_, filter_col1=None, filter_value1=None,

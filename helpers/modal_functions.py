@@ -230,7 +230,7 @@ def upload_dashboard_json(contents):
 
     return "Upload successful!"
 
-# Program Reports Upload and Dry Run
+# Clinical Reports Upload and Dry Run
 def validate_prog_reports_json(contents):
     """
     Validates that the uploaded JSON file:

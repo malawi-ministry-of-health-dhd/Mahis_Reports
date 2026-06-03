@@ -38,7 +38,7 @@ def _build_nav(pathname_prefix, query, last_updated, show_admin):
     items = [
         html.Li(html.A("Dashboard", href=f"{pathname_prefix}home{query}", className="nav-link")),
         html.Li(html.A("HMIS DataSet Reports", href=f"{pathname_prefix}hmis_reports{query}", className="nav-link")),
-        html.Li(html.A("Program Reports", href=f"{pathname_prefix}program_reports{query}", className="nav-link")),
+        html.Li(html.A("Clinical Reports", href=f"{pathname_prefix}program_reports{query}", className="nav-link")),
     ]
 
     if show_admin:
