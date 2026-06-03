@@ -79,14 +79,15 @@ SSH_CONFIG = {
 
 # on production remove COLLATE utf8mb3_general_ci
 # multijoin query to get all obs for each encounter, including those without obs (using LEFT JOIN)
-actual_keys_in_data = ['person_id', 'encounter_id',  
-                                       'Gender', 'Age', 'Age_Group', 
-                                       'Date', 'Program', 'Facility', 
-                                       'Facility_CODE', 'User', 'District', 
-                                       'Encounter', 'Home_district', 'TA', 
-                                       'Village', 'visit_days', 'obs_value_coded','concept_name', 'Value',"",
-                                       'ValueN', 'DrugName', 'Value_name', 'new_revisit','count','count_set','sum','Order_Name',
-                                       'person_id_key','value_datetime','months','Service_Area']
+actual_keys_in_data = ['person_id', 'visit_id', 'date_started', 'date_stopped', 'identifier', 
+                       'patient_identifier_type', 'given_name', 'family_name', 'Gender', 'birthdate', 
+                       'AgeDays', 'Age', 'Age_Group', 'person_attribute_name', 'person_attribute_type', 
+                       'Home_district', 'TA', 'Village', 'encounter_id', 'Encounter', 'Date', 
+                       'location_id', 'creator', 'provider_id', 'Program', 'concept_name', 'obs_datetime', 
+                       'obs_group_id', 'accession_number', 'value_group_id', 'value_boolean', 'obs_value_coded', 
+                       'value_coded_name_id', 'DrugName', 'value_datetime', 'ValueN', 'Value', 'Order_Type', 'Order_Name', 
+                       'Source_Program', 'Reporting_Program', 'Service_Area', 'new_revisit', 'DrugUnits', 'User', 'Facility_CODE', 
+                       'Facility', 'District', 'month_key']
 
 # ['Gender','Program','Encounter','obs_value_coded','concept_name', 'Value','ValueN', 'DrugName', 'Value_name']
 CONCEPTS = """
