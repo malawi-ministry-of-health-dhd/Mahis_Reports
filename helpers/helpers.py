@@ -17,7 +17,7 @@ from helpers.visualizations import (create_column_chart,
 from datetime import datetime
 from config import (actual_keys_in_data, 
                     FIRST_NAME_, LAST_NAME_,
-                    DATA_FILE_NAME_, 
+                    DATA_PATH_, 
                     DATE_, PERSON_ID_, ENCOUNTER_ID_,
                     FACILITY_, AGE_GROUP_, AGE_,
                     GENDER_, ENCOUNTER_, PROGRAM_,
@@ -33,7 +33,7 @@ from config import (actual_keys_in_data,
                     DRUG_NAME_,
                     VALUE_NAME_, VALUE_DATETIME_)
 
-def build_metrics_section(filtered,filtered_data_range,delta_days, counts_config, url_object=None):
+def build_metrics_section(filtered,filtered_data_range,delta_days, data_path, counts_config, url_object=None):
     """Build metric cards from counts configuration"""
     metrics = []
     for count_config in counts_config:
@@ -50,10 +50,10 @@ def build_metrics_section(filtered,filtered_data_range,delta_days, counts_config
                         'alignItems': 'flex-start', 'gap': '6px'}, children=[
             html.Div([
                 html.Div(count_config["name"], className='kpi-lbl'),
-                html.Div(create_count_from_config(filtered, count_config["filters"]), className='kpi-val'),
+                html.Div(create_count_from_config(filtered,data_path, count_config["filters"]), className='kpi-val'),
                 html.Div(html.A(count_config.get("href_name") or "", href=href),className='kpi-sub'),
             ]),
-            html.Div(f"(Avg: {int(create_count_from_config(filtered_data_range, count_config['filters'])/delta_days)})",style={"marginTop":"15px","fontFamily": "Arial", "fontSize": "12px","fontWeight": "bold","color":"#15803D", "display": display}),
+            html.Div(f"(Avg: {int(create_count_from_config(filtered_data_range,data_path, count_config['filters'])/delta_days)})",style={"marginTop":"15px","fontFamily": "Arial", "fontSize": "12px","fontWeight": "bold","color":"#15803D", "display": display}),
         ]),
         html.Div()])
         metrics.append(metric) 
@@ -75,7 +75,7 @@ def parse_filter_value(filter_val):
                 return filter_val
         return filter_val
 
-def create_count_from_config(df, filters): 
+def create_count_from_config(df,data_path, filters): 
     """Create count based on JSON filter configuration"""
 
     unique_col = filters.get("unique", "")
@@ -113,7 +113,7 @@ def create_count_from_config(df, filters):
         if var and val:
             active_filters.append((var, val))
     if not active_filters:
-        return create_count(df,aggregation, unique_col)
+        return create_count(df,data_path,aggregation, unique_col)
     # if active_filters[0][0] != filters.get("variable1"):
     #     return create_count(df, unique_col)  # failsafe
     args = []
@@ -121,11 +121,11 @@ def create_count_from_config(df, filters):
         args.extend([var, val])
     args.extend([filters.get("start_date"), filters.get("end_date")])
     if aggregation == "count_set":
-        return create_count_sets(df,aggregation, unique_col, *args)
+        return create_count_sets(df,data_path,aggregation, unique_col, *args)
     else:
-        return create_count(df,aggregation, unique_col, *args)
+        return create_count(df,data_path,aggregation, unique_col, *args)
 
-def build_charts_section(filtered, data_opd, delta_days, sections_config):
+def build_charts_section(filtered, data_opd, delta_days, data_path, sections_config):
     """Build chart sections from JSON configuration"""
     sections = []
 
@@ -134,13 +134,13 @@ def build_charts_section(filtered, data_opd, delta_days, sections_config):
         chart_items_per_row = section_config.get('chart_items_per_row') or 3 #default number of charts per section
         section = html.Div([
             html.H3(section_config["section_name"].upper(), style={'textAlign': 'left', 'color': 'grey'}),
-            build_section_items(filtered, data_opd, delta_days, section_config["items"], chart_items_per_row)
+            build_section_items(filtered, data_opd, delta_days,data_path, section_config["items"], chart_items_per_row)
         ])
         sections.append(section)
     
     return html.Div(sections)
 
-def build_section_items(filtered, data_opd, delta_days, items_config, chart_items_per_row):
+def build_section_items(filtered, data_opd, delta_days,data_path, items_config, chart_items_per_row):
     """Build individual chart items within a section"""
     items = []
     # Group items into pairs for card-container-2
@@ -150,7 +150,7 @@ def build_section_items(filtered, data_opd, delta_days, items_config, chart_item
             style={"display": "grid","gridTemplateColumns": f"repeat({chart_items_per_row}, 1fr)",
                         "gap": "15px", "marginBottom": "30px","overflowX": "auto"},
             children=[
-                build_single_chart(filtered, data_opd, delta_days, item_config)
+                build_single_chart(filtered, data_opd, delta_days,data_path, item_config)
                 for item_config in pair_items
             ]
         )
@@ -158,31 +158,31 @@ def build_section_items(filtered, data_opd, delta_days, items_config, chart_item
     
     return html.Div(items)
 
-def build_single_chart(filtered, data_opd, delta_days, item_config,user_role=None, style = "card-2", theme_name=None):
+def build_single_chart(filtered, data_opd, delta_days,data_path, item_config,user_role=None, style = "card-2", theme_name=None):
     """Build a single chart based on configuration"""
     chart_type = item_config["type"]
     filters = item_config["filters"]
     
     if chart_type == "Line":
-        figure = create_line_chart_from_config(data_opd, delta_days, filters)
+        figure = create_line_chart_from_config(data_opd,data_path, delta_days, filters)
     elif chart_type == "Pie":
-        figure = create_pie_chart_from_config(filtered, filters)
+        figure = create_pie_chart_from_config(filtered,data_path, filters)
     elif chart_type == "Column":
-        figure = create_column_chart_from_config(filtered, filters)
+        figure = create_column_chart_from_config(filtered,data_path, filters)
     elif chart_type == "Bar":
-        figure = create_bar_chart_from_config(filtered, filters)
+        figure = create_bar_chart_from_config(filtered,data_path, filters)
     elif chart_type == "Histogram":
-        figure = create_histogram_from_config(filtered, filters)
+        figure = create_histogram_from_config(filtered,data_path, filters)
     elif chart_type == "PivotTable":
-        figure = create_pivot_table_from_config(filtered, filters)
+        figure = create_pivot_table_from_config(filtered,data_path, filters)
     elif chart_type == "CrossTab":
-        figure = create_crosstab_from_config(filtered, filters)
+        figure = create_crosstab_from_config(filtered,data_path, filters)
     elif chart_type == "LineList":
-        figure = create_linelist_from_config(filtered, item_config, user_role)
+        figure = create_linelist_from_config(filtered,data_path, item_config, user_role)
     elif chart_type == "Sankey":
-        figure = create_sankey_from_config(filtered, filters)
+        figure = create_sankey_from_config(filtered,data_path, filters)
     elif chart_type == "NewReturningSplit":
-        figure = create_new_returning_from_config(filtered, filters)
+        figure = create_new_returning_from_config(filtered,data_path, filters)
     else:
         # Default empty figure for unknown chart types
         figure = create_empty_figure()
@@ -269,7 +269,7 @@ def apply_figure_theme(figure, chart_type, theme_name=None):
     return figure
 
 
-def create_line_chart_from_config(data_opd, delta_days, filters):
+def create_line_chart_from_config(data_opd,data_path, delta_days, filters):
     """
     Create line chart from JSON configuration
     Configs
@@ -311,13 +311,13 @@ def create_line_chart_from_config(data_opd, delta_days, filters):
     aggregation   = filters.get('measure') or 'count'
     custom_fields = filters.get('custom_fields') or None
 
-    return create_time_line_chart(data_opd, date_col, y_col, 
+    return create_time_line_chart(data_opd,data_path, date_col, y_col, 
                              title, x_title, y_title, unique_column, 
                              legend_title, color, filter_col1, 
                              filter_val1, filter_col2, filter_val2, 
                              filter_col3, filter_val3,aggregation, custom_fields)
 
-def create_pie_chart_from_config(filtered, filters):
+def create_pie_chart_from_config(filtered,data_path, filters):
     """
     Create pie chart from JSON configuration
     Configs:
@@ -355,12 +355,12 @@ def create_pie_chart_from_config(filtered, filters):
     aggregation   = filters.get('measure') or 'count'
     custom_fields = filters.get('custom_fields') or None
     
-    return create_pie_chart(filtered, names_col, values_col, title, 
+    return create_pie_chart(filtered,data_path, names_col, values_col, title, 
                             unique_column, filter_col1, filter_val1, 
                             filter_col2, filter_val2, filter_col3, 
                             filter_val3, colormap, aggregation, custom_fields)
 
-def create_column_chart_from_config(filtered, filters):
+def create_column_chart_from_config(filtered,data_path, filters):
     """
     Create column chart from JSON configuration
     Config:
@@ -400,12 +400,12 @@ def create_column_chart_from_config(filtered, filters):
     aggregation   = filters.get('measure') or 'count'
     custom_fields = filters.get('custom_fields') or None
 
-    return create_column_chart(filtered, x_col, y_col, title, x_title, y_title, 
+    return create_column_chart(filtered,data_path, x_col, y_col, title, x_title, y_title, 
                                unique_column, legend_title, color, filter_col1, 
                                filter_val1, filter_col2, filter_val2, filter_col3, 
                                filter_val3, aggregation, custom_fields)
 
-def create_bar_chart_from_config(filtered, filters):
+def create_bar_chart_from_config(filtered,data_path, filters):
     """
     Create column chart from JSON configuration
     Config: 
@@ -441,12 +441,12 @@ def create_bar_chart_from_config(filtered, filters):
     custom_fields = filters.get('custom_fields') or None
 
     return create_horizontal_bar_chart(
-        filtered, label_col, value_col, title, x_title, y_title, top_n,
+        filtered,data_path, label_col, value_col, title, x_title, y_title, top_n,
         filter_col1, filter_val1, filter_col2, filter_val2, 
         filter_col3, filter_val3, aggregation,custom_fields
     )
 
-def create_histogram_from_config(filtered, filters):
+def create_histogram_from_config(filtered,data_path, filters):
     """
     Create column chart from JSON configuration
     Config: 
@@ -484,13 +484,12 @@ def create_histogram_from_config(filtered, filters):
     # print(f"my bin size {filtered}")
 
     return create_age_gender_histogram(
-        filtered, age_col, gender_col, title, x_title, y_title, bin_size,
+        filtered,data_path, age_col, gender_col, title, x_title, y_title, bin_size,
         filter_col1, filter_val1, filter_col2, filter_val2, filter_col3,
         filter_val3, aggregation, custom_fields
     )
 
-
-def create_new_returning_from_config(filtered, filters):
+def create_new_returning_from_config(filtered,data_path, filters):
     """
     Build a New-vs-Returning chart from config.
     Uses a CTE to check whether each person_id has any record
@@ -517,7 +516,7 @@ def create_new_returning_from_config(filtered, filters):
     custom_fields  = filters.get('custom_fields') or None
 
     return create_new_returning_chart(
-        filtered, title,
+        filtered,data_path, title,
         chart_mode=chart_mode,
         date_col=date_col,
         unique_column=unique_column,
@@ -528,7 +527,7 @@ def create_new_returning_from_config(filtered, filters):
     )
 
 
-def create_pivot_table_from_config(filtered, filters):
+def create_pivot_table_from_config(filtered,data_path, filters):
     """
     Create pivot table from JSON configuration
     Config:     "measure": "chart",
@@ -567,13 +566,13 @@ def create_pivot_table_from_config(filtered, filters):
     custom_fields = filters.get('custom_fields') or None
 
     return create_pivot_table(
-        filtered, index_col, columns, values_co, title, unique_column, aggfunc,
+        filtered,data_path, index_col, columns, values_co, title, unique_column, aggfunc,
         filter_col1, filter_val1, filter_col2, filter_val2, filter_col3, 
         filter_val3, aggregation, rename, replace, custom_fields
     )
 
 
-def create_crosstab_from_config(filtered, filters):
+def create_crosstab_from_config(filtered,data_path, filters):
     """
     Create crosstab table from JSON configuration.
 
@@ -627,6 +626,7 @@ def create_crosstab_from_config(filtered, filters):
 
     return create_crosstab_table(
         query_fiter=filtered,
+        data_path = data_path,
         index_col=index_col,
         columns_col=columns_col,
         title=title,
@@ -640,7 +640,7 @@ def create_crosstab_from_config(filtered, filters):
         rename=rename, replace=replace, custom_fields=custom_fields
     )
 
-def create_linelist_from_config(query_fiter, filters, user_role=None, **kwargs):
+def create_linelist_from_config(query_fiter,data_path, filters, user_role=None, **kwargs):
     """
     Convert JSON config into arguments for create_line_list().
     Accepts a SQL WHERE-clause string (query_fiter) instead of a DataFrame.
@@ -691,6 +691,7 @@ def create_linelist_from_config(query_fiter, filters, user_role=None, **kwargs):
 
     return create_line_list(
         query_fiter=query_fiter,
+        data_path = data_path,
         unique_col=unique_col,
         cols_order=cols_order,
         title=title,
@@ -702,7 +703,7 @@ def create_linelist_from_config(query_fiter, filters, user_role=None, **kwargs):
         **group_kwargs,
     )
 
-def create_sankey_from_config(filtered, filters):
+def create_sankey_from_config(filtered,data_path, filters):
     """
     Create sankey diagram from JSON configuration
     Config:
@@ -734,7 +735,7 @@ def create_sankey_from_config(filtered, filters):
     aggregation   = filters.get('measure') or 'count'
 
     return create_sankey_diagram(
-        filtered, source_col, target_col, value_col, title,
+        filtered,data_path, source_col, target_col, value_col, title,
         filter_col1, filter_val1, filter_col2, filter_val2, filter_col3, filter_val3, aggregation
     )
     

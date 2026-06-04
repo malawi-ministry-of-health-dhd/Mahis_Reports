@@ -17,7 +17,7 @@ from data_storage import DataStorage
 
 pd.options.mode.chained_assignment = None
 
-from config import PERSON_ID_, ENCOUNTER_ID_, DATE_, CONCEPT_NAME_,DATA_FILE_NAME_,FIRST_NAME_, LAST_NAME_
+from config import PERSON_ID_, ENCOUNTER_ID_, DATE_, CONCEPT_NAME_,DATA_PATH_,FIRST_NAME_, LAST_NAME_
 
 
 THEME = {
@@ -332,7 +332,7 @@ def _apply_filter_mask(df, filter_col, filter_value):
         return df[filter_col] == filter_value
     return df[filter_col] == filter_value
 
-def build_filter_query(cols, vals, unique_column, isSet, start_date, end_date, query_filter:str=None):
+def build_filter_query(cols, vals,data_path, unique_column, isSet, start_date, end_date, query_filter:str=None):
     """
     Build a SQL WHERE clause based on filter type.
     Supports single filters and paired list filters with AND conditions.
@@ -387,16 +387,16 @@ def build_filter_query(cols, vals, unique_column, isSet, start_date, end_date, q
             for col, val in zip(cols, vals)
         ]
         where_clause = " AND ".join(conditions)
-        return f"SELECT DISTINCT {unique_column} FROM '{DATA_FILE_NAME_}' WHERE {query_filter} AND {where_clause}"
+        return f"SELECT DISTINCT {unique_column} FROM '{data_path}' WHERE {query_filter} AND {where_clause}"
     where_clause = build_single_condition(cols, vals)
     if isinstance(unique_column, list):
         unique_column_str = ", ".join(unique_column)
     else:        unique_column_str = unique_column
     if isSet:
-        return f"SELECT DISTINCT {unique_column_str} FROM '{DATA_FILE_NAME_}' WHERE {query_filter} AND {where_clause}"
+        return f"SELECT DISTINCT {unique_column_str} FROM '{data_path}' WHERE {query_filter} AND {where_clause}"
     return f"{where_clause}"
 
-def create_count(query_fiter, aggregation='count', unique_column=PERSON_ID_, *filters, start_date=None, end_date=None):
+def create_count(query_fiter,data_path, aggregation='count', unique_column=PERSON_ID_, *filters, start_date=None, end_date=None):
 
     isSet = False
 
@@ -412,12 +412,12 @@ def create_count(query_fiter, aggregation='count', unique_column=PERSON_ID_, *fi
     queries = []
     for col, val in zip(filter_cols, filter_vals):
         col,val = _normalize_filter_value(col), _normalize_filter_value(val)
-        query = build_filter_query(col, val, unique_column, isSet, start_date, end_date)
+        query = build_filter_query(col, val,data_path, unique_column, isSet, start_date, end_date)
         queries.append(query)
 
-    joined_query =f"SELECT DISTINCT {unique_column} FROM '{DATA_FILE_NAME_}' WHERE {query_fiter} AND "  + " AND ".join(queries)
+    joined_query =f"SELECT DISTINCT {unique_column} FROM '{data_path}' WHERE {query_fiter} AND "  + " AND ".join(queries)
     if not queries:
-        joined_query = f"SELECT DISTINCT {unique_column} FROM '{DATA_FILE_NAME_}' WHERE {query_fiter}"
+        joined_query = f"SELECT DISTINCT {unique_column} FROM '{data_path}' WHERE {query_fiter}"
     if aggregation == "time_diff_mins":
         joined_query = (joined_query.replace(unique_column, 
                                             f"({unique_column}), DATEDIFF('minute', MIN({DATE_}), MAX({DATE_})) AS patient_session_minutes")
@@ -440,7 +440,7 @@ def create_count(query_fiter, aggregation='count', unique_column=PERSON_ID_, *fi
         return len(result[unique_column].dropna().unique())
 
 def create_count_sets(
-    query_fiter,aggregation='count',
+    query_fiter,data_path,aggregation='count',
     unique_column=PERSON_ID_,
     *filters,
     start_date=None,
@@ -476,19 +476,18 @@ def create_count_sets(
         for col, val in zip(cols, vals):
             cols_list.append(col)
             vals_list.append(val)
-        query = build_filter_query(cols_list, vals_list, unique_column, isSet, start_date, end_date, query_fiter)
+        query = build_filter_query(cols_list, vals_list,data_path, unique_column, isSet, start_date, end_date, query_fiter)
         queries.append(query)
 
     for cols, vals in non_set_filters:
-        query = build_filter_query(cols, vals, unique_column, isSet, start_date, end_date, query_fiter)
+        query = build_filter_query(cols, vals,data_path, unique_column, isSet, start_date, end_date, query_fiter)
         queries.append(query)
 
     intersection_query = " INTERSECT ".join(queries)
-    print(intersection_query)
     result = DataStorage.query_duckdb(intersection_query)
     return result[unique_column].nunique()
 
-def create_sum(query_fiter, unique_column=PERSON_ID_, num_field='ValueN', *filters, start_date=None, end_date=None):
+def create_sum(query_fiter,data_path, unique_column=PERSON_ID_, num_field='ValueN', *filters, start_date=None, end_date=None):
 
     isSet = False
 
@@ -502,16 +501,16 @@ def create_sum(query_fiter, unique_column=PERSON_ID_, num_field='ValueN', *filte
         filter_vals = []
     queries = []
     for col, val in zip(filter_cols, filter_vals):
-        query = build_filter_query(col, val, [unique_column,num_field], isSet, start_date, end_date)
+        query = build_filter_query(col, val,data_path, [unique_column,num_field], isSet, start_date, end_date)
         queries.append(query)
-    joined_query =f"SELECT {unique_column}, {num_field} FROM '{DATA_FILE_NAME_}' WHERE {query_fiter} AND "  + " AND ".join(queries)
+    joined_query =f"SELECT {unique_column}, {num_field} FROM '{data_path}' WHERE {query_fiter} AND "  + " AND ".join(queries)
     if not queries:
-        joined_query =f"SELECT {unique_column}, {num_field} FROM '{DATA_FILE_NAME_}' WHERE {query_fiter}"  
+        joined_query =f"SELECT {unique_column}, {num_field} FROM '{data_path}' WHERE {query_fiter}"  
     result = DataStorage.query_duckdb(joined_query)
     return result[num_field].sum()
 
 
-def create_column_chart(query_fiter, x_col, y_col, title, x_title, y_title,
+def create_column_chart(query_fiter,data_path, x_col, y_col, title, x_title, y_title,
                         unique_column=PERSON_ID_, legend_title=None,
                         color=None, filter_col1=None, filter_value1=None,
                         filter_col2=None, filter_value2=None,
@@ -543,7 +542,7 @@ def create_column_chart(query_fiter, x_col, y_col, title, x_title, y_title,
             if isinstance(col, list):
                 col = col[0]
             val = _normalize_filter_value(val)
-            conditions.append(build_filter_query(col, val, unique_column, isSet, None, None))
+            conditions.append(build_filter_query(col, val,data_path, unique_column, isSet, None, None))
  
     where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
  
@@ -567,7 +566,7 @@ def create_column_chart(query_fiter, x_col, y_col, title, x_title, y_title,
         # SELECT x_col, color, AGG(y_col) … GROUP BY x_col, color
         joined_query = (
             f"SELECT {x_col}, {color} as Color, {agg_expr} AS data_value"
-            f" FROM '{DATA_FILE_NAME_}'"
+            f" FROM '{data_path}'"
             f" WHERE {where_clause}"
             f" GROUP BY {x_col}, {color}"
         )
@@ -598,7 +597,7 @@ def create_column_chart(query_fiter, x_col, y_col, title, x_title, y_title,
         order_clause = "ORDER BY data_value DESC" if sort_by_value else ""
         joined_query = (
             f"SELECT {x_col}, {agg_expr} AS data_value"
-            f" FROM '{DATA_FILE_NAME_}'"
+            f" FROM '{data_path}'"
             f" WHERE {where_clause}"
             f" GROUP BY {x_col}"
             f" {order_clause}"
@@ -737,7 +736,7 @@ def create_column_chart(query_fiter, x_col, y_col, title, x_title, y_title,
     
     return fig
 
-def create_time_line_chart(query_fiter, date_col, y_col, title, x_title, 
+def create_time_line_chart(query_fiter,data_path, date_col, y_col, title, x_title, 
                       y_title, unique_column=PERSON_ID_, 
                       legend_title=None, color=None, filter_col1=None, 
                       filter_value1=None, filter_col2=None, 
@@ -774,7 +773,7 @@ def create_time_line_chart(query_fiter, date_col, y_col, title, x_title,
             if isinstance(col, list):
                 col = col[0]
             val = _normalize_filter_value(val)
-            conditions.append(build_filter_query(col, val, unique_column, isSet, None, None))
+            conditions.append(build_filter_query(col, val,data_path, unique_column, isSet, None, None))
  
     where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
  
@@ -807,7 +806,7 @@ def create_time_line_chart(query_fiter, date_col, y_col, title, x_title,
     if color:
         joined_query = (
             f"SELECT {date_expr} AS date_trunc, {color}, {agg_expr} AS metric_value"
-            f" FROM '{DATA_FILE_NAME_}'"
+            f" FROM '{data_path}'"
             f" WHERE {where_clause}"
             f" GROUP BY {date_expr}, {color}"
             f" ORDER BY date_trunc"
@@ -815,7 +814,7 @@ def create_time_line_chart(query_fiter, date_col, y_col, title, x_title,
     else:
         joined_query = (
             f"SELECT {date_expr} AS date_trunc, {agg_expr} AS metric_value"
-            f" FROM '{DATA_FILE_NAME_}'"
+            f" FROM '{data_path}'"
             f" WHERE {where_clause}"
             f" GROUP BY {date_expr}"
             f" ORDER BY date_trunc"
@@ -1061,7 +1060,7 @@ def create_time_line_chart(query_fiter, date_col, y_col, title, x_title,
 
 
 def create_new_returning_chart(
-    query_fiter,
+    query_fiter,data_path,
     title,
     chart_mode='pie',           # 'pie' | 'line'
     date_col=DATE_,
@@ -1097,7 +1096,7 @@ def create_new_returning_chart(
             if isinstance(col, list):
                 col = col[0]
             val = _normalize_filter_value(val)
-            conditions.append(build_filter_query(col, val, unique_column, isSet, None, None))
+            conditions.append(build_filter_query(col, val,data_path, unique_column, isSet, None, None))
 
     where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
 
@@ -1105,12 +1104,12 @@ def create_new_returning_chart(
     prior_cte = f"""
         WITH range_start AS (
             SELECT MIN({date_col}) AS min_date
-            FROM '{DATA_FILE_NAME_}'
+            FROM '{data_path}'
             WHERE {where_clause}
         ),
         prior_patients AS (
             SELECT DISTINCT {unique_column}
-            FROM '{DATA_FILE_NAME_}', range_start
+            FROM '{data_path}', range_start
             WHERE {date_col} < range_start.min_date
         )
     """
@@ -1122,7 +1121,7 @@ def create_new_returning_chart(
             CASE WHEN p.{unique_column} IS NOT NULL THEN 'Returning'
                  ELSE 'New' END                                               AS patient_type,
             COUNT(DISTINCT f.{unique_column})                                 AS metric_value
-        FROM '{DATA_FILE_NAME_}' f
+        FROM '{data_path}' f
         LEFT JOIN prior_patients p ON f.{unique_column} = p.{unique_column}
         WHERE {where_clause}
         GROUP BY date_trunc, patient_type
@@ -1160,7 +1159,7 @@ def create_new_returning_chart(
             CASE WHEN p.{unique_column} IS NOT NULL THEN 'Returning'
                  ELSE 'New' END                       AS patient_type,
             COUNT(DISTINCT f.{unique_column})          AS metric_value
-        FROM '{DATA_FILE_NAME_}' f
+        FROM '{data_path}' f
         LEFT JOIN prior_patients p ON f.{unique_column} = p.{unique_column}
         WHERE {where_clause}
         GROUP BY patient_type
@@ -1208,7 +1207,7 @@ def create_new_returning_chart(
     return fig
 
 
-def create_pie_chart(query_fiter, names_col, values_col, title,
+def create_pie_chart(query_fiter,data_path, names_col, values_col, title,
                      unique_column=PERSON_ID_, filter_col1=None,
                      filter_value1=None, filter_col2=None,
                      filter_value2=None, filter_col3=None,
@@ -1243,7 +1242,7 @@ def create_pie_chart(query_fiter, names_col, values_col, title,
             if isinstance(col, list):
                 col = col[0]
             val = _normalize_filter_value(val)
-            conditions.append(build_filter_query(col, val, unique_column, isSet, None, None))
+            conditions.append(build_filter_query(col, val,data_path, unique_column, isSet, None, None))
 
     where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
 
@@ -1265,7 +1264,7 @@ def create_pie_chart(query_fiter, names_col, values_col, title,
     order_clause = "ORDER BY data_value DESC" if sort_by_value else ""
     joined_query = (
         f"SELECT {names_col}, {agg_expr} AS data_value"
-        f" FROM '{DATA_FILE_NAME_}'"
+        f" FROM '{data_path}'"
         f" WHERE {where_clause}"
         f" GROUP BY {names_col}"
         f" HAVING data_value > 0"
@@ -1370,7 +1369,7 @@ def create_pie_chart(query_fiter, names_col, values_col, title,
 
     return fig
  
-def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, unique_column='PERSON_ID_', aggfunc='sum',
+def create_pivot_table(query_fiter,data_path, index_col, columns_col, values_col, title, unique_column='PERSON_ID_', aggfunc='sum',
                      filter_col1=None, filter_value1=None,
                      filter_col2=None, filter_value2=None,
                      filter_col3=None, filter_value3=None,
@@ -1394,7 +1393,7 @@ def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, u
             if isinstance(col, list):
                 col = col[0]
             val = _normalize_filter_value(val)
-            conditions.append(build_filter_query(col, val, unique_column, isSet, None, None))
+            conditions.append(build_filter_query(col, val,data_path, unique_column, isSet, None, None))
 
     where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
 
@@ -1420,7 +1419,7 @@ def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, u
 
     joined_query = (
         f"SELECT {group_sql}, {agg_expr} AS __value__"
-        f" FROM '{DATA_FILE_NAME_}'"
+        f" FROM '{data_path}'"
         f" WHERE {where_clause}"
         f" GROUP BY {group_sql}"
     )
@@ -1528,6 +1527,7 @@ def create_pivot_table(query_fiter, index_col, columns_col, values_col, title, u
  
 def create_crosstab_table(
     query_fiter,
+    data_path,
     index_col,
     columns_col,
     title,
@@ -1558,7 +1558,7 @@ def create_crosstab_table(
             if isinstance(col, list):
                 col = col[0]
             val = _normalize_filter_value(val)
-            conditions.append(build_filter_query(col, val, unique_column, isSet, None, None))
+            conditions.append(build_filter_query(col, val,data_path, unique_column, isSet, None, None))
 
     where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
 
@@ -1577,7 +1577,7 @@ def create_crosstab_table(
         )
         joined_query = (
             f"SELECT {group_sql}, {agg_expr} AS {values_col}"
-            f" FROM '{DATA_FILE_NAME_}'"
+            f" FROM '{data_path}'"
             f" WHERE {where_clause}"
             f" GROUP BY {group_sql}"
         )
@@ -1590,7 +1590,7 @@ def create_crosstab_table(
         select_cols = ", ".join(dict.fromkeys(needed))
         joined_query = (
             f"SELECT {select_cols}"
-            f" FROM '{DATA_FILE_NAME_}'"
+            f" FROM '{data_path}'"
             f" WHERE {where_clause}"
         )
         data = DataStorage.query_duckdb(joined_query)
@@ -1733,7 +1733,7 @@ def create_crosstab_table(
     return table
  
 def create_age_gender_histogram(
-    query_fiter, age_col, gender_col, title, xtitle, ytitle, bin_size,
+    query_fiter,data_path, age_col, gender_col, title, xtitle, ytitle, bin_size,
     filter_col1=None, filter_value1=None,
     filter_col2=None, filter_value2=None,
     filter_col3=None, filter_value3=None,
@@ -1762,7 +1762,7 @@ def create_age_gender_histogram(
             if isinstance(col, list):
                 col = col[0]
             val = _normalize_filter_value(val)
-            conditions.append(build_filter_query(col, val, PERSON_ID_, isSet, None, None))
+            conditions.append(build_filter_query(col, val,data_path, PERSON_ID_, isSet, None, None))
 
     where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
     null_guard   = f"{age_col} IS NOT NULL AND {gender_col} IS NOT NULL"
@@ -1771,7 +1771,7 @@ def create_age_gender_histogram(
         f"SELECT MIN(CAST({age_col} AS INTEGER)) AS min_age,"
         f"       MAX(CAST({age_col} AS INTEGER)) AS max_age"
         f" FROM ("
-        f"   SELECT {age_col} FROM '{DATA_FILE_NAME_}'"
+        f"   SELECT {age_col} FROM '{data_path}'"
         f"   WHERE {where_clause} AND {null_guard}"
         f"   QUALIFY ROW_NUMBER() OVER (PARTITION BY {PERSON_ID_} ORDER BY {age_col}) = 1"
         f" )"
@@ -1800,7 +1800,7 @@ def create_age_gender_histogram(
 
     joined_query = (
         f"SELECT {age_col}, {gender_col}"
-        f" FROM '{DATA_FILE_NAME_}'"
+        f" FROM '{data_path}'"
         f" WHERE {where_clause} AND {null_guard}"
         f" QUALIFY ROW_NUMBER() OVER (PARTITION BY {PERSON_ID_} ORDER BY {age_col}) = 1"
     )
@@ -1930,7 +1930,7 @@ def create_age_gender_histogram(
     return fig
  
 def create_horizontal_bar_chart(
-    query_fiter, label_col, value_col, title, x_title, y_title, top_n=10,
+    query_fiter,data_path, label_col, value_col, title, x_title, y_title, top_n=10,
     filter_col1=None, filter_value1=None,
     filter_col2=None, filter_value2=None,
     filter_col3=None, filter_value3=None,
@@ -1961,7 +1961,7 @@ def create_horizontal_bar_chart(
             if isinstance(col, list):
                 col = col[0]
             val = _normalize_filter_value(val)
-            conditions.append(build_filter_query(col, val, PERSON_ID_, isSet, None, None))
+            conditions.append(build_filter_query(col, val,data_path, PERSON_ID_, isSet, None, None))
 
     where_clause = query_fiter + ((" AND " + " AND ".join(conditions)) if conditions else "")
 
@@ -1982,7 +1982,7 @@ def create_horizontal_bar_chart(
 
     joined_query = (
         f"SELECT {label_col}, {agg_expr} AS data_value"
-        f" FROM '{DATA_FILE_NAME_}'"
+        f" FROM '{data_path}'"
         f" WHERE {where_clause}"
         f" GROUP BY {label_col}"
         f" HAVING data_value > 0"
@@ -2129,6 +2129,7 @@ AGG_MAP: Dict[str, Union[str, Callable]] = {
 
 def create_line_list(
         title: str,
+        data_path,
         query_fiter: str,
         unique_col: Union[str, List[str]] = PERSON_ID_,
         rename: Optional[dict] = None,
@@ -2180,7 +2181,7 @@ def create_line_list(
         where_clause = query_fiter
         if group_filters:
             for col, val in group_filters.items():
-                clause = build_filter_query(col, val, unique_col, False, None, None)
+                clause = build_filter_query(col, val,data_path, unique_col, False, None, None)
                 where_clause += f" AND {clause}"
 
         if group_aggr:
@@ -2227,7 +2228,7 @@ def create_line_list(
             group_by    = ", ".join([unique_col] + non_aggr_cols)
             query = (
                 f"SELECT {', '.join(select_cols)}"
-                f" FROM '{DATA_FILE_NAME_}'"
+                f" FROM '{data_path}'"
                 f" WHERE {effective_where}"
                 f" GROUP BY {group_by}"
             )
@@ -2235,10 +2236,9 @@ def create_line_list(
         else:
             query = (
                 f"SELECT DISTINCT {unique_col}, {', '.join(renamed_cols)}"
-                f" FROM '{DATA_FILE_NAME_}'"
+                f" FROM '{data_path}'"
                 f" WHERE {where_clause}"
             )
-        print(f"Query number {i}",query)
         queries.append(query)
 
     # Join all subquery results on unique_col using configured merge_methods

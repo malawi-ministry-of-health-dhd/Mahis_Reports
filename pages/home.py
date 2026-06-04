@@ -14,7 +14,7 @@ from dashboard_layouts import build_premium_dashboard
 from datetime import datetime
 from datetime import datetime as dt
 from data_storage import DataStorage
-from config import DATA_FILE_NAME_,CUSTOM_GENDER_MAP
+from config import DATA_PATH_,CUSTOM_GENDER_MAP
 import warnings
 warnings.filterwarnings("ignore")
 from helpers.date_ranges import (
@@ -27,7 +27,7 @@ from helpers.navigation_callbacks import DEMO_UUID, DEMO_LOCATION
 
 # importing referential columns from config
 from config import (actual_keys_in_data, 
-                    DATA_FILE_NAME_, 
+                    DATA_PATH_, 
                     DATE_, PERSON_ID_, ENCOUNTER_ID_,
                     FACILITY_,DISTRICT_, AGE_GROUP_, AGE_,
                     GENDER_, ENCOUNTER_, PROGRAM_,
@@ -64,7 +64,7 @@ def _default_date_window():
 
 def _dataset_version_token() -> str:
     timestamp_path = os.path.join(path, 'data', 'TimeStamp.csv')
-    data_path = os.path.join(path, 'data', DATA_FILE_NAME_)
+    data_path = os.path.join(path, 'data', DATA_PATH_)
     parts = []
     try:
         parts.append(str(os.path.getmtime(data_path)))
@@ -85,8 +85,8 @@ def clear_dashboard_state_cache() -> None:
         pass
 
 
-def _load_user_registry() -> pd.DataFrame:
-    user_data_path = os.path.join(path, 'data','single_tables', 'users_data.csv')
+def _load_user_registry(route) -> pd.DataFrame:
+    user_data_path = os.path.join(path, f'data/{route}','single_tables', 'users_data.csv')
 
     if os.path.exists(user_data_path):
         user_data = pd.read_csv(user_data_path)
@@ -227,18 +227,13 @@ min_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 max_date = datetime.now().replace(hour=23, minute=59, second=59, microsecond=0)
 
 path = os.getcwd()
-try:
-    last_refreshed = pd.read_csv(f'{path}/data/TimeStamp.csv')['saving_time'].to_list()[0]
-except Exception as e:
-    last_refreshed = "Unknown"
-
 
 # BUILD CHARTS
 PREMIUM_DASHBOARD_REPORTS = {"Maternal and Child Health"}
 
 
 def build_charts_from_json(filtered_query, filtered_with_range_query, delta_days, dashboards_json, filter_summary=None,
-                          start_date=None, end_date=None, facility_code=None, scope_meta=None, url_object=None):
+                          start_date=None, end_date=None, data_path=DATA_PATH_, facility_code=None, scope_meta=None, url_object=None):
     config = dashboards_json
     count_items_per_row = config.get("count_items_per_row") or 5
 
@@ -259,8 +254,8 @@ def build_charts_from_json(filtered_query, filtered_with_range_query, delta_days
         return build_premium_dashboard(filtered_query, filtered_with_range_query, delta_days, config, filter_summary=filter_summary)
 
     # Build metrics from counts section
-    metrics = build_metrics_section(filtered_query,filtered_with_range_query, delta_days, config["visualization_types"]["counts"], url_object)
-    charts = build_charts_section(filtered_query, filtered_with_range_query, delta_days, config["visualization_types"]["charts"]["sections"])
+    metrics = build_metrics_section(filtered_query,filtered_with_range_query, delta_days, data_path, config["visualization_types"]["counts"], url_object)
+    charts = build_charts_section(filtered_query, filtered_with_range_query, delta_days, data_path, config["visualization_types"]["charts"]["sections"])
 
     return html.Div([
         html.Div(style={"display": "grid","gridTemplateColumns": f"repeat({count_items_per_row}, 1fr)",
@@ -609,12 +604,13 @@ def update_dashboard(gen, interval, start_date, end_date, level,
         ctx = callback_context
         triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else None
 
-        if not urlparams:
-            urlparams = {"Location": [DEMO_LOCATION], "uuid": [DEMO_UUID]}
-        if not urlparams.get("Location"):
-            urlparams["Location"] = [DEMO_LOCATION]
-        if not urlparams.get("uuid"):
-            urlparams["uuid"] = [DEMO_UUID]
+        # if not urlparams:
+        #     urlparams = {"Location": [DEMO_LOCATION], "uuid": [DEMO_UUID]}
+        # if not urlparams.get("Location"):
+        #     urlparams["Location"] = [DEMO_LOCATION]
+        # if not urlparams.get("uuid"):
+        #     urlparams["uuid"] = [DEMO_UUID]
+        
 
 
         # Determine which report to show
@@ -629,13 +625,13 @@ def update_dashboard(gen, interval, start_date, end_date, level,
         end_dt = pd.to_datetime(end_date or default_end).replace(hour=23, minute=59, second=59)
         default_start_date = start_dt - pd.Timedelta(days=DEFAULT_DASHBOARD_DAYS)
 
-        if urlparams.get('Location', [None])[0]:
-            location = urlparams.get('Location', [None])[0]
-        else:
-            location = DEMO_LOCATION
+        location = urlparams.get('Location', [None])[0]
+        data_route = urlparams.get('route', ["default"])[0]
+        DATA_PATH_ = f"data/{data_route}/parquet"
+
         mnid_location = urlparams.get('Location', [None])[0] if urlparams.get('Location') else None
 
-        user_data = _load_user_registry()
+        user_data = _load_user_registry(data_route)
         user_row, scope = _resolve_user_scope(urlparams, user_data)
 
         if user_row is None:
@@ -668,7 +664,7 @@ def update_dashboard(gen, interval, start_date, end_date, level,
             districts = []
 
         # locations
-        facilities_path = os.path.join(path, 'data', 'dcc_dropdown_json', 'facilities_dropdowns.json')
+        facilities_path = os.path.join(path, f'data/{data_route}', 'dcc_dropdown_json', 'facilities_dropdowns.json')
         with open(facilities_path, 'r') as f:
             facilities_dict = json.load(f)
         if requested_level == "national":
@@ -737,13 +733,13 @@ def update_dashboard(gen, interval, start_date, end_date, level,
                 if user_level == 'facility':
                     SQL = f"""
                         {sql_comment}
-                        SELECT * FROM '{DATA_FILE_NAME_}' WHERE Date >= TIMESTAMP '{default_start_date}' AND Date <= TIMESTAMP '{end_dt}'
+                        SELECT * FROM '{DATA_PATH_}' WHERE Date >= TIMESTAMP '{default_start_date}' AND Date <= TIMESTAMP '{end_dt}'
                         AND {FACILITY_CODE_} = '{location}'
                         """
                 else:
                     SQL = f"""
                         {sql_comment}
-                        SELECT * FROM '{DATA_FILE_NAME_}' WHERE Date >= TIMESTAMP '{default_start_date}'
+                        SELECT * FROM '{DATA_PATH_}' WHERE Date >= TIMESTAMP '{default_start_date}'
                         AND Date <= TIMESTAMP '{end_dt}'
                         """
                 try:
@@ -905,7 +901,7 @@ def update_dashboard(gen, interval, start_date, end_date, level,
                         'Home_district', 'TA', 'Village', 'Age', 'Age_Group', 'Gender',
                         'Source_Program',
                     ])
-                    _sql_full = f"SELECT {_mnid_cols} FROM '{DATA_FILE_NAME_}'"
+                    _sql_full = f"SELECT {_mnid_cols} FROM '{DATA_PATH_}'"
                     _full = DataStorage.query_duckdb(_sql_full)
                     _full[DATE_] = pd.to_datetime(_full[DATE_], errors='coerce')
                     _full = _apply_scope_to_data(_full, scope, district_col)
@@ -959,6 +955,7 @@ def update_dashboard(gen, interval, start_date, end_date, level,
                         filtered_data_date, _ndata, delta_days, dashboard_json,
                         start_date=adj_start_dt,
                         end_date=adj_end_dt,
+                        data_path=DATA_PATH_,
                         facility_code=facility_code_display,
                         scope_meta={
                             'label': scope_label,
@@ -995,6 +992,7 @@ def update_dashboard(gen, interval, start_date, end_date, level,
                     filtered_dates, filtered_with_range, 7, dashboard_json,
                     start_date,
                     end_date,
+                    data_path=DATA_PATH_,
                     facility_code=location,
                     scope_meta={
                         'label': "",

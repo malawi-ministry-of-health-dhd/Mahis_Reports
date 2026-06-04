@@ -76,11 +76,12 @@ def register_navigation_callbacks(app, pathname_prefix):
             location = url_params.get("Location", [None])[0]
             uuid = url_params.get("uuid", [None])[0]
             user_level = url_params.get("user_level", [None])[0]
+            data_route = url_params.get("route", ["default"])[0] if url_params else None
 
             path = os.getcwd()
-            timestamp_path = os.path.join(path, "data", "TimeStamp.csv")
+            timestamp_path = os.path.join(path, f"data/{data_route}", "TimeStamp.csv")
             os.makedirs(os.path.dirname(timestamp_path), exist_ok=True)
-            users_path = os.path.join(path, "data", "single_tables", "users_data.csv")
+            users_path = os.path.join(path, f"data/{data_route}", "single_tables", "users_data.csv")
             os.makedirs(os.path.dirname(users_path), exist_ok=True)
             last_updated = pd.read_csv(timestamp_path)["saving_time"].to_list()[0]
             users = pd.read_csv(users_path)
@@ -128,12 +129,13 @@ def register_navigation_callbacks(app, pathname_prefix):
         location = url_params.get("Location", [None])[0] if url_params else None
         uuid = url_params.get("uuid", [None])[0] if url_params else None
         user_level = url_params.get("user_level", [None])[0] if url_params else None
+        data_route = url_params.get("route", ["default"])[0] if url_params else None
 
         query = _build_query(location, uuid, user_level)
 
         try:
             path = os.getcwd()
-            timestamp_path = os.path.join(path, "data", "TimeStamp.csv")
+            timestamp_path = os.path.join(path, f"data/{data_route}", "TimeStamp.csv")
             last_updated = pd.read_csv(timestamp_path)["saving_time"].to_list()[0]
             status = f"Last updated on: {last_updated}"
         except Exception as exc:

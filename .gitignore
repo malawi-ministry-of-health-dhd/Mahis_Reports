@@ -35,3 +35,8 @@ data/single_tables
 venv
 data/parquet
 data/dcc_dropdown_json
+data/default
+data/mahistest
+data/mahisdev
+data/mahisuat
+data/mahisprod

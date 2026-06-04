@@ -14,7 +14,7 @@ from data_storage import DataStorage
 import warnings
 warnings.filterwarnings("ignore")
 from config import (actual_keys_in_data, 
-                    DATA_FILE_NAME_, 
+                    DATA_PATH_, 
                     DATE_, PERSON_ID_, ENCOUNTER_ID_,
                     FACILITY_, AGE_GROUP_, AGE_,
                     GENDER_, ENCOUNTER_, PROGRAM_,
@@ -41,7 +41,7 @@ from dash import html, dcc
 
 path = os.getcwd()
 path_program_reports = os.path.join(path, 'data','visualizations','validated_prog_reports.json')
-dropdowns_json_path = os.path.join(path, 'data', 'dcc_dropdown_json', 'dropdowns.json') 
+dropdowns_json_path = os.path.join(path, 'data/default', 'dcc_dropdown_json', 'dropdowns.json') 
 
 
 report_config_panel = html.Div(
@@ -206,13 +206,13 @@ report_config_panel = html.Div(
     style={"marginTop": "0px"}
 )
 
-def programs_report(filtered_query, programs_report_list, user_role):
+def programs_report(filtered_query,data_route, programs_report_list, user_role):
     """Render a single program report chart from a SQL WHERE-clause string."""
     if not programs_report_list:
         return html.Div('')
     json_data = programs_report_list[0]
     return html.Div(
-        build_single_chart(filtered_query, filtered_query, 10, json_data, user_role, style="")
+        build_single_chart(filtered_query, filtered_query, 10,data_route, json_data, user_role, style="")
     )
 
 
@@ -277,11 +277,15 @@ def update_filters(selected_program):
     ]
 )
 def generate_chart(n_clicks, urlparams, selected_report, pathname, report_name, start_date, end_date, hf):
-    user_data_path = os.path.join(path, 'data','single_tables', 'users_data.csv')
+    location = urlparams.get('Location', [None])[0]
+    data_route = urlparams.get('route', ["default"])[0]
+    DATA_PATH_ = f"data/{data_route}/parquet"
+
+    user_data_path = os.path.join(path, f'data/{data_route}','single_tables', 'users_data.csv')
     if not os.path.exists(user_data_path):
         user_data = pd.DataFrame(columns=['uuid', 'role'])
     else:
-        user_data = pd.read_csv(os.path.join(path, 'data','single_tables', 'users_data.csv'))
+        user_data = pd.read_csv(os.path.join(path, f'data/{data_route}','single_tables', 'users_data.csv'))
     test_admin = pd.DataFrame(columns=['uuid', 'role'], data=[[DEMO_UUID, 'reports_admin']])
     user_data = pd.concat([user_data, test_admin], ignore_index=True)
 
@@ -298,7 +302,6 @@ def generate_chart(n_clicks, urlparams, selected_report, pathname, report_name, 
         start_dt = pd.to_datetime(start_date).replace(hour=0, minute=0, second=0)
         end_dt   = pd.to_datetime(end_date).replace(hour=23, minute=59, second=59)
 
-        location = urlparams.get('Location', [None])[0]
         if not location:
             return html.Div("Missing Parameters"), no_update, no_update, 0
 
@@ -315,7 +318,7 @@ def generate_chart(n_clicks, urlparams, selected_report, pathname, report_name, 
         filtered_query = base_where
         try:
             fac_df   = DataStorage.query_duckdb(
-                f"SELECT DISTINCT {FACILITY_} FROM '{DATA_FILE_NAME_}'"
+                f"SELECT DISTINCT {FACILITY_} FROM '{DATA_PATH_}'"
                 f" WHERE {DATE_} BETWEEN '{start_dt}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP"
                 f" AND {FACILITY_CODE_} = '{location}'"
                 f" ORDER BY {FACILITY_}",
@@ -346,7 +349,7 @@ def generate_chart(n_clicks, urlparams, selected_report, pathname, report_name, 
         with open(path_program_reports) as x:
             config = json.load(x)
         report_cfg = [r for r in config.get("reports", []) if r.get("report_name") == report_name]
-        return programs_report(filtered_query, report_cfg, role), hf_options, prog_options, 0
+        return programs_report(filtered_query,DATA_PATH_, report_cfg, role), hf_options, prog_options, 0
 
     except Exception as e:
         traceback.print_exc()

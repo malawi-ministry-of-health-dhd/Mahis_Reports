@@ -10,16 +10,14 @@ from typing import Optional, Dict, Any, Generator
 import warnings
 warnings.filterwarnings("ignore")
 from config import (BATCH_SIZE, DB_CONFIG, SSH_CONFIG, USE_LOCALHOST,
-                    DB_CONFIG_LOCAL, START_DATE, 
-                    LOAD_FRESH_DATA, DATE_, GENDER_, 
-                    ENCOUNTER_ID_, DATA_FILE_NAME_)
+                    DB_CONFIG_LOCAL, START_DATE, LOAD_FRESH_DATA,DATA_PATH_)
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 if LOAD_FRESH_DATA:
     # drop file latest_data_opd.parquet if exists in data folder
-    file_path = os.path.join(os.getcwd(), DATA_FILE_NAME_)
+    file_path = os.path.join(os.getcwd(), DATA_PATH_)
     if os.path.exists(file_path):
         os.rename(file_path, f"{file_path}_backup")
         logger.info("Removed existing data file for fresh load.")
@@ -293,7 +291,7 @@ class DataFetcher:
         
         return batch_paths  # Return list of file paths only
     
-    def fetch_single_table(self, table_name: str, query: str, output_format: str = 'csv') -> pd.DataFrame:
+    def fetch_single_table(self, table_name: str, query: str,output_folder, output_format: str = 'csv') -> pd.DataFrame:
         """
         Fetch data from single table and save as CSV
         
@@ -329,8 +327,8 @@ class DataFetcher:
                 conn.close()
             
             # Save to file
-            output_path = os.path.join(self.path, self.single_tables_folder, f"{table_name}.{output_format}")
-            os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else '.', exist_ok=True)
+            output_path = os.path.join(output_folder, f"{table_name}.{output_format}")
+            # os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else '.', exist_ok=True)
             
             if output_format == 'csv':
                 df.to_csv(output_path, index=False)

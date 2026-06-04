@@ -6,7 +6,7 @@ import pandas as pd
 pd.options.mode.chained_assignment = None
 from flask import jsonify, request
 
-from config import DATA_FILE_NAME_, DATE_, FACILITY_CODE_, GENDER_
+from config import DATA_PATH_, DATE_, FACILITY_CODE_, GENDER_
 from data_storage import DataStorage
 from helpers.date_ranges import get_month_start_end, get_quarter_start_end, get_week_start_end
 from helpers.reports_class import ReportTableBuilder

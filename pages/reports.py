@@ -33,7 +33,7 @@ from data_storage import DataStorage
 
 from config import (DATE_, FACILITY_, AGE_GROUP_, GENDER_, PROGRAM_,PERSON_ID_,ENCOUNTER_ID_,
                     NEW_REVISIT_, HOME_DISTRICT_, TA_, VILLAGE_, CONCEPT_NAME_,VALUE_DATETIME_,
-                    FACILITY_CODE_, DATA_FILE_NAME_, actual_keys_in_data)
+                    FACILITY_CODE_, DATA_PATH_, actual_keys_in_data)
 from helpers.navigation_callbacks import DEMO_UUID
 
 
@@ -48,7 +48,7 @@ relative_biannual = RELATIVE_BIANNUAL
 relative_year = [str(year) for year in range(2024, 2051)]
 
 path = os.getcwd()
-dropdowns_json_path = os.path.join(path, 'data', 'dcc_dropdown_json', 'dropdowns.json')
+dropdowns_json_path = os.path.join(path, 'data/default', 'dcc_dropdown_json', 'dropdowns.json')
 with open(dropdowns_json_path) as x:
             dropdowns = json.load(x)
 prog_options = dropdowns['programs'] + ['General Reports']
@@ -330,17 +330,16 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, repo
     if not os.path.exists(spec_path):
         return html.Div("Report not found on Server. Request Admin to add report"), 0, None
     
-    if urlparams.get('Location', [None])[0]:
-        location = urlparams.get('Location', [None])[0]
-    else:
-        location = None
+    location = urlparams.get('Location', [None])[0]
+    data_route = urlparams.get('route', ["default"])[0]
+    DATA_PATH_ = f"data/{data_route}/parquet"
 
     # validate user
-    user_data_path = os.path.join(path, 'data','single_tables', 'users_data.csv')
+    user_data_path = os.path.join(path, f'data/{data_route}','single_tables', 'users_data.csv')
     if not os.path.exists(user_data_path):
         user_data = pd.DataFrame(columns=['uuid', 'role'])
     else:
-        user_data = pd.read_csv(os.path.join(path, 'data','single_tables', 'users_data.csv'))
+        user_data = pd.read_csv(os.path.join(path, f'data/{data_route}','single_tables', 'users_data.csv'))
     test_admin = pd.DataFrame(columns=['uuid', 'role'], data=[[DEMO_UUID, 'reports_admin']])
     user_data = pd.concat([user_data, test_admin], ignore_index=True)
     user_info = user_data[user_data['uuid'] == urlparams.get('uuid', [None])[0]]
@@ -356,7 +355,7 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, repo
     if report.get("page_name") in mnh_report_pages:
         sql = f"""
                 SELECT *
-                FROM '{DATA_FILE_NAME_}'
+                FROM '{DATA_PATH_}'
                 WHERE {FACILITY_CODE_} = '{location}'
             """
         data = DataStorage.query_duckdb(sql)
@@ -375,7 +374,7 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, repo
 
         dhis2_period = get_dhis2_period(start_date, period_type)
 
-        builder = ReportTableBuilder(spec_path,start_date,end_date,location, dhis2_period)
+        builder = ReportTableBuilder(spec_path,start_date,end_date,DATA_PATH_,location, dhis2_period)
         
         builder.load_spec()
         components = builder.build_dash_components()

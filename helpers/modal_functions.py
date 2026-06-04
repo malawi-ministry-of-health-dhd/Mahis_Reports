@@ -10,7 +10,7 @@ import io
 import uuid
 from data_storage import DataStorage
 from config import (actual_keys_in_data, 
-                    DATA_FILE_NAME_, 
+                    DATA_PATH_, 
                     DATE_, PERSON_ID_, ENCOUNTER_ID_,
                     FACILITY_, AGE_GROUP_, AGE_,
                     GENDER_, ENCOUNTER_, PROGRAM_,
@@ -27,7 +27,7 @@ from config import (actual_keys_in_data,
                     VALUE_NAME_)
 
 path = os.getcwd()
-path_dcc_json = os.path.join(path, 'data', 'dcc_dropdown_json','dropdowns.json')
+path_dcc_json = os.path.join(path, 'data/default', 'dcc_dropdown_json','dropdowns.json')
 with open(path_dcc_json) as r:
     dcc_json = json.load(r)
 

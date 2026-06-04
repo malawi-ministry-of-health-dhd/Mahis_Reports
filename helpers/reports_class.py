@@ -13,7 +13,7 @@ from config import (DATE_,CONCEPT_NAME_,
 
 
 class ReportTableBuilder:
-    def __init__(self, excel_path: str,report_start_date, report_end_date,location:str, dhis2_period: str):
+    def __init__(self, excel_path: str,report_start_date, report_end_date,data_route, location:str, dhis2_period: str):
         self.excel_path = excel_path
         self.dhis_url = f"{DHIS2_URL}/api/dataValueSets.json"
         self.vars_df: pd.DataFrame | None = None
@@ -28,6 +28,7 @@ class ReportTableBuilder:
         self.start_date = report_start_date
         self.end_date = report_end_date
         self.location = location
+        self.data_route = data_route
 
 
     def load_spec(self) -> None:
@@ -143,61 +144,61 @@ class ReportTableBuilder:
         original_dates = f"{DATE_} <= '{self.end_date}'::TIMESTAMP AND {FACILITY_CODE_} = '{self.location}' "
 
         if measure == "sum":
-            args = [filtered_dates, PERSON_ID_, spec["unique_column"]]
+            args = [filtered_dates,self.data_route, PERSON_ID_, spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
             result = create_sum(*args,self.start_date, self.end_date)
             
         elif measure == "cohort_sum":
-            args = [original_dates, PERSON_ID_, spec["unique_column"]]
+            args = [original_dates,self.data_route, PERSON_ID_, spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
             result = create_sum(*args,self.start_date, self.end_date)
 
         elif measure == "count_set":
-            args = [filtered_dates, "count", spec["unique_column"]]
+            args = [filtered_dates,self.data_route, "count", spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
             result = create_count_sets(*args,self.start_date, self.end_date)
         
         elif measure == "cohort_count_set":
-            args = [original_dates, "count", spec["unique_column"]]
+            args = [original_dates,self.data_route, "count", spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
             result = create_count_sets(*args,self.start_date, self.end_date)
 
         elif measure == "cohort_count_set_defaulter":
-            args = [original_dates, "count", spec["unique_column"]]
+            args = [original_dates,self.data_route, "count", spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
             result = create_count_sets(*args,self.start_date, self.end_date)
 
         elif measure == "count":
-            args = [filtered_dates, "count", spec["unique_column"]]
+            args = [filtered_dates,self.data_route, "count", spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
             result = create_count(*args,self.start_date, self.end_date)
         
         elif measure == "nunique":
-            args = [filtered_dates, "count", spec["unique_column"]]
+            args = [filtered_dates,self.data_route, "count", spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
             result = create_count(*args,self.start_date, self.end_date)
 
         elif measure == "cohort_count":
-            args = [original_dates, "count", spec["unique_column"]]
+            args = [original_dates,self.data_route, "count", spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
             result = create_count(*args,self.start_date, self.end_date)
 
         elif measure == "cohort_count_defaulter":
-            args = [original_dates, "count", spec["unique_column"]]
+            args = [original_dates,self.data_route, "count", spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
             result = create_count(*args,self.start_date, self.end_date)
 
         elif measure == "count_defaulter":
-            args = [filtered_dates, "count", spec["unique_column"]]
+            args = [filtered_dates,self.data_route, "count", spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
             result = create_count(*args,self.start_date, self.end_date)

@@ -1260,6 +1260,61 @@ def create_edit_modal():
         )
     ])
 
+_ds_config_path = os.path.join(path, 'configurations.json')
+_ssh_dir        = os.path.join(path, 'ssh')
+
+
+def _load_datasources():
+    try:
+        with open(_ds_config_path) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+
+def _save_datasources(data):
+    with open(_ds_config_path, 'w') as f:
+        json.dump(data, f, indent=2)
+
+
+def _list_ssh_keys():
+    """Return .pem/.cer/.key filenames from the project ssh/ directory."""
+    if not os.path.isdir(_ssh_dir):
+        return []
+    return sorted(
+        f for f in os.listdir(_ssh_dir)
+        if f.endswith(('.pem', '.cer', '.key'))
+    )
+
+
+def _build_ds_list(sources):
+    if not sources:
+        return html.Div("No data sources configured.",
+                        style={"padding": "16px", "color": "#9ca3af",
+                               "fontSize": "13px", "textAlign": "center"})
+    rows = []
+    for i, ds in enumerate(sources):
+        bg = "#f2f9f2" if i % 2 == 0 else "#ffffff"
+        rows.append(html.Div(
+            style={"display": "flex", "alignItems": "center",
+                   "padding": "10px 14px", "background": bg,
+                   "borderBottom": "1px solid #e5e7eb", "gap": "10px"},
+            children=[
+                html.Div(style={"flex": "1"}, children=[
+                    html.Div(ds.get("name", "Unnamed"),
+                             style={"fontWeight": "600", "fontSize": "13px",
+                                    "color": "#006401"}),
+                    html.Div(ds.get("date_updated", ""),
+                             style={"fontSize": "11px", "color": "#9ca3af"}),
+                ]),
+                html.Button("✏️", id={"type": "ds-edit-btn", "index": i},
+                            n_clicks=0, className="btn-secondary btn-small",
+                            title="Edit"),
+            ],
+        ))
+    return html.Div(rows, style={"borderRadius": "8px", "overflow": "hidden"})
+
+
 layout = html.Div(
     style={
         "display": "flex",
@@ -1333,6 +1388,12 @@ layout = html.Div(
                             n_clicks=0,
                             className="nav-btn-modern"
                         ),
+                        html.Button(
+                            "Configure Data Sources",
+                            id="configure-datasources-btn",
+                            n_clicks=0,
+                            className="nav-btn-modern"
+                        ),
                     ]
                 ),
                 
@@ -1357,8 +1418,7 @@ layout = html.Div(
                     id="main-content-area",
                     className="content-area-modern",
                     children=[
-                        # Instructions Section
-                        instructions,
+                        # instructions,
                         reports_table,
                     ]
                 ),
@@ -1598,6 +1658,249 @@ layout = html.Div(
                         ),
                     ],
                 ),
+
+                # ── Data Sources Panel ───────────────────────────────────────
+                html.Div(
+                    id="datasource-panel",
+                    style={"display": "none"},
+                    children=[
+                        html.Div(className="dashboard-card", style={"margin": "16px 0"}, children=[
+                            html.Div(
+                                className="dashboard-card-header",
+                                style={"display": "flex", "justifyContent": "space-between", "alignItems": "center"},
+                                children=[
+                                    html.H4("Configure Data Sources", className="dashboard-card-title"),
+                                    html.Div(style={"display": "flex", "gap": "8px"}, children=[
+                                        html.Button("➕ New Data Source", id="ds-new-btn", n_clicks=0,
+                                                    className="btn-primary-modern btn-small"),
+                                        html.Button("✕ Close", id="close-datasource-btn", n_clicks=0,
+                                                    className="btn-secondary btn-small"),
+                                    ]),
+                                ],
+                            ),
+                            html.Div(className="dashboard-card-body", children=[
+                                html.Div(style={"display": "flex", "gap": "24px", "alignItems": "flex-start"}, children=[
+
+                                    # ── Left: saved datasources list ──────────────────────
+                                    html.Div(style={"flex": "0 0 280px"}, children=[
+                                        html.Label("Saved Data Sources", className="form-label",
+                                                   style={"fontWeight": "600"}),
+                                        html.Div(
+                                            id="ds-list-container",
+                                            style={"overflowY": "auto", "maxHeight": "520px",
+                                                   "border": "1px solid #e5e7eb", "borderRadius": "8px",
+                                                   "marginTop": "8px"},
+                                            children=_build_ds_list(_load_datasources()),
+                                        ),
+                                    ]),
+
+                                    # ── Right: form ───────────────────────────────────────
+                                    html.Div(style={"flex": "1", "display": "flex",
+                                                    "flexDirection": "column", "gap": "14px"}, children=[
+
+                                        html.Div(id="ds-form-placeholder",
+                                                 style={"color": "#9ca3af", "fontSize": "14px",
+                                                        "padding": "24px 0"},
+                                                 children="Select a data source or click '➕ New Data Source'."),
+
+                                        html.Div(id="ds-form", style={"display": "none"}, children=[
+
+                                            # Hidden UUID store
+                                            dcc.Input(id="ds-uuid", style={"display": "none"}),
+                                            dcc.Input(id="ds-date-created", style={"display": "none"}),
+
+                                            # ── Identity ──────────────────────────────────
+                                            html.Div(className="form-group", children=[
+                                                html.Label("Data Source Name *", className="form-label"),
+                                                dcc.Input(id="ds-name", placeholder="e.g. Production MAHIS",
+                                                          className="modern-input", style={"width": "100%"}),
+                                            ]),
+
+                                            # ── DB_CONFIG ─────────────────────────────────
+                                            html.Details(open=True, children=[
+                                                html.Summary("Database Configuration (DB_CONFIG)",
+                                                             style={"fontWeight": "600", "cursor": "pointer",
+                                                                    "color": "#006401", "padding": "6px 0"}),
+                                                html.Div(style={"display": "flex", "gap": "10px",
+                                                                "flexWrap": "wrap", "marginTop": "10px"}, children=[
+                                                    html.Div(style={"flex": "2", "minWidth": "180px"}, children=[
+                                                        html.Label("Host", className="form-label"),
+                                                        dcc.Input(id="ds-db-host", value="127.0.0.1",
+                                                                  className="modern-input", style={"width": "100%"}),
+                                                    ]),
+                                                    html.Div(style={"flex": "1", "minWidth": "80px"}, children=[
+                                                        html.Label("Port", className="form-label"),
+                                                        dcc.Input(id="ds-db-port", value="3306", type="number",
+                                                                  className="modern-input", style={"width": "100%"}),
+                                                    ]),
+                                                    html.Div(style={"flex": "2", "minWidth": "160px"}, children=[
+                                                        html.Label("Database", className="form-label"),
+                                                        dcc.Input(id="ds-db-name", placeholder="database name",
+                                                                  className="modern-input", style={"width": "100%"}),
+                                                    ]),
+                                                    html.Div(style={"flex": "1", "minWidth": "120px"}, children=[
+                                                        html.Label("User", className="form-label"),
+                                                        dcc.Input(id="ds-db-user", placeholder="db user",
+                                                                  className="modern-input", style={"width": "100%"}),
+                                                    ]),
+                                                    html.Div(style={"flex": "1", "minWidth": "120px"}, children=[
+                                                        html.Label("Password", className="form-label"),
+                                                        dcc.Input(id="ds-db-password", placeholder="password",
+                                                                  type="password",
+                                                                  className="modern-input", style={"width": "100%"}),
+                                                    ]),
+                                                ]),
+                                            ]),
+
+                                            # ── SSH_CONFIG ────────────────────────────────
+                                            html.Details(children=[
+                                                html.Summary("SSH Tunnel Configuration (leave blank for USE_LOCALHOST)",
+                                                             style={"fontWeight": "600", "cursor": "pointer",
+                                                                    "color": "#006401", "padding": "6px 0"}),
+                                                html.Div(style={"marginTop": "10px", "display": "flex",
+                                                                "flexDirection": "column", "gap": "10px"}, children=[
+                                                    html.Div(style={"display": "flex", "gap": "10px",
+                                                                    "flexWrap": "wrap"}, children=[
+                                                        html.Div(style={"flex": "2", "minWidth": "180px"}, children=[
+                                                            html.Label("SSH Host", className="form-label"),
+                                                            dcc.Input(id="ds-ssh-host", placeholder="ec2-xxx.compute.amazonaws.com",
+                                                                      className="modern-input", style={"width": "100%"}),
+                                                        ]),
+                                                        html.Div(style={"flex": "1", "minWidth": "80px"}, children=[
+                                                            html.Label("SSH Port", className="form-label"),
+                                                            dcc.Input(id="ds-ssh-port", value="22", type="number",
+                                                                      className="modern-input", style={"width": "100%"}),
+                                                        ]),
+                                                        html.Div(style={"flex": "1", "minWidth": "120px"}, children=[
+                                                            html.Label("SSH User", className="form-label"),
+                                                            dcc.Input(id="ds-ssh-user", value="ubuntu",
+                                                                      className="modern-input", style={"width": "100%"}),
+                                                        ]),
+                                                    ]),
+                                                    html.Div(children=[
+                                                        html.Label("SSH Key File", className="form-label"),
+                                                        html.Div(style={"display": "flex", "gap": "10px",
+                                                                        "flexWrap": "wrap", "alignItems": "flex-end"},
+                                                                 children=[
+                                                            html.Div(style={"flex": "1"}, children=[
+                                                                dcc.Dropdown(id="ds-ssh-pkey-select",
+                                                                             placeholder="Select existing .pem / .cer file",
+                                                                             className="modern-dropdown",
+                                                                             clearable=True),
+                                                            ]),
+                                                            html.Span("or", style={"padding": "0 6px",
+                                                                                    "alignSelf": "center",
+                                                                                    "color": "#6b7280"}),
+                                                            dcc.Upload(id="ds-ssh-key-upload",
+                                                                       children=html.Button("Upload Key File",
+                                                                                            className="btn-secondary btn-small"),
+                                                                       accept=".pem,.cer,.key"),
+                                                        ]),
+                                                        html.Span(id="ds-ssh-key-status",
+                                                                  style={"fontSize": "12px", "color": "#006401"}),
+                                                    ]),
+                                                    html.Div(style={"display": "flex", "gap": "10px",
+                                                                    "flexWrap": "wrap"}, children=[
+                                                        html.Div(style={"flex": "2", "minWidth": "180px"}, children=[
+                                                            html.Label("Remote Bind Address (host)",
+                                                                       className="form-label"),
+                                                            dcc.Input(id="ds-ssh-remote-host",
+                                                                      placeholder="rds-instance.rds.amazonaws.com",
+                                                                      className="modern-input", style={"width": "100%"}),
+                                                        ]),
+                                                        html.Div(style={"flex": "1", "minWidth": "80px"}, children=[
+                                                            html.Label("Remote Port", className="form-label"),
+                                                            dcc.Input(id="ds-ssh-remote-port", value="3306",
+                                                                      type="number",
+                                                                      className="modern-input", style={"width": "100%"}),
+                                                        ]),
+                                                    ]),
+                                                ]),
+                                            ]),
+
+                                            # ── Runtime settings ──────────────────────────
+                                            html.Details(open=True, children=[
+                                                html.Summary("Runtime Settings",
+                                                             style={"fontWeight": "600", "cursor": "pointer",
+                                                                    "color": "#006401", "padding": "6px 0"}),
+                                                html.Div(style={"display": "flex", "gap": "10px",
+                                                                "flexWrap": "wrap", "marginTop": "10px"}, children=[
+                                                    html.Div(style={"flex": "1", "minWidth": "140px"}, children=[
+                                                        html.Label("Start Date", className="form-label"),
+                                                        dcc.DatePickerSingle(id="ds-start-date",
+                                                                             display_format="YYYY-MM-DD",
+                                                                             date="2026-01-01"),
+                                                    ]),
+                                                    html.Div(style={"flex": "1", "minWidth": "140px"}, children=[
+                                                        html.Label("Batch Size", className="form-label"),
+                                                        dcc.Input(id="ds-batch-size", value="1000", type="number",
+                                                                  className="modern-input", style={"width": "100%"}),
+                                                    ]),
+                                                    html.Div(style={"flex": "1", "minWidth": "160px"}, children=[
+                                                        html.Label("Data File Path *", className="form-label"),
+                                                        dcc.Input(id="ds-data-file-name", value="default",
+                                                                  placeholder="e.g. default",
+                                                                  className="modern-input", style={"width": "100%"}),
+                                                    ]),
+                                                    html.Div(style={"flex": "1", "minWidth": "160px"}, children=[
+                                                        html.Label("Load Fresh Data", className="form-label"),
+                                                        dcc.Dropdown(id="ds-load-fresh",
+                                                                     options=[{"label": "Yes (always reload)", "value": "true"},
+                                                                              {"label": "No (use cache)", "value": "false"}],
+                                                                     value="false", clearable=False,
+                                                                     className="modern-dropdown"),
+                                                    ]),
+                                                    html.Div(style={"flex": "1", "minWidth": "160px"}, children=[
+                                                        html.Label("Is Harmonized MAHIS", className="form-label"),
+                                                        dcc.Dropdown(id="ds-is-harmonized",
+                                                                     options=[{"label": "Yes", "value": "true"},
+                                                                              {"label": "No (legacy schema)", "value": "false"}],
+                                                                     value="true", clearable=False,
+                                                                     className="modern-dropdown"),
+                                                    ]),
+                                                ]),
+                                            ]),
+
+                                            # ── Base Query ────────────────────────────────
+                                            html.Details(children=[
+                                                html.Summary("Base SQL Query",
+                                                             style={"fontWeight": "600", "cursor": "pointer",
+                                                                    "color": "#006401", "padding": "6px 0"}),
+                                                html.Div(style={"marginTop": "10px"}, children=[
+                                                    html.Span("Use {date_filter} as a placeholder where the date "
+                                                              "range WHERE condition will be injected.",
+                                                              style={"fontSize": "12px", "color": "#6b7280"}),
+                                                    dcc.Textarea(id="ds-base-query",
+                                                                 placeholder="SELECT ... FROM encounter e\n"
+                                                                             "...\nWHERE e.voided = 0\n{date_filter}",
+                                                                 className="modern-input",
+                                                                 style={"width": "100%", "minHeight": "160px",
+                                                                        "fontFamily": "monospace",
+                                                                        "fontSize": "12px",
+                                                                        "resize": "vertical",
+                                                                        "marginTop": "8px"}),
+                                                ]),
+                                            ]),
+
+                                            # ── Actions ───────────────────────────────────
+                                            html.Div(style={"display": "flex", "gap": "10px",
+                                                            "alignItems": "center", "marginTop": "8px"}, children=[
+                                                html.Button("Test Connection", id="ds-test-btn", n_clicks=0,
+                                                            className="btn-secondary"),
+                                                html.Button("Save", id="ds-save-btn", n_clicks=0,
+                                                            className="btn-save"),
+                                                html.Button("Delete", id="ds-delete-btn", n_clicks=0,
+                                                            className="btn-danger btn-small"),
+                                                html.Span(id="ds-status",
+                                                          style={"fontSize": "13px", "fontWeight": "500"}),
+                                            ]),
+                                        ]),
+                                    ]),
+                                ]),
+                            ]),
+                        ]),
+                    ],
+                ),
             ],
         ),
     ],
@@ -1653,12 +1956,16 @@ def toggle_mnid_section(dashboard_type):
          Output('main-content', 'children')],
         [Input('url-params-store', 'data')])
 def validate_admin_access(urlparams):
-    user_data_path = os.path.join(path, 'data','single_tables', 'users_data.csv')
+    location = urlparams.get('Location', [None])[0]
+    data_route = urlparams.get('route', ["default"])[0]
+    DATA_PATH_ = f"data/{data_route}/parquet"
+
+    user_data_path = os.path.join(path, f'data/{data_route}','single_tables', 'users_data.csv')
     if not os.path.exists(user_data_path):
         user_data = pd.DataFrame(columns=['uuid', 'role'])
     else:
-        user_data = pd.read_csv(os.path.join(path, 'data','single_tables', 'users_data.csv'))
-        authorized_users = user_data[user_data['role'] == 'Superuser,Superuser']
+        user_data = pd.read_csv(os.path.join(path, f'data/{data_route}','single_tables', 'users_data.csv'))
+        authorized_users = user_data[user_data['role'].isin(['Superuser,Superuser'])]
     test_admin = pd.DataFrame(columns=['uuid', 'role'], data=[[DEMO_UUID, 'reports_admin']])
     user_data = pd.concat([authorized_users, test_admin], ignore_index=True)
 
@@ -4257,3 +4564,320 @@ def _build_users_table(users):
         style={"width": "100%", "borderCollapse": "collapse",
                "fontSize": "13px", "tableLayout": "auto"},
     )
+
+
+# ── Configure Data Sources callbacks ─────────────────────────────────────────
+
+# 1. Toggle panel (also hides user-config-panel so both never show at once)
+@callback(
+    [Output("datasource-panel",  "style"),
+     Output("user-config-panel", "style", allow_duplicate=True),
+     Output("main-content-area", "style", allow_duplicate=True)],
+    [Input("configure-datasources-btn", "n_clicks"),
+     Input("close-datasource-btn",      "n_clicks")],
+    prevent_initial_call=True,
+)
+def toggle_datasource_panel(open_clicks, close_clicks):
+    if ctx.triggered_id == "configure-datasources-btn":
+        return {"display": "block"}, {"display": "none"}, {"display": "none"}
+    return {"display": "none"}, {"display": "none"}, {"display": "block"}
+
+
+# 2. Populate SSH key dropdown and datasource list when panel opens
+@callback(
+    [Output("ds-ssh-pkey-select", "options"),
+     Output("ds-list-container",  "children")],   # primary owner — no allow_duplicate
+    Input("datasource-panel", "style"),
+    prevent_initial_call=True,
+)
+def populate_ds_panel(panel_style):
+    if not panel_style or panel_style.get("display") == "none":
+        raise PreventUpdate
+    key_opts = [{"label": k, "value": k} for k in _list_ssh_keys()]
+    return key_opts, _build_ds_list(_load_datasources())
+
+
+# 3. Open blank form for new datasource
+@callback(
+    [Output("ds-form",            "style",    allow_duplicate=True),
+     Output("ds-form-placeholder","style",    allow_duplicate=True),
+     Output("ds-uuid",            "value",    allow_duplicate=True),
+     Output("ds-date-created",    "value",    allow_duplicate=True),
+     Output("ds-name",            "value",    allow_duplicate=True),
+     Output("ds-db-host",         "value",    allow_duplicate=True),
+     Output("ds-db-port",         "value",    allow_duplicate=True),
+     Output("ds-db-name",         "value",    allow_duplicate=True),
+     Output("ds-db-user",         "value",    allow_duplicate=True),
+     Output("ds-db-password",     "value",    allow_duplicate=True),
+     Output("ds-ssh-host",        "value",    allow_duplicate=True),
+     Output("ds-ssh-port",        "value",    allow_duplicate=True),
+     Output("ds-ssh-user",        "value",    allow_duplicate=True),
+     Output("ds-ssh-pkey-select", "value",    allow_duplicate=True),
+     Output("ds-ssh-remote-host", "value",    allow_duplicate=True),
+     Output("ds-ssh-remote-port", "value",    allow_duplicate=True),
+     Output("ds-start-date",      "date",     allow_duplicate=True),
+     Output("ds-batch-size",      "value",    allow_duplicate=True),
+     Output("ds-data-file-name",  "value",    allow_duplicate=True),
+     Output("ds-load-fresh",      "value",    allow_duplicate=True),
+     Output("ds-is-harmonized",   "value",    allow_duplicate=True),
+     Output("ds-base-query",      "value",    allow_duplicate=True),
+     Output("ds-status",          "children", allow_duplicate=True)],
+    Input("ds-new-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+def new_datasource(_):
+    new_id = f"ds_{uuid.uuid4().hex[:8]}"
+    today  = datetime.now().strftime("%Y-%m-%d")
+    return (
+        {"display": "block"}, {"display": "none"},
+        new_id, today,
+        "",               # name
+        "127.0.0.1", "3306", "", "", "",   # DB_CONFIG
+        "", "22", "ubuntu", None, "", "3306",  # SSH_CONFIG
+        today, "1000", "data/parquet", "false", "true", "",  # runtime + query
+        "",
+    )
+
+
+# 4. Load existing datasource into form when edit button clicked
+@callback(
+    [Output("ds-form",            "style",    allow_duplicate=True),
+     Output("ds-form-placeholder","style",    allow_duplicate=True),
+     Output("ds-uuid",            "value",    allow_duplicate=True),
+     Output("ds-date-created",    "value",    allow_duplicate=True),
+     Output("ds-name",            "value",    allow_duplicate=True),
+     Output("ds-db-host",         "value",    allow_duplicate=True),
+     Output("ds-db-port",         "value",    allow_duplicate=True),
+     Output("ds-db-name",         "value",    allow_duplicate=True),
+     Output("ds-db-user",         "value",    allow_duplicate=True),
+     Output("ds-db-password",     "value",    allow_duplicate=True),
+     Output("ds-ssh-host",        "value",    allow_duplicate=True),
+     Output("ds-ssh-port",        "value",    allow_duplicate=True),
+     Output("ds-ssh-user",        "value",    allow_duplicate=True),
+     Output("ds-ssh-pkey-select", "value",    allow_duplicate=True),
+     Output("ds-ssh-remote-host", "value",    allow_duplicate=True),
+     Output("ds-ssh-remote-port", "value",    allow_duplicate=True),
+     Output("ds-start-date",      "date",     allow_duplicate=True),
+     Output("ds-batch-size",      "value",    allow_duplicate=True),
+     Output("ds-data-file-name",  "value",    allow_duplicate=True),
+     Output("ds-load-fresh",      "value",    allow_duplicate=True),
+     Output("ds-is-harmonized",   "value",    allow_duplicate=True),
+     Output("ds-base-query",      "value",    allow_duplicate=True),
+     Output("ds-status",          "children", allow_duplicate=True)],
+    Input({"type": "ds-edit-btn", "index": ALL}, "n_clicks"),
+    prevent_initial_call=True,
+)
+def load_datasource_into_form(n_clicks_list):
+    if not any(c for c in (n_clicks_list or []) if c and c > 0):
+        raise PreventUpdate
+    idx = ctx.triggered_id["index"]
+    sources = _load_datasources()
+    if idx >= len(sources):
+        raise PreventUpdate
+    ds  = sources[idx]
+    db  = ds.get("db_config", {})
+    ssh = ds.get("ssh_config", {})
+    rba = ssh.get("remote_bind_address", ["", 3306])
+    return (
+        {"display": "block"}, {"display": "none"},
+        ds.get("uuid", ""), ds.get("date_created", ""),
+        ds.get("name", ""),
+        db.get("host", "127.0.0.1"), str(db.get("port", 3306)),
+        db.get("database", ""), db.get("user", ""), db.get("password", ""),
+        ssh.get("ssh_host", ""), str(ssh.get("ssh_port", 22)),
+        ssh.get("ssh_user", "ubuntu"), ssh.get("ssh_pkey", None),
+        rba[0] if isinstance(rba, list) else "",
+        str(rba[1]) if isinstance(rba, list) and len(rba) > 1 else "3306",
+        ds.get("start_date", datetime.now().strftime("%Y-%m-%d")),
+        str(ds.get("batch_size", 1000)),
+        ds.get("data_path", "default"),
+        "true" if ds.get("load_fresh_data") else "false",
+        "true" if ds.get("is_harmonized_emr", True) else "false",
+        ds.get("base_query", ""),
+        "",
+    )
+
+
+# 5. Handle SSH key file upload — save to ssh/ directory
+@callback(
+    [Output("ds-ssh-pkey-select", "options", allow_duplicate=True),
+     Output("ds-ssh-pkey-select", "value",   allow_duplicate=True),
+     Output("ds-ssh-key-status",  "children")],
+    Input("ds-ssh-key-upload", "contents"),
+    State("ds-ssh-key-upload",  "filename"),
+    prevent_initial_call=True,
+)
+def upload_ssh_key(contents, filename):
+    if not contents or not filename:
+        raise PreventUpdate
+    os.makedirs(_ssh_dir, exist_ok=True)
+    _, content_string = contents.split(",")
+    decoded = base64.b64decode(content_string)
+    dest = os.path.join(_ssh_dir, filename)
+    with open(dest, "wb") as f:
+        f.write(decoded)
+    key_opts = [{"label": k, "value": k} for k in _list_ssh_keys()]
+    return key_opts, filename, f"✓ Uploaded: {filename}"
+
+
+# 6. Test connection
+@callback(
+    Output("ds-status", "children", allow_duplicate=True),
+    Input("ds-test-btn", "n_clicks"),
+    [State("ds-db-host",     "value"),
+     State("ds-db-port",     "value"),
+     State("ds-db-name",     "value"),
+     State("ds-db-user",     "value"),
+     State("ds-db-password", "value"),
+     State("ds-ssh-host",    "value"),
+     State("ds-ssh-port",    "value"),
+     State("ds-ssh-user",    "value"),
+     State("ds-ssh-pkey-select", "value"),
+     State("ds-ssh-remote-host", "value"),
+     State("ds-ssh-remote-port", "value")],
+    prevent_initial_call=True,
+)
+def test_datasource_connection(n_clicks,
+                                db_host, db_port, db_name, db_user, db_pass,
+                                ssh_host, ssh_port, ssh_user, ssh_pkey,
+                                ssh_remote_host, ssh_remote_port):
+    if not n_clicks:
+        raise PreventUpdate
+    use_ssh = bool(ssh_host and ssh_host.strip())
+    try:
+        if use_ssh:
+            try:
+                from sshtunnel import SSHTunnelForwarder
+            except ImportError:
+                return ("⚠ sshtunnel not installed. Run: pip install sshtunnel",)
+            pkey_path = os.path.join(_ssh_dir, ssh_pkey) if ssh_pkey else None
+            with SSHTunnelForwarder(
+                (ssh_host, int(ssh_port or 22)),
+                ssh_username=ssh_user,
+                ssh_pkey=pkey_path,
+                remote_bind_address=(ssh_remote_host or "localhost",
+                                     int(ssh_remote_port or 3306)),
+            ) as tunnel:
+                try:
+                    import pymysql
+                    conn = pymysql.connect(
+                        host="127.0.0.1", port=tunnel.local_bind_port,
+                        user=db_user, password=db_pass, database=db_name,
+                        connect_timeout=8,
+                    )
+                    conn.close()
+                    return "✓ SSH + DB connection successful"
+                except ImportError:
+                    return "⚠ pymysql not installed. Run: pip install pymysql"
+        else:
+            try:
+                import pymysql
+                conn = pymysql.connect(
+                    host=db_host or "127.0.0.1", port=int(db_port or 3306),
+                    user=db_user, password=db_pass, database=db_name,
+                    connect_timeout=8,
+                )
+                conn.close()
+                return "✓ Direct DB connection successful"
+            except ImportError:
+                return "⚠ pymysql not installed. Run: pip install pymysql"
+    except Exception as exc:
+        return f"✗ Connection failed: {exc}"
+
+
+# 7. Save datasource
+@callback(
+    [Output("ds-status",       "children",  allow_duplicate=True),
+     Output("ds-list-container","children", allow_duplicate=True)],
+    Input("ds-save-btn", "n_clicks"),
+    [State("ds-uuid",            "value"),
+     State("ds-date-created",    "value"),
+     State("ds-name",            "value"),
+     State("ds-db-host",         "value"),
+     State("ds-db-port",         "value"),
+     State("ds-db-name",         "value"),
+     State("ds-db-user",         "value"),
+     State("ds-db-password",     "value"),
+     State("ds-ssh-host",        "value"),
+     State("ds-ssh-port",        "value"),
+     State("ds-ssh-user",        "value"),
+     State("ds-ssh-pkey-select", "value"),
+     State("ds-ssh-remote-host", "value"),
+     State("ds-ssh-remote-port", "value"),
+     State("ds-start-date",      "date"),
+     State("ds-batch-size",      "value"),
+     State("ds-data-file-name",  "value"),
+     State("ds-load-fresh",      "value"),
+     State("ds-is-harmonized",   "value"),
+     State("ds-base-query",      "value")],
+    prevent_initial_call=True,
+)
+def save_datasource(n_clicks, ds_uuid, date_created, name,
+                    db_host, db_port, db_name, db_user, db_pass,
+                    ssh_host, ssh_port, ssh_user, ssh_pkey,
+                    ssh_remote_host, ssh_remote_port,
+                    start_date, batch_size, data_file_name,
+                    load_fresh, is_harmonized, base_query):
+    if not n_clicks or not name:
+        raise PreventUpdate
+    use_ssh = bool(ssh_host and ssh_host.strip())
+    
+    entry = {
+        "uuid":         ds_uuid or f"ds_{uuid.uuid4().hex[:8]}",
+        "name":         name,
+        "date_created": date_created or datetime.now().strftime("%Y-%m-%d"),
+        "date_updated": datetime.now().strftime("%Y-%m-%d"),
+        "use_localhost":       not use_ssh,
+        "start_date":          start_date or datetime.now().strftime("%Y-%m-%d"),
+        "load_fresh_data":     load_fresh == "true",
+        "data_path":      data_file_name or "default",
+        "base_query":          base_query or "",
+        "is_harmonized_emr": is_harmonized == "true",
+        "batch_size":          int(batch_size or 1000),
+        "db_config": {
+                "host":     db_host or "127.0.0.1",
+                "port":     int(db_port or 3306),
+                "database": db_name or "",
+                "user":     db_user or "",
+                "password": db_pass or "",
+            },
+        "ssh_config": {
+            "ssh_host":            ssh_host or "",
+            "ssh_port":            int(ssh_port or 22) if ssh_host else None,
+            "ssh_user":            ssh_user or "ubuntu" if ssh_host else None,
+            "ssh_pkey":            ssh_pkey or None,
+            "remote_bind_address": [ssh_remote_host or "localhost",
+                                    int(ssh_remote_port or 3306)],
+        } if use_ssh else None,
+    }
+    sources = _load_datasources()
+    for items in sources:
+        if entry.get("data_path") == items.get("data_path") and entry.get("uuid") != items.get("uuid"):
+            return f"Another datasource with the same data file name exists: {items.get('name', 'Unnamed')}", _build_ds_list(sources)
+    idx = next((i for i, s in enumerate(sources) if s.get("uuid") == ds_uuid), None)
+    if idx is not None:
+        sources[idx] = entry
+    else:
+        sources.append(entry)
+    _save_datasources(sources)
+    return "✓ Saved", _build_ds_list(sources)
+
+
+# 8. Delete datasource
+@callback(
+    [Output("ds-status",        "children", allow_duplicate=True),
+     Output("ds-list-container","children", allow_duplicate=True),
+     Output("ds-form",          "style",    allow_duplicate=True),
+     Output("ds-form-placeholder","style",  allow_duplicate=True)],
+    Input("ds-delete-btn", "n_clicks"),
+    State("ds-uuid", "value"),
+    prevent_initial_call=True,
+)
+def delete_datasource(n_clicks, ds_uuid):
+    if not n_clicks or not ds_uuid:
+        raise PreventUpdate
+    sources = [s for s in _load_datasources() if s.get("uuid") != ds_uuid]
+    _save_datasources(sources)
+    placeholder_shown = {"display": "block", "color": "#9ca3af",
+                          "fontSize": "14px", "padding": "24px 0"}
+    return "✓ Deleted", _build_ds_list(sources), {"display": "none"}, placeholder_shown

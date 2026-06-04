@@ -4,7 +4,7 @@ from dash import dcc, html, page_container
 import threading
 import time
 
-from config import PREFIX_NAME, DATA_FILE_NAME_
+from config import PREFIX_NAME, DATA_PATH_
 from helpers.api_routes import register_api_routes
 from helpers.navigation_callbacks import register_navigation_callbacks
 
@@ -40,7 +40,7 @@ def _prewarm_mnid_cache():
         import pandas as pd
         from data_storage import DataStorage
         from mnid.app import _network_df_cache, _prepare_mnid_dataframe
-        sql = f"SELECT * FROM '{DATA_FILE_NAME_}'"
+        sql = f"SELECT * FROM '{DATA_PATH_}'"
         df = DataStorage.query_duckdb(sql)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         key = (len(df), tuple(df.columns.tolist()))
