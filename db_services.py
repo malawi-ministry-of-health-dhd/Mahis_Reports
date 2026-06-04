@@ -181,7 +181,7 @@ class DataFetcher:
                     ssh_username=self.ssh_config['ssh_user'],
                     ssh_password=self.ssh_config.get('ssh_password'),
                     ssh_private_key=f"ssh/{self.ssh_config['ssh_pkey']}",
-                    remote_bind_address=self.ssh_config['remote_bind_address']
+                    remote_bind_address=tuple(self.ssh_config['remote_bind_address'])
                 ) as tunnel:
                     logger.info(f"SSH tunnel established on port {tunnel.local_bind_port}")
                     conn = self._get_db_connection(tunnel)
@@ -315,7 +315,7 @@ class DataFetcher:
                     ssh_username=self.ssh_config['ssh_user'],
                     ssh_password=self.ssh_config.get('ssh_password'),
                     ssh_private_key=f"ssh/{self.ssh_config['ssh_pkey']}",
-                    remote_bind_address=self.ssh_config['remote_bind_address']
+                    remote_bind_address=tuple(self.ssh_config['remote_bind_address'])
                 ) as tunnel:
                     logger.info(f"SSH tunnel established on port {tunnel.local_bind_port}")
                     conn = self._get_db_connection(tunnel)

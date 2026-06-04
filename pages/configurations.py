@@ -4634,7 +4634,7 @@ def new_datasource(_):
         "",               # name
         "127.0.0.1", "3306", "", "", "",   # DB_CONFIG
         "", "22", "ubuntu", None, "", "3306",  # SSH_CONFIG
-        today, "1000", "data/parquet", "false", "true", "",  # runtime + query
+        today, "1000", "default", "false", "true", "",  # runtime + query
         "",
     )
 
@@ -4677,16 +4677,21 @@ def load_datasource_into_form(n_clicks_list):
     ds  = sources[idx]
     db  = ds.get("db_config", {})
     ssh = ds.get("ssh_config", {})
-    rba = ssh.get("remote_bind_address", ["", 3306])
+    if ssh:
+        rba = ssh.get("remote_bind_address", ["", 3306])
+    else:
+        rba = []
     return (
         {"display": "block"}, {"display": "none"},
         ds.get("uuid", ""), ds.get("date_created", ""),
         ds.get("name", ""),
         db.get("host", "127.0.0.1"), str(db.get("port", 3306)),
         db.get("database", ""), db.get("user", ""), db.get("password", ""),
-        ssh.get("ssh_host", ""), str(ssh.get("ssh_port", 22)),
-        ssh.get("ssh_user", "ubuntu"), ssh.get("ssh_pkey", None),
-        rba[0] if isinstance(rba, list) else "",
+        ssh.get("ssh_host", "") if ssh else "",
+        str(ssh.get("ssh_port", 22)) if ssh else "22",
+        ssh.get("ssh_user", "ubuntu") if ssh else "ubuntu",
+        ssh.get("ssh_pkey", None) if ssh else None,
+        rba[0] if isinstance(rba, list) and len(rba) > 0 else "",
         str(rba[1]) if isinstance(rba, list) and len(rba) > 1 else "3306",
         ds.get("start_date", datetime.now().strftime("%Y-%m-%d")),
         str(ds.get("batch_size", 1000)),
@@ -4853,7 +4858,9 @@ def save_datasource(n_clicks, ds_uuid, date_created, name,
     sources = _load_datasources()
     for items in sources:
         if entry.get("data_path") == items.get("data_path") and entry.get("uuid") != items.get("uuid"):
-            return f"Another datasource with the same data file name exists: {items.get('name', 'Unnamed')}", _build_ds_list(sources)
+            return html.Div(f"Another datasource with the same data file name exists: {items.get('name', 'Unnamed')}", style={"color": "red"}), _build_ds_list(sources)
+        if entry.get("base_query") =="":
+            return html.Div("Base query cannot be empty.", style={"color": "red"}), _build_ds_list(sources)
     idx = next((i for i, s in enumerate(sources) if s.get("uuid") == ds_uuid), None)
     if idx is not None:
         sources[idx] = entry

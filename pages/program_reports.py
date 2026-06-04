@@ -40,9 +40,6 @@ from datetime import datetime, timedelta
 from dash import html, dcc
 
 path = os.getcwd()
-path_program_reports = os.path.join(path, 'data','visualizations','validated_prog_reports.json')
-dropdowns_json_path = os.path.join(path, 'data/default', 'dcc_dropdown_json', 'dropdowns.json') 
-
 
 report_config_panel = html.Div(
     className="report-config-modern",
@@ -237,6 +234,8 @@ layout = html.Div(
 )
 
 def update_filters(selected_program):
+    path_program_reports = os.path.join(path, 'data','visualizations','validated_prog_reports.json')
+    dropdowns_json_path = os.path.join(path, 'data/default', 'dcc_dropdown_json', 'dropdowns.json') 
     with open(path_program_reports) as x:
         program_reports_data = json.load(x)
     filtered_reports_list = [r for r in program_reports_data["reports"] if r.get("program") == selected_program or selected_program in (r.get("programs") or [])]
@@ -280,6 +279,9 @@ def generate_chart(n_clicks, urlparams, selected_report, pathname, report_name, 
     location = urlparams.get('Location', [None])[0]
     data_route = urlparams.get('route', ["default"])[0]
     DATA_PATH_ = f"data/{data_route}/parquet"
+
+    path_program_reports = os.path.join(path, 'data','visualizations','validated_prog_reports.json')
+    dropdowns_json_path = os.path.join(path, f'data/{data_route}', 'dcc_dropdown_json', 'dropdowns.json')
 
     user_data_path = os.path.join(path, f'data/{data_route}','single_tables', 'users_data.csv')
     if not os.path.exists(user_data_path):

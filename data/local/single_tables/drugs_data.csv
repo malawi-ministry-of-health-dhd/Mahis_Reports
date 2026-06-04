@@ -1,0 +1,1326 @@
+drug_id,name,units
+3,Triomune-40,tab(s)
+5,d4T (Stavudine 30mg tablet),tab(s)
+6,d4T (Stavudine 40mg tablet),tab(s)
+9,DDI (Didanosine 125mg tablet),tab(s)
+10,DDI (Didanosine 200mg tablet),tab(s)
+11,EFV (Efavirenz 600mg tablet),tab(s)
+14,TDF (Tenofavir 300 mg tablet),tab(s)
+15,S (Streptomycin 1gm vial),g
+16,RIF or R (Rifampin 300mg tablet),tab(s)
+17,RHZ (R60/H60/Z150),tab(s)
+18,RHZE (R150/H75/Z400),tab(s)
+19,RH (R150/H75),tab(s)
+20,Z (Pyrazinamide 500mg tablet),tab(s)
+21,NVP (Nevirapine syrup 1.5mL/dose in 25mL bottle),ml
+22,NVP (Nevirapine 200 mg tablet),tab(s)
+23,LPV/r (cold; Lopanavir and Ritonavir 166 mg tab),tab(s)
+24,INH or H (Isoniazid 100mg tablet),tab(s)
+25,FCZ (Fluconazole 150mg tablet),tab(s)
+26,Fluconazole (200mg tablet),tab(s)
+27,E (Ethambutol 400mg tablet),tab(s)
+28,EFV (Efavirenz 100mg tablet),tab(s)
+29,EFV (Efavirenz 50mg tablet),tab(s)
+30,EFV (Efavirenz 200mg tablet),tab(s)
+31,d4T (Stavudine 20mg tablet),tab(s)
+32,d4T (Stavudine 15mg tablet),tab(s)
+33,TMP/SMX (Cotrimoxazole 800/160mg tablet),tab(s)
+34,TMP/SMX (Cotrimoxazole 400/80mg tablet),tab(s)
+35,TMP/SMX (Cotrimoxazole 200/40mg tablet),tab(s)
+36,AZT (Zidovudine syrup 10mg/mL from 100ml bottle),ml
+37,AZT (Zidovudine 100mg tablet),tab(s)
+38,AZT (Zidovudine 300mg tablet),tab(s)
+39,AZT/3TC (Zidovudine and Lamivudine 300/150mg),tab(s)
+40,ABC (Abacavir 300mg tablet),tab(s)
+41,3TC (Lamivudine syrup 10mg/mL from 100mL bottle),ml
+42,3TC (Lamivudine 150mg tablet),tab(s)
+48,KM (Kanamycin 1gm vial),g
+49,AMK (Amikacin 500mg/2mL ),mg/2mL
+50,CM (Capreomicin 1g vial ),g
+51,VI (Viomycin),tab(s)
+55,Moxi (Moxifloxacin 400mg tablet),tab(s)
+56,Gati (Gatifloxacin 400 mg tablet),tab(s)
+57,Et(Ethionamide 250mg tablet),tab(s)
+58,CS (Cycloserine 250mg tablet),tab(s)
+59,Prothio (Prothionamide 250mg tablet),tab(s)
+60,TRD (Terizidone 250mg tablet),tab(s)
+61,ORS (100ml per loose stool/vomit-2 sachet),units
+63,AMX/CLV (Amoxicillin/Clavulantic Acid 500/125mg ta,tab(s)
+64,Clarithromycin (500mg tablet),tab(s)
+65,RFB (Rifabutin 150mg tablet ),tab(s)
+67,IDV (Indinavir 400mg tablet),tab(s)
+72,Triomune baby (d4T/3TC/NVP 6/30/50mg tablet),tab(s)
+73,LPV/r (Lopinavir and Ritonavir 200/50mg tablet),tab(s)
+74,LPV/r (Lopinavir and Ritonavir 100/25mg tablet),tab(s)
+75,CFZ (Clofazimine 100mg tablet),tab(s)
+76,Pyridoxine (50mg),tab(s)
+77,Pyridoxine (100mg),tab(s)
+78,Pyridoxine (300mg),tab(s)
+79,Lfx (Levofloxacin 250mg tablet),tab(s)
+80,OFX (Ofloxacin 200mg tablet),tab(s)
+81,OFX (Ofloxacin 300mg tablet),tab(s)
+82,OFX (Ofloxacin 400mg tablet),tab(s)
+83,Pyridoxine (25mg),tab(s)
+84,CFZ (Clofazimine 50mg tablet),tab(s)
+85,Atenolol (25mg tablet),tab(s)
+86,Ciprofloxacin (500mg tablet),tab(s)
+87,LFX (Levofloxacin 500mg tablet),tab(s)
+88,RHE (Rifampicin Isoniazid and Ethambutol -1-1-mg t,tab(s)
+89,Zidolam,tab(s)
+90,Coviro30 (Lamivudine + Stavudine 150/30 mg tablet),tab(s)
+91,Coviro40 (Lamivudine + Stavudine 150/40mg tablet),tab(s)
+92,MVI (multivitamin syrup),ml
+93,MVI (multivitamin tablet),tab(s)
+94,LPV/r (Lopinavir and Ritonavir syrup),ml
+95,d4T (Stavudine syrup),ml
+96,Amitriptyline (25mg tablets),tab(s)
+97,Chlorphenamine (4mg tablet),tab(s)
+98,Cloxacillin (tablet),tab(s)
+99,CPT (Cotrimoxazole 240mg/5ml suspension),ml
+100,Vincristine Sulphate (1mg PFR),tab(s)
+101,Bleomycin for Injection USP,mg/m2
+102,Paclitaxel (Taxol) Injection,mg/m2
+103,E (Ethambutol 100mg tablet),tab(s)
+104,Duovir-N,tab(s)
+105,Acyclovir (200mg tablet),tab(s)
+106,Albendazole (200mg tablet),tab(s)
+107,Albendazole (400mg tablet),tab(s)
+108,Aminophylline (100mg tablet),tab(s)
+109,Amoxicillin + Clavulanic Acid (375mg tablet),tab(s)
+110,Amoxicillin (125mg tablet),tab(s)
+111,Amoxicillin (250mg capsule),tab(s)
+112,Amoxicillin (250mg tablet),tab(s)
+113,Amoxicillin (500mg capsule),tab(s)
+114,Ampicillin (1mg ampulle),tab(s)
+115,Aspirin (300mg tablet),tab(s)
+116,Atenolol (100mg tablet),tab(s)
+117,Atenolol (50mg tablet),tab(s)
+118,Azithromycin (250mg tablet),tab(s)
+119,Pyridoxine (60mg),tab(s)
+120,Beclometasone Cream BP (15g tube),application
+121,Beclometasone Pressurised Inhalation (50mg dose),dose
+122,Benzyl Benzoate (25% topical 1000ml),application
+123,Betamethasone Valerate (.1% 15mg tube),application
+124,Calamine Lotion (100ml tube),application
+125,Calamine Lotion (500ml tube),application
+126,Carbamazepine (200mg tablet),tab(s)
+127,Ceftriaxone (1 g ampulle),g
+128,Ceftriaxone (250mg ampulle),tab(s)
+129,Chloramphenicol 125mg/5ml susp (100ml bottle),ml
+130,Chloramphenicol 10% ear drops (10ml bottle),drop(s)
+131,Chloramphenicol (125mg tablet),tab(s)
+132,Chloramphenicol (250mg capsule),tab(s)
+133,Chloramphenicol eye ointment (5mg tube),application
+134,Chloramphenicol Sodium (1g ampulle),g
+135,Chlorphenamine (10 mg ampulle),tab(s)
+136,Chlorphenamine (100mg tablet),tab(s)
+137,Chlorphenamine (25mg tablet),tab(s)
+139,Chlorphenamine (50mg tablet),tab(s)
+140,Chlorpromazine (100mg tablet),tab(s)
+141,Chlorpromazine (25mg tablet),tab(s)
+142,Chlorpromazine (50mg tablet),tab(s)
+143,Cimetidine (200mg tablet),tab(s)
+144,Cimetidine (400mg tablet),tab(s)
+145,Ciprofloxacin ear/eye drops (5ml bottle),drop(s)
+146,Clotrimazole Cream 1% (20g tube),application
+147,Cloxacillin (125mg suspension),tab(s)
+148,Cloxacillin (250mg tablet),tab(s)
+149,Cloxacillin (250mg capsule),tab(s)
+150,Cloxacillin (500mg capsule),tab(s)
+152,Dapsone (100mg tablet),tab(s)
+153,Diazepam 5mg/ml (2ml ampulle),ml
+154,Diazepam (5mg tablet),tab(s)
+155,Diclofenac Sodium (50mg tablet),tab(s)
+156,Diclofenac injection (25mg),mg (injection)
+157,Dihydrocodeine (30mg tablet),tab(s)
+158,Doxycycline (100mg capsule),tab(s)
+159,Erythromycin (125mg/5ml suspension),ml
+160,Erythromycin (250mg tablet),tab(s)
+161,Ferrous sulphate + folic acid (200mg+250mcg tablet,tab(s)
+162,Ferrous sulphate (200mg tablet),tab(s)
+163,Folic Acid (5mg tablet),tab(s)
+164,Furosemide (40mg tablet),tab(s)
+165,Gentamicine 0.3% Eye Drops (1nl),drop(s)
+166,Gentamicine (40mg ampulle),tab(s)
+167,Hydralazine (25mg tablet),tab(s)
+168,Hydrochlorothiazide (25mg tablet),tab(s)
+169,Hydrocortisone acetate 25mg/ml,ml
+170,Hydrocortisone Cream 1% (15g tube),application
+171,Ibuprofen (100mg capsule),tab(s)
+172,Ibuprofen (200mg tablet),tab(s)
+173,Ibuprofen (400mg tablet),tab(s)
+174,Imipramine Hcl (25mg tablet),tab(s)
+175,Indomethacin (25mg capsule),tab(s)
+176,Ketoconazole (200mg tablet),tab(s)
+177,Lamivudine (5ml bottle),ml
+178,Loperamide HCl (2mg tablet),tab(s)
+179,Magnesium trisilicate compound (250mg tablet),tab(s)
+180,Methyldopa (250mg tablet),tab(s)
+181,Metoclopramide (10mg tablet),tab(s)
+182,Metronidazole .5% (5mg ampulle),tab(s)
+183,Metronidazole (250mg tablet),tab(s)
+185,Miconazole 2% cream (30g tube),application
+186,Miconazole oral gel (20mg tube),application
+187,Nalidixic Acid (1g),g
+188,"Nystatin (100,000 IU tablet)",tab(s)
+189,"Nystatin susp 100,000 IU/dose (30ml bottle)",ml
+190,Omeprazole (20mg),tab(s)
+191,ORS (Oral Rehydration Salt 20g/dose),unit(s)
+192,Paracetamol (5ml),ml
+193,Penicillin V (250mg tablet),tab(s)
+194,Phenytoin sodium (100mg tablet),tab(s)
+195,Phenytoin sodium (25mg tablet),tab(s)
+196,Prednisolone (10mg),tab(s)
+197,Prednisolone (5mg tablet),tab(s)
+198,Proguanil hydrochloride (100mg tablet),tab(s)
+199,Propranolol (40mg tablet),tab(s)
+200,Pyridoxine (20mg),tab(s)
+201,Quinine (150mg/5ml susp),ml
+203,Salbutamol (4mg tablet),tab(s)
+204,Salbutamol MDI (100mcg/dose),mcg
+205,Sulphadoxine and Pyrimenthane (25mg tablet),tab(s)
+206,Tetracycline Hydrochloride eye ointment (1%),application
+207,Vitamin B complex (15mg tablet),tab(s)
+208,Acetazolamide (250mg tablet),tab(s)
+209,Adrenaline 1/1000 (1ml ampulle),ml
+210,Ascorbic Acid (250mg tablet),tab(s)
+212,Atropine sulphate  600mcg/ml (1ml ampulle),ml
+213,Quinine Injection,mg
+214,Bisacodyl (5mg tablet),tab(s)
+215,Calcium Gluconate 10% (8.94mg ampulle),tab(s)
+216,Captopril (25mg tablet),tab(s)
+217,Clindamycin (150mg capsule),tab(s)
+218,Clindamycin (150mg tablet),tab(s)
+219,Conjugated estrogen (0.625mg tablet),tab(s)
+220,Dexamethazone Sodium Phosphate (5mg ampulle),drop(s)
+221,Dextrose 50% (20ml ampulle),ml
+222,Fluoxetine (20mg capsule),tab(s)
+223,Glibenclamide (5mg tablet),tab(s)
+224,Griseofulvin (125mg tablet),tab(s)
+225,Griseofulvin (250mg tablet) ,tab(s)
+226,Griseofulvin (500mg tablet) ,tab(s)
+227,Haloperidol (5mg tablet),tab(s)
+228,Hydrocortisone Sodium Succinate (50mg/ml 2ml ampul,ml
+229,Ivermectin (3mg tablet) ,tab(s)
+230,Ivermectin (6mg tablet) ,tab(s)
+231,Levodopa + Carbidopa (250mg tablet) ,tab(s)
+232,Levothyroxine (100mg tablet) ,tab(s)
+233,Lidocaine Hydrochloride (HCL) 1% (25ml ampulle),ml
+234,Lidocaine Hydrochroride (HCL) 2% (25ml ampulle),ml
+235,Lofemenol 1 cycle,item
+240,Metformine HCI(500mg tablet),tab(s)
+241,Morphine sulphate (10mg - slow release),tab(s)
+242,Neomycin Sulphate & Bacitracin Zinc Ointment (15g),g
+243,Nicotinamide (50mg tablet),tab(s)
+244,Nitrofurantoin (100mg tablet),tab(s)
+245,Nitrofurantoin (20mg tablet) ,tab(s)
+246,Phenobarbitone (30mg tablet) ,tab(s)
+247,Phenobarbitone sodium (200mg/ml),mg/ml
+248,Potassium chloride (600mg tablet (slow relea)),tab(s)
+249,Praziquantel (600mg tablet),tab(s)
+250,Promethazine (5mg/5mL syrup),ml
+251,Promethazine (50mg),tab(s)
+252,Promethazine hydrochloride (25mg tablet),tab(s)
+253,Quinine Dihydrochloride (300mg/2ml ampulle),ml
+254,Quinine hydrochloride (300 mg tablet),tab(s)
+255,Silver Sulfadiazine Cream (50g tube),%
+256,Sodium Valproate (150mg  capsule (Covulex)),tab(s)
+257,Spironolactone (25mg tablet) ,tab(s)
+258,Valproic Acid (150mg tablet (Convulex 150)),tab(s)
+259,"Vitamin A (100,000 IU tablet)   ",tab(s)
+260,"Vitamin A (200,000 IU tablet)   ",tab(s)
+261,Zinc Oxide 10% cream(100mg tube) ,application
+262,Chloroquine(500mg),tab(s)
+263,Metformin (1g),g
+264,Metformin (850mg),tab(s)
+265,Metformin (750mg),tab(s)
+266,Glibenclamide (10mg tablet),tab(s)
+267,Captopril (6.25mg tablet),tab(s)
+268,Captopril (12.5mg tablet),tab(s)
+269,Captopril (50mg tablet),tab(s)
+270,Quinapril (20mg),tab(s)
+271,Quinapril (40mg tablet),tab(s)
+272,Aspirin (75mg tablet),tab(s)
+273,Aspirin (150mg tablet),tab(s)
+274,Hydrochlorothiazide (12.5mg tablet),tab(s)
+275,HCZ (25mg tablet),tab(s)
+276,Nifedipine (10mg tablet),tab(s)
+277,Nifedipine (20mg tablet),tab(s)
+278,Nifedipine SR (10mg tablet),tab(s)
+279,Nifedipine SR (20mg tablet),tab(s)
+280,Lente Insulin,unit(s)
+281,Propanolol (160mg tablet),tab(s)
+282,Propanolol (240mg tablet),tab(s)
+283,Propanolol (320mg tablet),tab(s)
+284,Methyldopa (125mg tablet),tab(s)
+285,Methyldopa (500mg tablet),tab(s)
+286,Furosemide (20mg tablet),tab(s)
+287,Furosemide (60mg tablet),tab(s)
+288,Furosemide (80mg tablet),tab(s)
+289,Furosemide (120mg tablet),tab(s)
+290,Acyclovir (400mg tablet),tab(s)
+291,Allopurinol (100mg tablet),tab(s)
+292,Benzhexol (5mg tablet),tab(s)
+293,Carbimazole (5mg tablet),tab(s)
+294,Chloramphenicol (250mg tablet),tab(s)
+295,Chlorpheniramine (4mg tablet),tab(s)
+296,Codeine phosphate (15mg tablet),tab(s)
+297,Cotrimoxazole (480mg tablet),tab(s)
+298,Dexamethasone (0.5mg tablet),tab(s)
+299,Diclofenac Sodium (25mg tablet),tab(s)
+300,Digoxin (0.250mg tablet),tab(s)
+301,Doxycycline (100mg tablet),tab(s)
+302,Flucloxacillin (250mg tablet),tab(s)
+303,Hydrocortisone (20mg tablet),tab(s)
+304,Indomethacin (25mg tablet),tab(s)
+305,Mebendazole (500mg tablet),tab(s)
+306,Methotrexate (2.5mg tablet),tab(s)
+307,Nitrofurantoin (50mg tablet),tab(s)
+308,Procyclidine (5mg tablet),tab(s)
+309,Propantheline bromide(15mg),tab(s)
+310,Sodium Valproate (200mg tablet),tab(s)
+311,SP (525mg tablet),tab(s)
+312,Tramadol (50mg),tab(s)
+313,Amoxicillin (125mg/5ml syrup),ml
+314,Chloramphenicol (125mg/5ml syrup),ml
+315,Chlorpheniramine (2mg/5ml Suspension),ml
+316,Flucloxacillin (125mg/5ml suspension),ml
+317,Fluconazole (10mg/ml suspension),ml
+318,Metronidazole (200mg/5ml suspension),ml
+319,Promethazine (25mg/5ml syrup),ml
+320,Aminophylline (25mg/ml),ml
+321,Benzylpenicillin (2.4MU),mu
+322,Cyclizine (50mg/ml Injection),
+323,Cimetidine (200mg/ml Injection),
+324,Dexamethasone (5mg/ml Injection),ml
+325,Diclofenac injection (75mg),mg (injection)
+326,Digoxin (250 mcg/ml),ml
+327,"Flucloxacillin (250mg, vial, PFR)",tab(s)
+328,Fluconazole (2mg/ml injection),ml
+329,Fluphenazine (25mg/ml),ml
+330,Frusemide (10mg/ml injection),ml
+331,Gentamicin (240mg),tab(s)
+332,Heparin (5000u/ml),ml
+333,Hyoscine (20mg/ml Injection),
+334,Hydralazine HCl (1ml Injection),ml
+335,Hydrocortisone iv (50mg/ml injection),ml
+336,Insulin soluble (100 IU/ml Injection),
+337,Insulin lente (100 IU/ml),
+338,Ketamine hydrochloride (50mg/ml injection),ml
+339,Lignocaine hydrochloride(1%),ml
+340,Lignocaine hydrochloride (2%),ml
+341,"Lignocaine + glucose (7.5%,heavy)",ml
+342,Magnesium sulphate (50%),ml
+343,Methylprednisolone (40mg Injection),tab(s)
+344,Metronidazole (5mg/ml Injection),ml
+345,Morphine sulphate (15mg/ml Injection),ml
+346,Neostigmine (2.5mg injection),tab(s)
+347,Oxytocin (10IU/ml),IU/ML
+348,Paraldehyde (10ml),ml
+349,Pethidine hydrochloride (50mg/1ml),ml
+350,Phytomenadione (10mg/ml Vit K),ml
+351,Potassium chloride (20%),ml
+352,Promethazine HCl (25mg/ml),ml
+353,Salbutamol (resp solution 5mg/ml),ml
+354,Salbutamol,ml
+355,Suxamethonium chloride (50mg/ml),ml
+356,"Thiopentone sodium (500mg, PFR)",tab(s)
+357,Water for injections,ml
+358,Rabies vaccine,
+359,Tetanus antitoxin (1500 IU),IU
+360,Vecuronium (4mg/ml Injecion),mg/ml
+361,Ferrous Syrup (60mg/5ml),mg/ml
+362,Ampicillin (500 mg injection PRF),tab(s)
+363,Benzylpenicillin (5mu),mu
+364,Bupivacaine spinal (0.5%),ml
+365,"Cefotaxime (500mg, PFR)",tab(s)
+366,"Chloramphenicol succinate (1g, PFR)",g
+367,Chlorpromazine HCl (25mg/ml),ml
+368,Ergometrine+Oxytocin,ml
+369,Antacid Susp (Mag/Alumin),
+370,Magnesium trisilicate compound,
+371,Frusemide (40mg tablet),tab(s)
+372,Vitamin B complex (strong tablets),tab(s)
+373,Vitamin (tablets),tab(s)
+374,Cephalexin 250mg capsule,tab(s)
+375,Isosorbide dinitrate (10mg tablet),tab(s)
+376,Metronidazole 200mg tablet,tab(s)
+377,Artesunate + Amodiaquine 50+153mg,tab(s)
+378,Amphotericin B (50mg injection),tab(s)
+379,Ampicillin (250mg injection PFR),tab(s)
+380,"Benzylpenicillin (1g,PFR)",g
+381,Gentamicin (20mg/ml Injection),ml
+382,Haloperidol 5mg/ml injection,ml
+383,Melarsoprol (Mel B) 3.6% (6ml),ml
+384,Metoclopramide hydrochloride (5mg/ml),mg/ml
+385,Phytomenadione (2mg/ml Vitamin K),mg/ml
+386,Salbutamol sulphate 1mg/ml,ml
+387,Suramin sodium (1g injection),g
+388,Tetanus antitoxin (20000 IU),IU
+389,Anti-snakebite serum,unit
+390,Acyclovir eye ointment 3%,application
+391,Alcohol 96%,application
+392,Atropine sulphate eye ointment 1%,application
+393,Benzoic acid 6% + salicylic acid 3% ointment,application
+394,Bismuth subgallate compound suppositories,item
+395,Chloramphenicol 5% ear drops,drop(s)
+396,Chloremphenicol eye drops 0.5%,drop(s)
+397,Chlorhexadine 1.5% solution,ml
+398,Erythromycin (60mg/5ml suspension),ml
+399,Fluorescein sodium eye drops 1% (Minims),drop(s)
+400,"Glycerine suppositories (adult), 4g",item
+401,"Glycerine suppositories (child), 2g",item
+402,Halofantrine suspension 100mg/5ml,ml
+403,"Iodine solution, weak (iodine tincture)",application
+404,Ketoconazole suspension 100mg/5ml,ml
+405,Salicylic acid ointment 5% (in YSP base),application
+406,Salicylic acid ointment 5% (in EO base),application
+407,Zinc oxide 15% ointment (in EO base),application
+408,Zinc oxide 15% ointment + sulphur 5%,application
+409,Zinc paste compount + sulphur 5%,application
+410,Soluble Insulin,unit(s)
+555,Amitriptyline (50mg tablet),
+556,Lisinopril (10mg tablet),tab(s)
+557,Lisinopril (20mg tablet),tab(s)
+558,Amlodipine (5mg tablet),tab(s)
+559,Amlodipine (10mg tablet),tab(s)
+560,Propanolol (40mg tablet),tab(s)
+561,Propanolol (80mg),tab(s)
+562,Acyclovir (800mg tablet),tab(s)
+563,Chloramphenicol (500mg),tab(s)
+564,Flucloxacillin (500mg),tab(s)
+565,Fluconazole (400mg),tab(s)
+566,Fluconazole (50mg),tab(s)
+567,Fluconazole (800mg),tab(s)
+568,Atavaquone (750 mg),tab(s)
+569,Beclomethasone Inhaler,
+570,Bisacodyl (10mg),tab(s)
+571,Captopril,
+572,Clindamycin (300mg),tab(s)
+573,Clotrimazole pessaries,
+574,Codeine (30mg),tab(s)
+575,Cotrimoxazole (1920mg),tab(s)
+576,Cotrimoxazole (960mg),tab(s)
+577,Dapsone,
+578,Diazepam,
+579,Digoxin,
+580,Fefol (450 mg),tab(s)
+581,Frusemide (80 mg),tab(s)
+582,Ibuprofen (800mg),tab(s)
+583,Indomethacin (400mg),tab(s)
+584,Isosorbide Dinitrate (20mg),tab(s)
+585,Isosorbide Mononitrate (20mg),tab(s)
+586,Loperamide (4mg),tab(s)
+587,Magnesium Trisilicate (500mg),tab(s)
+588,Metronidazole (2g),g
+589,Metronidazole (400mg),tab(s)
+590,Miconazole gum patch,tablet
+591,Morphine Sulphate Tablets (10mg),tab(s)
+592,Multivitamin,
+593,Nalidixic acid (500mg),tab(s)
+594,Nystatin pessaries,
+595,Omeprazole (40mg),tab(s)
+596,ORS,
+597,Paracetamol (1g),g
+598,Praziquantel (1200 mg),tab(s)
+599,Prednisolone (40mg),tab(s)
+600,Prednisolone (60mg),tab(s)
+601,Prednisolone (20 mg),tab(s)
+602,Primaquine (30mg),tab(s)
+603,Propanolol,
+604,Quinine (600mg),tab(s)
+605,Salbutamol Inhaler,
+606,Trimethoprim,
+607,Tetanus Immuno Globulin,
+609,TD (0.5ml),ml
+610,2SRHZ+7RH,
+611,2RHZE+4RH,
+612,2SRHZE+1RHZE/5RHE,
+613,d4T/3TC/NVP (30/150/200mg tablet),tab(s)
+615,Therapeutic feeding,
+616,Allopurinol (200mg tablet),tab(s)
+617,Allopurinol (300mg tablet),tab(s)
+618,Amitriptyline (75mg tablet),tab(s)
+619,Amoxicillin (500mg),tab(s)
+620,Aspirin (600mg tablet),tab(s)
+621,Benzhexol (1mg tablet),tab(s)
+622,Benzhexol (2mg tablet),tab(s)
+623,Benzhexol (4mg tablet),tab(s)
+624,Carbamazepine (100mg tablet),tab(s)
+625,Carbamazepine (300mg tablet),tab(s)
+626,Carbamazepine (400mg tablet),tab(s)
+627,Carbimazole (10mg tablet),tab(s)
+628,Carbimazole (15mg tablet),tab(s)
+629,Carbimazole (20mg tablet),tab(s)
+630,Carbimazole (30mg tablet),tab(s)
+631,Carbimazole (40mg tablet),tab(s)
+632,Chloramphenicol (1g tablet),g
+633,Chlorpromazine (75mg tablet),tab(s)
+634,Chlorpromazine (200mg tablet),tab(s)
+635,Cimetidine (800mg tablet),tab(s)
+636,Codeine phosphate (30mg tablet),tab(s)
+637,Codeine phosphate (60mg tablet),tab(s)
+638,Diazepam (10mg tablet),tab(s)
+639,Diclofenac Sodium (100mg tablet),tab(s)
+640,Digoxin (0.125mg tablet),tab(s)
+641,Digoxin (0.5mg tablet),tab(s)
+642,Doxycycline (200mg tablet),tab(s)
+643,Erythromycin (500mg tablet),tab(s)
+644,Ferrous sulphate (1 tablet),tablet
+645,Frusemide (120mg tablet),tab(s)
+646,Frusemide (160mg tablet),tab(s)
+647,Hydralazine (50mg tablet),tab(s)
+648,Hydrochlorothiazide (50mg tablet),tab(s)
+649,Hydrocortisone (10mg tablet),tab(s)
+650,Hydrocortisone (30mg tablet),tab(s)
+651,Indomethacin (50mg tablet),tab(s)
+652,Lisinopril (5mg tablet),tab(s)
+653,Lisinopril (2.5mg tablet),tab(s)
+654,Loperamide (2mg),tab(s)
+655,Mebendazole (400mg tablet),tab(s)
+656,Morphine sulphate (15mg (slow release)),tab(s)
+657,Penicillin V (1g),g
+658,Phenobarbitone (60mg) ,tab(s)
+659,Phenobarbitone (90 mg) ,tab(s)
+660,Phenobarbitone (120 mg) ,tab(s)
+661,Phenytoin sodium (150mg tablet),tab(s)
+662,Phenytoin sodium (300mg tablet),tab(s)
+663,Potassium chloride (Slow K (25 mmol)),mmol
+664,Potassium chloride (Slow K (50 mmol)),mmol
+665,Praziquantel (1800 mg),tab(s)
+666,Praziquantel (2400 mg),tab(s)
+667,Propantheline bromide(30mg),tab(s)
+668,Quinapril (10mg),tab(s)
+669,Quinapril (30mg),tab(s)
+670,Sodium Valproate (60mg),tab(s)
+671,Spironolactone (50mg) ,tab(s)
+672,Spironolactone (100mg) ,tab(s)
+673,SP (1 tablet),tablet
+674,SP (2 tablets),tablets
+675,SP (3 tablets),tablets
+676,Tramadol (100mg),tab(s)
+677,Vitamin B complex (1 tablet),tablet
+678,Adrenaline injection,tab(s)
+679,Aminophylline injection,tab(s)
+680,Atropine sulphate injection(600mcg),mcg
+681,Atropine sulphate injection(1200mcg),mcg
+682,Atropine sulphate injection(2400mcg),tab(s)
+683,Cefotaxime injection(1g),g
+684,Cefotaxime injection(2g),g
+685,Ceftriaxone Injection(2g),g
+686,Chloramphenicol injection(2g),g
+687,Chlorpromazine HCl injection (25 mg),tab(s)
+688,Chlorpromazine HCl injection (50 mg),tab(s)
+689,Chlorpromazine HCl injection (100 mg),tab(s)
+690,Chlorpromazine HCl injection (200 mg),tab(s)
+691,Dexamethasone injection (1 mg),tab(s)
+692,Dexamethasone injection (2 mg),tab(s)
+693,Dexamethasone injection (4 mg),tab(s)
+694,Dexamethasone injection (5 mg),tab(s)
+695,Dexamethasone injection (10 mg),tab(s)
+696,Diazepam injection (10mg),mg (injection)
+697,Diazepam injection (20mg),mg (injection)
+698,Diclofenac injection (50mg),mg (injection)
+699,Flucloxacillin injection (500 mg),mg (injection)
+700,"Frusemide 10mg/ml, 2ml",mg (injection)
+701,"Frusemide 10mg/ml, 2ml",mg (injection)
+702,"Frusemide 10mg/ml, 2ml",mg (injection)
+703,"Frusemide 10mg/ml, 2ml",mg (injection)
+704,Gentamicin injection (80mg),mg (injection)
+705,Gentamicin injection (160mg),mg (injection)
+706,Gentamicin injection (240mg),mg (injection)
+707,Heparin 5000u/ml (5ml),iu
+708,Heparin 5000u/ml (5ml),iu
+709,Heparin 5000u/ml (5ml),iu
+710,Hydralazine HCl (2.5ml),mg (injection)
+711,Hydralazine HCl (5ml),mg (injection)
+712,Hydralazine HCl (10ml),mg (injection)
+713,Losartan (25mg tablet),tab(s)
+714,Losartan (50mg tablet),tab(s)
+715,Losartan (100mg tablet),tab(s)
+716,Propranolol (80mg tablet),tab(s)
+717,Propranolol (120mg tablet),tab(s)
+718,Propranolol (160mg tablet),tab(s)
+719,HCZ (50mg tablet),tab(s)
+720,Prednisolone (15mg),tab(s)
+721,Prednisolone (30 mg),tab(s)
+722,Morphine Sulphate Tablets (15mg),tab(s)
+723,Fefol (1 tablet),tablet
+724,Acyclovir (500 mg),tab(s)
+725,Acyclovir (850 mg),tab(s)
+726,Glibenclamide (15mg tablet),tab(s)
+727,Hydralazine (100mg tablet),tab(s)
+728,Glibenclamide (2.5mg tablet),tab(s)
+729,METFORMIN (1000MG),tab(s)
+731,AZT/3TC/NVP (300/150/200mg tablet),tab(s)
+732,AZT/3TC/NVP (60/30/50mg tablet),tab(s)
+733,ABC/3TC (Abacavir and Lamivudine 60/30mg tablet),tab(s)
+734,TDF/3TC (Tenofavir and Lamivudine 300/300mg tablet,tab(s)
+735,TDF/3TC/EFV (300/300/600mg tablet),tab(s)
+736,AZT/3TC (Zidovudine and Lamivudine 60/30 tablet),tab(s)
+737,d4T/3TC (Stavudine Lamivudine 6/30mg tablet),tab(s)
+738,d4T/3TC (Stavudine Lamivudine 30/150 tablet),tab(s)
+739,LPV/r (Lopinavir and Ritonavir 133/33mg tablet),tab(s)
+740,RH (R60/H30),tab(s)
+741,Benzathine Benzylpen 1.44g (2.4MU),g
+742,Atorvastatin (10mg tablet),tab(s)
+743,Baclofen (30mg tablet),tab(s)
+744,Bromocriptine (2.5mg tablet),tab(s)
+745,Calcium Gluconate (600mg tablet),tab(s)
+746,Calcium Sandoze Forte,
+747,Cellcept (500mg),tab(s)
+748,Coversly (4mg tablet),tab(s)
+749,Perisindopril (75mg tablet),tab(s)
+750,Cyclophosphamide (50mg tablet),tab(s)
+751,Dostinex (0.5mg tablet),tab(s)
+752,Doxazosin (4mg tablet),tab(s)
+753,Epilim (300mg tablet),tab(s)
+754,Haloperidol (2mg tablet),tab(s)
+755,Lithium Carbonate (250mg tablet),tab(s)
+756,Lithium Carbonate (400mg tablet),tab(s)
+757,Lithium Carbonate (600mg tablet),tab(s)
+758,Liviferm (2.5mg tablet),tab(s)
+759,Levothyroxine Sodium (100mg tablet),tab(s)
+764,Misoprositol (200ug tablet),UG
+765,Sodium Bicarbonate,
+766,Gabapentin (100mg tablet),tab(s)
+767,Gabapentin (400mg tablet),tab(s)
+768,Norethisterone (5mg tablet),tab(s)
+769,Norfloxacin (400mg tablet),tab(s)
+770,Pericyazine (4mg tablet),tab(s)
+771,Premarin,
+772,Quinine Sulphate (300mg tablet),tab(s)
+773,Ranitidine (150mg tablet),tab(s)
+774,Sandimum Optoral,
+775,Sulphadoxine (500mg tablet),tab(s)
+776,Synarp Forte,
+777,Thioridazine (25mg tablet),tab(s)
+778,Thioridazine (50mg tablet),tab(s)
+779,Thioridazine Hydrochloride (100mg tablet),tab(s)
+780,Tranexamic Acid (tablet),
+781,Trifluoperazine (5mg tablet),tab(s)
+782,Warfarin Sodium (1mg tablet),tab(s)
+783,Actinomycin D(Injection),
+784,Calcium Gluconate 10% (10ml),ml
+786,Zuclopentioxol Acetate (50mg/ml),mg/ml
+788,Cyclophosphamide (200mg PRF),tab(s)
+789,Disodium Parmidronate (15mg),tab(s)
+790,Dopamine (40mg/ml),mg/ml
+792,Dopamine (5ml ampoule),
+793,Ephedrine Sulphate (30mg/ml),mg/ml
+795,Ephedrine Sulphate (1ml),ml
+796,Ergometrine Maleate (500mcg/ml),mcg/ml
+797,Ergometrine Maleate (1ml),ml
+798,Gelatin (500ml pack iv infusion),ml
+799,Haloperidol (2ml),ml
+800,Haloperidol Decanoate Oily (50mg/ml),mg/ml
+801,Haloperidol Decanoate Oily (1ml ampoule),ml
+802,Mannitol 20% (250ml),ml
+803,Metoclopramide hydrochloride (2ml),ml
+804,Phenobarbitone sodium (1ml),ml
+805,Procyclide Hydrochloride (5mg/ml),mg/ml
+806,Procyclide Hydrochloride (2ml),ml
+807,Sodium Bicarbonate 4% (50ml),ml
+808,Sodium Bicarbonate 0.9% (1000ml),ml
+809,Sodium Lactate Compound (1000ml),ml
+810,Vecuronium Bromide (10mg),tab(s)
+811,Venofor (20mg/ml),mg/ml
+812,Metformin (500 mg tablet),tab(s)
+813,Triomune junior (d4T/3TC/NVP 12/60/100mg tablet),tab(s)
+814,TDF/d4T (Tenofavir and Stavudine 300/300mg tablet,tab(s)
+815,DDI/ABC/LPV/r,tab(s)
+816,AZT/3TC/TDF/LPV/r,tab(s)
+817,NVP (Nevirapine syrup 1mL/dose in 25mL bottle),ml
+818,Paracetamol (250mg),tab(s)
+820,Silver nitrate stick,
+821,Halothane (Inhalation),
+822,"Ether, anaesthetic (Inhalation)",
+823,Nitrous oxide (medical gas),
+824,"Lignocaine Hcl + Adrenaline(2% + 1/80,0000)",
+827,Mefenamic acid (capsule 250mg),tab(s)
+828,Naloxone Hcl (injection 20mg),mg/ml
+830,Ipecacuanha (emetic mixture),
+831,Acetylcysteine (injection 200mg),mg/ml
+833,Activated charcoal (powder),
+834,Desferrioxamine (injection 500mg vial),mg
+836,Pralidoxime mesylate (injection 5 ml amp),ml
+837,Ethosuximide (capsule 250mg),
+838,Cephalexin (capsule 250mg),capsule
+839,Procaine penicillin ( 4.8 MU vial injection),
+840,Sodium fusidate (250mg tablet),tab(s)
+841,Chlorambucil  (2mg tablet),tab(s)
+842,Melphalan (2mg tablet),tab(s)
+843,Iron sorbitol ( 5% injection),mg/ml
+845,Hydroxocobalamin (1mg injection),mg/ml
+847,Protamine sulphate (10mg injection),mg/ml
+849,Reserpine (250mg tablet),tab(s)
+850,Prazosin (1mg tablet),tab(s)
+851,Methoxamine HCI (20mg injection),mg/ml
+853,Sodium thiosulphate (10% lotion),application
+855,Brilliant green (0.1% paint),application
+857,Podophyllum resin (15% paint/alcoholic),application
+859,Coal tar (500g crude coal tar),g
+860,Dithranol 0.5% in zinc + Salicylic acid paste (500,g
+861,Lindane (1% cream/lotion),application
+862,Emulsifying ointmentc (500g ointment),g
+863,Barium sulphate (98% oral powder),
+865,Barium sulphate (70% oesophageal cream),
+867,sodium diatrizoate+meglumine diatrizoate (10%+66%),
+869,Lopanoic acid (500mg tablet),tab(s)
+870,lopamidol (6.12 g/10 mL amp  injection),g/ml
+871,Meglumine iothalamate (60% injection),
+873,Meglumine iothalamate (17% iv infusion),
+875,Propyliodone (50% susp),
+877,Sodium iothalamate (70% injection ),
+879,ReSoMal (powder for 1 littre),Litre
+880,Fludrocortisone acetate (100mg tablet),tab(s)
+881,Norgestrel + ethinyl estradiol (0.3mg+0.03mg) tab,tab(s)
+882,Norgestrel (0.57mg tablet),tab(s)
+883,Levonorgestrel (75mg surgical implant ),tab(s)
+884,Levonorgestrel (750mg tablet),tab(s)
+885,Clomiphene citrate (50mg tablet),tab(s)
+886,Thyroxine sodium (100mg tablet),tab(s)
+887,Tuberculin purified ( 1 mL amp/vial injection),ml
+888,Anti D Immunoglobulin (250 mg injection),mg/ml
+890,"Antirabies serum (1,000 IU/5 mL vial injection)",ml
+891,"Diphtheria antitoxin (20,000 IU/vial injection)",ml
+892,"Gas-gangrene antitoxin (25,000 IU/vial injection)",ml
+893,Poliomyelitis vaccine (20-dose dispenser oral),
+894,Suxamethonum chloride (50mg injecftion),mg/ml
+896,Edrophonium chloride (10mg injection),mg/ml
+898,Alcuronium chloride (5mg injection),mg/ml
+900,Neostigmine (2.5mg injection),mg/ml
+902,Idoxuridine (0.1% eye drops),ml
+904,Amethocaine HCI (1% eye drops),ml
+906,Pilocarpine HCI (1% eye drops),ml
+908,Timolol maleate (0.25% eye drops),ml
+910,Cyclopentolate HCI (0.5% eye drops),ml
+912,Tropicamide (0.5% eye drops),ml
+914,Dinoprostone (200mg vag),mg/ml
+916,Dinoprostone (3mg tablet),tab(s)
+917,"Dianeal + dextrose (1.5%, 1 litre bottle solution)",ml
+919,"Dianeal + dextrose(4.25%, 1 litre bottle solution)",Litre
+920,Chlorpromazine HCI(25mg injection),ml
+921,Chlorpromazine HCI (25mg tablet),tab(s)
+922,Promazine (25mg tablet),tab(s)
+924,Beclomethasone (200-dose unit inhalation),
+925,Sodium cromoglycate (20mg spincap),
+926,Thiamine (100mg injection),mg
+927,"Calciferol (10,000 IU tablet)",tab(s)
+928,Acetic acid (2% ear drops),ml
+929,Colchicine (500mg tablet),tab(s)
+930,Lactulose (3.1mg/5ml solution),ml
+931,INH or H (Isoniazid 300mg tablet),tab(s)
+932,ATV/r (Atazanavir 300mg/Ritonavir 100mg),tab(s)
+935,Bendrofluazide (2.5mg tablet),tab(s)
+936,Carvedilol (12.5mg tablet),tab(s)
+937,Carvedilol (25mg tablet),tab(s)
+938,bisoprolol (25mg tablets),tab(s)
+939,bisoprolol (5mg tablets),tab(s)
+940,bisoprolol (10mg tablets),tab(s)
+941,metorpolol (15mg tablet),tab(s)
+942,Enalapril (5mg tablet),tab(s)
+943,Enalapril (10mg tablet),tab(s)
+944,Ramipril (2.5mg tablet),tab(s)
+945,Ramipril (5mg tablet),tab(s)
+946,Ramipril (10mg tablet),tab(s)
+947,Valsartan (20mg tablet),tab(s)
+948,Valsartan (40mg tablet),tab(s)
+949,Telmasartan (20mg tablet),tab(s)
+950,Telmasartan (40mg tablet),tab(s)
+951,NFV(Nelfinavir),tab(s)
+952,ATV/(Atazanavir),tab(s)
+953,atypical mycobacteriosis treatment,tab(s)
+954,RAL (Raltegravir 400mg),tab(s)
+955,d4T/3TC/EFV (Stavudine Lamvudine Efavirenz),tab(s)
+956,insecticide treated net,each
+957,Lamivudine 300,tab(s)
+958,Ipratropium Bromide inhaler,
+959,Ipratropium Bromide inhaler + spacer,
+960,leukotriene Inhibitors,
+961,Paracetamol (500mg),tab(s)
+962,Paracetamol (125mg),tab(s)
+963,TMP/SMX (Cotrimoxazole 120mg tablet),tab(s)
+964,TMP/SMX (Cotrimoxazole 240mg tablet),tab(s)
+965,INH or H (Isoniazid 150mg tablet),tab(s)
+966,INH or H (Isoniazid 200mg tablet),tab(s)
+967,INH or H (Isoniazid 250mg tablet),tab(s)
+968,NVP (Nevirapine 50 mg tablet),tab(s)
+969,ABC/3TC (Abacavir and Lamivudine 600/300mg tablet),tab(s)
+970,Z (Pyrazinamide 400mg tablet),tab(s)
+971,NVP (Nevirapine syrup 1mL/dose in 100mL bottle),ml
+972,ABC600/3TC300 + LPV/R 200/50,tabs
+973,TDF300/3TC300 + LPV/r200/50,tabs
+974,AZT60/3TC30 + LPV/R200/50,tabs
+975,DVR600 +R100 + EFV100 + RAL400,tabs
+976,Darunavir 600mg,tabs
+977,Ritonavir 100mg,tabs
+978,Etravirine 100mg,tabs
+979,LPV/r pellets,caps
+980,Dolutegravir (10mg tablet),tab(s)
+981,Dolutegravir (25mg tablet),tab(s)
+982,Dolutegravir (50mg tablet),tab(s)
+983,TDF300/3TC300/DTG50,tab(s)
+984,AZT300/3TC300,tab(s)
+985,Rifabutin Isoniazid Pyrazinamide Ethambutol,tab(s)
+986,RHZ (R75/H50/Z150),mg
+987,RH (R75/H50),mg
+988,RHZE (R150/H75/Z400/E275),mg
+989,Isoniazid (150mg),mg
+990,Isoniazid (200mg),mg
+991,Isoniazid (300mg),mg
+992,Rifampicin (300mg),mg
+993,Rifampicin (450mg),mg
+994,Rifampicin (600mg),mg
+995,Pyrazinamide (800mg),mg
+996,Pyrazinamide (1000mg),mg
+997,Pyrazinamide (1200mg),mg
+998,Pyrazinamide (1600mg),mg
+999,Pyrazinamide (2000mg),mg
+1000,Ethambutol (600mg),mg
+1001,Ethambutol (800mg),mg
+1002,Ethambutol (1000mg),mg
+1003,Ethambutol (1200mg),mg
+1004,Rifabutin (300mg),mg
+1005,Ethionamide (500mg),mg
+1006,Ethionamide (750mg),mg
+1007,Ethionamide (1000mg),mg
+1008,Prothionamide (500mg),mg
+1009,Prothionamide (750mg),mg
+1010,Prothionamide (1000mg),mg
+1011,Cycloserine (500mg),mg
+1012,Cycloserine (750mg),mg
+1013,P-aminosalicylic acid (8g),g
+1014,P-aminosalicylic acid (8-12g),g
+1015,Clofazimine (200mg),mg
+1016,Clofazimine (300mg),mg
+1017,Clofazimine (100mg),mg
+1018,Streptomycin (500mg),mg
+1019,Streptomycin (600mg),mg
+1020,Streptomycin (700mg),mg
+1021,Streptomycin (800mg),mg
+1022,Streptomycin (900mg),mg
+1023,Streptomycin (1000mg),mg
+1024,Kanamycin (500mg),mg
+1025,Kanamycin (625mg),mg
+1026,Kanamycin (750mg),mg
+1027,Kanamycin (875mg),mg
+1028,Kanamycin (1000mg),mg
+1029,Amikacin (500mg),mg
+1030,Amikacin (625mg),mg
+1031,Amikacin (750mg),mg
+1032,Amikacin (875mg),mg
+1033,Amikacin (1000mg),mg
+1034,Capreomycin (500mg),mg
+1035,Capreomycin (600mg),mg
+1036,Capreomycin (750mg),mg
+1037,Capreomycin (800mg),mg
+1038,Capreomycin (1000mg),mg
+1039,Pyridoxine (25mg),mg
+1040,Pyridoxine (50mg),mg
+1041,Pyridoxine (150mg),mg
+1042,Gentian violet (Tropical),Solution
+1043,RAL (Raltegravir 25mg),tab(s)
+1044,ABC/3TC (Abacavir and Lamivudine 120/60mg tablet),tab(s)
+1045,LPV/r Granules,granule(s)
+1046,Unknown ARV,
+1047,Levofloxacillin (1000mg),mg
+1048,Badaquiline (400mg),mg
+1049,Delamanid (100mg),mg
+1050,Delamanid (200mg),mg
+1051,High-dose isoniazid,mg
+1052,Imipenem-cilastatin,
+1053,Meropenem4,
+1054,Badaquiline (200mg),mg
+1055,Linezolid (600mg),mg
+1056,Rifapentine (150mg),tabs
+1057,Levofloxacin (750mg),mg
+1058,Dexamethasone eye/ear drops 0.1% (5ml) ,ml
+1059,"Tetracycline eye ointment 1%, (3.5g) ",g
+1060,Promethazine (12.5mg) ,mg
+1061,Azithromycin Capsules (500mg) ,mg
+1062,Azithromycin Tablet (500mg) ,mg
+1063,Azithromycin dihydrate (200mg) base/5ml suspension,mg
+1064,Acyclovir Cream 5% ,
+1065,Dressings,
+1066,Zinc sulphate (20mg tablet) ,mg
+1067,Microgynon tab (0.18 mg) ,mg
+1068,Catheter Condom ,
+1069,Catheter disposable female FG 14 ,
+1070,Catheter disposable female FG 16 ,
+1071,Catheter Foleys + urine bag (2000ml) 10g ,
+1072,Catheter Foleys + urine bag (2000ml) 12g ,
+1073,Catheter Foleys + urine bag (2000ml) 14g ,
+1074,Catheter Foleys + urine bag (2000ml) 16g ,
+1075,Catheter Foleys + urine bag (2000ml) 18g ,
+1076,"Catheter Foleys retention 10-20cc FG 18, 2 way ",
+1077,Catheter Foleys retention 10-20cc FG 20 2 way ,
+1078,Catheter Foleys retention 10cc FG 8 ,
+1079,Catheter Foleys retention 10cc FG 10 ,
+1080,Catheter Foleys retention 10cc FG 12 ,
+1081,Catheter Foleys retention 10cc FG 14 ,
+1082,Catheter Foleys retention 10cc FG 16 ,
+1083,Catheter Foleys retention 10cc FG 18 ,
+1084,Catheter Foleys retention 10cc FG 6 ,
+1086,"Catheter Foleys retention 20-30cc FG 20, 3 way ",
+1087,"Catheter Foleys retention 20-30cc FG 22, 3 way ",
+1088,"Catheter Foleys retention 30 - 50cc FG 22, 3way ",
+1089,"Catheter Foley's retention 20-30cc FG 24, 3 way ",
+1090,"Catheter Foleys retention 20-30cc FG 28, 3 way ",
+1091,Catheter Foleys retention 20-30cc FG 30 3 way ,
+1092,Catheter Foleys retention 30cc FG 14 ,
+1093,Catheter Foleys retention 30cc FG 16 ,
+1094,Catheter Foleys retention 30cc FG 18 ,
+1095,Catheter Foleys retention 30cc FG 20 ,
+1096,Catheter Foleys retention 30cc FG 22 ,
+1097,Catheter Foleys retention 30cc FG 24 ,
+1098,Catheter Foleys retention 5-10cc FG 16 2 way ,
+1099,Catheter Foleys retention 5cc FG 16 ,
+1100,Catheter Foleys retention 5cc FG 18 ,
+1101,Catheter Foleys retention 5cc FG 20 ,
+1102,Catheter Foleys retention 5cc FG 8 ,
+1103,Catheter Foleys suction 53cm FG 14 ,
+1104,Catheter Foleys suction 53cm FG 18 ,
+1105,Introducer for catheter 5.5 ,
+1106,Forceps nickel suture extracting ,
+1107,"Catgut chromic suture sterile 0, round bodied ? circle 40mm needle. ",
+1108,"Catgut chromic suture sterile 1,round bodied ? circle 50mm needle ",
+1109,"Catgut chromic suture sterile 2, round bodied ? circle 50mm needle ",
+1110,"Catgut chromic suture sterile 2/0, round bodied ? circle 35mm, needle ",
+1111,"Catgut chromic suture sterile 3/0, round bodied ? circle 25mm, needle ",
+1112,"Catgut chromic suture sterile 4/0, round bodied ? circle 20mm needle ",
+1113,"Polyamide monofilament suture sterile 0, on 40mm round bodied 3/8 circle needle ",
+1114,"Polyamide monofilament suture sterile 0, on 40mm3/8 circle reverse cutting needle ",
+1115,"Polyamide monofilament suture sterile 1, on 40mm 3/8 circle reverse cutting needle ",
+1116,"Polyamide monofilament suture sterile 1, on 40mm round bodied 3/8 circle needle ",
+1117,"Polyamide monofilament suture sterile 2, Cutting Needle ",
+1118,Polyamide monofilament suture 0 taper point 1/2 circle ,
+1119,Polyamide monofilament suture sterile 10/0 on 6mm single armed spatulated needle ,
+1120,Polyamide monofilament suture sterile 10/0 on cutting needle ,
+1121,Polyamide monofilament suture sterile 10/0 Reverse cutting n ,
+1122,"Polyamide monofilament suture sterile 10/0, Spatulated 6mm Needle, Double Armed (12 pcs) ",
+1123,Polyamide monofilament suture sterile 2 (gauge 3.0) on 31mm 3/8 circle round bodied needle ,
+1124,Polyamide monofilament suture sterile 2 (gauge 3/0) on 19mm 3/8 circle reverse cutting needle ,
+1125,"Polyamide monofilament suture sterile 2, on 40mm 3/8 circle reverse cutting needle ",
+1126,"Polyamide monofilament suture sterile 2, on 40mm 3/8 cutting needle ",
+1127,Polyamide monofilament suture sterile 2/0 on 40mm 3/8 circle cutting needle ,
+1128,"Polyamide monofilament suture sterile 2/0, on 40mm 3/8 circle reverse cutting needle ",
+1129,"Polyamide monofilament suture sterile 2/0, on 40mm Reverse cutting ",
+1130,"Polyamide monofilament suture sterile 2/0, on 40mm round bodied 3/8 circle needle ",
+1131,"Polyamide monofilament suture sterile 2/0, on 40mm round bodied needle ",
+1132,Polyamide monofilament suture sterile 3 (gauge 2/0) on 40mm curved 3/8 cutting needle ,
+1133,Polyamide monofilament suture sterile 3/0 on cutting needle ,
+1134,Polyamide monofilament suture sterile 3/0 on 26mm 3/8 circle convetional cutting needle ,
+1135,"Polyamide monofilament suture sterile 3/0, on 40mm round bodied 3/8 circle needle ",
+1136,"Polyamide monofilament suture sterile 3/0, on 40mm3/8 circle reverse cutting needle ",
+1137,Polyamide monofilament suture sterile 4/0 on 40mm round bodied 3/8 circle needle ,
+1138,"Polyamide monofilament suture sterile 4/0, on 40mm round bodied 3/8 circle needle ",
+1139,"Polyamide monofilament suture sterile 5/0, on 40mm round bodied 3/8 circle needle ",
+1140,Polyamide monofilament suture sterile 9/0 Spatulated 6mm Ne ,
+1141,Polyamide monofilament suture sterile CEC 2 (gauge 3/0) on 40mm 3/8 circle cutting needle ,
+1142,Polydioxanone monofilament (PDS II) suture sterile 0 on 30m ,
+1143,"Polydioxanone monofilament (PDS II) suture sterile 1, on 30mm round bodied 1/2 circle needle ",
+1144,"Polydioxanone monofilament (PDS II) suture sterile 2, on 35mm round bodied 1/2 circle needle ",
+1145,"Polydioxanone monofilament (PDS II) suture sterile 2/0, on 35mm round bodied 1/2 circle needle ",
+1146,"Polydioxanone monofilament (PDS II) suture sterile 3/0, on 20mm round bodied 1/2 circle needle ",
+1147,"Polydioxanone monofilament (PDS II) suture sterile 3/0, on 35mm round bodied 1/2 circle needle ",
+1148,Polydioxanone monofilament (PDS II) suture sterile 4/0 on 2 ,
+1149,"Polyglactin 910 braided synthetic surgical suture sterile 0 on round bodied needle, 1/2 cycle, 36-40mm, tapercut/blunt point ",
+1150,Braided synthetic sterile polyglactin 910 surg suture 1 tp ,
+1152,"Polyglactin 910 braided synthetic absorbable surgical suture sterile, 3/0, 75cm on 31mm ? circle round bodied Gauge ",
+1153,"Polyglactin 910 braided synthetic absorbable surgical suture sterile (4/0) gauge 1.5, 75cm on 16mm curved (3/8 circle) cutting needle ",
+1154,"Polyglactin 910 braided synthetic absorbable surgical suture sterile, 3/0, 75cm on 16mm (3/8 circle) on cut needle ",
+1155,Polyglactin 910 braided synthetic absorbable suture sterile ,
+1156,"Braided synthetic sterile polyglactin 910 surgi suture 0, tc ",
+1157,"Polyglactin 910 braided synthetic absorbable suture sterile surgical ligatures 2/ 0, 150cm ",
+1158,"Polyglactin 910 Braided Synthetic Surgical Suture Sterile coated 1 on rev cut needle, 75cm on 35mm 1/2c ",
+1159,Polyglactin 910 Braided Synthetic Surgical Suture Sterile 1 ,
+1160,Polyglactin 910 Braided Synthetic Surgical Suture Sterile 6/0 ophthalmic needle spatulated 20mm Single armed ,
+1161,Polyglactin 910 Braided Synthetic Surgical Suture Sterile 8 ,
+1162,"Polyglactin 910 Braided Synthetic Surgical Suture Sterile 1 on round bodied needle, 1/2 cycle, 50mm ",
+1163,"Polyglactin 910 Braided Synthetic Surgical Suture Sterile 2 on round bodied needle, 1/2 cycle, 50mm ",
+1164,"Polyglactin 910 Braided Synthetic Surgical Suture Sterile 2/ 0, 75cm on 40mm ? circle round bodied needle ",
+1165,"Polyglactin 910 Braided Synthetic Surgical Suture Sterile 3/0 round bodied needle, 1/2 circle 20mm ",
+1166,Polyglactin 910 Braided Synthetic Surgical Suture Sterile 4/0 round bodied needle ,
+1167,Polyglycolic Acid 2/0 Suture 24mm 3/8 Circle Reverse Cutting ,
+1168,Polyglactin 910 Braided Synthetic Surgical Suture Sterile 4/ ,
+1169,Polyglactin 910 Braided Synthetic Surgical Suture Sterile 4 ,
+1170,"Polyglactin 910 Braided Synthetic Surgical Suture Sterile 5/0 Spatulated 6mm Needle, single Armed ",
+1171,"Polyglactin 910 Braided Synthetic Surgical Suture Sterile 8/0 Spatulated 6mm Needle, Single Armed ",
+1172,"Polyglactin 910 nthetic absorbable sterile surgical suture 3/0 on round bodied needle 30mm, 90cm ",
+1173,Shirodka/Macdonalds suture material/tape ,
+1174,Silk non absorbable suture sterile 0 1/2 circle cutting nee ,
+1175,Silk black braided non absorbable suture sterile 2 on cutting needle ,
+1177,Silk black braided non absorbable suture sterile 2 on round bodied needle ,
+1178,Silk black braided non absorbable suture sterile 3/0 on 30mm 1/2 circle cutting needle ,
+1179,Silk black braided non absorbable suture sterile 4/0 on 25mm 1/2 circle cutting needle ,
+1181,Needle suture intestinal size 4 ,
+1182,Needle Suture Intesfying Curved Size 5 ,
+1183,Needle Suture Intesfying Curved Size 6 ,
+1184,Needle suture Size 1 ,
+1185,Ciprofloxacin syrup (250mg/5ml) ,ml
+1186,"Bandage, plaster of paris 10cm X 2.7m long , when stretched ",
+1187,"Bandage, plaster of paris 15cm X 2.7m long , when stretched ",
+1189,"Bandage, plaster of paris 5cm X 2.7m long, when stretched ",
+1190,"Bandage, plaster of paris 7.5cm X 2.7m long, when stretched ",
+1191,Plaster of Paris (POP) 10 cm x 2.7cm slab ,
+1193,Plaster of Paris (POP) 12.5cm x 7.5cm slab ,
+1194,Plaster of Paris (POP) 7.5cm x 7.5cm slab ,
+1195,"Plaster, elastic adhesive 10cm x 5m long, when stretched ",
+1196,"Plaster, elastic adhesive 5cm x 5m long, when stretched ",
+1197,"Plaster, elastic adhesive 7.5cm x 5m long, when stretched ",
+1198,"Plaster, extension 10cm long, when stretched ",
+1199,"Plaster, extension 7.5cm x 5m long, when stretched ",
+1200,"Plaster, zinc oxide 10cm x 5m long, when stretched ",
+1201,"Plaster, zinc oxide 5cm x 5m long, when stretched ",
+1202,"Plaster, zinc oxide 7.5cm x 5m long, when stretched ",
+1203,Gabapentin (300mg) ,mg
+1204,Vitamin C 100mg (Ascorbic acid) ,mg
+1205,Tripride 2 ,
+1206,BG Glutamin (Vitamin B1+B6+B12) (tablets 273mg) ,mg
+1207,Ursodeoxycholic acid (300mg tablet) ,tab
+1208,Clozapine (25mg tablet) ,tab
+1209,Atorvastatin (20mg) ,mg
+1210,HCT 25mg ,mg
+1211,Amlodipine 5mg,mg
+1212,Digoxin (0.25mcg),mcg
+1213,EFV (Efavirenz 400mg tablet),tab(s)
+1214,Darunavir 150mg,tabs
+1215,Ritonavir 50mg,tabs
+1216,INH 300 / RFP 300 (3HP),tabs
+1217,TDF/3TC/EFV (300/300/400mg tablet),tab(s)
+1218,Artesunate injenction,ml
+1219,ASAQ 25mg/67.5mg (3 tablets),tab(s)
+1220,ASAQ 50mg/135mg (3 tablets),tab(s)
+1221,ASAQ 100mg/270mg (3 tablets),tab(s)
+1222,ASAQ 100mg/270mg (6 tablets),tab(s)
+1223,Cotrim (120mg),tab(s)
+1224,Zinc tablet (100mg),tab(s)
+1225,Zinc tablet (50mg),tab(s)
+1226,Zinc tablet (30mg),tab(s)
+1227,Zinc tablet (15mg),tab(s)
+1228,Artovastatin (20mg) ,tab(s)
+1229,Prednisolone (20mg),tab(s)
+1230,Beclomethasone 2 puffs bd,puff(s)
+1231,Beclomethasone 1 puff bd,puff(s)
+1232,Atenolol (50mg),tab(s)
+1233,Spironolactone (25mg),tab(s)
+1234,Amlodipine (20mg),tab(s)
+1235,Amlodipine (5mg),tab(s)
+1236,Amlodipine (2.5mg),tab(s)
+1237,Enalapril (20mg),tab(s)
+1238,Enalapril (10mg),tab(s)
+1239,Enalapril (5mg),tab(s)
+1240,Enalapril (2.5mg),tab(s)
+1241,Hctz (100mg),tab(s)
+1242,Hctz (50mg),tab(s)
+1243,Hctz (25mg),tab(s)
+1244,Hctz (12.5mg),tab(s)
+1246,Cenfixine 400mg,tab(s)
+1247,Sulphadoxine and Pyrimenthane (525mg tablet),tabs(s)
+1248,Cetirizine (10mg),mg
+1249,Whitfield (20g),g
+1250,Cophydrex (67.25mg),mg
+1251,Diclofenac Cream (50g),g
+1252,Diclofenac Cream (100g),g
+1253,Anti Hemorrhoids (8.7%),%
+1254,Cold tabs (537mg),mg
+1255,Liquid Paraffin (100ml),ml
+1256,Liquid Paraffin (400ml),ml
+1257,cotrimoxazole (240mg),mg
+1258,Diclofenac Cream (20g),g
+1259,TDF/FTC (300/200mg tablet),tab(s)
+1260,Microgynon,tab(s)
+1261,Cipro 250 tablet,tab(s)
+1262,Cotrimazole 120 tablet,tab(s)
+1263,Fluconazole cream,tab(s)
+1264,TDF/FTC (300/200mg tablet),mg
+1265,Zinc tablet (10mg),mg
+1266,Zinc tablet (20mg),mg
+1267,Zinc Sulphate (10mg),mg
+1268,Zinc Sulphate (20mg),mg
+1269,Celecoxibs (200mg),mg
+1270,Cotrimoxazole (120mg),mg
+1271,Cefixime (400mg),mg
+1272,Darunavir (400mg),
+1273,Warfarin (2.5mg),mg
+1274,Warfarin (5mg),mg
+1275,Ciprofloxacin (750mg),mg
+1276,Acetazolamide (500mg),mg
+1277,Enoxapiline (10mg),mg
+1278,Rabetalo (10mg),mg
+1279,kepra (100mg),mg
+1280,Losartan (5mg),mg
+1281,Hepanne (5mg),mg
+1282,Pyridoxine /B6 Psych (25mg),mg
+1283,BCG,
+1284,bOPV,
+1288,DPT-HepB-Hib_vac,
+1291,PCV13,
+1296,RTS,
+1300,Vit A,
+1301,IPV,
+1302,MR vaccine,
+1303,MR2,
+1304,TCV,
+1305,HPV vaccine 4-valent,
+1307,Pfizer-BioNTech COVID-19 vaccine,
+1308,AstraZeneca Covid 19,
+1309,Johnson & Johnson Covid 19,
+1310,TD,
+1311,ABC (Abacavir 300mg tablet),(Tabs)
+1312,ABC/3TC (Abacavir and Lamivudine 120/60mg tablet),Tab(s)
+1313,ABC (Abacavir 300mg tablet),Tab(s)
+1314,ABC/3TC (Abacavir and Lamivudine 60/30mg tablet),Tab(s)
+1315,ABC/3TC (Abacavir and Lamivudine 600/300mg tablet),Tab(s)
+1316,ABC600/3TC300 + LPV/R 200/50,Tab(s)
+1317,Acetic acid (2% ear drops),ml
+1318,Acetylcysteine (injection 200mg),mg/ml
+1319,Activated charcoal (powder),
+1321,Albendazole (500mg tablet),Tab(s)
+1322,Alcohol 96%,Application
+1323,Alcuronium chloride (5mg injection),mg/ml
+1324,Amethocaine HCI (1% eye drops),ml
+1325,Amikacin (1000mg),mg
+1326,Amikacin (500mg),mg
+1327,Amikacin (500mg),mg
+1328,Amikacin (750mg),mg
+1329,Amikacin (750mg),mg
+1330,AMK (Amikacin 500mg/2mL ),mg/2mL
+1331,Anti D Immunoglobulin (250 mg injection),mg/ml
+1332,Anti-snakebite serum,unit
+1333,"Antirabies serum (1,000 IU/5 mL vial injection)",ml
+1334,Artesunate + Amodiaquine 50+153mg,Tab(s)
+1335,Artesunate + Amodiaquine 50+153mg,ml
+1336,ASAQ 100mg/270mg (3 tablets),tab(s)
+1337,ASAQ 100mg/270mg (6 tablets),Tab(s)
+1338,ASAQ 25mg/67.5mg (3 tablets),Tab(s)
+1339,ASAQ 50mg/135mg (3 tablets),Tab(s)
+1341,ATV/(Atazanavir),Tab(s)
+1342,ATV/(Atazanavir),Tab(s)
+1343,ATV/r (Atazanavir 300mg/Ritonavir 100mg),Tab(s)
+1344,Atypical mycobacteriosis treatment,Tab(s)
+1345,AZT/3TC/TDF/LPV/r,Tab(s)
+1346,AZT300/3TC300,Tab(s)
+1347,AZT60/3TC30 + LPV/R200/50,Tab(s)
+1348,Badaquiline (200mg),mg
+1349,Badaquiline (400mg),mg
+1350,Barium sulphate (70% oesophageal cream),
+1351,Barium sulphate (98% oral powder),
+1353,Bendrofluazide (2.5mg tablet),Tab(s)
+1354,bisoprolol (10mg tablets),Tab(s)
+1355,bisoprolol (25mg tablets),Tab(s)
+1356,bisoprolol (25mg tablets),1
+1357,Bleomycin for Injection USP,mg/m2
+1358,"Calciferol (10,000 IU tablet)",Tab(s)
+1359,Capreomycin (1000mg),mg
+1360,Capreomycin (500mg),mg
+1361,Capreomycin (600mg),mg
+1362,Capreomycin (750mg),mg
+1363,Capreomycin (800mg),mg
+1364,Carvedilol (12.5mg tablet),Tab(s)
+1365,Carvedilol (25mg tablet),Tab(s)
+1366,Carvedilol (25mg tablet),Tab(s)
+1367,Cenfixine 400mg,Tab(s)
+1368,Cetirizine (10mg),mg
+1369,CFZ (Clofazimine 100mg tablet),Tab(s)
+1370,CFZ (Clofazimine 50mg tablet),Tab(s)
+1371,Chlorambucil (2mg tablet),Tab(s)
+1372,Chlorhexadine 1.5% solution,ml
+1373,Clarithromycin (500mg tablet),tab(s)
+1374,Clofazimine (100mg),mg
+1375,Clofazimine (200mg),mg
+1376,Clofazimine (300mg),mg
+1377,Clomiphene citrate (50mg tablet),tab(s)
+1378,Cyclopentolate HCI (0.5% eye drops),ml
+1379,Cycloserine (500mg),mg
+1380,Cycloserine (750mg),mg
+1381,DDI (Didanosine 125mg tablet),tab(s)
+1382,DDI (Didanosine 200mg tablet),tab(s)
+1383,Delamanid (100mg),mg
+1384,Delamanid (200mg),mg
+1385,Desferrioxamine (injection 500mg vial),mg
+1386,"Dianeal + dextrose (1.5%, 1 litre bottle solution)",ml
+1387,"Dianeal + dextrose(4.25%, 1 litre bottle solution)",Litre
+1388,Dinoprostone (200mg vag),mg/ml
+1389,Dinoprostone (3mg tablet),tab(s)
+1390,"Diphtheria antitoxin (20,000 IU/vial injection)",ml
+1391,Dithranol 0.5% in zinc + Salicylic acid paste (500,g
+1392,Dolutegravir (10mg tablet),tab(s)
+1393,Dolutegravir (25mg tablet),tab(s)
+1394,Dolutegravir (50mg tablet),tab(s)
+1395,E (Ethambutol 100mg tablet),tab(s)
+1396,E (Ethambutol 400mg tablet),tab(s)
+1397,EFV (Efavirenz 100mg tablet),tab(s)
+1398,EFV (Efavirenz 200mg tablet),tab(s)
+1399,EFV (Efavirenz 400mg tablet),tab(s)
+1400,EFV (Efavirenz 50mg tablet),tab(s)
+1401,EFV (Efavirenz 600mg tablet),tab(s)
+1402,Emulsifying ointmentc (500g ointment),g
+1403,Et(Ethionamide 250mg tablet),tab(s)
+1404,Ethambutol (1000mg),mg
+1405,Ethambutol (1200mg),mg
+1406,Ethambutol (600mg),mg
+1407,Ethambutol (800mg),mg
+1408,"Ether, anaesthetic (Inhalation)",
+1409,Ethionamide (1000mg),mg
+1410,Ethionamide (500mg),mg
+1411,Ethionamide (750mg),mg
+1412,Ethosuximide (capsule 250mg),
+1413,Etravirine 100mg,tab(s)
+1414,Fludrocortisone acetate (100mg tablet),tab(s)
+1415,Gati (Gatifloxacin 400 mg tablet),tab(s)
+1416,Halofantrine suspension 100mg/5ml,ml
+1417,Halothane (Inhalation),
+1418,High-dose isoniazid,mg
+1419,HPV,
+1420,Hydroxocobalamin (1mg injection),mg/ml
+1421,Idoxuridine (0.1% eye drops),ml
+1422,IDV (Indinavir 400mg tablet),tab(s)
+1423,Imipenem-cilastatin,
+1424,INH 300 / RFP 300 (3HP),tab(s)
+1425,INH or H (Isoniazid 100mg tablet),tab(s)
+1426,INH or H (Isoniazid 150mg tablet),tab(s)
+1427,INH or H (Isoniazid 200mg tablet),tab(s)
+1428,INH or H (Isoniazid 250mg tablet),tab(s)
+1429,INH or H (Isoniazid 300mg tablet),tab(s)
+1430,Insecticide treated net,each
+1431,Ipecacuanha (emetic mixture),
+1432,Ipratropium Bromide inhaler,
+1433,Ipratropium Bromide inhaler + spacer,
+1435,Iron sorbitol ( 5% injection),mg/ml
+1436,Isoniazid (150mg),mg
+1437,Isoniazid (200mg),mg
+1438,Isoniazid (300mg),mg
+1440,Kanamycin (1000mg),mg
+1441,Kanamycin (500mg),mg
+1442,Kanamycin (625mg),mg
+1443,Kanamycin (750mg),mg
+1444,Kanamycin (875mg),mg
+1445,KM (Kanamycin 1gm vial),g
+1446,Lactulose (3.1mg/5ml solution),ml
+1447,Levofloxacillin (1000mg),mg
+1448,Levofloxacin (750mg),mg
+1449,Levonorgestrel (750mg tablet),tab(s)
+1450,Levonorgestrel (75mg surgical implant ),tab(s)
+1451,Lfx (Levofloxacin 250mg tablet),tab(s)
+1452,Lindane (1% cream/lotion),Application
+1453,LFX (Levofloxacin 500mg tablet),tab(s)
+1454,Linezolid (600mg),mg
+1455,lopamidol (6.12 g/10 mL amp injection),g/ml
+1456,Lopanoic acid (500mg tablet),tab(s)
+1461,Lumefantrine + Arthemether 1 x 6,tab(s)
+1462,Lumefantrine + Arthemether 2 x 6,tab(s)
+1463,Lumefantrine + Arthemether 3 x 6,tab(s)
+1464,Lumefantrine + Arthemether 4 x 6,tab(s)
+1465,Mefenamic acid (capsule 250mg),tab(s)
+1466,Meglumine iothalamate (17% iv infusion),
+1467,Meglumine iothalamate (60% injection),
+1468,Melphalan (2mg tablet),tab(s)
+1469,Methoxamine HCI (20mg injection),mg/ml
+1470,Moxi (Moxifloxacin 400mg tablet),tab(s)
+1471,Naloxone Hcl (injection 20mg),mg/ml
+1472,NFV(Nelfinavir),tab(s)
+1473,Norgestrel (0.57mg tablet),tab(s)
+1474,Norgestrel + ethinyl estradiol (0.3mg+0.03mg) tab,tab(s)
+1475,NVP (Nevirapine 200 mg tablet),tab(s)
+1476,NVP (Nevirapine 50 mg tablet),tab(s)
+1477,NVP (Nevirapine syrup 1.5mL/dose in 25mL bottle),ml
+1478,NVP (Nevirapine syrup 1mL/dose in 100mL bottle),ml
+1479,NVP (Nevirapine syrup 1mL/dose in 25mL bottle),ml
+1480,OFX (Ofloxacin 200mg tablet),tab(s)
+1481,OFX (Ofloxacin 300mg tablet),tab(s)
+1482,OFX (Ofloxacin 400mg tablet),tab(s)
+1483,OPV,
+1485,Pilocarpine HCI (1% eye drops),ml
+1486,Pralidoxime mesylate (injection 5 ml amp),ml
+1487,Prazosin (1mg tablet),tab(s)
+1488,Procaine penicillin ( 4.8 MU vial injection),
+1489,Propranolol (120mg tablet),tab(s)
+1490,Propyliodone (50% susp),
+1491,Protamine sulphate (10mg injection),mg/ml
+1492,Prothionamide 250mg tablet,tab(s)
+1493,Prothionamide (1000mg),mg
+1494,Prothionamide (500mg),mg
+1495,Prothionamide (750mg),mg
+1496,Pyrazinamide (1000mg),mg
+1497,Pyrazinamide (1200mg),mg
+1498,Pyrazinamide (1600mg),mg
+1499,Pyrazinamide (2000mg),mg
+1500,Pyrazinamide (800mg),mg
+1501,RAL (Raltegravir 25mg),tab(s)
+1502,RAL (Raltegravir 400mg),tab(s)
+1503,Ramipril (10mg tablet),tab(s)
+1504,Ramipril (2.5mg tablet),tab(s)
+1505,Ramipril (5mg tablet),tab(s)
+1506,Reserpine (250mg tablet),tab(s)
+1507,ReSoMal (powder for 1 littre),tab(s)
+1508,RFB (Rifabutin 150mg tablet ),tab(s)
+1509,RHZE (R150/H75/Z400),tab(s)
+1510,RHZE (R150/H75/Z400/E275),mg
+1511,RIF or R (Rifampicin 300mg tablet),tab(s)
+1512,Rifabutin (300mg),mg
+1513,Rifabutin Isoniazid Pyrazinamide Ethambutol,tab(s)
+1514,Rifampicin (300mg),mg
+1515,Rifampicin (450mg),mg
+1516,Rifampicin (600mg),mg
+1517,Rifapentine (150mg),tab(s)
+1518,Ritonavir 100mg,tab(s)
+1519,Ritonavir 50mg,tab(s)
+1520,Rota_liq,
+1521,S (Streptomycin 1gm vial),g
+1522,Sodium cromoglycate (20mg spincap),
+1523,sodium diatrizoate+meglumine diatrizoate (10%+66%),
+1524,Sodium fusidate (250mg tablet),tab(s)
+1525,Sodium iothalamate (70% injection ),
+1526,Sodium thiosulphate (10% lotion),Application
+1527,Streptomycin (1000mg),mg
+1528,Streptomycin (500mg),mg
+1529,Streptomycin (600mg),mg
+1530,Streptomycin (700mg),tab(s)
+1531,Streptomycin (800mg),mg
+1532,Streptomycin (900mg),mg
+1533,Sulphadoxine and Pyrimenthane (25mg tablet),tab(s)
+1534,Sulphadoxine and Pyrimenthane (525mg tablet),tab(s)
+1535,Suxamethonum chloride (50mg injecftion),mg/ml
+1537,TDF (Tenofavir 300 mg tablet),tab(s)
+1538,TDF/3TC (Tenofavir and Lamivudine 300/300mg tablet,tab(s)
+1539,TDF/3TC/EFV (300/300/400mg tablet),tab(s)
+1540,TDF/3TC/EFV (300/300/600mg tablet),tab(s)
+1541,TDF/d4T (Tenofavir and Stavudine 300/300mg tablet,tab(s)
+1542,TDF300/3TC300 + LPV/r200/50,tab(s)
+1543,TDF300/3TC300/DTG50,tab(s)
+1544,Thiamine (100mg injection),mg
+1545,Thyroxine sodium (100mg tablet),tab(s)
+1546,Timolol maleate (0.25% eye drops),ml
+1547,TRD (Terizidone 250mg tablet),tab(s)
+1548,Trimethoprim,
+1549,Tropicamide (0.5% eye drops),ml
+1550,Tuberculin purified ( 1 mL amp/vial injection),ml
+1551,Ursodeoxycholic acid (300mg tablet),tab(s)
+1552,Valsartan (20mg tablet),tab(s)
+1553,Valsartan (40mg tablet),tab(s)
+1554,VI (Viomycin),tab(s)
+1555,Z (Pyrazinamide 400mg tablet),tab(s)
+1556,Z (Pyrazinamide 500mg tablet),tab(s)
+1557,Condom Male,
+1558,Condom Female,
+1559,Anti Hemorrhoids (8.7%),%
+1560,Benzyl benzoate 12.5%,%
+1561,Benzyl benzoate 6.25%,%
+1562,Metronidazole 100mg,mg
+1563,Chlorohexidine,
+1564,GV-Paint,
+1565,Amoxicillin 62.5mg,mg
+1566,Salicylic Acid,
+1567,Miconazole 125mg,mg
+1568,Acyclovir 100mg,mg
+1569,Albendazole 100mg,mg
+1570,Magnesium Trisilicate 125mg,mg
+1571,Chlorphenamine 1mg,mg
+1572,TDV,
+1573,Amoxicillin (1000mg),mg
+1574,Zinc (20mg),mg
+1575,Predinisolone (5mg ),mg
+1576,Predinisolone (10mg ),mg
+1577,Predinisolone (20mg ),mg

@@ -28,8 +28,15 @@ from config import (actual_keys_in_data,
 
 path = os.getcwd()
 path_dcc_json = os.path.join(path, 'data/default', 'dcc_dropdown_json','dropdowns.json')
-with open(path_dcc_json) as r:
-    dcc_json = json.load(r)
+if os.path.exists(path_dcc_json):
+    with open(path_dcc_json) as r:
+        dcc_json = json.load(r)
+else:
+    dcc_json = {
+        "programs": [],
+        "encounters": [],
+        "concepts": []
+    }
 
 drop_down_programs = dcc_json['programs']
 drop_down_encounters = dcc_json['encounters']

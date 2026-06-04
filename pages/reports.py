@@ -48,10 +48,6 @@ relative_biannual = RELATIVE_BIANNUAL
 relative_year = [str(year) for year in range(2024, 2051)]
 
 path = os.getcwd()
-dropdowns_json_path = os.path.join(path, 'data/default', 'dcc_dropdown_json', 'dropdowns.json')
-with open(dropdowns_json_path) as x:
-            dropdowns = json.load(x)
-prog_options = dropdowns['programs'] + ['General Reports']
 
 def load_report_options(program=None):
     """Load reports from JSON and return concatenated options for dropdown"""
@@ -256,6 +252,8 @@ def update_month_options(period_type):
         Input('program_filter','value')]
 )
 def update_report_dropdown(urlparams, program):
+    data_route = urlparams.get('route', ["default"])[0] if urlparams else None
+    dropdowns_json_path = os.path.join(path, f'data/{data_route}', 'dcc_dropdown_json', 'dropdowns.json')
     with open(dropdowns_json_path) as x:
             dropdowns = json.load(x)
     prog_options = ['General Reports'] + dropdowns['programs']
@@ -308,6 +306,7 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, repo
     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
     if clicks is None or clicks == 0:
         raise PreventUpdate
+    
     # Handle missing inputs to prevent errors
     if not urlparams or not period_type or not year_filter or not month_filter or not report_filter:
         return html.Div("Missing Report Parameters"), 0, None

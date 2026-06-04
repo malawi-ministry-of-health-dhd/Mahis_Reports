@@ -15,7 +15,6 @@ warnings.filterwarnings("ignore")
 
 logging.basicConfig(level=logging.DEBUG)
 
-QUERY_OBS_OLD = cfg.QUERY_OBS_OLD
 QUERY_OBS_HARMONIZED = cfg.QUERY_OBS_HARMONIZED
 QUERY_PROGRAMS = cfg.QUERY_PROGRAMS
 QUERY_CONCEPT_NAMES = cfg.QUERY_CONCEPT_NAMES
@@ -40,7 +39,6 @@ USE_LOCALHOST = cfg.USE_LOCALHOST
 DATA_PATH_ = cfg.DATA_PATH_
 CONCEPTS = getattr(cfg, "CONCEPTS", None)
 KEYS_IN_DATA = cfg.actual_keys_in_data
-
 
 class DataStorage:
     def __init__ (self, 
@@ -305,6 +303,11 @@ if __name__ == "__main__":
     if os.path.exists(os.path.join(os.path.dirname(os.path.realpath(__file__)), "configurations.json")):
         with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "configurations.json")) as f:
             global_configurations = json.load(f)
+        # JSON serialises tuples as arrays; restore remote_bind_address to tuple
+        for _cfg in global_configurations:
+            _ssh = _cfg.get("ssh_config") or _cfg.get("SSH_CONFIG")
+            if isinstance(_ssh, dict) and isinstance(_ssh.get("remote_bind_address"), list):
+                _ssh["remote_bind_address"] = tuple(_ssh["remote_bind_address"])
     else:
         global_configurations = [
             {
@@ -323,7 +326,7 @@ if __name__ == "__main__":
         ]
         with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "configurations.json"), 'w') as f:
             json.dump(global_configurations, f, indent=2)
-    sys.exit(0)
+
     for items in global_configurations:
         BASE_QUERY = items.get("base_query")
         DATA_ROUTE = f"data/{items.get('data_path')}"
@@ -334,40 +337,40 @@ if __name__ == "__main__":
         LOAD_FRESH_DATA = items.get("load_fresh_data", True)
         START_DATE = items.get("start_date", "2026-01-01")
 
-    
-        programs = DataStorage(query=QUERY_PROGRAMS)
+
+        programs = DataStorage(query=QUERY_PROGRAMS,data_dir=DATA_ROUTE)
         programs.fetch_and_save_single_table(table_name="programs_data")
 
-        concepts = DataStorage(query=QUERY_CONCEPT_NAMES)
+        concepts = DataStorage(query=QUERY_CONCEPT_NAMES,data_dir=DATA_ROUTE)
         concepts.fetch_and_save_single_table(table_name="concept_names_data")
 
-        encounter_types = DataStorage(query=QUERY_ENCOUNTER_TYPES)
+        encounter_types = DataStorage(query=QUERY_ENCOUNTER_TYPES,data_dir=DATA_ROUTE)
         encounter_types.fetch_and_save_single_table(table_name="encounter_types_data")
 
-        locations = DataStorage(query=QUERY_LOCATIONS)
+        locations = DataStorage(query=QUERY_LOCATIONS,data_dir=DATA_ROUTE)
         locations.fetch_and_save_single_table(table_name="locations_data")
 
-        if not IS_HARMONIZED_MAHIS:
-            facilities = DataStorage(query=QUERY_FACILITIES)
-            facilities.fetch_and_save_single_table(table_name="facilities_data")
+        # if not IS_HARMONIZED_MAHIS:
+        #     facilities = DataStorage(query=QUERY_FACILITIES)
+        #     facilities.fetch_and_save_single_table(table_name="facilities_data")
 
-        drugs = DataStorage(query=QUERY_DRUGS)
+        drugs = DataStorage(query=QUERY_DRUGS,data_dir=DATA_ROUTE)
         drugs.fetch_and_save_single_table(table_name="drugs_data")
 
-        order_types = DataStorage(query=QUERY_ORDER_TYPES)
+        order_types = DataStorage(query=QUERY_ORDER_TYPES,data_dir=DATA_ROUTE)
         order_types.fetch_and_save_single_table(table_name="order_types_data")
 
 
-        users = DataStorage(query=QUERY_USERS)
+        users = DataStorage(query=QUERY_USERS,data_dir=DATA_ROUTE)
         users.fetch_and_save_single_table(table_name="users_data")
 
-        user_programs = DataStorage(query=QUERY_USER_PROGRAMS)
+        user_programs = DataStorage(query=QUERY_USER_PROGRAMS,data_dir=DATA_ROUTE)
         user_programs.fetch_and_save_single_table(table_name="user_programs")
 
         # bids = DataStorage(query=QUERY_BIDS)
         # bids.fetch_and_save_single_table(table_name="bids")
 
-        transactional = DataStorage(query=BASE_QUERY, data_dir=DATA_PATH_,
+        transactional = DataStorage(query=BASE_QUERY, data_dir=DATA_ROUTE,
                                     db_config=DB_CONFIG, ssh_config=SSH_CONFIG, 
                                     use_localhost=USE_LOCALHOST,batch_size=BATCH_SIZE, 
                                     load_fresh_data=LOAD_FRESH_DATA, start_date=START_DATE)

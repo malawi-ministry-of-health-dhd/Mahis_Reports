@@ -1,0 +1,10 @@
+order_type_id,name
+1,Drug Order
+2,Drug
+3,Test
+4,Lab 
+5,Drug Given
+6,Drug Prescribed
+7,Common drug orders
+8,Radiology
+9,HTS Lab

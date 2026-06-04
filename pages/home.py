@@ -139,8 +139,8 @@ def _title_level(value: str) -> str:
     return {'national': 'National', 'district': 'District', 'facility': 'Facility'}.get(value, 'Facility')
 
 
-def _load_user_properties() -> list:
-    props_path = os.path.join(os.getcwd(), 'data', 'dcc_dropdown_json', 'user_properties.json')
+def _load_user_properties(route) -> list:
+    props_path = os.path.join(os.getcwd(), f'data/{route}', 'dcc_dropdown_json', 'user_properties.json')
     try:
         with open(props_path) as f:
             return json.load(f).get('users', [])
@@ -150,9 +150,10 @@ def _load_user_properties() -> list:
 
 def _resolve_user_scope(urlparams, user_data: pd.DataFrame):
     requested_uuid = urlparams.get('uuid', [None])[0] if urlparams else None
+    data_route = urlparams.get('route', ["default"])[0] if urlparams else None
 
     # Check user_properties.json first (GUI-configured overrides)
-    for entry in _load_user_properties():
+    for entry in _load_user_properties(data_route):
         p = entry.get('properties', {})
         if p.get('uuid') == requested_uuid:
             level     = _normalize_level(p.get('user_level'))
