@@ -1448,6 +1448,10 @@ layout = html.Div(
                 dcc.Store(id='current-dashboard-data', data={}),
                 dcc.Store(id='current-dashboard-index', data=-1),
                 dcc.Store(id='delete-confirmation', data=False),
+                dcc.Store(id="ds-refresh-store",
+                          data={"running": False, "pid": None, "start_time": None}),
+                dcc.Interval(id="ds-refresh-interval", interval=2000,
+                             n_intervals=0, disabled=True),
                 dcc.Interval(
                     id='configurations-interval-update-today',
                     interval=10*60*1000,
@@ -1667,12 +1671,22 @@ layout = html.Div(
                         html.Div(className="dashboard-card", style={"margin": "16px 0"}, children=[
                             html.Div(
                                 className="dashboard-card-header",
-                                style={"display": "flex", "justifyContent": "space-between", "alignItems": "center"},
+                                style={"display": "flex", "justifyContent": "space-between",
+                                       "alignItems": "center", "flexWrap": "wrap", "gap": "8px"},
                                 children=[
                                     html.H4("Configure Data Sources", className="dashboard-card-title"),
-                                    html.Div(style={"display": "flex", "gap": "8px"}, children=[
+                                    # Refresh summary (shown after a run completes)
+                                    html.Span(id="ds-refresh-summary",
+                                              style={"fontSize": "12px", "color": "#006401",
+                                                     "fontStyle": "italic", "flex": "1",
+                                                     "textAlign": "center"}),
+                                    html.Div(style={"display": "flex", "gap": "8px",
+                                                    "alignItems": "center"}, children=[
                                         html.Button("➕ New Data Source", id="ds-new-btn", n_clicks=0,
                                                     className="btn-primary-modern btn-small"),
+                                        html.Button("🔄 Refresh Data", id="ds-run-btn", n_clicks=0,
+                                                    className="btn-secondary btn-small",
+                                                    title="Run data_storage.py to pull fresh data"),
                                         html.Button("✕ Close", id="close-datasource-btn", n_clicks=0,
                                                     className="btn-secondary btn-small"),
                                     ]),
@@ -4902,3 +4916,118 @@ def delete_datasource(n_clicks, ds_uuid):
     placeholder_shown = {"display": "block", "color": "#9ca3af",
                           "fontSize": "14px", "padding": "24px 0"}
     return "✓ Deleted", _build_ds_list(sources), {"display": "none"}, placeholder_shown
+
+
+# ── Data Refresh (run data_storage.py) callbacks ─────────────────────────────
+import subprocess as _subprocess
+import sys as _sys
+import time as _time
+
+# Module-level dict to hold the running Popen object keyed by PID.
+# dcc.Store cannot hold a process object, so we park it here.
+_refresh_processes: dict = {}
+
+
+@callback(
+    [Output("ds-refresh-store",    "data",     allow_duplicate=True),
+     Output("ds-refresh-interval", "disabled", allow_duplicate=True),
+     Output("ds-run-btn",          "disabled"),
+     Output("ds-run-btn",          "children"),
+     Output("ds-refresh-summary",  "children", allow_duplicate=True)],
+    Input("ds-run-btn", "n_clicks"),
+    State("ds-refresh-store", "data"),
+    prevent_initial_call=True,
+)
+def start_data_refresh(n_clicks, store):
+    """Launch data_storage.py as a background subprocess and lock the button."""
+    if not n_clicks:
+        raise PreventUpdate
+
+    store = store or {}
+
+    # ── Lock: refuse a second run if one is already in progress ──────────────
+    if store.get("running"):
+        return (store, True, True, "🔄 Refreshing...",
+                "⚠ A refresh is already running.")
+
+    # ── Launch subprocess ─────────────────────────────────────────────────────
+    script_path = os.path.join(path, "data_storage.py")
+    try:
+        proc = _subprocess.Popen(
+            [_sys.executable, script_path],
+            stdout=_subprocess.PIPE,
+            stderr=_subprocess.PIPE,
+        )
+    except Exception as exc:
+        return ({"running": False, "pid": None, "start_time": None},
+                True, False, "🔄 Refresh Data",
+                f"✗ Failed to start: {exc}")
+
+    start_ts = _time.time()
+    _refresh_processes[proc.pid] = (proc, start_ts)
+
+    new_store = {"running": True, "pid": proc.pid,
+                 "start_time": start_ts}
+    return (new_store, False, True, "🔄 Refreshing...", "⏳ Running…")
+
+
+@callback(
+    [Output("ds-refresh-store",    "data",     allow_duplicate=True),
+     Output("ds-refresh-interval", "disabled", allow_duplicate=True),
+     Output("ds-run-btn",          "disabled", allow_duplicate=True),
+     Output("ds-run-btn",          "children", allow_duplicate=True),
+     Output("ds-refresh-summary",  "children", allow_duplicate=True)],
+    Input("ds-refresh-interval",  "n_intervals"),
+    State("ds-refresh-store",     "data"),
+    prevent_initial_call=True,
+)
+def poll_data_refresh(n_intervals, store):
+    """Poll every 2 s; when the process finishes, show a summary."""
+    store = store or {}
+
+    if not store.get("running"):
+        raise PreventUpdate
+
+    pid        = store.get("pid")
+    start_time = store.get("start_time", _time.time())
+
+    entry = _refresh_processes.get(pid)
+    if entry is None:
+        # Process not found — treat as completed (e.g. after a server restart)
+        return ({"running": False, "pid": None, "start_time": None},
+                True, False, "🔄 Refresh Data", "✓ Completed (process not found).")
+
+    proc, _ = entry
+    retcode  = proc.poll()   # None = still running
+
+    if retcode is None:
+        elapsed = _time.time() - start_time
+        return (store, False, True, "🔄 Refreshing…",
+                f"⏳ Running… ({elapsed:.0f}s)")
+
+    # ── Process finished ──────────────────────────────────────────────────────
+    elapsed  = round(_time.time() - start_time, 1)
+    _refresh_processes.pop(pid, None)
+
+    # Count rows in the parquet file
+    row_count = "—"
+    try:
+        from data_storage import DataStorage
+        _route    = "default"
+        pq_path   = os.path.join(path, "data", _route, "parquet")
+        if os.path.isdir(pq_path) or os.path.exists(pq_path):
+            count_df  = DataStorage.query_duckdb(
+                f"SELECT COUNT(*) AS n FROM '{pq_path}'"
+            )
+            row_count = f"{int(count_df['n'].iloc[0]):,}"
+    except Exception:
+        pass
+
+    if retcode == 0:
+        summary = (f"✓ Completed in {elapsed}s — {row_count} rows in dataset")
+    else:
+        stderr_out = proc.stderr.read().decode(errors="replace")[-300:] if proc.stderr else ""
+        summary    = f"✗ Failed (exit {retcode}) after {elapsed}s. {stderr_out}"
+
+    done_store = {"running": False, "pid": None, "start_time": None}
+    return (done_store, True, False, "🔄 Refresh Data", summary)
