@@ -1950,6 +1950,7 @@ def toggle_mnid_section(dashboard_type):
         return {"display": "block"}
     return {"display": "none"}
 
+DATA_ROUTE = ""
 # validate admins
 @callback(
         [Output('sidebar', 'children'),
@@ -1958,26 +1959,27 @@ def toggle_mnid_section(dashboard_type):
 def validate_admin_access(urlparams):
     location = urlparams.get('Location', [None])[0]
     data_route = urlparams.get('route', ["default"])[0]
+    user_uuid = urlparams.get('uuid', [None])[0]
     DATA_PATH_ = f"data/{data_route}/parquet"
 
-    user_data_path = os.path.join(path, f'data/{data_route}','single_tables', 'users_data.csv')
-    if not os.path.exists(user_data_path):
-        user_data = pd.DataFrame(columns=['uuid', 'role'])
-    else:
-        user_data = pd.read_csv(os.path.join(path, f'data/{data_route}','single_tables', 'users_data.csv'))
-        authorized_users = user_data[user_data['role'].isin(['Superuser,Superuser'])]
-    test_admin = pd.DataFrame(columns=['uuid', 'role'], data=[[DEMO_UUID, 'reports_admin']])
-    user_data = pd.concat([authorized_users, test_admin], ignore_index=True)
-
-    user_info = user_data[user_data['uuid'] == urlparams.get('uuid', [None])[0]]
-    if user_info.empty:
-        return dash.no_update, html.Div([
-            html.H2("Access Denied"),
-            html.P("You do not have permission to access this page. Please log in as an administrator.")], 
-            style={'textAlign': 'center', 'marginTop': '100px'})
-    else:
+    props_data = _load_user_props(data_route)
+    existing   = next((u for u in props_data.get("users", []) if u.get("properties").get("uuid") == user_uuid), None)
+    # if not existing:
+    #     existing = {"properties": {"role": "none", "uuid": "none"}}
+    if existing and existing.get("properties").get("role").strip() == "reports_admin":
         return dash.no_update, dash.no_update
-
+    if not existing:
+        if user_uuid == DEMO_UUID:
+            return dash.no_update, dash.no_update
+        else:
+            return dash.no_update, html.Div([
+                html.H2("Access Denied"),
+                html.P("You do not have permission to access this page. Please log in as an administrator.")], 
+                style={'textAlign': 'center', 'marginTop': '100px'})
+    return dash.no_update, html.Div([
+                html.H2("Access Denied"),
+                html.P("You do not have permission to access this page. Please log in as an administrator.")], 
+                style={'textAlign': 'center', 'marginTop': '100px'})
 
 @callback(
     Output('download-template', 'data'),
@@ -4251,20 +4253,16 @@ def toggle_confirmation_modal(show_confirmation):
         return {"display": "none"}
 
 
-# ── Configure Users callbacks ─────────────────────────────────────────────────
-
-_users_csv_path        = os.path.join(path, 'data', 'single_tables', 'users_data.csv')
-_user_props_path       = os.path.join(path, 'data', 'dcc_dropdown_json', 'user_properties.json')
-_facilities_json_path  = os.path.join(path, 'data', 'dcc_dropdown_json', 'facilities_dropdowns.json')
-
-def _load_user_csv():
+def _load_user_csv(route):
+    _users_csv_path        = os.path.join(path, f'data/{route}', 'single_tables', 'users_data.csv')
     if not os.path.exists(_users_csv_path):
         return pd.DataFrame(columns=['User', 'uuid', 'role'])
     df = pd.read_csv(_users_csv_path)
     df = df.dropna(subset=['User']).drop_duplicates(subset=['User'])
     return df
 
-def _load_user_props():
+def _load_user_props(route):
+    _user_props_path       = os.path.join(path, f'data/{route}', 'dcc_dropdown_json', 'user_properties.json')
     if not os.path.exists(_user_props_path):
         return {"users": []}
     try:
@@ -4273,12 +4271,14 @@ def _load_user_props():
     except (json.JSONDecodeError, IOError):
         return {"users": []}
 
-def _save_user_props(data):
+def _save_user_props(data, route):
+    _user_props_path       = os.path.join(path, f'data/{route}', 'dcc_dropdown_json', 'user_properties.json')
     os.makedirs(os.path.dirname(_user_props_path), exist_ok=True)
     with open(_user_props_path, 'w') as f:
         json.dump(data, f, indent=2)
 
-def _load_facilities():
+def _load_facilities(route):
+    _facilities_json_path  = os.path.join(path, f'data/{route}', 'dcc_dropdown_json', 'facilities_dropdowns.json')
     try:
         with open(_facilities_json_path) as f:
             return json.load(f)
@@ -4303,12 +4303,14 @@ def toggle_user_config_panel(open_clicks, close_clicks):
 # 2. Populate user search dropdown when panel opens
 @callback(
     Output("user-search-dropdown", "options"),
-    Input("user-config-panel", "style"),
+    [Input("user-config-panel", "style"),
+    Input('url-params-store', 'data')],
 )
-def populate_user_dropdown(panel_style):
+def populate_user_dropdown(panel_style, urlparams):
+    data_route = urlparams.get('route', ["default"])[0]
     if not panel_style or panel_style.get("display") == "none":
         raise PreventUpdate
-    df = _load_user_csv()
+    df = _load_user_csv(data_route)
     return [{"label": row["User"], "value": row["User"]} for _, row in df.iterrows()]
 
 
@@ -4325,9 +4327,11 @@ def populate_user_dropdown(panel_style):
      Output("uc-district",           "value"),
      Output("uc-facility-name",      "value")],
     Input("user-search-dropdown", "value"),
+    Input('url-params-store', 'data'),
     prevent_initial_call=True,
 )
-def load_user_into_form(username):
+def load_user_into_form(username, urlparams):
+    route = urlparams.get('route', ["default"])[0]
     placeholder_shown  = {"display": "block", "color": "#9ca3af",
                           "fontSize": "14px", "padding": "24px 0"}
     placeholder_hidden = {"display": "none"}
@@ -4336,7 +4340,7 @@ def load_user_into_form(username):
         return ({"display": "none"}, placeholder_shown,
                 "", "", "", [], None, "facility", [], [])
 
-    df = _load_user_csv()
+    df = _load_user_csv(route)
     user_row = df[df["User"] == username]
     csv_uuid = ""
     csv_location = ""
@@ -4353,7 +4357,7 @@ def load_user_into_form(username):
     default_role = all_roles[0] if all_roles else "reports_admin"
 
     # Overlay with any existing saved properties
-    props_data = _load_user_props()
+    props_data = _load_user_props(route)
     existing   = next((u for u in props_data.get("users", []) if u.get("username") == username), None)
     if existing:
         p            = existing.get("properties", {})
@@ -4404,9 +4408,11 @@ def toggle_district_section(level):
 @callback(
     Output("uc-district", "options"),
     Input("uc-user-level", "value"),
+    Input('url-params-store', 'data')
 )
-def populate_districts(level):
-    facilities = _load_facilities()
+def populate_districts(level, urlparams):
+    route = urlparams.get('route', ["default"])[0]
+    facilities = _load_facilities(route)
     return [{"label": d, "value": d} for d in sorted(facilities.keys())]
 
 
@@ -4414,11 +4420,13 @@ def populate_districts(level):
 @callback(
     Output("uc-facility-name", "options"),
     Input("uc-district", "value"),
+    Input('url-params-store', 'data')
 )
-def update_facility_options(districts):
+def update_facility_options(districts, urlparams):
+    route = urlparams.get('route', ["default"])[0]
     if not districts:
         return []
-    facilities = _load_facilities()
+    facilities = _load_facilities(route)
     opts = []
     for d in (districts or []):
         for fac in facilities.get(d, []):
@@ -4430,7 +4438,8 @@ def update_facility_options(districts):
 @callback(
     [Output("uc-save-status",         "children"),
      Output("configured-users-table", "children")],
-    Input("uc-save-btn", "n_clicks"),
+    [Input("uc-save-btn", "n_clicks"),
+     Input('url-params-store', 'data')],
     [State("uc-username",      "value"),
      State("uc-uuid",          "value"),
      State("uc-facility-code", "value"),
@@ -4440,11 +4449,12 @@ def update_facility_options(districts):
      State("uc-facility-name", "value")],
     prevent_initial_call=True,
 )
-def save_user_properties(n_clicks, username, uuid_val, facility_code, role, user_level, districts, facilities):
+def save_user_properties(n_clicks,urlparams, username, uuid_val, facility_code, role, user_level, districts, facilities):
+    route = urlparams.get('route', ["default"])[0]
     if not n_clicks or not username:
         raise PreventUpdate
 
-    props_data = _load_user_props()
+    props_data = _load_user_props(route)
     users = props_data.get("users", [])
 
     new_entry = {
@@ -4466,7 +4476,7 @@ def save_user_properties(n_clicks, username, uuid_val, facility_code, role, user
         users.append(new_entry)
 
     props_data["users"] = users
-    _save_user_props(props_data)
+    _save_user_props(props_data, route)
 
     return "✓ Saved", _build_users_table(users)
 
@@ -4479,15 +4489,17 @@ def save_user_properties(n_clicks, username, uuid_val, facility_code, role, user
      Output("user-form-placeholder",  "style",    allow_duplicate=True),
      Output("user-search-dropdown",   "value")],
     Input("uc-remove-btn", "n_clicks"),
+    Input('url-params-store', 'data'),
     State("uc-username", "value"),
     prevent_initial_call=True,
 )
-def remove_user(n_clicks, username):
+def remove_user(n_clicks,urlparams, username):
+    route = urlparams.get('route', ["default"])[0]
     if not n_clicks or not username:
         raise PreventUpdate
-    props_data = _load_user_props()
+    props_data = _load_user_props(route)
     props_data["users"] = [u for u in props_data.get("users", []) if u.get("username") != username]
-    _save_user_props(props_data)
+    _save_user_props(props_data, route)
     placeholder_style = {"display": "block", "color": "#9ca3af", "fontSize": "14px",
                           "padding": "40px", "textAlign": "center"}
     return "✓ Removed", _build_users_table(props_data["users"]), {"display": "none"}, placeholder_style, None
@@ -4497,12 +4509,14 @@ def remove_user(n_clicks, username):
 @callback(
     Output("configured-users-table", "children", allow_duplicate=True),
     Input("user-config-panel", "style"),
+    Input('url-params-store', 'data'),
     prevent_initial_call=True,
 )
-def refresh_users_table(panel_style):
+def refresh_users_table(panel_style, urlparams):
+    route = urlparams.get('route', ["default"])[0]
     if not panel_style or panel_style.get("display") == "none":
         raise PreventUpdate
-    data = _load_user_props()
+    data = _load_user_props(route)
     return _build_users_table(data.get("users", []))
 
 

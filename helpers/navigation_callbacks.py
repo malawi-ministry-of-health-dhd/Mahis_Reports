@@ -73,19 +73,24 @@ def register_navigation_callbacks(app, pathname_prefix):
             path = os.getcwd()
             timestamp_path = os.path.join(path, f"data/{data_route}", "TimeStamp.csv")
             os.makedirs(os.path.dirname(timestamp_path), exist_ok=True)
-            users_path = os.path.join(path, f"data/{data_route}", "single_tables", "users_data.csv")
+            users_path = os.path.join(path, f"data/{data_route}", "dcc_dropdown_json", "user_properties.json")
             os.makedirs(os.path.dirname(users_path), exist_ok=True)
             last_updated = pd.read_csv(timestamp_path)["saving_time"].to_list()[0]
-            users = pd.read_csv(users_path)
+            with open(users_path, "r") as f:
+                users = pd.read_json(f)
 
             query = _build_query(data_route,location, uuid, user_level)
             
-            is_admin = uuid == DEMO_UUID
-
-            if uuid in users["uuid"].tolist():
-                role_string = users.query(f'uuid == "{uuid}"')["role"].iloc[0]
-                roles_list = [r.strip() for r in role_string.split(",")]
-                is_admin = "Superuser" in roles_list
+            existing   = next((u for u in users.get("users", []) if u.get("properties").get("uuid") == uuid), None)
+            if existing and existing.get("properties").get("role").strip() == "reports_admin":
+                is_admin = True
+            elif not existing:
+                if uuid == DEMO_UUID:
+                    is_admin = True
+                else:
+                    is_admin = False
+            else:
+                is_admin = False
 
             return _build_nav(pathname_prefix, query, last_updated, is_admin)
         except Exception:
