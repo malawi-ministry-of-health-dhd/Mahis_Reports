@@ -74,8 +74,12 @@ def register_navigation_callbacks(app, pathname_prefix):
             timestamp_path = os.path.join(path, f"data/{data_route}", "TimeStamp.csv")
             os.makedirs(os.path.dirname(timestamp_path), exist_ok=True)
             users_path = os.path.join(path, f"data/{data_route}", "dcc_dropdown_json", "user_properties.json")
+            
             os.makedirs(os.path.dirname(users_path), exist_ok=True)
             last_updated = pd.read_csv(timestamp_path)["saving_time"].to_list()[0]
+
+            if not os.path.exists(users_path):
+                users = {}
             with open(users_path, "r") as f:
                 users = pd.read_json(f)
 
