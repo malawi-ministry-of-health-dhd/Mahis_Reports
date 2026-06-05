@@ -41,3 +41,5 @@ data/mahisdev
 data/mahisuat
 data/mahisprod
 data/local
+configurations.json
+.gitignore

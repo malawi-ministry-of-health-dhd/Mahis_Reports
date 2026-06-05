@@ -1,18 +1,17 @@
 import os
 
-USE_LOCALHOST = True
-START_DATE = '2025-12-01'
+USE_LOCALHOST = False
+START_DATE = '2026-05-01'
 LOAD_FRESH_DATA = False # Set to True to always start from START_DATE and fetch fresh data. Not recommended for large datasets.
 PREFIX_NAME = '/'  # Set to your desired prefix for https paths, e.g., '/myapp'
-BATCH_SIZE = 5000 # Number of records to fetch per batch when loading from database
-IS_HARMONIZED_MAHIS = False # Set to True if using the harmonized MAHIS database schema, False for legacy schema
+BATCH_SIZE = 1000 # Number of records to fetch per batch when loading from database
+IS_HARMONIZED_MAHIS = True # Set to True if using the harmonized MAHIS database schema, False for legacy schema
 DEMO_UUID = "m3his@dhd"
 DEMO_LOCATION = "LL040033"
-
 RELATIVE_DAYS = [ 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'This Week', 'Last Week', 'This Month', 'Last Month' ]
 
 # REFERENTIAL COLUMNS - THESE SHOULD MATCH THE QUERY OUTPUT COLUMNS
-DATA_FILE_NAME_ = "data/parquet"
+DATA_PATH_ = "data/default"
 
 FIRST_NAME_ = 'given_name'
 LAST_NAME_ = 'family_name'
