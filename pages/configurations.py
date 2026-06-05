@@ -1791,11 +1791,33 @@ layout = html.Div(
                                                                       className="modern-input", style={"width": "100%"}),
                                                         ]),
                                                     ]),
-                                                    html.Div(children=[
+                                                    # Authentication type selector
+                                                    html.Div(style={"display": "flex", "gap": "12px",
+                                                                    "alignItems": "center"}, children=[
+                                                        html.Label("Authentication", className="form-label",
+                                                                   style={"marginBottom": "0",
+                                                                          "whiteSpace": "nowrap"}),
+                                                        dcc.RadioItems(
+                                                            id="ds-ssh-auth-type",
+                                                            options=[
+                                                                {"label": "Key File", "value": "key"},
+                                                                {"label": "Password", "value": "password"},
+                                                            ],
+                                                            value="key",
+                                                            inline=True,
+                                                            className="form-input",
+                                                            inputStyle={"marginRight": "4px"},
+                                                            labelStyle={"marginRight": "14px",
+                                                                        "fontSize": "13px"},
+                                                        ),
+                                                    ]),
+
+                                                    # Key file section (shown when auth=key)
+                                                    html.Div(id="ds-ssh-key-section", children=[
                                                         html.Label("SSH Key File", className="form-label"),
                                                         html.Div(style={"display": "flex", "gap": "10px",
-                                                                        "flexWrap": "wrap", "alignItems": "flex-end"},
-                                                                 children=[
+                                                                        "flexWrap": "wrap",
+                                                                        "alignItems": "flex-end"}, children=[
                                                             html.Div(style={"flex": "1"}, children=[
                                                                 dcc.Dropdown(id="ds-ssh-pkey-select",
                                                                              placeholder="Select existing .pem / .cer file",
@@ -1803,15 +1825,27 @@ layout = html.Div(
                                                                              clearable=True),
                                                             ]),
                                                             html.Span("or", style={"padding": "0 6px",
-                                                                                    "alignSelf": "center",
-                                                                                    "color": "#6b7280"}),
+                                                                                   "alignSelf": "center",
+                                                                                   "color": "#6b7280"}),
                                                             dcc.Upload(id="ds-ssh-key-upload",
-                                                                       children=html.Button("Upload Key File",
-                                                                                            className="btn-secondary btn-small"),
+                                                                       children=html.Button(
+                                                                           "Upload Key File",
+                                                                           className="btn-secondary btn-small"),
                                                                        accept=".pem,.cer,.key"),
                                                         ]),
                                                         html.Span(id="ds-ssh-key-status",
                                                                   style={"fontSize": "12px", "color": "#006401"}),
+                                                    ]),
+
+                                                    # Password section (shown when auth=password)
+                                                    html.Div(id="ds-ssh-password-section",
+                                                             style={"display": "none"}, children=[
+                                                        html.Label("SSH Password", className="form-label"),
+                                                        dcc.Input(id="ds-ssh-password",
+                                                                  placeholder="SSH tunnel password",
+                                                                  type="password",
+                                                                  className="modern-input",
+                                                                  style={"width": "100%"}),
                                                     ]),
                                                     html.Div(style={"display": "flex", "gap": "10px",
                                                                     "flexWrap": "wrap"}, children=[
@@ -4640,7 +4674,9 @@ def populate_ds_panel(panel_style):
      Output("ds-ssh-host",        "value",    allow_duplicate=True),
      Output("ds-ssh-port",        "value",    allow_duplicate=True),
      Output("ds-ssh-user",        "value",    allow_duplicate=True),
+     Output("ds-ssh-auth-type",   "value",    allow_duplicate=True),
      Output("ds-ssh-pkey-select", "value",    allow_duplicate=True),
+     Output("ds-ssh-password",    "value",    allow_duplicate=True),
      Output("ds-ssh-remote-host", "value",    allow_duplicate=True),
      Output("ds-ssh-remote-port", "value",    allow_duplicate=True),
      Output("ds-start-date",      "date",     allow_duplicate=True),
@@ -4659,10 +4695,12 @@ def new_datasource(_):
     return (
         {"display": "block"}, {"display": "none"},
         new_id, today,
-        "",               # name
-        "127.0.0.1", "3306", "", "", "",   # DB_CONFIG
-        "", "22", "ubuntu", None, "", "3306",  # SSH_CONFIG
-        today, "1000", "default", "false", "true", "",  # runtime + query
+        "",                                    # name
+        "127.0.0.1", "3306", "", "", "",       # DB_CONFIG
+        "", "22", "ubuntu",                    # SSH host/port/user
+        "key", None, "",                       # auth_type, pkey, password
+        "", "3306",                            # remote bind address
+        today, "1000", "default", "false", "true", "",
         "",
     )
 
@@ -4682,7 +4720,9 @@ def new_datasource(_):
      Output("ds-ssh-host",        "value",    allow_duplicate=True),
      Output("ds-ssh-port",        "value",    allow_duplicate=True),
      Output("ds-ssh-user",        "value",    allow_duplicate=True),
+     Output("ds-ssh-auth-type",   "value",    allow_duplicate=True),
      Output("ds-ssh-pkey-select", "value",    allow_duplicate=True),
+     Output("ds-ssh-password",    "value",    allow_duplicate=True),
      Output("ds-ssh-remote-host", "value",    allow_duplicate=True),
      Output("ds-ssh-remote-port", "value",    allow_duplicate=True),
      Output("ds-start-date",      "date",     allow_duplicate=True),
@@ -4709,6 +4749,8 @@ def load_datasource_into_form(n_clicks_list):
         rba = ssh.get("remote_bind_address", ["", 3306])
     else:
         rba = []
+    # Determine saved auth type from what keys exist
+    saved_auth = "password" if (ssh and ssh.get("ssh_password")) else "key"
     return (
         {"display": "block"}, {"display": "none"},
         ds.get("uuid", ""), ds.get("date_created", ""),
@@ -4718,7 +4760,9 @@ def load_datasource_into_form(n_clicks_list):
         ssh.get("ssh_host", "") if ssh else "",
         str(ssh.get("ssh_port", 22)) if ssh else "22",
         ssh.get("ssh_user", "ubuntu") if ssh else "ubuntu",
+        saved_auth,
         ssh.get("ssh_pkey", None) if ssh else None,
+        ssh.get("ssh_password", "") if ssh else "",
         rba[0] if isinstance(rba, list) and len(rba) > 0 else "",
         str(rba[1]) if isinstance(rba, list) and len(rba) > 1 else "3306",
         ds.get("start_date", datetime.now().strftime("%Y-%m-%d")),
@@ -4757,22 +4801,25 @@ def upload_ssh_key(contents, filename):
 @callback(
     Output("ds-status", "children", allow_duplicate=True),
     Input("ds-test-btn", "n_clicks"),
-    [State("ds-db-host",     "value"),
-     State("ds-db-port",     "value"),
-     State("ds-db-name",     "value"),
-     State("ds-db-user",     "value"),
-     State("ds-db-password", "value"),
-     State("ds-ssh-host",    "value"),
-     State("ds-ssh-port",    "value"),
-     State("ds-ssh-user",    "value"),
+    [State("ds-db-host",         "value"),
+     State("ds-db-port",         "value"),
+     State("ds-db-name",         "value"),
+     State("ds-db-user",         "value"),
+     State("ds-db-password",     "value"),
+     State("ds-ssh-host",        "value"),
+     State("ds-ssh-port",        "value"),
+     State("ds-ssh-user",        "value"),
+     State("ds-ssh-auth-type",   "value"),
      State("ds-ssh-pkey-select", "value"),
+     State("ds-ssh-password",    "value"),
      State("ds-ssh-remote-host", "value"),
      State("ds-ssh-remote-port", "value")],
     prevent_initial_call=True,
 )
 def test_datasource_connection(n_clicks,
                                 db_host, db_port, db_name, db_user, db_pass,
-                                ssh_host, ssh_port, ssh_user, ssh_pkey,
+                                ssh_host, ssh_port, ssh_user,
+                                ssh_auth_type, ssh_pkey, ssh_password,
                                 ssh_remote_host, ssh_remote_port):
     if not n_clicks:
         raise PreventUpdate
@@ -4782,14 +4829,27 @@ def test_datasource_connection(n_clicks,
             try:
                 from sshtunnel import SSHTunnelForwarder
             except ImportError:
-                return ("⚠ sshtunnel not installed. Run: pip install sshtunnel",)
-            pkey_path = os.path.join(_ssh_dir, ssh_pkey) if ssh_pkey else None
+                return "⚠ sshtunnel not installed. Run: pip install sshtunnel"
+
+            # Build tunnel kwargs based on selected auth type
+            tunnel_kwargs = {
+                "ssh_username": ssh_user,
+                "remote_bind_address": (ssh_remote_host or "localhost",
+                                        int(ssh_remote_port or 3306)),
+            }
+            if ssh_auth_type == "password":
+                if not ssh_password:
+                    return "✗ Password auth selected but no SSH password entered."
+                tunnel_kwargs["ssh_password"] = ssh_password
+            else:
+                pkey_path = os.path.join(_ssh_dir, ssh_pkey) if ssh_pkey else None
+                if not pkey_path:
+                    return "✗ Key auth selected but no key file chosen."
+                tunnel_kwargs["ssh_pkey"] = pkey_path
+
             with SSHTunnelForwarder(
                 (ssh_host, int(ssh_port or 22)),
-                ssh_username=ssh_user,
-                ssh_pkey=pkey_path,
-                remote_bind_address=(ssh_remote_host or "localhost",
-                                     int(ssh_remote_port or 3306)),
+                **tunnel_kwargs,
             ) as tunnel:
                 try:
                     import pymysql
@@ -4834,7 +4894,9 @@ def test_datasource_connection(n_clicks,
      State("ds-ssh-host",        "value"),
      State("ds-ssh-port",        "value"),
      State("ds-ssh-user",        "value"),
+     State("ds-ssh-auth-type",   "value"),
      State("ds-ssh-pkey-select", "value"),
+     State("ds-ssh-password",    "value"),
      State("ds-ssh-remote-host", "value"),
      State("ds-ssh-remote-port", "value"),
      State("ds-start-date",      "date"),
@@ -4847,41 +4909,52 @@ def test_datasource_connection(n_clicks,
 )
 def save_datasource(n_clicks, ds_uuid, date_created, name,
                     db_host, db_port, db_name, db_user, db_pass,
-                    ssh_host, ssh_port, ssh_user, ssh_pkey,
+                    ssh_host, ssh_port, ssh_user,
+                    ssh_auth_type, ssh_pkey, ssh_password,
                     ssh_remote_host, ssh_remote_port,
                     start_date, batch_size, data_file_name,
                     load_fresh, is_harmonized, base_query):
     if not n_clicks or not name:
         raise PreventUpdate
     use_ssh = bool(ssh_host and ssh_host.strip())
-    
-    entry = {
-        "uuid":         ds_uuid or f"ds_{uuid.uuid4().hex[:8]}",
-        "name":         name,
-        "date_created": date_created or datetime.now().strftime("%Y-%m-%d"),
-        "date_updated": datetime.now().strftime("%Y-%m-%d"),
-        "use_localhost":       not use_ssh,
-        "start_date":          start_date or datetime.now().strftime("%Y-%m-%d"),
-        "load_fresh_data":     load_fresh == "true",
-        "data_path":      data_file_name or "default",
-        "base_query":          base_query or "",
-        "is_harmonized_emr": is_harmonized == "true",
-        "batch_size":          int(batch_size or 1000),
-        "db_config": {
-                "host":     db_host or "127.0.0.1",
-                "port":     int(db_port or 3306),
-                "database": db_name or "",
-                "user":     db_user or "",
-                "password": db_pass or "",
-            },
-        "ssh_config": {
-            "ssh_host":            ssh_host or "",
-            "ssh_port":            int(ssh_port or 22) if ssh_host else None,
-            "ssh_user":            ssh_user or "ubuntu" if ssh_host else None,
-            "ssh_pkey":            ssh_pkey or None,
+
+    # Build SSH_CONFIG only when SSH host is provided;
+    # include either ssh_pkey OR ssh_password depending on auth type (never both)
+    if use_ssh:
+        ssh_cfg = {
+            "ssh_host": ssh_host,
+            "ssh_port": int(ssh_port or 22),
+            "ssh_user": ssh_user or "ubuntu",
             "remote_bind_address": [ssh_remote_host or "localhost",
                                     int(ssh_remote_port or 3306)],
-        } if use_ssh else None,
+        }
+        if ssh_auth_type == "password" and ssh_password:
+            ssh_cfg["ssh_password"] = ssh_password   # only key present
+        elif ssh_pkey:
+            ssh_cfg["ssh_pkey"] = ssh_pkey            # only pkey present
+    else:
+        ssh_cfg = None
+
+    entry = {
+        "uuid":            ds_uuid or f"ds_{uuid.uuid4().hex[:8]}",
+        "name":            name,
+        "date_created":    date_created or datetime.now().strftime("%Y-%m-%d"),
+        "date_updated":    datetime.now().strftime("%Y-%m-%d"),
+        "use_localhost":   not use_ssh,
+        "start_date":      start_date or datetime.now().strftime("%Y-%m-%d"),
+        "load_fresh_data": load_fresh == "true",
+        "data_path":       data_file_name or "default",
+        "base_query":      base_query or "",
+        "is_harmonized_emr": is_harmonized == "true",
+        "batch_size":      int(batch_size or 1000),
+        "db_config": {
+            "host":     db_host or "127.0.0.1",
+            "port":     int(db_port or 3306),
+            "database": db_name or "",
+            "user":     db_user or "",
+            "password": db_pass or "",
+        },
+        "ssh_config": ssh_cfg,
     }
     sources = _load_datasources()
     for items in sources:
@@ -5031,3 +5104,16 @@ def poll_data_refresh(n_intervals, store):
 
     done_store = {"running": False, "pid": None, "start_time": None}
     return (done_store, True, False, "🔄 Refresh Data", summary)
+
+
+# ── SSH auth-type toggle (key ↔ password) ─────────────────────────────────────
+@callback(
+    [Output("ds-ssh-key-section",      "style"),
+     Output("ds-ssh-password-section", "style")],
+    Input("ds-ssh-auth-type", "value"),
+    prevent_initial_call=False,
+)
+def toggle_ssh_auth_type(auth_type):
+    if auth_type == "password":
+        return {"display": "none"}, {"display": "block"}
+    return {"display": "block"}, {"display": "none"}
