@@ -78,10 +78,11 @@ def register_navigation_callbacks(app, pathname_prefix):
             os.makedirs(os.path.dirname(users_path), exist_ok=True)
             last_updated = pd.read_csv(timestamp_path)["saving_time"].to_list()[0]
 
-            if not os.path.exists(users_path):
-                users = {}
-            with open(users_path, "r") as f:
-                users = pd.read_json(f)
+            if os.path.exists(users_path):
+                with open(users_path, "r") as f:
+                    users = pd.read_json(f)
+            else:
+                users = {"users":[]}
 
             query = _build_query(data_route,location, uuid, user_level)
             
