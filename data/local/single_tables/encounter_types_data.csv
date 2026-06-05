@@ -1,225 +1,267 @@
 encounter_type_id,name
-1,ADULTINITIAL
-2,ADULTRETURN
-3,PEDSINITIAL
-4,PEDSRETURN
-5,REGISTRATION
-6,VITALS
-7,APPOINTMENT
-8,OUTPATIENT DIAGNOSIS
-9,HIV CLINIC REGISTRATION
-10,ART_FOLLOWUP
-11,PART_INITIAL
-12,PART_FOLLOWUP
-13,LAB
-14,TB_INITIAL
-15,TB_FOLLOWUP
-17,PATIENT EVALUATION
-20,EID_INITIAL
-21,EID_FOLLOWUP
-22,Bacteriology Result
-23,DST Result
-24,CHEMOTHERAPY
-25,TREATMENT
-26,REQUEST
-27,ADMINISTRATION
-28,EXAMINATION
-29,DIABETES HYPERTENSION INITIAL VISIT
-30,MEDICAL HISTORY
-31,COMPLICATIONS
-32,LAB RESULTS
-33,EYE COMPLICATIONS
-34,NEURALGIC COMPLICATIONS
-35,CARDIOVASCULAR COMPLICATIONS
-36,RENAL COMPLICATIONS
-37,ENDOCRINE COMPLICATIONS
-38,DIABETES TEST
-39,UPDATE HIV STATUS
-40,PATIENT OUTCOME
-41,DIAGNOSIS
-42,ADMIT PATIENT
-43,DIABETES HISTORY
-44,DIABETES TREATMENTS
-46,PAST DIABETES MEDICAL HISTORY
-47,INITIAL DIABETES COMPLICATIONS
-48,HYPERTENSION MANAGEMENT
-49,GENERAL HEALTH
-51,HIV RECEPTION
-52,HIV STAGING
-53,HIV CLINIC CONSULTATION
-54,DISPENSING
-55,LABEL SPECIMENS
-56,INFLUENZA DATA
-57,LAB ORDERS
-58,CHRONIC CONDITIONS
-59,MATERNITY DIAGNOSIS
-61,MARTENITY VISIT
-62,IS PATIENT REFERRED?
-63,REFER PATIENT OUT?
-64,ACTUAL DIAGNOSIS
-65,DIABETES INITIAL QUESTIONS
-66,TRANSFER OUT
-67,CHRONIC CARE VISIT
-68,ART ADHERENCE
-69,CHRONIC_CARE_FOLLOWUP
-70,SPUTUM SUBMISSION
-71,TIPS AND REMINDERS
-72,MATERNAL HEALTH SYMPTOMS
-73,CHILD HEALTH SYMPTOMS
-74,DEFAULTER TRACING START
-75,DEFAULTER TRACING STOP
-76,UPDATE PREGNANCY STATUS
-77,TB RECEPTION
-78,TB REGISTRATION
-79,ART Enrollment
-80,OUTPATIENT RECEPTION
-81,CURRENT PREGNANCY
-82,OBSTETRIC HISTORY
-83,SURGICAL HISTORY
-84,SOCIAL HISTORY
-85,TB VISIT
-86,TB CLINIC VISIT
-87,TB ADHERENCE
-88,GIVE LAB RESULTS
-90,BABY DELIVERY
-92,EXPOSED_CHILD_INITIAL
-93,EXPOSED_CHILD_FOLLOWUP
-94,SOURCE OF REFERRAL
-95,MATERNITY EXAMINATION
-97,PATIENT ADMISSIONS
-98,ANC EXAMINATION
-99,PROCEDURES DONE
-100,ADMISSION DIAGNOSIS
-101,DISCHARGE DIAGNOSIS
-102,VAGINAL EXAMINATION
-103,PHYSICAL EXAMINATION
-104,PATIENT REGISTRATION
-105,NOTES
-106,DISCHARGE PATIENT
-107,ANC VISIT TYPE
-111,PREGNANCY STATUS
-112,FILM
-113,SCREENING
-114,REFERRAL
-115,CURRENT BBA DELIVERY
-116,ABDOMINAL EXAMINATION
-117,PHYSICAL EXAMINATION BABY
-119,EXIT FROM HIV CARE
-121,RADIOLOGY EXAMINATION
-122,PRESENTING COMPLAINTS
-123,SOCIAL DETERMINANTS
-124,REFERRAL DIAGNOSIS
-125,INPATIENT DIAGNOSIS
-127,UPDATE BABY OUTCOME
-128,KANGAROO REVIEW VISIT
-129,PMTCT HISTORY
-130,HIV STATUS AT ENROLLMENT
-131,RAPID ANTIBODY TEST
-132,DNA-PCR TEST
-133,EID VISIT
-134,IMMUNIZATION RECORD
-135,VITAMIN A SUPPLEMENTATION AND DE-WORMING SCHEDULE
-136,REASON FOR SPECIAL CARE
-137,INITIAL NEW-BORN RECORD
-138,ASSESSMENT AT ONE WEEK POSTNATAL CHECK
-139,FAMILY MEDICAL HISTORY
-140,UNDER 5 VISIT
-141,ASSESSMENT
-142,ASTHMA MEASURE
-143,DRUGS GIVEN
-144,EPILEPSY CLINIC VISIT
-145,Referral Consent Confirmation
-146,HIV Testing
-147,IN WAITING
-148,IN SESSION
-149,Counseling
-150,BIRTH PLAN
-151,ANC VISIT
-152,HSA VISIT
-153,QUALITY CONTROL TEST
-154,CERVICAL CANCER SCREENING
-156,FAST TRACK ASSESMENT
-157,GENITAL EXAMINATION
-158,CIRCUMCISION
-159,POST-OP REVIEW
-160,FOLLOW UP
-161,SUMMARY ASSESSMENT
-162,REGISTRATION CONSENT
-163,HTS Visit
-164,Confirmatory HIV Testing
-165,POST-OP VITALS
-166,SECOND POST-OP REVIEW
-167,THIRD POST-OP REVIEW
-168,General Consultation
-169,Obstetrics and Gynecology
-170,ORTHOPEDIC VISIT
-171,PRESCRIPTION
-172,SKIN VISIT
-173,INTENSIVE CARE UNIT
-174,DENTAL VISIT
-175,ART VISIT
-176,VMMC VISIT
-177,UNDER_FIVE VISIT
-178,EXIT FROM CARE
-179,REGIMEN INITIAL
-180,REGIMEN CHANGE
-181,CxCa test
-182,CxCa treatment
-183,CxCa reception
-184,CxCa referral feedback
-185,CxCa results
-186,CxCa screening result
-187,CxCa test
-188,CxCa treatment
-189,CxCa reception
-191,CxCa results
-192,CxCa screening result
-193,TRIAGE PRESENTING COMPLAINTS
-194,Partner Reception
-195,HTS Contact
-196,ITEMS GIVEN
-197,Testing
-198,RECENCY
-199,DBS ORDER
-200,SYMPTOM SCREENING
-201,AHD SCREENING
-202,AHD LAB RESULTS
-203,IMMUNIZATION FOLLOWUP
-204,PNC VISIT
-205,Labour and delivery visit
-206,QUICK CHECK
-207,MEDICATIONS
-208,PAST MEDICAL HISTORY
-209,WOMAN BEHAVIOUR
-210,PRESENTING SIGNS FOR IPV
-211,POSTNATAL DETAILS
-212,ROUTINE WARD MONITORING AND MANAGEMENT
-213,DISCHARGE WOMAN
-214,END PNC PROGRAM
-216,POSTNATAL WARD STAY MOTHER
-217,POSTNATAL WARD STAY BABY
-218,POSTNATAL VISIT
-219,LABOUR ASSESSMENT
-220,Delivery Details
-221,IMMEDIATE POSTNATAL CHECKS
-222,Continous Monitoring
-223,END LABOUR PROGRAM
-224,VISIT
-225,AHD PRESENTING COMPLAINTS
-226,AHD PAST MEDICAL HISTORY
-227,AHD LAB ORDERS
-228,AHD HIV STAGING
-229,NEONATAL SYSTEMIC EXAMINATION
-230,NEONATAL SIGNS SYMPTOMS
-231,NEONATAL REVIEW OF SYSTEMS
-232,NEONATAL EMERGENCY TRIAGE
-233,NEONATAL TRIAGE
-234,NEONATAL ADMISSION OUTCOMES
-235,NEONATAL DISCHARGE
-236,NEONATAL ENROLMENT
-237,IMMEDIATE POSTNATAL CHECKS CHILD
-238,KNOWN MEDICAL CONDITION
-239,LABOUR PROFILE
-240,PNC MONITOR BABY
-241,LABOUR ENROLLMENT
-242,PNC ENROLLMENT
+1,Adultinitial
+2,Adultreturn
+3,Pedsinitial
+4,Pedsreturn
+5,Registration
+6,Vitals
+7,Appointment
+8,Outpatient diagnosis
+9,Hiv clinic registration
+10,Art_followup
+11,Part_initial
+12,Part_followup
+13,Lab
+14,Tb_initial
+15,Tb_followup
+16,Patient evaluation
+17,Eid_initial
+18,Eid_followup
+19,Bacteriology result
+20,Dst result
+21,Chemotherapy
+22,Treatment
+23,Request
+24,Administration
+25,Examination
+26,Diabetes hypertension initial visit
+27,Medical history
+28,Complications
+29,Lab results
+30,Eye complications
+31,Neuralgic complications
+32,Cardiovascular complications
+33,Renal complications
+34,Endocrine complications
+35,Diabetes test
+36,Update hiv status
+37,Patient outcome
+38,Diagnosis
+39,Admit patient
+40,Diabetes history
+41,Diabetes treatments
+42,Hospital admissions
+43,Past diabetes medical history
+44,Initial diabetes complications
+45,Hypertension management
+46,General health
+47,Hiv reception
+48,Hiv staging
+49,Hiv clinic consultation
+50,Dispensing
+51,Label specimens
+52,Influenza data
+53,Lab orders
+54,Chronic conditions
+55,Maternity diagnosis
+56,Martenity visit
+57,Is patient referred?
+58,Refer patient out?
+59,Actual diagnosis
+60,Diabetes initial questions
+61,Transfer out
+62,Chronic care visit
+63,Art adherence
+64,Chronic_care_followup
+65,Sputum submission
+66,Tips and reminders
+67,Maternal health symptoms
+68,Child health symptoms
+69,Defaulter tracing start
+70,Defaulter tracing stop
+71,Update pregnancy status
+72,Tb reception
+73,Tb registration
+74,Art enrollment
+75,Outpatient reception
+76,Current pregnancy
+77,Obstetric history
+78,Surgical history
+79,Social history
+80,Tb visit
+81,Tb clinic visit
+82,Tb adherence
+83,Give lab results
+84,Baby delivery
+85,Exposed_child_initial
+86,Exposed_child_followup
+87,Source of referral
+88,Maternity examination
+89,Patient admissions
+90,ANC examination
+91,Procedures done
+92,Admission diagnosis
+93,Discharge diagnosis
+94,Vaginal examination
+95,Physical examination
+96,Patient registration
+97,Notes
+98,Discharge patient
+99,ANC visit type
+100,Pregnancy status
+101,Film
+102,Screening
+103,Referral
+104,Current bba delivery
+105,Abdominal examination
+106,Physical examination baby
+107,Exit from hiv care
+108,Radiology examination
+109,Presenting complaints
+110,Social determinants
+111,Referral diagnosis
+112,Inpatient diagnosis
+113,Patient sent home
+114,Update baby outcome
+115,Kangaroo review visit
+116,Pmtct history
+117,Hiv status at enrollment
+118,Rapid antibody test
+119,Dna-pcr test
+120,Eid visit
+121,Immunization record
+122,Vitamin a supplementation and de-worming schedule
+123,Reason for special care
+124,Initial new-born record
+125,Assessment at one week postnatal check
+126,Family medical history
+127,Under 5 visit
+128,Assessment
+129,Asthma measure
+130,Drugs given
+131,Epilepsy clinic visit
+132,Referral consent confirmation
+133,Hiv testing
+134,In waiting
+135,In session
+136,Counseling
+137,Birth plan
+138,ANC visit
+139,Hsa visit
+140,Quality control test
+141,Cervical cancer screening
+142,Fast track assesment
+143,Genital examination
+144,Circumcision
+145,Post-op review
+146,Follow up
+147,Summary assessment
+148,Registration consent
+149,Hts visit
+150,Confirmatory hiv testing
+151,Post-op vitals
+152,Second post-op review
+153,Third post-op review
+154,General consultation
+155,Obstetrics and gynecology
+156,Orthopedic visit
+157,Prescription
+158,Skin visit
+159,Intensive care unit
+160,Dental visit
+161,Art visit
+162,Vmmc visit
+163,Under_five visit
+164,Exit from care
+165,Regimen initial
+166,Regimen change
+167,Cxca test
+168,Cxca treatment
+169,Cxca reception
+170,Cxca referral feedback
+171,Cxca results
+172,Cxca screening result
+173,Triage presenting complaints
+174,Partner reception
+175,Hts contact
+176,Items given
+177,Testing
+178,Recency
+179,Dbs order
+180,Symptom screening
+181,Ahd screening
+182,Ahd lab results
+183,Emergency drug refill
+184,Immunization followup
+185,Pnc visit
+186,Labour and delivery visit
+187,Quick check
+188,Medications
+189,Past medical history
+190,Woman behaviour
+191,Presenting signs for ipv
+192,Postnatal details
+193,Routine ward monitoring and management
+194,Discharge woman
+195,End pnc program
+196,Postnatal ward stay mother
+197,Postnatal ward stay baby
+198,Postnatal visit
+199,Labour assessment
+200,Delivery details
+201,Immediate postnatal checks
+202,Continous monitoring
+203,End labour program
+204,Visit
+205,Ahd presenting complaints
+206,Ahd past medical history
+207,Ahd lab orders
+208,Ahd hiv staging
+209,Neonatal systemic examination
+210,Neonatal signs symptoms
+211,Neonatal review of systems
+212,Neonatal emergency triage
+213,Neonatal triage
+214,Neonatal admission outcomes
+215,Neonatal discharge
+216,Neonatal enrolment
+217,ANC enrollment
+218,Pregnant outcome
+219,Airway breathing
+220,Blood circulation
+221,Consciousness
+222,Persistent pain
+223,Airway assessment
+224,Breathing assessment
+225,Circulation_assessment
+226,Disability-assessment
+227,Initial registration
+228,Financing
+229,Triage result
+230,Allergies
+231,"General information,"
+232,Head and neck assessment
+233,Chest assessment
+234,Abdomen and pelvis assessment
+235,Extremities assessment
+236,Neurological examination
+237,Exposure_assessment
+238,Patient care area
+239,Non-pharmacological
+240,Review of systems
+241,Bedside investigations
+242,Nursing care notes
+243,Disposition
+244,Continuation sheet
+245,Surgical notes template
+246,Bedside test
+247,Disposed prescription
+248,Primary disability assessment
+249,Cpr
+250,Medical in patient
+251,Gyneacology ward
+252,Lab orders plan
+253,Bedside investigation plan
+254,Awaiting specialty
+255,Soapier prescription
+256,Soapier dispensing
+257,Immediate postnatal checks child
+258,Known medical condition
+259,Labour profile
+260,Pnc monitor baby
+261,Labour enrollment
+262,Pnc enrollment
+263,Summary of labour
+264,PNC ward monitoring mother
+265,PNC ward monitoring baby
+266,Previous ANC contacts

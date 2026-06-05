@@ -1,10 +1,14 @@
 order_type_id,name
 1,Drug Order
-2,Drug
-3,Test
-4,Lab 
-5,Drug Given
-6,Drug Prescribed
-7,Common drug orders
-8,Radiology
-9,HTS Lab
+2,Laboratory Order
+3,Radiology Order
+4,Drug
+5,Test
+6,Lab
+7,Drug given
+8,Drug prescribed
+9,Common drug orders
+10,Radiology
+11,Hts lab
+12,Name
+13,HTS Lab

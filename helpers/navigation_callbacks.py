@@ -16,21 +16,13 @@ def normalize_url_params(params):
     return normalized
 
 
-def _build_query(location, uuid, user_level):
-    if location and uuid and user_level:
-        return f"?Location={location}&uuid={uuid}&user_level={user_level}"
+def _build_query(route, location, uuid, user_level):
+    if route and location and uuid and user_level:
+        return f"?route={route}&Location={location}&uuid={uuid}&user_level={user_level}"
+    if route and location and uuid:
+        return f"?route={route}&Location={location}&uuid={uuid}"
     if location and uuid:
-        return f"?Location={location}&uuid={uuid}"
-    if location and user_level:
-        return f"?Location={location}&user_level={user_level}"
-    if uuid and user_level:
-        return f"?uuid={uuid}&user_level={user_level}"
-    if location:
-        return f"?Location={location}"
-    if uuid:
-        return f"?uuid={uuid}"
-    if user_level:
-        return f"?user_level={user_level}"
+        return f"?route={route}&Location={location}&uuid={uuid}"
     return ""
 
 
@@ -86,7 +78,7 @@ def register_navigation_callbacks(app, pathname_prefix):
             last_updated = pd.read_csv(timestamp_path)["saving_time"].to_list()[0]
             users = pd.read_csv(users_path)
 
-            query = _build_query(location, uuid, user_level)
+            query = _build_query(data_route,location, uuid, user_level)
             
             is_admin = uuid == DEMO_UUID
 
@@ -131,7 +123,7 @@ def register_navigation_callbacks(app, pathname_prefix):
         user_level = url_params.get("user_level", [None])[0] if url_params else None
         data_route = url_params.get("route", ["default"])[0] if url_params else None
 
-        query = _build_query(location, uuid, user_level)
+        query = _build_query(data_route, location, uuid, user_level)
 
         try:
             path = os.getcwd()
