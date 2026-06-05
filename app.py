@@ -22,7 +22,7 @@ app.layout = dmc.MantineProvider(
     children=html.Div(
         [
             dcc.Location(id="url", refresh=False),
-            dcc.Store(id="url-params-store", storage_type="session"),
+            dcc.Store(id="url-params-store", storage_type="memory"),
             html.Div(id="nav-container"),
             page_container,
         ],

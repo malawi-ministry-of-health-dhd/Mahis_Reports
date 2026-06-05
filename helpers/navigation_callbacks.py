@@ -6,24 +6,15 @@ from dash import Input, Output, html
 from dash.exceptions import PreventUpdate
 from config import DEMO_UUID, DEMO_LOCATION
 
-
-def normalize_url_params(params):
-    normalized = dict(params) if params else {}
-    if not normalized.get("Location"):
-        normalized["Location"] = [DEMO_LOCATION]
-    if not normalized.get("uuid"):
-        normalized["uuid"] = [DEMO_UUID]
-    return normalized
-
-
 def _build_query(route, location, uuid, user_level):
     if route and location and uuid and user_level:
         return f"?route={route}&Location={location}&uuid={uuid}&user_level={user_level}"
-    if route and location and uuid:
+    elif route and location and uuid:
         return f"?route={route}&Location={location}&uuid={uuid}"
-    if location and uuid:
+    elif location and uuid:
         return f"?route={route}&Location={location}&uuid={uuid}"
-    return ""
+    else:
+        return ""
 
 
 def _build_nav(pathname_prefix, query, last_updated, show_admin):
@@ -64,7 +55,8 @@ def register_navigation_callbacks(app, pathname_prefix):
     @app.callback(Output("nav-container", "children"), Input("url-params-store", "data"))
     def render_nav(url_params):
         try:
-            url_params = normalize_url_params(url_params)
+            if not isinstance(url_params, dict):
+                url_params = {}
             location = url_params.get("Location", [None])[0]
             uuid = url_params.get("uuid", [None])[0]
             user_level = url_params.get("user_level", [None])[0]
@@ -103,13 +95,49 @@ def register_navigation_callbacks(app, pathname_prefix):
             traceback.print_exc()
             return _build_nav(pathname_prefix, "", "Unknown", False)
 
-    @app.callback(Output("url-params-store", "data"), Input("url", "href"))
+    @app.callback(
+        Output("url-params-store", "data"),
+        Input("url", "href"),
+    )
     def store_url_params(href):
+        """
+        Populate url-params-store from the current URL.
+
+        Rules:
+        - If the URL contains no 'uuid' parameter → return "" (unauthorized).
+        - If the URL contains 'uuid' but it does not match any user in
+          users_data.csv (and is not the DEMO_UUID) → return "" (unauthorized).
+        - Otherwise → return the parsed query-string dict.
+        """
         if not href:
-            raise PreventUpdate
-        parsed_url = urllib.parse.urlparse(href)
-        params = urllib.parse.parse_qs(parsed_url.query)
-        return normalize_url_params(params)
+            return {}
+
+        parsed = urllib.parse.urlparse(href)
+        params = urllib.parse.parse_qs(parsed.query)   # {'uuid': ['...'], ...}
+
+        requested_uuid = (params.get("uuid") or [None])[0]
+
+        # No uuid supplied → unauthorized (empty dict so callers can still .get())
+        if not requested_uuid:
+            return {}
+
+        # Accept the demo/default uuid without hitting the CSV
+        if requested_uuid == DEMO_UUID:
+            return params
+
+        # Validate against users_data.csv
+        try:
+            users_path = os.path.join(os.getcwd(), "data", "single_tables", "users_data.csv")
+            if os.path.exists(users_path):
+                import pandas as _pd
+                users_df = _pd.read_csv(users_path)
+                if requested_uuid in users_df["uuid"].astype(str).values:
+                    return params
+        except Exception:
+            pass
+
+        # uuid not found → unauthorized
+        return {}
 
     @app.callback(Output("url", "pathname"), Input("url", "pathname"), prevent_initial_call=True)
     def redirect_to_home(pathname):
@@ -128,10 +156,12 @@ def register_navigation_callbacks(app, pathname_prefix):
         Input("url-params-store", "data"),
     )
     def update_nav_links(url_params):
-        location = url_params.get("Location", [None])[0] if url_params else None
-        uuid = url_params.get("uuid", [None])[0] if url_params else None
-        user_level = url_params.get("user_level", [None])[0] if url_params else None
-        data_route = url_params.get("route", ["default"])[0] if url_params else None
+        if not isinstance(url_params, dict):
+            url_params = {}
+        location   = url_params.get("Location",   [None])[0]
+        uuid       = url_params.get("uuid",        [None])[0]
+        user_level = url_params.get("user_level",  [None])[0]
+        data_route = url_params.get("route",       ["default"])[0]
 
         query = _build_query(data_route, location, uuid, user_level)
 
