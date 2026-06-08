@@ -865,7 +865,7 @@ def update_dashboard(gen, interval, start_date, end_date, level,
             selected_reports = overview
         else:
             selected_reports = [clicked_name] if clicked_name else [menu_json[0]["report_name"] if menu_json else "Dashboard"]
-        selected_reports = [normalize_report_name(r, menu_json) for r in selected_reports]
+        selected_reports = list(dict.fromkeys(normalize_report_name(r, menu_json) for r in selected_reports))
         dataset_version = _dataset_version_token()
     
         rendered = []

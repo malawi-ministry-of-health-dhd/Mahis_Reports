@@ -15,7 +15,7 @@ pd.options.mode.chained_assignment = None
 import plotly.graph_objects as go
 import uuid
 from datetime import datetime
-from dash import html, dcc, clientside_callback, callback, callback_context, Input, Output, State, ALL
+from dash import html, dcc, clientside_callback, callback, callback_context, no_update, Input, Output, State, ALL
 from dash.exceptions import PreventUpdate
 from helpers.helpers import create_count_from_config
 from mnid.constants import (
@@ -1649,6 +1649,8 @@ def update_trend_chart(n_clicks_list, toggle_clicks, selected_ind_ids, stored_tr
     ind_options = [{'label': i['label'], 'value': i['id']} for i in cat_inds]
     valid_ids = [opt['value'] for opt in ind_options]
     selected = [iid for iid in selected_ind_ids if iid in valid_ids][:2]
+
+    user_changed_indicators = triggered_prop == 'mnid-trend-indicators.value'
     should_default_selection = (
         not triggered_prop
         or 'trend-cat-btn' in str(triggered_prop)
@@ -1665,7 +1667,8 @@ def update_trend_chart(n_clicks_list, toggle_clicks, selected_ind_ids, stored_tr
     ]
     toggle_class = 'mnid-trend-toggle is-bar' if mode == 'bar' else 'mnid-trend-toggle is-line'
     toggle_text = 'Bar' if mode == 'bar' else 'Line'
-    return fig, cat, classes, ind_options, selected, mode, toggle_class, toggle_text
+    indicators_value_out = no_update if user_changed_indicators else selected
+    return fig, cat, classes, ind_options, indicators_value_out, mode, toggle_class, toggle_text
 
 
 def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None = None,
@@ -2067,15 +2070,31 @@ def _monthly_concept_rate(df, concept, positive_values=None, title='', target=No
     if not col:
         return None
 
-    sub['_m'] = pd.to_datetime(sub['Date']).dt.to_period('M')
-    months = sorted(sub['_m'].dropna().unique())[-12:]
-    if not months:
+    dates = pd.to_datetime(sub['Date'], errors='coerce').dropna()
+    if dates.empty:
+        return None
+    span_days = max(int((dates.max() - dates.min()).days), 0)
+    if span_days <= 45:
+        sub['_m'] = dates.dt.floor('D')
+        tickfmt = '%d %b'
+        hover_fmt = '%{x|%d %b %Y}<br>%{y:.0f}%'
+    elif span_days <= 180:
+        sub['_m'] = dates.dt.to_period('W').apply(lambda p: p.start_time)
+        tickfmt = '%d %b'
+        hover_fmt = '%{x|%d %b %Y}<br>%{y:.0f}%'
+    else:
+        sub['_m'] = dates.dt.to_period('M').apply(lambda p: datetime(p.year, p.month, 1))
+        tickfmt = '%b %y'
+        hover_fmt = '%{x|%b %Y}<br>%{y:.0f}%'
+
+    periods = sorted(sub['_m'].dropna().unique())
+    if not periods:
         return None
 
-    xs = [pd.Period(m, 'M').to_timestamp().to_pydatetime() for m in months]
+    xs = list(periods)
     ys = []
-    for m in months:
-        month_df = sub[sub['_m'] == m]
+    for p in periods:
+        month_df = sub[sub['_m'] == p]
         den = month_df['person_id'].dropna().astype(str).nunique() if 'person_id' in month_df.columns else len(month_df)
         if den <= 0:
             ys.append(None)
@@ -2099,7 +2118,7 @@ def _monthly_concept_rate(df, concept, positive_values=None, title='', target=No
         line=dict(color=color, width=2.5, shape='linear'),
         marker=dict(size=6, color=color, line=dict(color='#fff', width=1.35)),
         connectgaps=False,
-        hovertemplate='%{x|%b %Y}<br>%{y:.0f}%<extra></extra>',
+        hovertemplate=hover_fmt + '<extra></extra>',
         showlegend=False,
     ))
 
@@ -2141,7 +2160,7 @@ def _monthly_concept_rate(df, concept, positive_values=None, title='', target=No
         textfont=dict(size=9, color='#374151'),
         marker=dict(size=7, color='#1e293b'),
         showlegend=False,
-        hovertemplate='%{x|%b %Y}: %{y:.0f}%<extra></extra>',
+        hovertemplate=hover_fmt + '<extra></extra>',
     ))
 
     fig.update_layout(
@@ -2151,7 +2170,7 @@ def _monthly_concept_rate(df, concept, positive_values=None, title='', target=No
         margin=dict(l=12, r=8, t=28, b=26),
         height=210,
         title=dict(text=title, x=0, xanchor='left', font=dict(size=12, color='#444441', family=FONT)),
-        xaxis=dict(showgrid=False, zeroline=False, showline=False, tickformat='%b %y',
+        xaxis=dict(showgrid=False, zeroline=False, showline=False, tickformat=tickfmt,
                    tickfont=dict(size=9, color=MUTED)),
         yaxis=dict(range=[0, 115], showgrid=True, gridcolor=GRID_C, zeroline=False, showline=False,
                    tickfont=dict(size=9, color=MUTED), ticksuffix='%',
@@ -3917,6 +3936,10 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
 
     ind_options = [{'label': i['label'], 'value': i['id']} for i in tracked]
     valid_ind_ids = {opt['value'] for opt in ind_options}
+    user_changed_indicators = (
+        ctx and ctx.triggered and
+        ctx.triggered[0]['prop_id'] == 'mnid-compare-indicators.value'
+    )
     selected_ind_ids = [iid for iid in (selected_ind_ids or []) if iid in valid_ind_ids][:3]
     if not selected_ind_ids:
         selected_ind_ids = [i['id'] for i in tracked[:3]]
@@ -4045,7 +4068,8 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
     )
     toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
     toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
-    return fig, entity_options, entities, ind_options, selected_ind_ids, chart_type, toggle_class, toggle_text
+    ind_value_out = no_update if user_changed_indicators else selected_ind_ids
+    return fig, entity_options, entities, ind_options, ind_value_out, chart_type, toggle_class, toggle_text
 
 
 def register_mnid_callbacks(app) -> None:
