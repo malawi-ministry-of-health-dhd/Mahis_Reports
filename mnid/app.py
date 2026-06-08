@@ -1680,12 +1680,15 @@ def _indicator_run_fig(plot_df: pd.DataFrame, ind: dict, color: str,
     pid = 'person_id'
 
     xs, ys = [], []
+    n_vals, d_vals = [], []
     for p in periods:
         pm = plot_df['_p'] == p
         n_val = int(plot_df.loc[pm & nm, pid].dropna().nunique()) if pid in plot_df.columns else int((pm & nm).sum())
         d_val = int(plot_df.loc[pm & dm, pid].dropna().nunique()) if pid in plot_df.columns else int((pm & dm).sum())
         xs.append(p)
         ys.append(round(n_val / d_val * 100, 1) if d_val > 0 else None)
+        n_vals.append(n_val)
+        d_vals.append(d_val)
 
     valid_ys = [y for y in ys if y is not None]
     fig = go.Figure()
@@ -1751,13 +1754,19 @@ def _indicator_run_fig(plot_df: pd.DataFrame, ind: dict, color: str,
         hovertemplate=f'%{{x|{hfmt}}}: %{{y:.0f}}%<extra></extra>',
     ))
 
-    # Main data line
+    # Main data line — customdata carries (n, d) for rich hover
     fig.add_trace(go.Scatter(
         x=xs, y=ys, mode='lines+markers',
         line=dict(color=color, width=2.4, shape='linear'),
         marker=dict(size=5, color=color, line=dict(color='#fff', width=1.2)),
         connectgaps=False, showlegend=False,
-        hovertemplate=f'%{{x|{hfmt}}}<br>Coverage: %{{y:.0f}}%<extra></extra>',
+        customdata=list(zip(n_vals, d_vals)),
+        hovertemplate=(
+            f'<b>%{{x|{hfmt}}}</b><br>'
+            'Coverage: <b>%{y:.1f}%</b><br>'
+            'Clients: %{customdata[0]} / %{customdata[1]}'
+            '<extra></extra>'
+        ),
     ))
 
     fig.update_layout(
@@ -5594,45 +5603,70 @@ _TH = {
 
 # # MNID hero indicator donut row
 
-def _hero_donut_card(label, pct, target, color, mode='max'):
-    """Large CSS conic-gradient donut card for a single indicator."""
+def _hero_donut_card(label, pct, target, color, mode='max', delta_pct=None,
+                     numerator=None, denominator=None):
+    """Large CSS conic-gradient donut card — period delta + num/den counts."""
     p = max(0.0, min(float(pct), 100.0))
     r_v = int(color[1:3], 16)
     g_v = int(color[3:5], 16)
     b_v = int(color[5:7], 16)
     cls = _css(p, target, mode)
     badge_map = {
-        'ok':     ('#F0FDF4', '#14532D', '#BBF7D0', 'On target'),
-        'warn':   ('#FFFBEB', '#92400E', '#FDE68A', 'Performing'),
-        'danger': ('#FEF2F2', '#7F1D1D', '#FECACA', 'Needs review'),
+        'ok':     ('#F0FDF4', '#14532D', '#BBF7D0', '✓ On target', color),
+        'warn':   ('#FFFBEB', '#92400E', '#FDE68A', '~ Watch',     '#F59E0B'),
+        'danger': ('#FEF2F2', '#7F1D1D', '#FECACA', '✕ Review',   '#EF4444'),
     }
-    bg, fg, border, txt = badge_map.get(cls, badge_map['danger'])
+    bg, fg, border, txt, stripe_color = badge_map.get(cls, badge_map['danger'])
 
-    return html.Div(className='mnid-hero-card', children=[
+    # Delta badge
+    if delta_pct is not None:
+        if delta_pct > 0.5:
+            d_cls, d_arrow = 'mnid-hero-delta-up', '▲'
+        elif delta_pct < -0.5:
+            d_cls, d_arrow = 'mnid-hero-delta-down', '▼'
+        else:
+            d_cls, d_arrow = 'mnid-hero-delta-flat', '→'
+        d_sign = '+' if delta_pct > 0 else ''
+        delta_badge = html.Span(
+            f'{d_arrow} {d_sign}{delta_pct:.1f}pp vs prior',
+            className=f'mnid-hero-delta {d_cls}',
+        )
+    else:
+        delta_badge = None
+
+    return html.Div(className='mnid-hero-card', style={'position': 'relative', 'overflow': 'hidden'}, children=[
+        # Top accent stripe
         html.Div(style={
-            'width': '120px', 'height': '120px', 'borderRadius': '50%',
-            'background': f'conic-gradient({color} {p:.1f}%, {GRID_C} 0)',
+            'position': 'absolute', 'top': '0', 'left': '0', 'right': '0',
+            'height': '4px', 'background': stripe_color, 'borderRadius': '16px 16px 0 0',
+        }),
+        # Donut ring — animated fill via CSS @property --mnid-p
+        html.Div(style={
+            '--mnid-p': f'{p:.1f}',
+            'width': '118px', 'height': '118px', 'borderRadius': '50%',
+            'background': f'conic-gradient({color} calc(var(--mnid-p) * 1%), {GRID_C} 0)',
             'display': 'flex', 'alignItems': 'center', 'justifyContent': 'center',
-            'margin': '0 auto 10px',
+            'margin': '14px auto 10px',
+            'animation': 'mnid-donut-in 1.1s cubic-bezier(.34,1.2,.64,1) both',
             'filter': (
                 'drop-shadow(0 4px 14px rgba(226,232,240,0.5))'
                 if p == 0
-                else f'drop-shadow(0 4px 14px rgba({r_v},{g_v},{b_v},0.28))'
+                else f'drop-shadow(0 4px 14px rgba({r_v},{g_v},{b_v},0.25))'
             ),
         }, children=[
             html.Div(style={
-                'width': '84px', 'height': '84px', 'borderRadius': '50%',
+                'width': '82px', 'height': '82px', 'borderRadius': '50%',
                 'background': '#fff',
                 'display': 'flex', 'flexDirection': 'column',
-                'alignItems': 'center', 'justifyContent': 'center',
+                'alignItems': 'center', 'justifyContent': 'center', 'gap': '1px',
             }, children=[
                 html.Span(f'{_display_pct(p):.0f}%', style={
-                    'fontSize': '24px', 'fontWeight': '800',
+                    'fontSize': '23px', 'fontWeight': '800',
                     'color': color, 'lineHeight': '1',
                 }),
-                html.Span(f'Target {"<=" if _target_mode(mode) == "min" else ""}{target}%', style={
-                    'fontSize': '8px', 'color': MUTED,
-                    'lineHeight': '1.3', 'marginTop': '3px',
+                html.Span(f'Target {target}%', style={
+                    'fontSize': '7.5px', 'color': MUTED,
+                    'lineHeight': '1.2', 'marginTop': '2px',
                 }),
             ]),
         ]),
@@ -5641,8 +5675,9 @@ def _hero_donut_card(label, pct, target, color, mode='max'):
             'background': bg, 'color': fg, 'border': f'1px solid {border}',
             'fontSize': '9px', 'fontWeight': '600',
             'padding': '2px 8px', 'borderRadius': '10px',
-            'display': 'inline-block', 'marginTop': '5px',
+            'display': 'inline-block', 'marginTop': '6px',
         }),
+        delta_badge,
     ])
 
 
@@ -5661,7 +5696,12 @@ def _hero_donut_row(computed, preferred_cat: str = 'ANC', section_title: str | N
     for ind in heroes:
         attained = _target_attainment_pct(ind['pct'], ind['target'], ind)
         color = _cov_color(attained)
-        cards.append(_hero_donut_card(ind['label'], ind['pct'], ind['target'], color, ind))
+        cards.append(_hero_donut_card(
+            ind['label'], ind['pct'], ind['target'], color, ind,
+            delta_pct=ind.get('delta_pct'),
+            numerator=ind.get('numerator'),
+            denominator=ind.get('denominator'),
+        ))
 
     return html.Div(style={'marginBottom': '12px'}, children=[
         html.Div(section_title, className='mnid-section-lbl'),
@@ -6079,22 +6119,104 @@ def _sidebar(facility_code: str, theme: str = 'default') -> html.Div:
 
 def _alert_banner(below, strong):
     if not below:
-        return html.Div(className='mnid-alert mnid-alert-ok', children=[
-            html.Div(className='mnid-alert-icon',
-                     children=html.Span('OK', style={'color':'#fff','fontSize':'9px',
-                                                     'fontWeight':'700'})),
-            html.P([html.Strong('On track. '),
-                    'All available indicators are meeting target.']),
-        ])
-    below_txt = ', '.join(f'{n} ({_display_pct(p):.0f}%)' for n, p in below)
-    strong_txt = ', '.join(strong[:3]) or 'None'
-    return html.Div(className='mnid-alert', children=[
-        html.Div(className='mnid-alert-icon',
-                 children=html.Span('!', style={'color': '#fff', 'fontSize': '10px',
-                                                'fontWeight': '700'})),
-        html.P([html.Strong('Needs attention. '),
-                f'Below target: {below_txt}. Strong areas: {strong_txt}.']),
-    ])
+        return html.Div(
+            style={
+                'display': 'flex', 'alignItems': 'center', 'gap': '10px',
+                'background': '#F0FDF4', 'border': '1px solid #BBF7D0',
+                'borderRadius': '10px', 'padding': '10px 14px',
+                'marginBottom': '10px',
+                'animation': 'mnid-ok-pop 0.5s cubic-bezier(.22,.68,0,1.2) both',
+            },
+            children=[
+                html.Div('✓', style={
+                    'width': '28px', 'height': '28px', 'borderRadius': '50%',
+                    'background': '#16A34A', 'color': '#fff',
+                    'display': 'flex', 'alignItems': 'center', 'justifyContent': 'center',
+                    'fontSize': '14px', 'fontWeight': '800', 'flexShrink': '0',
+                }),
+                html.Div([
+                    html.Span('All indicators on target. ', style={
+                        'fontWeight': '700', 'fontSize': '12px', 'color': '#14532D',
+                    }),
+                    html.Span(
+                        f'{len(strong)} strong area{"s" if len(strong) != 1 else ""}: '
+                        + (', '.join(strong[:5]) + ('…' if len(strong) > 5 else '')),
+                        style={'fontSize': '11px', 'color': '#166534'},
+                    ),
+                ]),
+            ]
+        )
+
+    n_below = len(below)
+    n_strong = len(strong)
+    slot = 3.5          # seconds each item is on screen
+    total = n_below * slot
+    # Use the pre-defined keyframe for this N (capped at 15)
+    kf_name = f'mnid-alert-rotate-{min(n_below, 15)}'
+
+    def _item(name, pct, i):
+        is_bad = pct < 50
+        bg   = '#FEE2E2' if is_bad else '#FEF3C7'
+        fg   = '#991B1B' if is_bad else '#92400E'
+        icon = '▼' if is_bad else '↘'
+        return html.Div(
+            style={
+                'position': 'absolute', 'top': '0', 'left': '0',
+                'display': 'flex', 'alignItems': 'center', 'gap': '6px',
+                'opacity': 0,
+                'animation': f'{kf_name} {total:.1f}s {i * slot:.1f}s ease-in-out infinite',
+                'animationFillMode': 'both',
+            },
+            children=[
+                html.Span(f'{icon} {name[:36]}', style={
+                    'fontSize': '12px', 'fontWeight': '600', 'color': fg,
+                    'background': bg, 'padding': '3px 10px', 'borderRadius': '999px',
+                    'whiteSpace': 'nowrap',
+                }),
+                html.Span(f'{pct:.0f}%', style={
+                    'fontSize': '13px', 'fontWeight': '800', 'color': fg,
+                }),
+            ]
+        )
+
+    items = [_item(n, p, i) for i, (n, p) in enumerate(below)]
+
+    return html.Div(
+        style={
+            'display': 'flex', 'alignItems': 'center', 'gap': '12px',
+            'background': '#FFF7ED', 'border': '1px solid #FED7AA',
+            'borderRadius': '10px', 'padding': '10px 14px',
+            'marginBottom': '10px',
+        },
+        children=[
+            # Pulsing dot + count
+            html.Div(style={
+                'display': 'flex', 'flexDirection': 'column',
+                'alignItems': 'center', 'gap': '3px', 'flexShrink': '0',
+            }, children=[
+                html.Div(style={
+                    'width': '10px', 'height': '10px', 'borderRadius': '50%',
+                    'background': '#EF4444',
+                    'animation': 'mnid-dot-blink 1.3s ease-in-out infinite',
+                }),
+                html.Span(f'{n_below}', style={
+                    'fontSize': '15px', 'fontWeight': '800', 'color': '#DC2626', 'lineHeight': '1',
+                }),
+                html.Span('below', style={'fontSize': '8px', 'color': '#9A3412', 'lineHeight': '1'}),
+            ]),
+            # Divider
+            html.Div(style={'width': '1px', 'height': '38px', 'background': '#FED7AA', 'flexShrink': '0'}),
+            # One-at-a-time rotating items
+            html.Div(style={'position': 'relative', 'height': '28px', 'flex': '1', 'minWidth': '0'}, children=items),
+            # Strong count (right side)
+            html.Div(style={'flexShrink': '0', 'textAlign': 'center'}, children=[
+                html.Span(f'{n_strong}', style={
+                    'fontSize': '15px', 'fontWeight': '800', 'color': '#16A34A', 'lineHeight': '1',
+                }),
+                html.Div('on target', style={'fontSize': '8px', 'color': '#166534'}),
+            ]) if n_strong else None,
+        ]
+    )
 
 
 def _avg_ring(pct: float, color: str) -> html.Div:
@@ -6291,6 +6413,33 @@ def render_mnid_dashboard(data_opd, config,
             'denominator': den,
             'attained_pct': _target_attainment_pct(pct, ind.get('target', 0), ind),
         })
+
+    # Compute previous-period delta — same window duration shifted back
+    try:
+        s = pd.to_datetime(start_date)
+        e = pd.to_datetime(end_date) if end_date else network_df['Date'].max()
+        window = max((e - s).days, 1)
+        prev_end = s - pd.Timedelta(days=1)
+        prev_start = prev_end - pd.Timedelta(days=window - 1)
+        prev_df = network_df[
+            (network_df['Date'] >= prev_start) & (network_df['Date'] <= prev_end)
+        ] if 'Date' in network_df.columns and not network_df.empty else pd.DataFrame()
+        if not prev_df.empty and selected_facilities and 'Facility' in prev_df.columns:
+            prev_df = prev_df[prev_df['Facility'].isin(selected_facilities)]
+        elif not prev_df.empty and selected_districts and 'District' in prev_df.columns:
+            prev_df = prev_df[prev_df['District'].isin(selected_districts)]
+    except Exception:
+        prev_df = pd.DataFrame()
+
+    for c in computed:
+        if not prev_df.empty:
+            try:
+                _, _, prev_pct = _cov(prev_df, c['numerator_filters'], c['denominator_filters'])
+                c['delta_pct'] = round(c['pct'] - prev_pct, 1)
+            except Exception:
+                c['delta_pct'] = None
+        else:
+            c['delta_pct'] = None
 
     below  = [(c['label'], c['pct']) for c in computed if not _on_target(c['pct'], c['target'], c)]
     strong = [c['label'] for c in computed if _on_target(c['pct'], c['target'], c)]
