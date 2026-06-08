@@ -1935,11 +1935,11 @@ layout = html.Div(
                                                                      className="modern-dropdown"),
                                                     ]),
                                                     html.Div(style={"flex": "1", "minWidth": "160px"}, children=[
-                                                        html.Label("Is Harmonized MAHIS", className="form-label"),
+                                                        html.Label("Pause Data Source", className="form-label"),
                                                         dcc.Dropdown(id="ds-is-harmonized",
-                                                                     options=[{"label": "Yes", "value": "true"},
-                                                                              {"label": "No (legacy schema)", "value": "false"}],
-                                                                     value="true", clearable=False,
+                                                                     options=[{"label": "No", "value": "false"},
+                                                                              {"label": "Yes", "value": "true"}],
+                                                                     value="false", clearable=False,
                                                                      className="modern-dropdown"),
                                                     ]),
                                                 ]),
@@ -2798,7 +2798,7 @@ def confirm_archive(n_clicks, current_report, current_n_clicks):
     
 @callback(
     [Output("preview-popup", "style"),
-     Output("reports-table-container", "style")],
+     Output("reports-table-container", "style", allow_duplicate=True)],
     [Input("preview-data", "n_clicks"),
      Input("close-preview-btn", "n_clicks")],
     prevent_initial_call=True,
@@ -4337,7 +4337,7 @@ def _load_facilities(route):
 # 1. Toggle panel visibility — show user config, hide main content area (and vice-versa)
 @callback(
     [Output("user-config-panel",  "style"),
-     Output("main-content-area",  "style")],
+     Output("reports-table-container", "style", allow_duplicate=True)],
     [Input("configure-users-btn",  "n_clicks"),
      Input("close-user-config-btn","n_clicks")],
     prevent_initial_call=True,
@@ -4634,7 +4634,7 @@ def _build_users_table(users):
 @callback(
     [Output("datasource-panel",  "style"),
      Output("user-config-panel", "style", allow_duplicate=True),
-     Output("main-content-area", "style", allow_duplicate=True)],
+     Output("reports-table-container", "style", allow_duplicate=True)],
     [Input("configure-datasources-btn", "n_clicks"),
      Input("close-datasource-btn",      "n_clicks")],
     prevent_initial_call=True,
@@ -4769,7 +4769,7 @@ def load_datasource_into_form(n_clicks_list):
         str(ds.get("batch_size", 1000)),
         ds.get("data_path", "default"),
         "true" if ds.get("load_fresh_data") else "false",
-        "true" if ds.get("is_harmonized_emr", True) else "false",
+        "true" if ds.get("pause_data_source", True) else "false",
         ds.get("base_query", ""),
         "",
     )
@@ -4945,7 +4945,7 @@ def save_datasource(n_clicks, ds_uuid, date_created, name,
         "load_fresh_data": load_fresh == "true",
         "data_path":       data_file_name or "default",
         "base_query":      base_query or "",
-        "is_harmonized_emr": is_harmonized == "true",
+        "pause_data_source": is_harmonized == "true",
         "batch_size":      int(batch_size or 1000),
         "db_config": {
             "host":     db_host or "127.0.0.1",
@@ -4990,8 +4990,6 @@ def delete_datasource(n_clicks, ds_uuid):
                           "fontSize": "14px", "padding": "24px 0"}
     return "✓ Deleted", _build_ds_list(sources), {"display": "none"}, placeholder_shown
 
-
-# ── Data Refresh (run data_storage.py) callbacks ─────────────────────────────
 import subprocess as _subprocess
 import sys as _sys
 import time as _time
@@ -5018,12 +5016,9 @@ def start_data_refresh(n_clicks, store):
 
     store = store or {}
 
-    # ── Lock: refuse a second run if one is already in progress ──────────────
     if store.get("running"):
         return (store, True, True, "🔄 Refreshing...",
                 "⚠ A refresh is already running.")
-
-    # ── Launch subprocess ─────────────────────────────────────────────────────
     script_path = os.path.join(path, "data_storage.py")
     try:
         proc = _subprocess.Popen(

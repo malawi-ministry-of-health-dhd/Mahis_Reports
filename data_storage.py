@@ -318,7 +318,7 @@ if __name__ == "__main__":
                 "load_fresh_data": cfg.LOAD_FRESH_DATA,
                 "data_path": "default",
                 "base_query": cfg.QUERY_OBS_HARMONIZED,
-                "is_harmonized_emr": cfg.IS_HARMONIZED_MAHIS,
+                "pause_data_source": False,
                 "batch_size": cfg.BATCH_SIZE,
                 "db_config": cfg.DB_CONFIG,
                 "ssh_config": cfg.SSH_CONFIG, 
@@ -337,7 +337,10 @@ if __name__ == "__main__":
         LOAD_FRESH_DATA = items.get("load_fresh_data", True)
         START_DATE = items.get("start_date", "2026-01-01")
 
-
+        # skip if data source is paused
+        if items.get("pause_data_source"):
+            continue
+        
         programs = DataStorage(query=QUERY_PROGRAMS,data_dir=DATA_ROUTE)
         programs.fetch_and_save_single_table(table_name="programs_data")
 
