@@ -305,12 +305,25 @@ def _monthly_visits(df, encounter_val, unique_col='person_id'):
         service_area = area_map.get(str(encounter_val or '').strip().upper())
         if service_area:
             sub = df[df['Service_Area'].astype(str) == service_area]
-    if not len(sub): return pd.DataFrame(columns=['month','n'])
-    sub['month'] = pd.to_datetime(sub['Date']).dt.to_period('M')
+    if not len(sub):
+        return pd.DataFrame(columns=['month', 'n', 'freq'])
+    dates = pd.to_datetime(sub['Date'], errors='coerce').dropna()
+    if dates.empty:
+        return pd.DataFrame(columns=['month', 'n', 'freq'])
+    span_days = max(int((dates.max() - dates.min()).days), 0)
+    if span_days <= 45:
+        freq, fmt = 'D', 'day'
+        sub['month'] = dates.dt.floor('D')
+    elif span_days <= 180:
+        freq, fmt = 'W', 'week'
+        sub['month'] = dates.dt.to_period('W').apply(lambda p: p.start_time)
+    else:
+        freq, fmt = 'M', 'month'
+        sub['month'] = dates.dt.to_period('M').apply(lambda p: datetime(p.year, p.month, 1))
     out = sub.groupby('month')[unique_col].nunique().reset_index()
-    out.columns = ['month','n']
-    out['month'] = out['month'].apply(lambda m: datetime(m.year, m.month, 1))
-    return out
+    out.columns = ['month', 'n']
+    out['freq'] = fmt
+    return out.sort_values('month')
 
 
 # MNID chart builders
@@ -383,20 +396,68 @@ def _hbar(counts_df, title, color=INFO_C, single_color=False):
 
 def _line(monthly_df, title, color='#2563EB', y_label='Clients'):
     if not len(monthly_df): return None
+    clean = monthly_df.dropna(subset=['n']).copy()
+    if clean.empty:
+        return None
+
+    freq = clean['freq'].iloc[0] if 'freq' in clean.columns else 'month'
+    if freq == 'day':
+        tickfmt = '%d %b'
+        hover_fmt = '%{x|%d %b %Y}: %{y}'
+    elif freq == 'week':
+        tickfmt = '%d %b'
+        hover_fmt = '%{x|%d %b %Y}: %{y}'
+    else:
+        tickfmt = '%b %y'
+        hover_fmt = '%{x|%b %Y}: %{y}'
+
     fig = go.Figure(go.Scatter(
-        x=monthly_df['month'], y=monthly_df['n'],
+        x=clean['month'], y=clean['n'],
         mode='lines+markers',
-        line=dict(color=color, width=2.25, shape='spline'),
-        marker=dict(size=5, color=color, line=dict(color='#fff', width=1.25)),
-        hovertemplate='%{x|%b %Y}: %{y}<extra></extra>',
+        line=dict(color=color, width=2.5, shape='linear'),
+        marker=dict(size=6, color=color, line=dict(color='#fff', width=1.35)),
+        hovertemplate=hover_fmt + '<extra></extra>',
     ))
+
+    avg_val = clean['n'].mean()
+    fig.add_hline(
+        y=avg_val,
+        line_dash='dash',
+        line_color='#DC2626',
+        line_width=1.5,
+        annotation_text=f'Average = {avg_val:.0f}',
+        annotation_position='top right',
+        annotation_font_color='#374151',
+    )
+
+    key_points = []
+    start_point = (clean.iloc[0]['month'], clean.iloc[0]['n'])
+    end_point = (clean.iloc[-1]['month'], clean.iloc[-1]['n'])
+    peak_row = clean.loc[clean['n'].idxmax()]
+    peak_point = (peak_row['month'], peak_row['n'])
+    for point in [start_point, peak_point, end_point]:
+        if point not in key_points:
+            key_points.append(point)
+
+    fig.add_trace(go.Scatter(
+        x=[x for x, _ in key_points],
+        y=[y for _, y in key_points],
+        mode='markers+text',
+        text=[f'{y:.0f}' for _, y in key_points],
+        textposition='top center',
+        textfont=dict(size=9, color='#374151'),
+        marker=dict(size=8, color='#1e293b'),
+        showlegend=False,
+        hovertemplate=hover_fmt + '<extra></extra>',
+    ))
+
     fig.update_layout(
         **_CHART_LAYOUT,
         title=dict(text=title, font=dict(size=12, color='#444441', family=FONT),
                    x=0, xanchor='left', y=0.98),
         height=220,
         xaxis=dict(showgrid=False, zeroline=False, showline=False,
-                   tickformat='%b %y', tickfont=dict(size=10, color=MUTED)),
+                   tickformat=tickfmt, tickfont=dict(size=10, color=MUTED)),
         yaxis=dict(showgrid=True, gridcolor=GRID_C, zeroline=False,
                    showline=False, tickfont=dict(size=10, color=MUTED),
                    title=dict(text=y_label, font=dict(size=10, color=MUTED))),
@@ -1587,14 +1648,14 @@ def update_trend_chart(n_clicks_list, toggle_clicks, selected_ind_ids, stored_tr
     cat_inds = [i for i in tracked if i.get('category') == cat and i.get('status') == 'tracked']
     ind_options = [{'label': i['label'], 'value': i['id']} for i in cat_inds]
     valid_ids = [opt['value'] for opt in ind_options]
-    selected = [iid for iid in selected_ind_ids if iid in valid_ids][:3]
+    selected = [iid for iid in selected_ind_ids if iid in valid_ids][:2]
     should_default_selection = (
         not triggered_prop
         or 'trend-cat-btn' in str(triggered_prop)
         or triggered_prop == 'mnid-trend-chart-toggle.n_clicks'
     )
     if not selected and should_default_selection:
-        selected = valid_ids[:3]
+        selected = valid_ids[:1]
     active_inds = [i for i in cat_inds if i['id'] in selected]
     fig = _location_trend_fig(df, active_inds, cat, mode, scope_meta)
 
@@ -1614,7 +1675,7 @@ def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None 
     tracked = [i for i in indicators if i.get('status') == 'tracked']
     cat_order = _resolve_category_order(tracked, categories)
     default_cat = default_cat if default_cat in cat_order else (cat_order[0] if cat_order else 'ANC')
-    default_inds = [i for i in tracked if i.get('category') == default_cat][:3]
+    default_inds = [i for i in tracked if i.get('category') == default_cat][:1]
     default_ind_opts = [{'label': i['label'], 'value': i['id']} for i in tracked if i.get('category') == default_cat]
     default_fig = _location_trend_fig(df, default_inds, default_cat, 'line', scope_meta)
     trend_store = {
@@ -1626,7 +1687,7 @@ def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None 
     return html.Div(className='mnid-card', style={'marginBottom': '12px'}, children=[
         html.Div(style={'display': 'flex', 'alignItems': 'center',
                         'justifyContent': 'space-between', 'marginBottom': '8px', 'gap': '12px', 'flexWrap': 'wrap'}, children=[
-            html.Div('COVERAGE TREND BY LOCATION', className='mnid-section-lbl',
+            html.Div('RUN CHARTS', className='mnid-section-lbl',
                      style={'marginBottom': '0'}),
             html.Div(style={'display': 'flex', 'alignItems': 'center', 'gap': '10px', 'flexWrap': 'wrap'}, children=[
                 html.Button(
@@ -1657,7 +1718,7 @@ def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None 
                 options=default_ind_opts,
                 value=[i['id'] for i in default_inds],
                 multi=True,
-                placeholder='Select up to 3 indicators...',
+                placeholder='Select up to 2 indicators...',
                 style={'fontSize': '12px', 'minHeight': '34px'},
             ),
         ]),
@@ -2027,24 +2088,62 @@ def _monthly_concept_rate(df, concept, positive_values=None, title='', target=No
             num = month_df[series.isin(wanted)]['person_id'].dropna().astype(str).nunique() if 'person_id' in month_df.columns else int(series.isin(wanted).sum())
         ys.append(round((num / den) * 100, 1) if den else None)
 
+    valid = [(x, y) for x, y in zip(xs, ys) if y is not None]
+    if not valid:
+        return None
+
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=xs, y=ys,
         mode='lines+markers',
-        line=dict(color=color, width=2.2, shape='spline'),
-        marker=dict(size=5, color=color, line=dict(color='#fff', width=1)),
+        line=dict(color=color, width=2.5, shape='linear'),
+        marker=dict(size=6, color=color, line=dict(color='#fff', width=1.35)),
         connectgaps=False,
         hovertemplate='%{x|%b %Y}<br>%{y:.0f}%<extra></extra>',
         showlegend=False,
     ))
+
+    valid_ys = [y for y in ys if y is not None]
+    avg_val = sum(valid_ys) / len(valid_ys)
+    fig.add_hline(
+        y=avg_val,
+        line_dash='dash',
+        line_color='#DC2626',
+        line_width=1.5,
+        annotation_text=f'Avg {avg_val:.0f}%',
+        annotation_position='top right',
+        annotation_font_color='#374151',
+        annotation_font_size=9,
+    )
+
     if target is not None:
         fig.add_trace(go.Scatter(
             x=xs, y=[target] * len(xs),
             mode='lines',
-            line=dict(color='#A1A1AA', width=1.5, dash='dash'),
+            line=dict(color='#A1A1AA', width=1.5, dash='dot'),
             hovertemplate='Target: %{y:.0f}%<extra></extra>',
             showlegend=False,
         ))
+
+    key_pts = []
+    start = valid[0]
+    end = valid[-1]
+    peak = max(valid, key=lambda p: p[1])
+    for pt in [start, peak, end]:
+        if pt not in key_pts:
+            key_pts.append(pt)
+    fig.add_trace(go.Scatter(
+        x=[p[0] for p in key_pts],
+        y=[p[1] for p in key_pts],
+        mode='markers+text',
+        text=[f'{p[1]:.0f}%' for p in key_pts],
+        textposition='top center',
+        textfont=dict(size=9, color='#374151'),
+        marker=dict(size=7, color='#1e293b'),
+        showlegend=False,
+        hovertemplate='%{x|%b %Y}: %{y:.0f}%<extra></extra>',
+    ))
+
     fig.update_layout(
         paper_bgcolor='#FFFFFF',
         plot_bgcolor='#FFFFFF',
@@ -2054,7 +2153,7 @@ def _monthly_concept_rate(df, concept, positive_values=None, title='', target=No
         title=dict(text=title, x=0, xanchor='left', font=dict(size=12, color='#444441', family=FONT)),
         xaxis=dict(showgrid=False, zeroline=False, showline=False, tickformat='%b %y',
                    tickfont=dict(size=9, color=MUTED)),
-        yaxis=dict(range=[0, 100], showgrid=True, gridcolor=GRID_C, zeroline=False, showline=False,
+        yaxis=dict(range=[0, 115], showgrid=True, gridcolor=GRID_C, zeroline=False, showline=False,
                    tickfont=dict(size=9, color=MUTED), ticksuffix='%',
                    title=dict(text='Coverage', font=dict(size=9, color=MUTED))),
     )
@@ -2467,119 +2566,135 @@ def _location_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str,
                           height=340, margin=dict(l=8, r=8, t=12, b=24))
         return fig
 
-    scope_meta = scope_meta or {}
-    selected_facs = [str(v) for v in (scope_meta.get('selected_facilities') or [])]
-    selected_dists = [str(v) for v in (scope_meta.get('selected_districts') or [])]
-    level = str(scope_meta.get('level') or '').strip().lower()
-
-    d2 = df
-    d2['_m'] = pd.to_datetime(d2['Date']).dt.to_period('M')
-    periods = sorted(d2['_m'].dropna().unique())[-12:]
-
-    facility_name_map = {}
-    facility_code_by_name = {}
-    if 'Facility_CODE' in d2.columns:
-        for fac_code, fac_df in d2.groupby('Facility_CODE', dropna=True):
-            fac_name = _FACILITY_NAMES.get(str(fac_code), str(fac_code))
-            if 'Facility' in fac_df.columns:
-                names = fac_df['Facility'].dropna().astype(str)
-                if not names.empty:
-                    fac_name = names.mode().iloc[0]
-            facility_name_map[str(fac_code)] = fac_name
-            facility_code_by_name.setdefault(str(fac_name), str(fac_code))
-
-    entity_mode = 'district'
-    entities = []
-    if selected_facs and 'Facility_CODE' in d2.columns:
-        entity_mode = 'facility'
-        entities = []
-        for selected in selected_facs:
-            selected_text = str(selected)
-            if selected_text in facility_name_map:
-                entities.append(selected_text)
-                continue
-            mapped_code = facility_code_by_name.get(selected_text)
-            entities.append(mapped_code or selected_text)
-        entities = entities[:6]
-    elif selected_dists and 'District' in d2.columns:
-        entities = selected_dists[:6]
-    elif level == 'facility' and 'Facility_CODE' in d2.columns:
-        entity_mode = 'facility'
-        entities = d2['Facility_CODE'].dropna().astype(str).value_counts().index.tolist()[:6]
-    elif 'District' in d2.columns:
-        entities = d2['District'].dropna().astype(str).value_counts().index.tolist()[:6]
-    elif 'Facility_CODE' in d2.columns:
-        entity_mode = 'facility'
-        entities = d2['Facility_CODE'].dropna().astype(str).value_counts().index.tolist()[:6]
-
-    if not entities:
-        fig.add_annotation(text='No locations available for trend view',
+    d2 = df.copy()
+    d2['Date'] = pd.to_datetime(d2['Date'], errors='coerce')
+    d2 = d2.dropna(subset=['Date'])
+    if d2.empty:
+        fig.add_annotation(text='No dated records available for run chart view',
                            xref='paper', yref='paper', x=0.5, y=0.5,
                            showarrow=False, font=dict(size=12, color=MUTED))
         fig.update_layout(paper_bgcolor=BG, plot_bgcolor=BG,
                           height=340, margin=dict(l=8, r=8, t=12, b=24))
         return fig
 
-    series_idx = 0
-    for entity in entities:
-        if entity_mode == 'facility':
-            entity_str = str(entity)
-            entity_df = d2[d2['Facility_CODE'].astype(str) == entity_str]
-            if entity_df.empty and 'Facility' in d2.columns:
-                entity_df = d2[d2['Facility'].astype(str) == entity_str]
-                if not entity_df.empty and 'Facility_CODE' in entity_df.columns:
-                    entity_str = str(entity_df['Facility_CODE'].dropna().astype(str).iloc[0])
-            entity_label = facility_name_map.get(entity_str, str(entity))
+    span_days = max(int((d2['Date'].max() - d2['Date'].min()).days), 0)
+    if span_days <= 45:
+        freq = 'D'
+        tickformat = '%d %b'
+        period_label = 'daily'
+    elif span_days <= 180:
+        freq = 'W-MON'
+        tickformat = '%d %b'
+        period_label = 'weekly'
+    else:
+        freq = 'M'
+        tickformat = '%b %y'
+        period_label = 'monthly'
+
+    d2['_period'] = d2['Date'].dt.to_period(freq)
+    periods = sorted(d2['_period'].dropna().unique())
+    if not periods:
+        fig.add_annotation(text='No time periods available for run chart view',
+                           xref='paper', yref='paper', x=0.5, y=0.5,
+                           showarrow=False, font=dict(size=12, color=MUTED))
+        fig.update_layout(paper_bgcolor=BG, plot_bgcolor=BG,
+                          height=340, margin=dict(l=8, r=8, t=12, b=24))
+        return fig
+
+    color_cycle = CAT_PALETTES.get(cat, _TREND_SERIES_PALETTE)
+    active_inds = cat_inds[:2]
+
+    for idx, ind in enumerate(active_inds):
+        xs, ys = [], []
+        for p in periods:
+            period_df = d2[d2['_period'] == p]
+            _, den, pct = _cov(period_df, ind['numerator_filters'], ind['denominator_filters'])
+            xs.append(pd.Period(p, freq).to_timestamp().to_pydatetime())
+            ys.append(_display_pct(pct) if den > 0 else None)
+
+        if not any(y is not None for y in ys):
+            continue
+
+        color = color_cycle[idx % len(color_cycle)]
+        series_name = ind['label']
+        clean_pairs = [(x, y) for x, y in zip(xs, ys) if y is not None]
+        clean_xs = [x for x, _ in clean_pairs]
+        clean_ys = [y for _, y in clean_pairs]
+
+        if chart_type == 'bar':
+            fig.add_trace(go.Bar(
+                x=clean_xs,
+                y=clean_ys,
+                name=series_name,
+                marker=dict(color=color, line=dict(color=color, width=1)),
+                hovertemplate=f'%{{x|%d %b %Y}}<br>{series_name}: %{{y:.0f}}%<extra></extra>',
+            ))
         else:
-            entity_df = d2[d2['District'].astype(str) == str(entity)]
-            entity_label = str(entity)
-        for ind in cat_inds:
-            xs, ys = [], []
-            for p in periods:
-                month_df = entity_df[entity_df['_m'] == p]
-                _, den, pct = _cov(month_df, ind['numerator_filters'], ind['denominator_filters'])
-                xs.append(pd.Period(p, 'M').to_timestamp().to_pydatetime())
-                ys.append(_display_pct(pct) if den > 0 else None)
+            fig.add_trace(go.Scatter(
+                x=clean_xs,
+                y=clean_ys,
+                name=series_name,
+                mode='lines+markers',
+                line=dict(color=color, width=2.8, shape='linear'),
+                marker=dict(size=6, color=color, line=dict(color='#fff', width=1.4)),
+                connectgaps=False,
+                hovertemplate=f'%{{x|%d %b %Y}}<br>{series_name}: %{{y:.0f}}%<extra></extra>',
+            ))
 
-            if not any(y is not None for y in ys):
-                continue
+            if idx == 0 and clean_xs:
+                avg_val = sum(clean_ys) / len(clean_ys)
+                fig.add_hline(
+                    y=avg_val,
+                    line_dash='dash',
+                    line_color='#DC2626',
+                    line_width=1.5,
+                    annotation_text=f'Average = {avg_val:.0f}',
+                    annotation_position='top right',
+                    annotation_font_color='#374151',
+                )
 
-            color = _TREND_SERIES_PALETTE[series_idx % len(_TREND_SERIES_PALETTE)]
-            series_idx += 1
-            r, g, b = int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16)
-            series_name = f'{entity_label} | {ind["label"]}'
-            if chart_type == 'bar':
-                clean_xs = [x for x, y in zip(xs, ys) if y is not None]
-                clean_ys = [y for y in ys if y is not None]
-                fig.add_trace(go.Bar(
-                    x=clean_xs, y=clean_ys, name=series_name,
-                    marker=dict(color=f'rgba({r},{g},{b},0.85)', line=dict(color=color, width=1)),
-                    hovertemplate=f'%{{x|%b %Y}}<br>{series_name}: %{{y:.0f}}%<extra></extra>',
-                    offsetgroup=str(series_idx),
-                ))
-            else:
+                key_points = []
+                key_points.append((clean_xs[0], clean_ys[0]))
+                if len(clean_xs) > 1:
+                    key_points.append((clean_xs[-1], clean_ys[-1]))
+                peak_idx = clean_ys.index(max(clean_ys))
+                peak_point = (clean_xs[peak_idx], clean_ys[peak_idx])
+                if peak_point not in key_points:
+                    key_points.append(peak_point)
+
                 fig.add_trace(go.Scatter(
-                    x=xs, y=ys, name=series_name,
-                    mode='lines+markers',
-                    line=dict(color=color, width=2.3, shape='spline'),
-                    marker=dict(size=5, color=color, line=dict(color='#fff', width=1.2)),
-                    connectgaps=False,
-                    hovertemplate=f'%{{x|%b %Y}}<br>{series_name}: %{{y:.0f}}%<extra></extra>',
+                    x=[x for x, _ in key_points],
+                    y=[y for _, y in key_points],
+                    mode='markers+text',
+                    text=[f'{y:.0f}' for _, y in key_points],
+                    textposition='top center',
+                    marker=dict(size=8, color='black'),
+                    showlegend=False,
+                    hovertemplate=f'%{{x|%d %b %Y}}<br>{series_name}: %{{y:.0f}}%<extra></extra>',
                 ))
+
+    if not fig.data:
+        fig.add_annotation(text='No run chart points available for the selected indicator',
+                           xref='paper', yref='paper', x=0.5, y=0.5,
+                           showarrow=False, font=dict(size=12, color=MUTED))
+
+    chart_title = active_inds[0]['label'] if len(active_inds) == 1 else f'{_CAT_LABELS.get(cat, cat)} related indicators'
     fig.update_layout(
         paper_bgcolor=BG, plot_bgcolor=BG,
         font=dict(family=FONT, color=TEXT, size=11),
         hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
-        height=340,
+        height=360,
         margin=dict(l=8, r=8, t=12, b=24),
         barmode='group' if chart_type == 'bar' else None,
+        title=dict(text=f'{chart_title} ({period_label})', x=0.01, xanchor='left', font=dict(size=14, color=TEXT, family=FONT)),
         xaxis=dict(showgrid=False, zeroline=False, showline=False,
-                   tickformat='%b %y', tickfont=dict(size=10, color=MUTED)),
+                   tickformat=tickformat, tickfont=dict(size=10, color=MUTED),
+                   title=dict(text='Date', font=dict(size=10, color=MUTED))),
         yaxis=dict(showgrid=True, gridcolor=GRID_C, zeroline=False, showline=False,
                    tickfont=dict(size=10, color=MUTED), range=[0, 105],
                    title=dict(text='Coverage %', font=dict(size=10, color=MUTED))),
         legend=dict(font=dict(size=10, color=DIM), bgcolor='rgba(0,0,0,0)',
-                    orientation='v', x=1.01, y=1, xanchor='left', yanchor='top'),
+                    orientation='h', x=0, y=1.05, xanchor='left', yanchor='bottom'),
         hovermode='closest' if chart_type == 'bar' else 'x unified',
     )
     return fig
@@ -5701,7 +5816,7 @@ def _sidebar(facility_code: str, theme: str = 'default') -> html.Div:
         nav_items = [
             ('Overview', '#mnid-summary'),
             ('Service Delivery', '#mnid-data-tables'),
-            ('Patient Trends & Outcomes', '#mnid-trends'),
+            ('Run Charts', '#mnid-trends'),
             ('District Performance', '#mnid-performance'),
             ('Geographic Coverage', '#mnid-heatmap'),
             ('Coverage & Quality', '#mnid-coverage'),
@@ -5713,7 +5828,7 @@ def _sidebar(facility_code: str, theme: str = 'default') -> html.Div:
         nav_items = [
             ('Overview', '#mnid-summary'),
             ('Data Tables', '#mnid-data-tables'),
-            ('Trend', '#mnid-trends'),
+            ('Run Charts', '#mnid-trends'),
             ('Performance', '#mnid-performance'),
             ('Map View', '#mnid-heatmap'),
             ('Indicators', '#mnid-coverage'),
@@ -6018,9 +6133,9 @@ def render_mnid_dashboard(data_opd, config,
         service_table_div,
 
         _section_anchor('mnid-trends'),
-        _sec_header('Patient Trends & Outcomes' if dashboard_theme == 'newborn' else 'Coverage Trends',
-                    desc='Monthly trends for neonatal admissions and outcome-related indicators, with target references where applicable.' if dashboard_theme == 'newborn' else '12-month rolling - dotted line = target',
-                    eyebrow='Trends' if dashboard_theme == 'newborn' else None),
+        _sec_header('Run Charts',
+                    desc='Focused indicator run charts for the current filtered scope.' if dashboard_theme == 'newborn' else 'Focused indicator run charts for the current filtered scope.',
+                    eyebrow='Run Charts' if dashboard_theme == 'newborn' else None),
         _trend_switcher(facility_df, all_inds, scope_meta=scope_meta, payload_key=_payload_key),
 
         _section_anchor('mnid-performance'),
