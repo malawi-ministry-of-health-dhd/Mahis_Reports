@@ -436,19 +436,6 @@ def archive_report(report_id):
     
     save_reports_data(data)
 
-# Preview Data
-def load_preview_data():
-    """Load preview data from parquet file"""
-    file_path = os.path.join("data", "concepts_data.csv")
-    if not os.path.exists(file_path):
-        return pd.DataFrame(), "Empty Reference"
-    
-    try:
-        df = pd.read_csv(file_path)
-        return df, None
-    except Exception as e:
-        return None, f"Error loading data: {str(e)}"
-
 # DASHBOARDS 
 def create_chart_fields(chart_type, chart_data=None, section_index=None, chart_index=None):
     chart_data = chart_data or {}

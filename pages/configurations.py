@@ -6,13 +6,14 @@ import os
 import uuid
 import pandas as pd
 from datetime import datetime
+from data_storage import DataStorage
 import base64
 import io
 import warnings
 warnings.filterwarnings("ignore")
 from helpers.modal_functions import (validate_excel_file, load_reports_data, save_reports_data,
                         check_existing_report, get_next_report_id, update_or_create_report,load_excel_file,
-                        save_excel_file, update_report_metadata, archive_report, load_preview_data,
+                        save_excel_file, update_report_metadata, archive_report, 
                         create_count_item,create_chart_item, create_section,create_chart_fields, create_mnid_indicator_item, validate_dashboard_json,
                         upload_dashboard_json,validate_prog_reports_json,upload_prog_reports_json,CHART_TEMPLATES,render_filter_rows)
 from config import actual_keys_in_data
@@ -349,46 +350,90 @@ instructions = html.Div(
 )
 preview_modal = html.Div([
         html.Div([
-            html.H3("Preview Data", style={'marginBottom': '20px'}),  
-            html.Div(id="preview-data-info", style={'marginBottom': '20px'}),
-            # Data table container
-            html.Div(id="preview-data-table", style={'maxHeight': '500px', 'overflowY': 'auto', 'marginBottom': '20px'}),
-            html.Div([
-                html.Button(
-                    "Close",
-                    id="close-preview-btn",
-                    n_clicks=0,
+            # ── Header ────────────────────────────────────────────────────────
+            html.Div(style={"display": "flex", "justifyContent": "space-between",
+                            "alignItems": "center", "marginBottom": "16px"}, children=[
+                html.H3("Preview Data", style={"margin": "0", "color": "#006401"}),
+                html.Button("✕ Close", id="close-preview-btn", n_clicks=0,
+                            className="btn-secondary btn-small"),
+            ]),
+
+            # ── SQL editor ────────────────────────────────────────────────────
+            html.Div(style={"marginBottom": "14px"}, children=[
+                html.Div(style={"display": "flex", "justifyContent": "space-between",
+                                "alignItems": "flex-end", "marginBottom": "6px"}, children=[
+                    html.Label("SQL Query - Query should exclude 'LIMIT CLAUSE'. Default Limit is 100 ", className="form-label",
+                               style={"fontWeight": "600", "margin": "0"}),
+                    html.Span(
+                        f""
+                        "Column names are validated as you type.",
+                        style={"fontSize": "11px", "color": "#6b7280"},
+                    ),
+                ]),
+                dcc.Textarea(
+                    id="preview-sql-input",
+                    placeholder=(
+                        "SELECT person_id, Date, Program, Encounter\n"
+                        "FROM data\n"
+                        "WHERE Program = 'OPD Program'\n"
+                    ),
                     style={
-                        'backgroundColor': '#6c757d',
-                        'color': 'white',
-                        'border': 'none',
-                        'padding': '8px 16px',
-                        'borderRadius': '6px',
-                        'cursor': 'pointer'
-                    }
+                        "width": "100%", "height": "110px",
+                        "fontFamily": "monospace", "fontSize": "13px",
+                        "padding": "10px", "border": "1px solid #d1d5db",
+                        "borderRadius": "6px", "resize": "vertical",
+                        "boxSizing": "border-box",
+                    },
                 ),
-            ], style={'textAlign': 'center'})
+                # ── Live column-name validation ───────────────────────────────
+                html.Div(
+                    id="preview-col-validation",
+                    style={"marginTop": "6px", "fontSize": "12px",
+                           "lineHeight": "1.6", "minHeight": "20px"},
+                ),
+                html.Div(style={"display": "flex", "gap": "10px",
+                                "alignItems": "center", "marginTop": "10px"}, children=[
+                    html.Button(
+                        "▶ Run Query",
+                        id="preview-run-btn",
+                        n_clicks=0,
+                        className="btn-save",
+                    ),
+                    dcc.Loading(
+                        id="preview-loading",
+                        type="circle",
+                        color="#006401",
+                        children=html.Span(id="preview-run-status",
+                                           style={"fontSize": "12px", "color": "#6b7280"}),
+                    ),
+                ]),
+            ]),
+
+            html.Hr(style={"borderColor": "#e5e7eb", "margin": "14px 0"}),
+
+            # ── Results ───────────────────────────────────────────────────────
+            html.Div(id="preview-data-info", style={"marginBottom": "10px"}),
+            html.Div(id="preview-data-table",
+                     style={"maxHeight": "420px", "overflowY": "auto"}),
         ], style={
             'backgroundColor': 'white',
-            'padding': '30px',
+            'padding': '28px',
             'borderRadius': '10px',
-            'width': '90%',
-            'maxWidth': '1400px',
-            'maxHeight': '90vh',
+            'width': '92%',
+            'maxWidth': '1500px',
+            'maxHeight': '94vh',
             'overflowY': 'auto',
-            'margin': 'auto'
+            'margin': 'auto',
         })
     ], id="preview-popup", style={
         'position': 'fixed',
-        'top': '0',
-        'left': '0',
-        'width': '100%',
-        'height': '100%',
+        'top': '0', 'left': '0',
+        'width': '100%', 'height': '100%',
         'backgroundColor': 'rgba(0,0,0,0.5)',
         'display': 'none',
         'justifyContent': 'center',
         'alignItems': 'center',
-        'zIndex': '1000'
+        'zIndex': '1000',
     })
 upload_excel_popup_modal = html.Div([
         html.Div([
@@ -1341,31 +1386,31 @@ layout = html.Div(
                     className="sidebar-nav",
                     children=[
                         html.Button(
-                            "Data Set Reports List",
+                            "DataSet Reports",
                             id="dataset-reports-btn",
                             n_clicks=0,
                             className="nav-btn-modern success"
                         ),
                         html.Button(
-                            "Add XLSX-DataSet Report",
+                            "Upload Report Template",
                             id="add-from-template-btn",
                             n_clicks=0,
                             className="nav-btn-modern"
                         ),
                         html.Button(
-                            "Add Dashboard File (JSON)",
+                            "Upload Dashboard Template (JSON)",
                             id="add-dashboard-temp-btn",
                             n_clicks=0,
                             className="nav-btn-modern"
                         ),
                         html.Button(
-                            "Add Prog Report File (JSON)",
+                            "Upload Program Report Template (JSON)",
                             id="add-prog-report-temp-btn",
                             n_clicks=0,
                             className="nav-btn-modern"
                         ),
                         html.Button(
-                            "Add Dashboard (GUI)",
+                            "Create Dashboards (GUI)",
                             id="add-dashboard",
                             n_clicks=0,
                             className="nav-btn-modern"
@@ -1412,18 +1457,9 @@ layout = html.Div(
         html.Div(
             id="main-content",
             className="main-content-modern",
-            children=[
-                # Main Content Area
-                html.Div(
-                    id="main-content-area",
-                    className="content-area-modern",
-                    children=[
-                        # instructions,
-                        reports_table,
-                    ]
-                ),
-                
+            children=[        
                 # Modals (kept as is but with modern styling)
+                reports_table,
                 preview_modal,
                 upload_excel_popup_modal,
                 upload_dashboard_json_popup_modal,
@@ -2762,54 +2798,18 @@ def confirm_archive(n_clicks, current_report, current_n_clicks):
     
 @callback(
     [Output("preview-popup", "style"),
-     Output("preview-data-info", "children"),
-     Output("preview-data-table", "children")],
+     Output("reports-table-container", "style")],
     [Input("preview-data", "n_clicks"),
      Input("close-preview-btn", "n_clicks")],
-    prevent_initial_call=True
+    prevent_initial_call=True,
 )
 def toggle_preview_popup(preview_clicks, close_clicks):
-    ctx = dash.callback_context
-    if not ctx.triggered:
-        return dash.no_update
-    
-    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
-    
+    trigger_id = ctx.triggered_id
     if trigger_id == "close-preview-btn":
-        return {'display': 'none'}, "", ""
-    
+        return {"display": "none"}, {}
     if trigger_id == "preview-data" and preview_clicks:
-        # Load the preview data
-        df, error = load_preview_data()
-        
-        if error:
-            error_message = html.Div([
-                html.Div("❌ Error loading preview data", style={'color': 'red', 'marginBottom': '10px', 'fontWeight': 'bold'}),
-                html.Div(error, style={'color': 'red'})
-            ])
-            return {'display': 'flex'}, error_message, ""
-        
-        if df is None or df.empty:
-            no_data_message = html.Div([
-                html.Div("No data available", style={'color': 'orange', 'marginBottom': '10px', 'fontWeight': 'bold'}),
-                html.Div("The data file is empty or could not be loaded.", style={'color': 'orange'})
-            ])
-            return {'display': 'flex'}, no_data_message, ""
-        
-        # Create info message
-        info_message = html.Div([
-            html.Div("✅ Data loaded successfully", style={'color': 'green', 'marginBottom': '10px', 'fontWeight': 'bold'}),
-            html.Div(f"Records loaded: {len(df)} ( records)", style={'color': 'blue', 'marginBottom': '5px'}),
-            html.Div(f"Columns: {len(df.columns)}", style={'color': 'blue', 'marginBottom': '5px'}),
-            html.Div("Tip: Use the filter icons in column headers to filter data", style={'color': 'gray', 'fontStyle': 'italic'})
-        ])
-        
-        # Create the preview table
-        preview_table = create_preview_table(df)
-        
-        return {'display': 'flex'}, info_message, preview_table
-    
-    return dash.no_update
+        return {"display": "flex"}, {"display": "none"}
+    return dash.no_update, dash.no_update
 
 # DASHBOARD
 @callback(
@@ -5117,3 +5117,121 @@ def toggle_ssh_auth_type(auth_type):
     if auth_type == "password":
         return {"display": "none"}, {"display": "block"}
     return {"display": "block"}, {"display": "none"}
+
+
+import re as _re
+
+# All valid column names the user can reference in a query
+_VALID_COLS = set(actual_keys_in_data)
+
+
+def _extract_identifiers(sql: str) -> list[str]:
+    """Return word-like tokens from SQL that could be column names."""
+    # Remove string literals and comments first
+    sql_clean = _re.sub(r"'[^']*'", " ", sql)
+    sql_clean = _re.sub(r'"[^"]*"', " ", sql_clean)
+    sql_clean = _re.sub(r"--[^\n]*", " ", sql_clean)
+    # SQL keywords to skip
+    _KEYWORDS = {
+        "select","from","where","and","or","not","in","is","null","like",
+        "limit","offset","group","by","order","having","join","on","as",
+        "distinct","count","sum","avg","min","max","between","case","when",
+        "then","else","end","with","inner","left","right","outer","cross",
+        "union","all","insert","update","delete","create","drop","cast",
+        "timestamp","date","interval","true","false","asc","desc","exists",
+    }
+    tokens = _re.findall(r"\b[A-Za-z_][A-Za-z0-9_]*\b", sql_clean)
+    return [t for t in tokens if t.lower() not in _KEYWORDS]
+
+
+@callback(
+    Output("preview-col-validation", "children"),
+    Input("preview-sql-input", "n_blur"),
+    State("preview-sql-input", "value"),
+    prevent_initial_call=True,
+)
+def validate_sql_columns(n_blur, sql):
+    """Validate column-name tokens against actual_keys_in_data while typing."""
+    if not sql or not sql.strip():
+        return ""
+
+    tokens = _extract_identifiers(sql)
+    if not tokens:
+        return ""
+
+    valid, invalid = [], []
+    for tok in dict.fromkeys(tokens):    # deduplicate, preserve order
+        if tok in _VALID_COLS:
+            valid.append(tok)
+        else:
+            # Suggest close matches
+            suggestions = [c for c in _VALID_COLS
+                           if tok.lower() in c.lower() or c.lower().startswith(tok.lower())][:3]
+            invalid.append((tok, suggestions))
+
+    parts = []
+    if valid:
+        parts.append(html.Span(
+            "✓ " + ", ".join(valid),
+            style={"color": "#006401", "marginRight": "12px", "fontWeight": "500"},
+        ))
+    for tok, suggestions in invalid:
+        hint = f"  (did you mean: {', '.join(suggestions)}?)" if suggestions else ""
+        parts.append(html.Span(
+            f"✗ {tok}{hint}",
+            style={"color": "#dc2626", "marginRight": "10px"},
+        ))
+
+    return parts
+
+
+@callback(
+    [Output("preview-data-info",  "children", allow_duplicate=True),
+     Output("preview-data-table", "children", allow_duplicate=True),
+     Output("preview-run-status", "children")],
+    Input("preview-run-btn", "n_clicks"),
+    Input("url-params-store", "data"),
+    State("preview-sql-input", "value"),
+    prevent_initial_call=True,
+)
+def run_preview_query(n_clicks,urlparams, sql):
+    """Execute the user-supplied SQL via DuckDB and display results."""
+    if not n_clicks or not sql or not sql.strip():
+        raise PreventUpdate
+
+    try:
+        route = urlparams.get('route', ["default"])[0]
+
+        sql = sql.replace("data", f"'data/{route}/parquet'") + " LIMIT 100"
+        df = DataStorage.query_duckdb(sql.strip())
+    except Exception as exc:
+        err_msg = str(exc)
+        error_div = html.Div([
+            html.Div("✗ SQL Error", style={"color": "#dc2626", "fontWeight": "700",
+                                            "marginBottom": "6px"}),
+            html.Pre(err_msg, style={
+                "background": "#fef2f2", "border": "1px solid #fecaca",
+                "borderRadius": "6px", "padding": "12px",
+                "fontSize": "12px", "whiteSpace": "pre-wrap",
+                "color": "#dc2626", "maxHeight": "160px", "overflowY": "auto",
+            }),
+        ])
+        return error_div, "", ""
+
+    if df is None or df.empty:
+        return (
+            html.Div("⚠ Query returned no rows.",
+                     style={"color": "#f59e0b", "fontWeight": "600"}),
+            "", "",
+        )
+
+    info = html.Div(style={"display": "flex", "gap": "20px", "flexWrap": "wrap"}, children=[
+        html.Span(f"✓ {len(df):,} rows",
+                  style={"color": "#006401", "fontWeight": "600"}),
+        html.Span(f"{len(df.columns)} columns",
+                  style={"color": "#374151"}),
+        html.Span("Use column headers to sort/filter.",
+                  style={"color": "#6b7280", "fontStyle": "italic", "fontSize": "12px"}),
+    ])
+
+    return info, create_preview_table(df), ""

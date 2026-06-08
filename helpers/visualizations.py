@@ -22,7 +22,7 @@ from config import PERSON_ID_, ENCOUNTER_ID_, DATE_, CONCEPT_NAME_,DATA_PATH_,FI
 
 THEME = {
     # Multi-series: dark green → mid greens → warm amber → teal → slate
-    "primary":  ["#006401", "#2e8b2e", "#57b957", "#f59e0b", "#0d9488"],
+    "primary":  ["#006401", "#03FAD5", "#8A5A01", "#f59e0b", "#0d9488"],
     # Single-series or color group: progressive green shades
     "greens":   ["#006401", "#1a7a1a", "#2e8f2e", "#43a443", "#57b957", "#80cc80"],
     # Gender/binary split (green + amber)
