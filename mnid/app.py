@@ -57,53 +57,33 @@ _TREND_ACCENT = {
 }
 _ANALYSIS_PALETTE = ['#2563EB', '#0F766E', '#7C3AED', '#C2410C', '#DB2777', '#0891B2', '#64748B']
 
-_MNID_UI_CACHE = {}
-_MNID_UI_CACHE_MAX = 16
-_MNID_UI_CACHE_TTL_SECONDS = 3600
-try:
-    _MNID_UI_DISK_CACHE = diskcache.Cache(os.path.join('.', 'cache', 'mnid_ui'))
-except Exception:
-    _MNID_UI_DISK_CACHE = None
+# Lightweight in-memory store for UI payload (trend, compare, heatmap callbacks).
+# Diskcache removed — all data now comes from SQL queries.
+_MNID_UI_CACHE: dict = {}
+_MNID_UI_CACHE_MAX = 32
 
 
 def _remember_ui_payload(prefix: str, records: list[dict]) -> str:
+    """Store serialised DataFrame records under a UUID key for callback access."""
     cache_key = f'{prefix}:{uuid.uuid4().hex}'
     _MNID_UI_CACHE[cache_key] = records
+    # Evict oldest entries when the dict grows too large
     while len(_MNID_UI_CACHE) > _MNID_UI_CACHE_MAX:
         oldest_key = next(iter(_MNID_UI_CACHE))
         _MNID_UI_CACHE.pop(oldest_key, None)
-    if _MNID_UI_DISK_CACHE is not None:
-        try:
-            _MNID_UI_DISK_CACHE.set(cache_key, records, expire=_MNID_UI_CACHE_TTL_SECONDS)
-        except Exception:
-            pass
     return cache_key
 
 
 def _restore_ui_dataframe(cache_key: str | None) -> pd.DataFrame:
+    """Recover a DataFrame from the in-memory UI payload store."""
     if not cache_key:
         return pd.DataFrame()
-
     records = _MNID_UI_CACHE.get(cache_key)
-    if records is None and _MNID_UI_DISK_CACHE is not None:
-        try:
-            records = _MNID_UI_DISK_CACHE.get(cache_key)
-        except Exception:
-            records = None
-        if records is not None:
-            _MNID_UI_CACHE[cache_key] = records
-
     return _deserialize_store_df(records)
 
 
 def clear_runtime_caches() -> None:
-    _network_df_cache.clear()
     _MNID_UI_CACHE.clear()
-    if _MNID_UI_DISK_CACHE is not None:
-        try:
-            _MNID_UI_DISK_CACHE.clear()
-        except Exception:
-            pass
 
 # MNID data helpers
 
@@ -208,7 +188,7 @@ def _monthly_visits(df, encounter_val, unique_col='person_id'):
         }
         service_area = area_map.get(str(encounter_val or '').strip().upper())
         if service_area:
-            sub = df[df['Service_Area'].astype(str) == service_area]
+            sub = df[df['Service_Area'].astype(str).str.contains(service_area)]
     if not len(sub): return pd.DataFrame(columns=['month','n'])
     sub['month'] = pd.to_datetime(sub['Date']).dt.to_period('M')
     out = sub.groupby('month')[unique_col].nunique().reset_index()
@@ -5448,42 +5428,53 @@ def _section_anchor(anchor_id):
 
 # MNID dashboard entry point
 
-_network_df_cache: dict = {}
+
+_MNID_SQL_COLUMNS = ', '.join([
+    'person_id', 'encounter_id', 'Date', 'Program', 'Reporting_Program',
+    'Service_Area', 'Facility', 'Facility_CODE', 'District', 'Encounter',
+    'obs_value_coded', 'concept_name', 'Value', 'ValueN', 'new_revisit',
+    'Home_district', 'TA', 'Village', 'Age', 'Age_Group', 'Gender', 'Source_Program',
+])
 
 
-def render_mnid_dashboard(filtered, data_opd, delta_days, config,
+def render_mnid_dashboard(filtered, data_opd, delta_days,data_path, config,
                           facility_code, start_date, end_date,
                           scope_meta: dict | None = None):
-    dataset_version = (scope_meta or {}).get('dataset_version')
-    selected_programs = tuple(sorted((scope_meta or {}).get('mnid_categories') or []))
-    selected_facilities = tuple(sorted((scope_meta or {}).get('selected_facilities') or []))
-    selected_districts = tuple(sorted((scope_meta or {}).get('selected_districts') or []))
-    _opd_key = (
-        dataset_version,
-        len(data_opd),
-        tuple(data_opd.columns.tolist()) if not data_opd.empty else (),
-        selected_programs,
-        selected_facilities,
-        selected_districts,
-    )
-    if _opd_key not in _network_df_cache:
-        _network_df_cache.clear()
-        _network_df_cache[_opd_key] = _prepare_mnid_dataframe(data_opd)
-    network_df = _network_df_cache[_opd_key]
+    """
+    Render the MNID dashboard.
 
-    # Derive facility_df by filtering the already-prepared network_df instead of re-running
-    # the expensive _prepare_mnid_dataframe on every date change.
+    ``filtered`` and ``data_opd`` can be either:
+    - **SQL WHERE-clause strings** (memory-efficient path — fetches only needed
+      columns via DuckDB internally), or
+    - **pandas DataFrames** (legacy / backward-compatible path).
+    """
+    if isinstance(filtered, str):
+        from data_storage import DataStorage as _DS
+        filtered = _DS.query_duckdb(
+            f"SELECT {_MNID_SQL_COLUMNS} FROM '{data_path}' WHERE {filtered}"
+        )
+        data_opd = _DS.query_duckdb(
+            f"SELECT {_MNID_SQL_COLUMNS} FROM '{data_path}' WHERE {data_opd}"
+        )
+
+    selected_programs   = tuple(sorted((scope_meta or {}).get('mnid_categories') or []))
+    selected_facilities = tuple(sorted((scope_meta or {}).get('selected_facilities') or []))
+    selected_districts  = tuple(sorted((scope_meta or {}).get('selected_districts') or []))
+
+    # No network-df cache — SQL queries supply fresh data every render.
+    network_df = _prepare_mnid_dataframe(data_opd)
+
+    # Derive facility_df from network_df by applying date and scope filters.
     facility_df = network_df
     if start_date and 'Date' in network_df.columns and not network_df.empty:
         try:
             s = pd.to_datetime(start_date)
             e = pd.to_datetime(end_date) if end_date else network_df['Date'].max()
-            date_mask = (network_df['Date'] >= s) & (network_df['Date'] <= e)
-            facility_df = network_df[date_mask]
+            facility_df = network_df[(network_df['Date'] >= s) & (network_df['Date'] <= e)]
         except Exception:
             facility_df = network_df
     selected_facilities = list(selected_facilities)
-    selected_districts = list(selected_districts)
+    selected_districts  = list(selected_districts)
     if selected_facilities and 'Facility' in facility_df.columns:
         facility_df = facility_df[facility_df['Facility'].isin(selected_facilities)]
     elif selected_districts and 'District' in facility_df.columns:

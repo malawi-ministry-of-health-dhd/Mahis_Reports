@@ -40,6 +40,31 @@ class DataFetcher:
         # Ensure batch folder exists
         os.makedirs(os.path.join(self.path, batch_folder), exist_ok=True)
     
+    def _build_tunnel_kwargs(self) -> dict:
+        """
+        Build SSHTunnelForwarder keyword arguments from ssh_config.
+        Handles two mutually exclusive auth modes:
+          - password auth: ssh_config contains 'ssh_password'
+          - key-file auth: ssh_config contains 'ssh_pkey'
+        """
+        cfg = self.ssh_config
+        kwargs = {
+            'ssh_username':         cfg.get('ssh_user', 'ubuntu'),
+            'remote_bind_address':  tuple(cfg['remote_bind_address']),
+        }
+        ssh_port = cfg.get('ssh_port', 22)
+
+        if cfg.get('ssh_password'):
+            kwargs['ssh_password'] = cfg['ssh_password']
+        elif cfg.get('ssh_pkey'):
+            pkey_path = cfg['ssh_pkey']
+            # Prepend the ssh/ directory if only a filename is given
+            if not os.path.isabs(pkey_path) and not pkey_path.startswith('ssh/'):
+                pkey_path = os.path.join('ssh', pkey_path)
+            kwargs['ssh_pkey'] = pkey_path
+
+        return (cfg['ssh_host'], ssh_port), kwargs
+
     def _get_db_connection(self, tunnel=None) -> pymysql.Connection:
         """
         Establish database connection with SSL support if configured
@@ -176,13 +201,8 @@ class DataFetcher:
                                                      id_column, start_date)
                 conn.close()
             elif self.ssh_config:
-                with SSHTunnelForwarder(
-                    (self.ssh_config['ssh_host'], 22),
-                    ssh_username=self.ssh_config['ssh_user'],
-                    ssh_password=self.ssh_config.get('ssh_password'),
-                    ssh_private_key=f"ssh/{self.ssh_config['ssh_pkey']}",
-                    remote_bind_address=tuple(self.ssh_config['remote_bind_address'])
-                ) as tunnel:
+                _tunnel_host, _tunnel_kwargs = self._build_tunnel_kwargs()
+                with SSHTunnelForwarder(_tunnel_host, **_tunnel_kwargs) as tunnel:
                     logger.info(f"SSH tunnel established on port {tunnel.local_bind_port}")
                     conn = self._get_db_connection(tunnel)
                     batch_paths = self._fetch_in_batches(conn, query_template, date_column,
@@ -310,13 +330,8 @@ class DataFetcher:
                 df = pd.read_sql(query, conn)
                 conn.close()
             elif self.ssh_config:
-                with SSHTunnelForwarder(
-                    (self.ssh_config['ssh_host'], 22),
-                    ssh_username=self.ssh_config['ssh_user'],
-                    ssh_password=self.ssh_config.get('ssh_password'),
-                    ssh_private_key=f"ssh/{self.ssh_config['ssh_pkey']}",
-                    remote_bind_address=tuple(self.ssh_config['remote_bind_address'])
-                ) as tunnel:
+                _tunnel_host, _tunnel_kwargs = self._build_tunnel_kwargs()
+                with SSHTunnelForwarder(_tunnel_host, **_tunnel_kwargs) as tunnel:
                     logger.info(f"SSH tunnel established on port {tunnel.local_bind_port}")
                     conn = self._get_db_connection(tunnel)
                     df = pd.read_sql(query, conn)
