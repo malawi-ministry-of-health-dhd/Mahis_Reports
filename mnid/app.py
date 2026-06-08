@@ -13,6 +13,8 @@ import os
 import pandas as pd
 pd.options.mode.chained_assignment = None
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import statistics as _stats
 import uuid
 from datetime import datetime
 from dash import html, dcc, clientside_callback, callback, callback_context, no_update, Input, Output, State, ALL
@@ -1604,71 +1606,269 @@ def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str, chart_type: str =
 
 
 @callback(
-    Output('mnid-trend-graph', 'figure'),
+    Output('mnid-run-charts-container', 'children'),
     Output('mnid-trend-active-cat', 'data'),
     Output({'type': 'trend-cat-btn', 'index': ALL}, 'className'),
-    Output('mnid-trend-indicators', 'options'),
-    Output('mnid-trend-indicators', 'value'),
-    Output('mnid-trend-chart-type-store', 'data'),
-    Output('mnid-trend-chart-toggle', 'className'),
-    Output('mnid-trend-chart-toggle-text', 'children'),
+    Output('mnid-trend-location', 'options'),
+    Output('mnid-trend-ind-filter', 'options'),
+    Output('mnid-trend-ind-filter', 'value'),
     Input({'type': 'trend-cat-btn', 'index': ALL}, 'n_clicks'),
-    Input('mnid-trend-chart-toggle', 'n_clicks'),
-    Input('mnid-trend-indicators', 'value'),
+    Input('mnid-trend-location', 'value'),
+    Input('mnid-trend-ind-filter', 'value'),
     State('mnid-trend-store', 'data'),
     State('mnid-trend-active-cat', 'data'),
-    State('mnid-trend-chart-type-store', 'data'),
     State('mnid-trend-cats-store', 'data'),
     prevent_initial_call=False,
 )
-def update_trend_chart(n_clicks_list, toggle_clicks, selected_ind_ids, stored_trend, active_cat, chart_type, cat_order):
+def update_trend_chart(n_clicks_list, location, selected_inds, stored_trend, active_cat, cat_order):
     categories = cat_order or _CAT_ORDER
     cat = active_cat if active_cat in categories else (categories[0] if categories else 'ANC')
-    mode = chart_type or 'line'
-    selected_ind_ids = selected_ind_ids or []
+
     ctx = callback_context
-    triggered_prop = None
-    if ctx and ctx.triggered:
-        triggered_prop = ctx.triggered[0]['prop_id']
-        if 'trend-cat-btn' in triggered_prop:
-            try:
-                next_cat = json.loads(triggered_prop.split('.')[0]).get('index', cat)
-                if next_cat in categories:
-                    cat = next_cat
-            except Exception:
-                pass
-        elif triggered_prop == 'mnid-trend-chart-toggle.n_clicks':
-            mode = 'bar' if mode == 'line' else 'line'
-            selected_ind_ids = []
+    triggered_prop = ctx.triggered[0]['prop_id'] if ctx and ctx.triggered else None
+    cat_changed = False
+    if triggered_prop and 'trend-cat-btn' in triggered_prop:
+        try:
+            next_cat = json.loads(triggered_prop.split('.')[0]).get('index', cat)
+            if next_cat in categories:
+                cat = next_cat
+                cat_changed = True
+        except Exception:
+            pass
 
     trend_payload = stored_trend or {}
     tracked = trend_payload.get('tracked', [])
     df = _restore_ui_dataframe(trend_payload.get('data_key'))
     scope_meta = trend_payload.get('scope_meta') or {}
-    cat_inds = [i for i in tracked if i.get('category') == cat and i.get('status') == 'tracked']
-    ind_options = [{'label': i['label'], 'value': i['id']} for i in cat_inds]
-    valid_ids = [opt['value'] for opt in ind_options]
-    selected = [iid for iid in selected_ind_ids if iid in valid_ids][:2]
+    loc_options = trend_payload.get('loc_options') or [{'label': 'All locations', 'value': 'all'}]
+    ind_opts_by_cat = trend_payload.get('ind_opts_by_cat') or {}
+    ind_options = ind_opts_by_cat.get(cat, [])
 
-    user_changed_indicators = triggered_prop == 'mnid-trend-indicators.value'
-    should_default_selection = (
-        not triggered_prop
-        or 'trend-cat-btn' in str(triggered_prop)
-        or triggered_prop == 'mnid-trend-chart-toggle.n_clicks'
+    # Reset indicator selection when category changes; preserve on other triggers
+    ind_value_out = None if cat_changed else no_update
+
+    cards = _run_chart_cards(df, tracked, cat, location or 'all',
+                             selected_inds if not cat_changed else None,
+                             scope_meta)
+    classes = ['mnid-filter-btn active' if c == cat else 'mnid-filter-btn' for c in categories]
+    return cards, cat, classes, loc_options, ind_options, ind_value_out
+
+
+def _location_options_for_df(df: pd.DataFrame, scope_meta: dict) -> list[dict]:
+    """Build location filter options from the available data."""
+    level = str((scope_meta or {}).get('level') or '').strip().lower()
+    opts = [{'label': 'All locations', 'value': 'all'}]
+    if df is None or df.empty:
+        return opts
+    if level == 'facility' and 'Facility_CODE' in df.columns:
+        for fc in sorted(df['Facility_CODE'].dropna().astype(str).unique()):
+            opts.append({'label': _FACILITY_NAMES.get(fc, fc), 'value': fc})
+    elif 'District' in df.columns and df['District'].dropna().nunique() > 1:
+        for d in sorted(df['District'].dropna().astype(str).unique()):
+            opts.append({'label': d, 'value': d})
+    elif 'Facility_CODE' in df.columns:
+        for fc in sorted(df['Facility_CODE'].dropna().astype(str).unique()):
+            opts.append({'label': _FACILITY_NAMES.get(fc, fc), 'value': fc})
+    return opts
+
+
+def _indicator_run_fig(plot_df: pd.DataFrame, ind: dict, color: str,
+                       periods: list, tickfmt: str, hfmt: str) -> go.Figure:
+    """Single-indicator run chart figure for one card."""
+    nm = _mask(plot_df, ind['numerator_filters'])
+    dm = _mask(plot_df, ind['denominator_filters'])
+    pid = 'person_id'
+
+    xs, ys = [], []
+    for p in periods:
+        pm = plot_df['_p'] == p
+        n_val = int(plot_df.loc[pm & nm, pid].dropna().nunique()) if pid in plot_df.columns else int((pm & nm).sum())
+        d_val = int(plot_df.loc[pm & dm, pid].dropna().nunique()) if pid in plot_df.columns else int((pm & dm).sum())
+        xs.append(p)
+        ys.append(round(n_val / d_val * 100, 1) if d_val > 0 else None)
+
+    valid_ys = [y for y in ys if y is not None]
+    fig = go.Figure()
+    if not valid_ys:
+        fig.update_layout(paper_bgcolor=BG, plot_bgcolor=BG, height=200,
+                          margin=dict(l=8, r=8, t=4, b=4),
+                          annotations=[dict(text='No data for this period',
+                                            xref='paper', yref='paper', x=0.5, y=0.5,
+                                            showarrow=False, font=dict(size=11, color=MUTED))])
+        return fig
+
+    avg = sum(valid_ys) / len(valid_ys)
+    r_val = int(color[1:3], 16)
+    g_val = int(color[3:5], 16)
+    b_val = int(color[5:7], 16)
+
+    # SD band
+    if len(valid_ys) > 2:
+        sd = _stats.stdev(valid_ys)
+        ub = [min(avg + sd, 100.0)] * len(xs)
+        lb = [max(avg - sd, 0.0)] * len(xs)
+        fig.add_trace(go.Scatter(
+            x=xs + xs[::-1], y=ub + lb[::-1],
+            fill='toself',
+            fillcolor=f'rgba({r_val},{g_val},{b_val},0.08)',
+            line=dict(color='rgba(0,0,0,0)'),
+            showlegend=False, hoverinfo='skip',
+        ))
+
+    # Mean line
+    fig.add_trace(go.Scatter(
+        x=xs, y=[avg] * len(xs), mode='lines',
+        line=dict(color='#EF4444', width=1.5, dash='dash'),
+        showlegend=False,
+        hovertemplate=f'Mean: {avg:.0f}%<extra></extra>',
+    ))
+
+    # Target
+    target = ind.get('target')
+    if target is not None:
+        fig.add_trace(go.Scatter(
+            x=xs, y=[target] * len(xs), mode='lines',
+            line=dict(color='#94A3B8', width=1.2, dash='dot'),
+            showlegend=False,
+            hovertemplate=f'Target: {target}%<extra></extra>',
+        ))
+
+    # Key-point labels (first, peak, last — deduplicated)
+    valid_pts = [(x, y) for x, y in zip(xs, ys) if y is not None]
+    kp_set, key_pts = set(), []
+    for pt in [valid_pts[0], max(valid_pts, key=lambda p: p[1]), valid_pts[-1]]:
+        if pt[0] not in kp_set:
+            kp_set.add(pt[0])
+            key_pts.append(pt)
+    fig.add_trace(go.Scatter(
+        x=[p[0] for p in key_pts], y=[p[1] for p in key_pts],
+        mode='markers+text',
+        text=[f'{p[1]:.0f}%' for p in key_pts],
+        textposition='top center',
+        textfont=dict(size=9, color='#374151'),
+        marker=dict(size=7, color='#1e293b'),
+        showlegend=False,
+        hovertemplate=f'%{{x|{hfmt}}}: %{{y:.0f}}%<extra></extra>',
+    ))
+
+    # Main data line
+    fig.add_trace(go.Scatter(
+        x=xs, y=ys, mode='lines+markers',
+        line=dict(color=color, width=2.4, shape='linear'),
+        marker=dict(size=5, color=color, line=dict(color='#fff', width=1.2)),
+        connectgaps=False, showlegend=False,
+        hovertemplate=f'%{{x|{hfmt}}}<br>Coverage: %{{y:.0f}}%<extra></extra>',
+    ))
+
+    fig.update_layout(
+        paper_bgcolor=BG, plot_bgcolor=BG,
+        font=dict(family=FONT, color=TEXT, size=10),
+        height=200,
+        margin=dict(l=6, r=80, t=6, b=24),
+        showlegend=False,
+        hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
+        xaxis=dict(showgrid=False, zeroline=False, showline=False,
+                   tickformat=tickfmt, tickfont=dict(size=9, color=MUTED)),
+        yaxis=dict(showgrid=True, gridcolor=GRID_C, zeroline=False, showline=False,
+                   tickfont=dict(size=9, color=MUTED), ticksuffix='%', range=[0, 112]),
+        annotations=[dict(
+            x=1.0, y=avg / 112, xref='paper', yref='paper',
+            text=f'<b>avg {avg:.0f}%</b>',
+            showarrow=False, font=dict(size=9, color='#EF4444'),
+            xanchor='left', yanchor='middle',
+        )],
     )
-    if not selected and should_default_selection:
-        selected = valid_ids[:1]
-    active_inds = [i for i in cat_inds if i['id'] in selected]
-    fig = _location_trend_fig(df, active_inds, cat, mode, scope_meta)
+    return fig
 
-    classes = [
-        'mnid-filter-btn active' if c == cat else 'mnid-filter-btn'
-        for c in categories
-    ]
-    toggle_class = 'mnid-trend-toggle is-bar' if mode == 'bar' else 'mnid-trend-toggle is-line'
-    toggle_text = 'Bar' if mode == 'bar' else 'Line'
-    indicators_value_out = no_update if user_changed_indicators else selected
-    return fig, cat, classes, ind_options, indicators_value_out, mode, toggle_class, toggle_text
+
+def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
+                     location: str | None = None,
+                     selected_ids: list | None = None,
+                     scope_meta: dict | None = None) -> list:
+    """Build a list of card divs — one per tracked indicator in cat."""
+    tracked = [i for i in indicators if i.get('status') == 'tracked' and i.get('category') == cat]
+    if selected_ids:
+        id_set = set(selected_ids)
+        tracked = [i for i in tracked if i.get('id') in id_set] or tracked
+    if not tracked or df is None or df.empty:
+        return [html.Div('No indicators configured for this category.',
+                         style={'color': MUTED, 'fontSize': '13px', 'padding': '24px'})]
+
+    # Apply location filter
+    plot_df = df.copy()
+    if location and location != 'all':
+        for col_name in ('Facility_CODE', 'District'):
+            if col_name in df.columns:
+                mask = df[col_name].astype(str) == str(location)
+                if mask.any():
+                    plot_df = df[mask].copy()
+                    break
+
+    # Auto-detect time frequency from the filtered data
+    dates = pd.to_datetime(plot_df['Date'], errors='coerce').dropna()
+    if dates.empty:
+        return [html.Div('No data for the selected location.',
+                         style={'color': MUTED, 'fontSize': '13px', 'padding': '24px'})]
+
+    span = max(int((dates.max() - dates.min()).days), 0)
+    if span <= 45:
+        tickfmt, hfmt = '%d %b', '%d %b %Y'
+        plot_df['_p'] = dates.dt.floor('D')
+    elif span <= 180:
+        tickfmt, hfmt = '%d %b', '%d %b %Y'
+        plot_df['_p'] = dates.dt.to_period('W').apply(lambda p: p.start_time)
+    else:
+        tickfmt, hfmt = '%b %y', '%b %Y'
+        plot_df['_p'] = dates.dt.to_period('M').apply(lambda p: datetime(p.year, p.month, 1))
+
+    periods = sorted(plot_df['_p'].dropna().unique())
+    if not periods:
+        return [html.Div('No time periods available.',
+                         style={'color': MUTED, 'fontSize': '13px', 'padding': '24px'})]
+
+    cat_colors = CAT_PALETTES.get(cat, _TREND_SERIES_PALETTE)
+    cards = []
+
+    for idx, ind in enumerate(tracked):
+        color = cat_colors[idx % len(cat_colors)]
+        fig = _indicator_run_fig(plot_df, ind, color, periods, tickfmt, hfmt)
+
+        target = ind.get('target')
+        target_badge = None
+        if target is not None:
+            cls = _css(
+                _cov(plot_df, ind['numerator_filters'], ind['denominator_filters'])[2],
+                target, ind,
+            )
+            badge_colors = {'ok': ('#D1FAE5', '#065F46'), 'warn': ('#FEF3C7', '#92400E'), 'danger': ('#FEE2E2', '#991B1B')}
+            bg, fg = badge_colors.get(cls, ('#F1F5F9', '#475569'))
+            target_badge = html.Span(
+                f'Target {target}%',
+                style={'fontSize': '10px', 'fontWeight': '600', 'padding': '2px 7px',
+                       'borderRadius': '999px', 'backgroundColor': bg, 'color': fg,
+                       'marginLeft': '6px'},
+            )
+
+        card = html.Div(className='mnid-chart-card', children=[
+            html.Div(style={'display': 'flex', 'alignItems': 'center',
+                            'justifyContent': 'space-between', 'marginBottom': '2px'}, children=[
+                html.Div(ind['label'], style={
+                    'fontSize': '11px', 'fontWeight': '600', 'color': TEXT,
+                    'lineHeight': '1.3',
+                }),
+                target_badge,
+            ]),
+            dcc.Graph(
+                figure=fig,
+                config={'displayModeBar': 'hover',
+                        'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'],
+                        'toImageButtonOptions': {'format': 'png', 'scale': 2}},
+                style={'height': '200px'},
+            ),
+        ])
+        cards.append(card)
+
+    return cards
 
 
 def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None = None,
@@ -1678,31 +1878,31 @@ def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None 
     tracked = [i for i in indicators if i.get('status') == 'tracked']
     cat_order = _resolve_category_order(tracked, categories)
     default_cat = default_cat if default_cat in cat_order else (cat_order[0] if cat_order else 'ANC')
-    default_inds = [i for i in tracked if i.get('category') == default_cat][:1]
-    default_ind_opts = [{'label': i['label'], 'value': i['id']} for i in tracked if i.get('category') == default_cat]
-    default_fig = _location_trend_fig(df, default_inds, default_cat, 'line', scope_meta)
+    loc_options = _location_options_for_df(df, scope_meta or {})
+
+    # Per-category indicator options stored so callback can swap them on tab change
+    ind_opts_by_cat = {
+        c: [{'label': i['label'], 'value': i['id']}
+            for i in tracked if i.get('category') == c]
+        for c in cat_order
+    }
+    default_ind_opts = ind_opts_by_cat.get(default_cat, [])
+
+    default_cards = _run_chart_cards(df, tracked, default_cat, 'all', None, scope_meta)
     trend_store = {
         'tracked': tracked,
         'data_key': _remember_ui_payload('trend', df, stable_key=payload_key),
         'scope_meta': scope_meta or {},
+        'loc_options': loc_options,
+        'ind_opts_by_cat': ind_opts_by_cat,
     }
 
     return html.Div(className='mnid-card', style={'marginBottom': '12px'}, children=[
         html.Div(style={'display': 'flex', 'alignItems': 'center',
-                        'justifyContent': 'space-between', 'marginBottom': '8px', 'gap': '12px', 'flexWrap': 'wrap'}, children=[
-            html.Div('RUN CHARTS', className='mnid-section-lbl',
-                     style={'marginBottom': '0'}),
-            html.Div(style={'display': 'flex', 'alignItems': 'center', 'gap': '10px', 'flexWrap': 'wrap'}, children=[
-                html.Button(
-                    id='mnid-trend-chart-toggle',
-                    className='mnid-trend-toggle is-line',
-                    n_clicks=0,
-                    type='button',
-                    children=[
-                        html.Span('Line', id='mnid-trend-chart-toggle-text', className='mnid-trend-toggle-text'),
-                        html.Span(className='mnid-trend-toggle-thumb'),
-                    ],
-                ),
+                        'justifyContent': 'space-between', 'marginBottom': '10px',
+                        'gap': '12px', 'flexWrap': 'wrap'}, children=[
+            html.Div('RUN CHARTS', className='mnid-section-lbl', style={'marginBottom': '0'}),
+            html.Div(style={'display': 'flex', 'alignItems': 'center', 'gap': '8px', 'flexWrap': 'wrap'}, children=[
                 html.Div(className='mnid-filter-row', children=[
                     html.Button(
                         _CAT_LABELS.get(c, c),
@@ -1712,25 +1912,34 @@ def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None 
                     )
                     for c in cat_order
                 ]),
+                dcc.Dropdown(
+                    id='mnid-trend-ind-filter',
+                    options=default_ind_opts,
+                    value=None,
+                    multi=True,
+                    clearable=True,
+                    placeholder='All indicators',
+                    style={'minWidth': '200px', 'maxWidth': '300px', 'fontSize': '12px'},
+                ),
+                dcc.Dropdown(
+                    id='mnid-trend-location',
+                    options=loc_options,
+                    value='all',
+                    clearable=False,
+                    searchable=True,
+                    placeholder='All locations',
+                    style={'minWidth': '150px', 'maxWidth': '210px', 'fontSize': '12px'},
+                ),
             ]),
-        ]),
-        html.Div(style={'marginBottom': '8px', 'maxWidth': '360px'}, children=[
-            html.Div('Indicators', style={'fontSize': '10px', 'color': MUTED, 'fontWeight': '600', 'marginBottom': '3px'}),
-            dcc.Dropdown(
-                id='mnid-trend-indicators',
-                options=default_ind_opts,
-                value=[i['id'] for i in default_inds],
-                multi=True,
-                placeholder='Select up to 2 indicators...',
-                style={'fontSize': '12px', 'minHeight': '34px'},
-            ),
         ]),
         dcc.Store(id='mnid-trend-store', data=trend_store),
         dcc.Store(id='mnid-trend-active-cat', data=default_cat),
         dcc.Store(id='mnid-trend-cats-store', data=cat_order),
-        dcc.Store(id='mnid-trend-chart-type-store', data='line'),
-        dcc.Graph(id='mnid-trend-graph', figure=default_fig,
-                  config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}}, style={'height': '340px'}),
+        html.Div(
+            id='mnid-run-charts-container',
+            className='mnid-chart-grid',
+            children=default_cards,
+        ),
     ])
 
 
@@ -4083,20 +4292,17 @@ def register_mnid_callbacks(app) -> None:
     )
 
     app.callback(
-        Output('mnid-trend-graph', 'figure'),
+        Output('mnid-run-charts-container', 'children'),
         Output('mnid-trend-active-cat', 'data'),
         Output({'type': 'trend-cat-btn', 'index': ALL}, 'className'),
-        Output('mnid-trend-indicators', 'options'),
-        Output('mnid-trend-indicators', 'value'),
-        Output('mnid-trend-chart-type-store', 'data'),
-        Output('mnid-trend-chart-toggle', 'className'),
-        Output('mnid-trend-chart-toggle-text', 'children'),
+        Output('mnid-trend-location', 'options'),
+        Output('mnid-trend-ind-filter', 'options'),
+        Output('mnid-trend-ind-filter', 'value'),
         Input({'type': 'trend-cat-btn', 'index': ALL}, 'n_clicks'),
-        Input('mnid-trend-chart-toggle', 'n_clicks'),
-        Input('mnid-trend-indicators', 'value'),
+        Input('mnid-trend-location', 'value'),
+        Input('mnid-trend-ind-filter', 'value'),
         State('mnid-trend-store', 'data'),
         State('mnid-trend-active-cat', 'data'),
-        State('mnid-trend-chart-type-store', 'data'),
         State('mnid-trend-cats-store', 'data'),
         prevent_initial_call=False,
     )(update_trend_chart)
