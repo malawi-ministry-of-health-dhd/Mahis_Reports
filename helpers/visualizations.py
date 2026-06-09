@@ -486,6 +486,7 @@ def create_count_sets(
         queries.append(query)
 
     intersection_query = " INTERSECT ".join(queries)
+    # print(intersection_query)
     result = DataStorage.query_duckdb(intersection_query)
     return result[unique_column].nunique()
 
