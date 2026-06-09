@@ -373,7 +373,7 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, repo
 
         dhis2_period = get_dhis2_period(start_date, period_type)
 
-        builder = ReportTableBuilder(spec_path,start_date,end_date,DATA_PATH_,location, dhis2_period)
+        builder = ReportTableBuilder(spec_path,start_date,end_date,DATA_PATH_,location, dhis2_period) 
         
         builder.load_spec()
         components = builder.build_dash_components()

@@ -25,7 +25,7 @@ def register_api_routes(server):
     def api_root():
         uuid_param = request.args.get("uuid")
         if not _is_authorized(uuid_param):
-            return jsonify({"error": "Unauthorized, Please supply id"}), 403
+            return jsonify({"error": "Unauthorized"}), 403
 
         return jsonify(
             {
@@ -66,8 +66,10 @@ def register_api_routes(server):
     def get_report_dataset():
         uuid_param = request.args.get("uuid")
         period_param = request.args.get("period")
-        facility_id = request.args.get("hf_code")
+        facility_id = (request.args.get("Location") or request.args.get("?Location"))
         report_name_id = request.args.get("report_name")
+        data_route = request.args.get("route")
+        DATA_PATH_ = f"data/{data_route}/parquet"
 
         if not all([period_param, facility_id, report_name_id]):
             return jsonify({"error": "Missing required parameters: Period, Health Facility ID, Report Name"}), 400
@@ -109,7 +111,7 @@ def register_api_routes(server):
             if not os.path.exists(spec_path):
                 return jsonify({"error": "Report template not found"}), 500
 
-            builder = ReportTableBuilder(spec_path,start_date,end_date,facility_id, dhis2_period=None)
+            builder = ReportTableBuilder(spec_path,start_date,end_date,DATA_PATH_, facility_id, dhis2_period=None)
             builder.load_spec()
             sections = builder.build_section_tables()
             section_ids = builder.build_section_tables_with_ids()
