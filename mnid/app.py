@@ -438,17 +438,6 @@ def _line(monthly_df, title, color='#2563EB', y_label='Clients'):
         hovertemplate=hover_fmt + '<br>Moving Avg: %{y:.1f}<br>Raw value: %{customdata[0]}<extra></extra>',
     ))
 
-    avg_val = sum(moving_average) / len(moving_average)
-    fig.add_hline(
-        y=avg_val,
-        line_dash='dash',
-        line_color='#DC2626',
-        line_width=1.5,
-        annotation_text=f'{ma_window}-period Moving Avg = {avg_val:.1f}',
-        annotation_position='top right',
-        annotation_font_color='#374151',
-    )
-
     key_points = []
     start_point = (clean.iloc[0]['month'], moving_average[0], clean.iloc[0]['n'])
     end_point = (clean.iloc[-1]['month'], moving_average[-1], clean.iloc[-1]['n'])
@@ -1693,7 +1682,8 @@ def _location_options_for_df(df: pd.DataFrame, scope_meta: dict) -> list[dict]:
 
 
 def _indicator_run_fig(plot_df: pd.DataFrame, ind: dict, color: str,
-                       periods: list, tickfmt: str, hfmt: str) -> go.Figure:
+                       periods: list, tickfmt: str, hfmt: str,
+                       grain: str = 'monthly') -> go.Figure:
     """Single-indicator run chart figure for one card."""
     nm = _mask(plot_df, ind['numerator_filters'])
     dm = _mask(plot_df, ind['denominator_filters'])
@@ -1710,7 +1700,9 @@ def _indicator_run_fig(plot_df: pd.DataFrame, ind: dict, color: str,
         n_vals.append(n_val)
         d_vals.append(d_val)
 
-    valid_ys = [y for y in ys if y is not None]
+    smoothed, _ = _moving_average_values(ys, grain)
+
+    valid_ys = [y for y in smoothed if y is not None]
     fig = go.Figure()
     if not valid_ys:
         fig.update_layout(paper_bgcolor=BG, plot_bgcolor=BG, height=200,
@@ -1720,44 +1712,22 @@ def _indicator_run_fig(plot_df: pd.DataFrame, ind: dict, color: str,
                                             showarrow=False, font=dict(size=11, color=MUTED))])
         return fig
 
-    avg = sum(valid_ys) / len(valid_ys)
     r_val = int(color[1:3], 16)
     g_val = int(color[3:5], 16)
     b_val = int(color[5:7], 16)
 
-    # SD band
-    if len(valid_ys) > 2:
-        sd = _stats.stdev(valid_ys)
-        ub = [min(avg + sd, 100.0)] * len(xs)
-        lb = [max(avg - sd, 0.0)] * len(xs)
-        fig.add_trace(go.Scatter(
-            x=xs + xs[::-1], y=ub + lb[::-1],
-            fill='toself',
-            fillcolor=f'rgba({r_val},{g_val},{b_val},0.08)',
-            line=dict(color='rgba(0,0,0,0)'),
-            showlegend=False, hoverinfo='skip',
-        ))
-
-    # Mean line
-    fig.add_trace(go.Scatter(
-        x=xs, y=[avg] * len(xs), mode='lines',
-        line=dict(color='#EF4444', width=1.5, dash='dash'),
-        showlegend=False,
-        hovertemplate=f'Mean: {avg:.0f}%<extra></extra>',
-    ))
-
-    # Target
+    # Target line
     target = ind.get('target')
     if target is not None:
         fig.add_trace(go.Scatter(
             x=xs, y=[target] * len(xs), mode='lines',
-            line=dict(color='#94A3B8', width=1.2, dash='dot'),
+            line=dict(color='#94A3B8', width=1.5, dash='dot'),
             showlegend=False,
             hovertemplate=f'Target: {target}%<extra></extra>',
         ))
 
-    # Key-point labels (first, peak, last — deduplicated)
-    valid_pts = [(x, y) for x, y in zip(xs, ys) if y is not None]
+    # Key-point labels (first, peak, last — deduplicated) using smoothed values
+    valid_pts = [(x, y, raw) for x, y, raw in zip(xs, smoothed, ys) if y is not None]
     kp_set, key_pts = set(), []
     for pt in [valid_pts[0], max(valid_pts, key=lambda p: p[1]), valid_pts[-1]]:
         if pt[0] not in kp_set:
@@ -1774,20 +1744,29 @@ def _indicator_run_fig(plot_df: pd.DataFrame, ind: dict, color: str,
         hovertemplate=f'%{{x|{hfmt}}}: %{{y:.0f}}%<extra></extra>',
     ))
 
-    # Main data line — customdata carries (n, d) for rich hover
+    # Main line — moving average, customdata carries (n, d) for rich hover
     fig.add_trace(go.Scatter(
-        x=xs, y=ys, mode='lines+markers',
+        x=xs, y=smoothed, mode='lines+markers',
         line=dict(color=color, width=2.4, shape='linear'),
         marker=dict(size=5, color=color, line=dict(color='#fff', width=1.2)),
         connectgaps=False, showlegend=False,
         customdata=list(zip(n_vals, d_vals)),
         hovertemplate=(
             f'<b>%{{x|{hfmt}}}</b><br>'
-            'Coverage: <b>%{y:.1f}%</b><br>'
+            'Moving Avg: <b>%{y:.1f}%</b><br>'
             'Clients: %{customdata[0]} / %{customdata[1]}'
             '<extra></extra>'
         ),
     ))
+
+    layout_annotations = []
+    if target is not None:
+        layout_annotations.append(dict(
+            x=1.0, y=target / 112, xref='paper', yref='paper',
+            text=f'<b>target {target:.0f}%</b>',
+            showarrow=False, font=dict(size=9, color='#64748B'),
+            xanchor='left', yanchor='middle',
+        ))
 
     fig.update_layout(
         paper_bgcolor=BG, plot_bgcolor=BG,
@@ -1800,12 +1779,7 @@ def _indicator_run_fig(plot_df: pd.DataFrame, ind: dict, color: str,
                    tickformat=tickfmt, tickfont=dict(size=9, color=MUTED)),
         yaxis=dict(showgrid=True, gridcolor=GRID_C, zeroline=False, showline=False,
                    tickfont=dict(size=9, color=MUTED), ticksuffix='%', range=[0, 112]),
-        annotations=[dict(
-            x=1.0, y=avg / 112, xref='paper', yref='paper',
-            text=f'<b>avg {avg:.0f}%</b>',
-            showarrow=False, font=dict(size=9, color='#EF4444'),
-            xanchor='left', yanchor='middle',
-        )],
+        annotations=layout_annotations,
     )
     return fig
 
@@ -1842,12 +1816,15 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
     span = max(int((dates.max() - dates.min()).days), 0)
     if span <= 45:
         tickfmt, hfmt = '%d %b', '%d %b %Y'
+        grain = 'daily'
         plot_df['_p'] = dates.dt.floor('D')
     elif span <= 180:
         tickfmt, hfmt = '%d %b', '%d %b %Y'
+        grain = 'weekly'
         plot_df['_p'] = dates.dt.to_period('W').apply(lambda p: p.start_time)
     else:
         tickfmt, hfmt = '%b %y', '%b %Y'
+        grain = 'monthly'
         plot_df['_p'] = dates.dt.to_period('M').apply(lambda p: datetime(p.year, p.month, 1))
 
     periods = sorted(plot_df['_p'].dropna().unique())
@@ -1860,7 +1837,7 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
 
     for idx, ind in enumerate(tracked):
         color = cat_colors[idx % len(cat_colors)]
-        fig = _indicator_run_fig(plot_df, ind, color, periods, tickfmt, hfmt)
+        fig = _indicator_run_fig(plot_df, ind, color, periods, tickfmt, hfmt, grain)
 
         target = ind.get('target')
         target_badge = None
@@ -2364,19 +2341,6 @@ def _monthly_concept_rate(df, concept, positive_values=None, title='', target=No
         hovertemplate=hover_fmt + '<br>Moving Avg: %{y:.1f}%<br>Raw Coverage: %{customdata[0]:.1f}%<extra></extra>',
         showlegend=False,
     ))
-
-    valid_ys = [y for y in moving_average if y is not None]
-    avg_val = sum(valid_ys) / len(valid_ys)
-    fig.add_hline(
-        y=avg_val,
-        line_dash='dash',
-        line_color='#DC2626',
-        line_width=1.5,
-        annotation_text=f'{ma_window}-period Moving Avg = {avg_val:.1f}%',
-        annotation_position='top right',
-        annotation_font_color='#374151',
-        annotation_font_size=9,
-    )
 
     if target is not None:
         fig.add_trace(go.Scatter(
@@ -2909,16 +2873,16 @@ def _location_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str,
             ))
 
             if idx == 0 and clean_xs:
-                avg_val = sum(clean_ys) / len(clean_ys)
-                fig.add_hline(
-                    y=avg_val,
-                    line_dash='dash',
-                    line_color='#DC2626',
-                    line_width=1.5,
-                    annotation_text=f'{ma_window}-period Moving Avg = {avg_val:.1f}',
-                    annotation_position='top right',
-                    annotation_font_color='#374151',
-                )
+                _tgt = ind.get('target')
+                if _tgt is not None:
+                    fig.add_trace(go.Scatter(
+                        x=clean_xs, y=[_tgt] * len(clean_xs),
+                        mode='lines',
+                        line=dict(color='#A1A1AA', width=1.5, dash='dot'),
+                        name=_target_label(ind),
+                        showlegend=True,
+                        hovertemplate=f'Target: {_tgt:.0f}%<extra></extra>',
+                    ))
 
                 key_points = []
                 key_points.append((clean_xs[0], clean_ys[0], clean_raw[0]))
@@ -4170,8 +4134,8 @@ _COMPARE_COLORS = [
 )
 def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids, toggle_clicks, stored, chart_type):
     mode = mode or 'facility'
-    time_grain = time_grain or 'monthly'
-    chart_type = chart_type or 'bar'
+    time_grain = time_grain or 'weekly'
+    chart_type = chart_type or 'line'
     ctx = callback_context
     if ctx and ctx.triggered and ctx.triggered[0]['prop_id'] == 'mnid-compare-chart-toggle.n_clicks':
         chart_type = 'line' if chart_type == 'bar' else 'bar'
@@ -4235,19 +4199,30 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
         toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
         return _empty_fig, entity_options, entities, ind_options, selected_ind_ids, chart_type, toggle_class, toggle_text
 
-    if time_grain == 'quarterly':
+    if time_grain == 'daily':
+        period_code = 'D'
+        period_fmt = lambda p: pd.Period(p, 'D').strftime('%d %b %Y')
+        max_periods = 30
+    elif time_grain == 'weekly':
+        period_code = 'W'
+        period_fmt = lambda p: pd.Period(p, 'W').start_time.strftime('%d %b %Y')
+        max_periods = 26
+    elif time_grain == 'quarterly':
         period_code = 'Q'
         period_fmt = lambda p: f"{p.year} Q{p.quarter}"
+        max_periods = 8
     elif time_grain == 'yearly':
         period_code = 'Y'
         period_fmt = lambda p: str(p.year)
+        max_periods = 5
     else:
         period_code = 'M'
         period_fmt = lambda p: pd.Period(p, 'M').strftime('%b %Y')
+        max_periods = 12
 
     d2 = mch_full
     d2['_period'] = pd.to_datetime(d2['Date']).dt.to_period(period_code)
-    periods = sorted(d2['_period'].dropna().unique())[-12:]
+    periods = sorted(d2['_period'].dropna().unique())[-max_periods:]
 
     fig = go.Figure()
     series_idx = 0
@@ -4281,6 +4256,18 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
                     hovertemplate=f'<b>{series_name}</b><br>%{{x}}<br>Moving Avg: %{{y:.1f}}%<br>Raw Coverage: %{{customdata[0]:.1f}}%<extra></extra>',
                     connectgaps=False,
                 ))
+                _tgt = ind.get('target')
+                if _tgt is not None:
+                    fig.add_trace(go.Scatter(
+                        name=f'{entity_labels.get(entity, entity)} | {_target_label(ind)}',
+                        x=xs,
+                        y=[_tgt] * len(xs),
+                        mode='lines',
+                        line=dict(color=color, width=1.5, dash='dot'),
+                        opacity=0.7,
+                        showlegend=False,
+                        hovertemplate=f'Target: {_tgt:.0f}%<extra></extra>',
+                    ))
             else:
                 fig.add_trace(go.Bar(
                     name=series_name,
@@ -5553,11 +5540,11 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                 ),
                 html.Button(
                     id='mnid-compare-chart-toggle',
-                    className='mnid-trend-toggle is-bar',
+                    className='mnid-trend-toggle is-line',
                     n_clicks=0,
                     type='button',
                     children=[
-                        html.Span('Bar', id='mnid-compare-chart-toggle-text', className='mnid-trend-toggle-text'),
+                        html.Span('Line', id='mnid-compare-chart-toggle-text', className='mnid-trend-toggle-text'),
                         html.Span(className='mnid-trend-toggle-thumb'),
                     ],
                 ),
@@ -5579,11 +5566,13 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                 dcc.Dropdown(
                     id='mnid-compare-time-grain',
                     options=[
-                        {'label': 'Monthly', 'value': 'monthly'},
+                        {'label': 'Daily',     'value': 'daily'},
+                        {'label': 'Weekly',    'value': 'weekly'},
+                        {'label': 'Monthly',   'value': 'monthly'},
                         {'label': 'Quarterly', 'value': 'quarterly'},
-                        {'label': 'Yearly', 'value': 'yearly'},
+                        {'label': 'Yearly',    'value': 'yearly'},
                     ],
-                    value='monthly',
+                    value='weekly',
                     clearable=False,
                 ),
             ]),
@@ -5620,7 +5609,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
             'current_fac': facility_code,
             'current_dist': current_dist,
         }),
-        dcc.Store(id='mnid-compare-chart-type-store', data='bar'),
+        dcc.Store(id='mnid-compare-chart-type-store', data='line'),
         html.Div(className='mnid-chart-grid', children=[compare_card]),
     ])
 
