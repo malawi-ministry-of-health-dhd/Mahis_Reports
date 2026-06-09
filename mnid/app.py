@@ -4204,19 +4204,18 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
         toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
         return _empty_fig, entity_options, entities, ind_options, selected_ind_ids, chart_type, toggle_class, toggle_text
 
-    if time_grain == 'quarterly':
-        period_code = 'Q'
-        period_fmt = lambda p: f"{p.year} Q{p.quarter}"
-    elif time_grain == 'yearly':
-        period_code = 'Y'
-        period_fmt = lambda p: str(p.year)
-    else:
-        period_code = 'M'
-        period_fmt = lambda p: pd.Period(p, 'M').strftime('%b %Y')
+    _grain_cfg = {
+        'daily':     ('D',  lambda p: pd.Period(p, 'D').strftime('%d %b %Y'),  30),
+        'weekly':    ('W',  lambda p: pd.Period(p, 'W').strftime('%d %b'),     26),
+        'monthly':   ('M',  lambda p: pd.Period(p, 'M').strftime('%b %Y'),     12),
+        'quarterly': ('Q',  lambda p: f"{p.year} Q{p.quarter}",                8),
+        'yearly':    ('Y',  lambda p: str(p.year),                             5),
+    }
+    period_code, period_fmt, max_periods = _grain_cfg.get(time_grain, _grain_cfg['weekly'])
 
-    d2 = mch_full
-    d2['_period'] = pd.to_datetime(d2['Date']).dt.to_period(period_code)
-    periods = sorted(d2['_period'].dropna().unique())[-12:]
+    d2 = mch_full.copy()
+    d2['_period'] = pd.to_datetime(d2['Date'], errors='coerce').dt.to_period(period_code)
+    periods = sorted(d2['_period'].dropna().unique())[-max_periods:]
 
     fig = go.Figure()
     series_idx = 0
@@ -4227,7 +4226,9 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
         for ind in active_inds:
             xs, ys, texts = [], [], []
             for period in periods:
-                period_df = entity_df[pd.to_datetime(entity_df['Date']).dt.to_period(period_code) == period]
+                period_df = entity_df[
+                    pd.to_datetime(entity_df['Date'], errors='coerce').dt.to_period(period_code) == period
+                ]
                 _, den, pct = _cov(period_df, ind['numerator_filters'], ind['denominator_filters'])
                 xs.append(period_fmt(period))
                 ys.append(_display_pct(pct) if den > 0 else None)
@@ -4238,13 +4239,27 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
             series_idx += 1
             series_name = f'{entity_labels.get(entity, entity)} | {ind["label"]}'
             if chart_type == 'line':
+                valid_ys = [y for y in ys if y is not None]
+                avg = sum(valid_ys) / len(valid_ys) if valid_ys else None
+
+                # Mean reference line (dashed, same colour, lighter)
+                if avg is not None:
+                    fig.add_trace(go.Scatter(
+                        x=xs, y=[avg] * len(xs),
+                        mode='lines',
+                        line=dict(color=color, width=1.2, dash='dash'),
+                        showlegend=False,
+                        hovertemplate=f'Mean {entity_labels.get(entity, entity)}: {avg:.0f}%<extra></extra>',
+                        opacity=0.55,
+                    ))
+
                 fig.add_trace(go.Scatter(
                     name=series_name,
                     x=xs,
                     y=ys,
                     mode='lines+markers',
-                    line=dict(color=color, width=2.4, shape='spline'),
-                    marker=dict(size=6, color=color, line=dict(color='#fff', width=1.0)),
+                    line=dict(color=color, width=2.4, shape='linear'),
+                    marker=dict(size=5, color=color, line=dict(color='#fff', width=1.0)),
                     hovertemplate=f'<b>{series_name}</b><br>%{{x}}<br>Coverage: %{{y:.1f}}%<extra></extra>',
                     connectgaps=False,
                 ))
@@ -5519,11 +5534,11 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                 ),
                 html.Button(
                     id='mnid-compare-chart-toggle',
-                    className='mnid-trend-toggle is-bar',
+                    className='mnid-trend-toggle is-line',
                     n_clicks=0,
                     type='button',
                     children=[
-                        html.Span('Bar', id='mnid-compare-chart-toggle-text', className='mnid-trend-toggle-text'),
+                        html.Span('Line', id='mnid-compare-chart-toggle-text', className='mnid-trend-toggle-text'),
                         html.Span(className='mnid-trend-toggle-thumb'),
                     ],
                 ),
@@ -5545,11 +5560,13 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                 dcc.Dropdown(
                     id='mnid-compare-time-grain',
                     options=[
-                        {'label': 'Monthly', 'value': 'monthly'},
+                        {'label': 'Daily',     'value': 'daily'},
+                        {'label': 'Weekly',    'value': 'weekly'},
+                        {'label': 'Monthly',   'value': 'monthly'},
                         {'label': 'Quarterly', 'value': 'quarterly'},
-                        {'label': 'Yearly', 'value': 'yearly'},
+                        {'label': 'Yearly',    'value': 'yearly'},
                     ],
-                    value='monthly',
+                    value='weekly',
                     clearable=False,
                 ),
             ]),
@@ -5586,7 +5603,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
             'current_fac': facility_code,
             'current_dist': current_dist,
         }),
-        dcc.Store(id='mnid-compare-chart-type-store', data='bar'),
+        dcc.Store(id='mnid-compare-chart-type-store', data='line'),
         html.Div(className='mnid-chart-grid', children=[compare_card]),
     ])
 
