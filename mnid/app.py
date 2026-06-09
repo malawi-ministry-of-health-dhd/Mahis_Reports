@@ -118,6 +118,20 @@ def _warn_once(message: str) -> None:
     _LOGGER.warning(message)
 
 
+def _moving_average_window(length: int, grain: str | None = None) -> int:
+    grain_value = str(grain or '').lower()
+    if grain_value in {'d', 'day', 'daily'}:
+        return max(1, min(7, length))
+    return max(1, min(3, length))
+
+
+def _moving_average_values(values, grain: str | None = None):
+    numeric = pd.Series(values, dtype='float64')
+    window = _moving_average_window(len(numeric), grain)
+    smoothed = numeric.rolling(window=window, min_periods=1).mean()
+    return [None if pd.isna(value) else float(value) for value in smoothed.tolist()], window
+
+
 def _filter_columns_missing(df: pd.DataFrame, cfg: dict | None) -> list[str]:
     if not cfg:
         return []
@@ -413,44 +427,48 @@ def _line(monthly_df, title, color='#2563EB', y_label='Clients'):
         tickfmt = '%b %y'
         hover_fmt = '%{x|%b %Y}: %{y}'
 
+    moving_average, ma_window = _moving_average_values(clean['n'].tolist(), freq)
+
     fig = go.Figure(go.Scatter(
-        x=clean['month'], y=clean['n'],
+        x=clean['month'], y=moving_average,
         mode='lines+markers',
         line=dict(color=color, width=2.5, shape='linear'),
         marker=dict(size=6, color=color, line=dict(color='#fff', width=1.35)),
-        hovertemplate=hover_fmt + '<extra></extra>',
+        customdata=clean[['n']].to_numpy(),
+        hovertemplate=hover_fmt + '<br>Moving Avg: %{y:.1f}<br>Raw value: %{customdata[0]}<extra></extra>',
     ))
 
-    avg_val = clean['n'].mean()
+    avg_val = sum(moving_average) / len(moving_average)
     fig.add_hline(
         y=avg_val,
         line_dash='dash',
         line_color='#DC2626',
         line_width=1.5,
-        annotation_text=f'Average = {avg_val:.0f}',
+        annotation_text=f'{ma_window}-period Moving Avg = {avg_val:.1f}',
         annotation_position='top right',
         annotation_font_color='#374151',
     )
 
     key_points = []
-    start_point = (clean.iloc[0]['month'], clean.iloc[0]['n'])
-    end_point = (clean.iloc[-1]['month'], clean.iloc[-1]['n'])
-    peak_row = clean.loc[clean['n'].idxmax()]
-    peak_point = (peak_row['month'], peak_row['n'])
+    start_point = (clean.iloc[0]['month'], moving_average[0], clean.iloc[0]['n'])
+    end_point = (clean.iloc[-1]['month'], moving_average[-1], clean.iloc[-1]['n'])
+    peak_index = pd.Series(moving_average).idxmax()
+    peak_point = (clean.iloc[peak_index]['month'], moving_average[peak_index], clean.iloc[peak_index]['n'])
     for point in [start_point, peak_point, end_point]:
         if point not in key_points:
             key_points.append(point)
 
     fig.add_trace(go.Scatter(
-        x=[x for x, _ in key_points],
-        y=[y for _, y in key_points],
+        x=[x for x, _, _ in key_points],
+        y=[y for _, y, _ in key_points],
         mode='markers+text',
-        text=[f'{y:.0f}' for _, y in key_points],
+        text=[f'{y:.1f}' for _, y, _ in key_points],
         textposition='top center',
         textfont=dict(size=9, color='#374151'),
         marker=dict(size=8, color='#1e293b'),
         showlegend=False,
-        hovertemplate=hover_fmt + '<extra></extra>',
+        customdata=[[raw] for _, _, raw in key_points],
+        hovertemplate=hover_fmt + '<br>Moving Avg: %{y:.1f}<br>Raw value: %{customdata[0]}<extra></extra>',
     ))
 
     fig.update_layout(
@@ -1559,8 +1577,9 @@ def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str, chart_type: str =
             d = d_by_m[ind['id']].get(p, 0)
             xs.append(pd.Period(p, 'M').to_timestamp().to_pydatetime())
             ys.append(round(n / d * 100, 1) if d > 0 else None)
+        moving_average, _ = _moving_average_values(ys, 'monthly')
 
-        has_data = any(y is not None for y in ys)
+        has_data = any(y is not None for y in moving_average)
         if not has_data:
             if chart_type == 'bar':
                 fig.add_trace(go.Bar(x=[], y=[], name=ind['label'], marker=dict(color=c), showlegend=True))
@@ -1569,8 +1588,8 @@ def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str, chart_type: str =
             continue
 
         if chart_type == 'bar':
-            clean_xs = [x for x, y in zip(xs, ys) if y is not None]
-            clean_ys = [y for y in ys if y is not None]
+            clean_xs = [x for x, y in zip(xs, moving_average) if y is not None]
+            clean_ys = [y for y in moving_average if y is not None]
             fig.add_trace(go.Bar(
                 x=clean_xs, y=clean_ys, name=ind['label'],
                 marker=dict(color=f'rgba({r},{g},{b},0.85)', line=dict(color=c, width=1)),
@@ -1579,12 +1598,13 @@ def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str, chart_type: str =
             ))
         else:
             fig.add_trace(go.Scatter(
-                x=xs, y=ys, name=ind['label'],
+                x=xs, y=moving_average, name=ind['label'],
                 mode='lines+markers',
                 line=dict(color=c, width=2, shape='spline'),
                 marker=dict(size=5, color=c, line=dict(color='#fff', width=1.25)),
                 connectgaps=True,
-                hovertemplate=f'%{{x|%b %Y}}<br>{ind["label"]}: %{{y:.0f}}%<extra></extra>',
+                customdata=[[raw] for raw in ys],
+                hovertemplate=f'%{{x|%b %Y}}<br>{ind["label"]} Moving Avg: %{{y:.1f}}%<br>Raw Coverage: %{{customdata[0]:.1f}}%<extra></extra>',
             ))
     fig.update_layout(
         paper_bgcolor=BG, plot_bgcolor=BG,
@@ -2293,14 +2313,17 @@ def _monthly_concept_rate(df, concept, positive_values=None, title='', target=No
         return None
     span_days = max(int((dates.max() - dates.min()).days), 0)
     if span_days <= 45:
+        period_grain = 'daily'
         sub['_m'] = dates.dt.floor('D')
         tickfmt = '%d %b'
         hover_fmt = '%{x|%d %b %Y}<br>%{y:.0f}%'
     elif span_days <= 180:
+        period_grain = 'weekly'
         sub['_m'] = dates.dt.to_period('W').apply(lambda p: p.start_time)
         tickfmt = '%d %b'
         hover_fmt = '%{x|%d %b %Y}<br>%{y:.0f}%'
     else:
+        period_grain = 'monthly'
         sub['_m'] = dates.dt.to_period('M').apply(lambda p: datetime(p.year, p.month, 1))
         tickfmt = '%b %y'
         hover_fmt = '%{x|%b %Y}<br>%{y:.0f}%'
@@ -2325,29 +2348,31 @@ def _monthly_concept_rate(df, concept, positive_values=None, title='', target=No
             num = month_df[series.isin(wanted)]['person_id'].dropna().astype(str).nunique() if 'person_id' in month_df.columns else int(series.isin(wanted).sum())
         ys.append(round((num / den) * 100, 1) if den else None)
 
-    valid = [(x, y) for x, y in zip(xs, ys) if y is not None]
+    moving_average, ma_window = _moving_average_values(ys, period_grain)
+    valid = [(x, y, raw) for x, y, raw in zip(xs, moving_average, ys) if y is not None]
     if not valid:
         return None
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(
-        x=xs, y=ys,
+        x=xs, y=moving_average,
         mode='lines+markers',
         line=dict(color=color, width=2.5, shape='linear'),
         marker=dict(size=6, color=color, line=dict(color='#fff', width=1.35)),
         connectgaps=False,
-        hovertemplate=hover_fmt + '<extra></extra>',
+        customdata=[[raw] for raw in ys],
+        hovertemplate=hover_fmt + '<br>Moving Avg: %{y:.1f}%<br>Raw Coverage: %{customdata[0]:.1f}%<extra></extra>',
         showlegend=False,
     ))
 
-    valid_ys = [y for y in ys if y is not None]
+    valid_ys = [y for y in moving_average if y is not None]
     avg_val = sum(valid_ys) / len(valid_ys)
     fig.add_hline(
         y=avg_val,
         line_dash='dash',
         line_color='#DC2626',
         line_width=1.5,
-        annotation_text=f'Avg {avg_val:.0f}%',
+        annotation_text=f'{ma_window}-period Moving Avg = {avg_val:.1f}%',
         annotation_position='top right',
         annotation_font_color='#374151',
         annotation_font_size=9,
@@ -2373,12 +2398,13 @@ def _monthly_concept_rate(df, concept, positive_values=None, title='', target=No
         x=[p[0] for p in key_pts],
         y=[p[1] for p in key_pts],
         mode='markers+text',
-        text=[f'{p[1]:.0f}%' for p in key_pts],
+        text=[f'{p[1]:.1f}%' for p in key_pts],
         textposition='top center',
         textfont=dict(size=9, color='#374151'),
         marker=dict(size=7, color='#1e293b'),
         showlegend=False,
-        hovertemplate=hover_fmt + '<extra></extra>',
+        customdata=[[p[2]] for p in key_pts],
+        hovertemplate=hover_fmt + '<br>Moving Avg: %{y:.1f}%<br>Raw Coverage: %{customdata[0]:.1f}%<extra></extra>',
     ))
 
     fig.update_layout(
@@ -2848,15 +2874,17 @@ def _location_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str,
             _, den, pct = _cov(period_df, ind['numerator_filters'], ind['denominator_filters'])
             xs.append(pd.Period(p, freq).to_timestamp().to_pydatetime())
             ys.append(_display_pct(pct) if den > 0 else None)
+        moving_average, ma_window = _moving_average_values(ys, period_label)
 
-        if not any(y is not None for y in ys):
+        if not any(y is not None for y in moving_average):
             continue
 
         color = color_cycle[idx % len(color_cycle)]
         series_name = ind['label']
-        clean_pairs = [(x, y) for x, y in zip(xs, ys) if y is not None]
-        clean_xs = [x for x, _ in clean_pairs]
-        clean_ys = [y for _, y in clean_pairs]
+        clean_pairs = [(x, y, raw) for x, y, raw in zip(xs, moving_average, ys) if y is not None]
+        clean_xs = [x for x, _, _ in clean_pairs]
+        clean_ys = [y for _, y, _ in clean_pairs]
+        clean_raw = [raw for _, _, raw in clean_pairs]
 
         if chart_type == 'bar':
             fig.add_trace(go.Bar(
@@ -2864,7 +2892,8 @@ def _location_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str,
                 y=clean_ys,
                 name=series_name,
                 marker=dict(color=color, line=dict(color=color, width=1)),
-                hovertemplate=f'%{{x|%d %b %Y}}<br>{series_name}: %{{y:.0f}}%<extra></extra>',
+                customdata=[[raw] for raw in clean_raw],
+                hovertemplate=f'%{{x|%d %b %Y}}<br>{series_name} Moving Avg: %{{y:.1f}}%<br>Raw Coverage: %{{customdata[0]:.1f}}%<extra></extra>',
             ))
         else:
             fig.add_trace(go.Scatter(
@@ -2875,7 +2904,8 @@ def _location_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str,
                 line=dict(color=color, width=2.8, shape='linear'),
                 marker=dict(size=6, color=color, line=dict(color='#fff', width=1.4)),
                 connectgaps=False,
-                hovertemplate=f'%{{x|%d %b %Y}}<br>{series_name}: %{{y:.0f}}%<extra></extra>',
+                customdata=[[raw] for raw in clean_raw],
+                hovertemplate=f'%{{x|%d %b %Y}}<br>{series_name} Moving Avg: %{{y:.1f}}%<br>Raw Coverage: %{{customdata[0]:.1f}}%<extra></extra>',
             ))
 
             if idx == 0 and clean_xs:
@@ -2885,29 +2915,30 @@ def _location_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str,
                     line_dash='dash',
                     line_color='#DC2626',
                     line_width=1.5,
-                    annotation_text=f'Average = {avg_val:.0f}',
+                    annotation_text=f'{ma_window}-period Moving Avg = {avg_val:.1f}',
                     annotation_position='top right',
                     annotation_font_color='#374151',
                 )
 
                 key_points = []
-                key_points.append((clean_xs[0], clean_ys[0]))
+                key_points.append((clean_xs[0], clean_ys[0], clean_raw[0]))
                 if len(clean_xs) > 1:
-                    key_points.append((clean_xs[-1], clean_ys[-1]))
+                    key_points.append((clean_xs[-1], clean_ys[-1], clean_raw[-1]))
                 peak_idx = clean_ys.index(max(clean_ys))
-                peak_point = (clean_xs[peak_idx], clean_ys[peak_idx])
+                peak_point = (clean_xs[peak_idx], clean_ys[peak_idx], clean_raw[peak_idx])
                 if peak_point not in key_points:
                     key_points.append(peak_point)
 
                 fig.add_trace(go.Scatter(
-                    x=[x for x, _ in key_points],
-                    y=[y for _, y in key_points],
+                    x=[x for x, _, _ in key_points],
+                    y=[y for _, y, _ in key_points],
                     mode='markers+text',
-                    text=[f'{y:.0f}' for _, y in key_points],
+                    text=[f'{y:.1f}' for _, y, _ in key_points],
                     textposition='top center',
                     marker=dict(size=8, color='black'),
                     showlegend=False,
-                    hovertemplate=f'%{{x|%d %b %Y}}<br>{series_name}: %{{y:.0f}}%<extra></extra>',
+                    customdata=[[raw] for _, _, raw in key_points],
+                    hovertemplate=f'%{{x|%d %b %Y}}<br>{series_name} Moving Avg: %{{y:.1f}}%<br>Raw Coverage: %{{customdata[0]:.1f}}%<extra></extra>',
                 ))
 
     if not fig.data:
@@ -4232,7 +4263,8 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
                 xs.append(period_fmt(period))
                 ys.append(_display_pct(pct) if den > 0 else None)
                 texts.append(f'{pct:.0f}%' if den > 0 else 'No data')
-            if not any(y is not None for y in ys):
+            moving_average, _ = _moving_average_values(ys, time_grain)
+            if not any(y is not None for y in moving_average):
                 continue
             color = _COMPARE_COLORS[series_idx % len(_COMPARE_COLORS)]
             series_idx += 1
@@ -4241,24 +4273,26 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
                 fig.add_trace(go.Scatter(
                     name=series_name,
                     x=xs,
-                    y=ys,
+                    y=moving_average,
                     mode='lines+markers',
                     line=dict(color=color, width=2.4, shape='spline'),
                     marker=dict(size=6, color=color, line=dict(color='#fff', width=1.0)),
-                    hovertemplate=f'<b>{series_name}</b><br>%{{x}}<br>Coverage: %{{y:.1f}}%<extra></extra>',
+                    customdata=[[raw] for raw in ys],
+                    hovertemplate=f'<b>{series_name}</b><br>%{{x}}<br>Moving Avg: %{{y:.1f}}%<br>Raw Coverage: %{{customdata[0]:.1f}}%<extra></extra>',
                     connectgaps=False,
                 ))
             else:
                 fig.add_trace(go.Bar(
                     name=series_name,
                     x=xs,
-                    y=ys,
+                    y=moving_average,
                     text=texts,
                     textposition='outside',
                     textfont=dict(size=9, color='#E2E8F0'),
                     marker=dict(color=color, opacity=0.88,
                                 line=dict(color='rgba(255,255,255,0.25)', width=0.8)),
-                    hovertemplate=f'<b>{series_name}</b><br>%{{x}}<br>Coverage: %{{y:.1f}}%<extra></extra>',
+                    customdata=[[raw] for raw in ys],
+                    hovertemplate=f'<b>{series_name}</b><br>%{{x}}<br>Moving Avg: %{{y:.1f}}%<br>Raw Coverage: %{{customdata[0]:.1f}}%<extra></extra>',
                 ))
 
     fig.update_layout(
