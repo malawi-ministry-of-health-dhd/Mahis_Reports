@@ -6085,7 +6085,6 @@ def _sidebar(facility_code: str, theme: str = 'default') -> html.Div:
     if theme == 'newborn':
         nav_items = [
             ('Overview', '#mnid-summary'),
-            ('Service Delivery', '#mnid-data-tables'),
             ('Run Charts', '#mnid-trends'),
             ('District Performance', '#mnid-performance'),
             ('Geographic Coverage', '#mnid-heatmap'),
@@ -6097,7 +6096,6 @@ def _sidebar(facility_code: str, theme: str = 'default') -> html.Div:
     else:
         nav_items = [
             ('Overview', '#mnid-summary'),
-            ('Data Tables', '#mnid-data-tables'),
             ('Run Charts', '#mnid-trends'),
             ('Performance', '#mnid-performance'),
             ('Map View', '#mnid-heatmap'),
@@ -6468,7 +6466,6 @@ def render_mnid_dashboard(data_opd, config,
     _payload_key = f'{hash(_opd_key)}_{start_date}_{end_date}'
 
     performance_div, heatmap_div = _coverage_heatmap_section(all_inds, facility_code, facility_df)
-    service_table_div = _service_table_switcher(facility_df, category_order, default_cat, scope_meta)
     comparative_div  = _comparative_analysis_section(all_inds, facility_code, facility_df, payload_key=_payload_key)
 
     def _sec_header(title, count=None, desc=None, eyebrow=None):
@@ -6504,12 +6501,6 @@ def render_mnid_dashboard(data_opd, config,
         _kpi_row(computed),
         _hero_donut_row(computed, preferred_cat=default_cat, section_title=hero_title),
         _priority_table(computed),
-
-        _section_anchor('mnid-data-tables'),
-        _sec_header('Service Delivery' if dashboard_theme == 'newborn' else 'Data Tables',
-                    desc='Structured service counts for admissions, thermal care, respiratory support, KMC, and newborn outcomes.' if dashboard_theme == 'newborn' else 'Key service counts and outcomes',
-                    eyebrow='Service Summary' if dashboard_theme == 'newborn' else None),
-        service_table_div,
 
         _section_anchor('mnid-trends'),
         _sec_header('Run Charts',
