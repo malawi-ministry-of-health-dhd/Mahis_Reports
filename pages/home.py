@@ -91,7 +91,7 @@ def _load_user_registry(route) -> pd.DataFrame:
     if os.path.exists(user_data_path):
         user_data = pd.read_csv(user_data_path)
     else:
-        user_data = pd.DataFrame(columns=['uuid', 'role'])
+        user_data = pd.DataFrame(columns=['uuid', 'role','user_level','district','facility_name','facility_code'])
     demo_row = {
         'uuid': DEMO_UUID,
         'role': 'reports_admin',
@@ -618,11 +618,11 @@ def update_dashboard(gen, interval, start_date, end_date, level,
         end_dt = pd.to_datetime(end_date or default_end).replace(hour=23, minute=59, second=59)
         default_start_date = start_dt - pd.Timedelta(days=DEFAULT_DASHBOARD_DAYS)
 
-        location = urlparams.get('Location', [None])[0]
+        location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0]
         data_route = urlparams.get('route', ["default"])[0]
         DATA_PATH_ = f"data/{data_route}/parquet"
 
-        mnid_location = urlparams.get('Location', [None])[0] if urlparams.get('Location') else None
+        mnid_location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0] if urlparams.get('Location') else None
 
         user_data = _load_user_registry(data_route)
         user_row, scope = _resolve_user_scope(urlparams, user_data)
@@ -678,8 +678,9 @@ def update_dashboard(gen, interval, start_date, end_date, level,
                         )) 
         else:
             all_districts = sorted(set(user_districts) | set(user_districts))
-            all_facilities = scope['facilities'] if scope.get('facilities') else []
-        
+            all_facilities = (scope['facilities']) if scope.get('facilities') else []
+        if isinstance(all_facilities, str):
+            all_facilities = [all_facilities]
         # Determine report selection
         menu_json = load_dashboard_menu()
         if overview:

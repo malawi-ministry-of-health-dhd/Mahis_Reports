@@ -35,27 +35,60 @@ from config import (actual_keys_in_data,
 
 def build_metrics_section(filtered,filtered_data_range,delta_days, data_path, counts_config, url_object=None):
     """Build metric cards from counts configuration"""
+
+    # generate_ a dict for chart id and value for further statistical computations
+    all_count_metrics = {}
+    for count_config in counts_config:
+        measure = count_config.get("filters").get("measure","count")
+        if measure == "calculated":
+            continue #lets not store these
+        count_id = count_config.get("id")
+        count_value = create_count_from_config(filtered,data_path, count_config["filters"])
+        all_count_metrics[count_id] = count_value
+
     metrics = []
     for count_config in counts_config:
         href = count_config.get("href", "") +"?"+ url_object if url_object else ""
         flag = count_config.get("flag", "")
         display_average = count_config.get("display_average", False)
+        measure = count_config.get("filters").get("measure","count")
         if not display_average:
             display = "none"
         else:
             display = "block"
-            
-        metric = html.Div(className=f'mnid-kpi {flag}', children=[ 
-        html.Div(style={'display': 'flex', 'justifyContent': 'space-between',
-                        'alignItems': 'flex-start', 'gap': '6px'}, children=[
-            html.Div([
-                html.Div(count_config["name"], className='kpi-lbl'),
-                html.Div(create_count_from_config(filtered,data_path, count_config["filters"]), className='kpi-val'),
-                html.Div(html.A(count_config.get("href_name") or "", href=href),className='kpi-sub'),
-            ]),
-            html.Div(f"(Avg: {int(create_count_from_config(filtered_data_range,data_path, count_config['filters'])/delta_days)})",style={"marginTop":"15px","fontFamily": "Arial", "fontSize": "12px","fontWeight": "bold","color":"#15803D", "display": display}),
-        ]),
-        html.Div()])
+        
+        if measure == "calculated":
+            try:
+                value = round(eval(count_config.get("filters").get('expression'), {"__builtins__":{}}, all_count_metrics), 1)
+            except ZeroDivisionError:
+                value = 0
+            except Exception as e:
+                value = "Error"
+                print(e)
+            metric = html.Div(className=f'mnid-kpi {flag}', children=[ 
+                html.Div(style={'display': 'flex', 'justifyContent': 'space-between',
+                                'alignItems': 'flex-start', 'gap': '6px'}, children=[
+                    html.Div([
+                        html.Div(count_config["name"], className='kpi-lbl'),
+                        html.Div(value, className='kpi-val'),
+                        html.Div(html.A(count_config.get("href_name") or "", href=href),className='kpi-sub'),
+                    ])
+                ]),
+                html.Div()])
+        
+        else:
+            metric = html.Div(className=f'mnid-kpi {flag}', children=[ 
+                    html.Div(style={'display': 'flex', 'justifyContent': 'space-between',
+                                    'alignItems': 'flex-start', 'gap': '6px'}, children=[
+                        html.Div([
+                            html.Div(count_config["name"], className='kpi-lbl'),
+                            html.Div(create_count_from_config(filtered,data_path, count_config["filters"]), className='kpi-val'),
+                            html.Div(html.A(count_config.get("href_name") or "", href=href),className='kpi-sub'),
+                        ]),
+                        html.Div(f"(Avg: {int(create_count_from_config(filtered_data_range,data_path, count_config['filters'])/delta_days)})",style={"marginTop":"15px","fontFamily": "Arial", "fontSize": "12px","fontWeight": "bold","color":"#15803D", "display": display}),
+                    ]),
+                    html.Div()])
+
         metrics.append(metric) 
     
     return metrics
@@ -311,11 +344,19 @@ def create_line_chart_from_config(data_opd,data_path, delta_days, filters):
     aggregation   = filters.get('measure') or 'count'
     custom_fields = filters.get('custom_fields') or None
 
+    query1 = filters.get("query1") or ""
+    query2 = filters.get("query2") or ""
+    query3 = filters.get("query3") or ""
+    query4 = filters.get("query4") or ""
+    query5 = filters.get("query5") or ""
+    expression = filters.get("expression") or ""
+
+    args = [query1,query2,query3,query4,query5,expression]
     return create_time_line_chart(data_opd,data_path, date_col, y_col, 
                              title, x_title, y_title, unique_column, 
                              legend_title, color, filter_col1, 
                              filter_val1, filter_col2, filter_val2, 
-                             filter_col3, filter_val3,aggregation, custom_fields)
+                             filter_col3, filter_val3,aggregation, custom_fields, *args)
 
 def create_pie_chart_from_config(filtered,data_path, filters):
     """
@@ -354,11 +395,13 @@ def create_pie_chart_from_config(filtered,data_path, filters):
     colormap        = filters.get('colormap') or None
     aggregation   = filters.get('measure') or 'count'
     custom_fields = filters.get('custom_fields') or None
+    rename = filters.get('rename') or {}
+    replace = filters.get('replace') or {}
     
     return create_pie_chart(filtered,data_path, names_col, values_col, title, 
                             unique_column, filter_col1, filter_val1, 
                             filter_col2, filter_val2, filter_col3, 
-                            filter_val3, colormap, aggregation, custom_fields)
+                            filter_val3, colormap, aggregation, custom_fields, rename, replace)
 
 def create_column_chart_from_config(filtered,data_path, filters):
     """

@@ -329,7 +329,7 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, repo
     if not os.path.exists(spec_path):
         return html.Div("Report not found on Server. Request Admin to add report"), 0, None
     
-    location = urlparams.get('Location', [None])[0]
+    location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0]
     data_route = urlparams.get('route', ["default"])[0]
     DATA_PATH_ = f"data/{data_route}/parquet"
 

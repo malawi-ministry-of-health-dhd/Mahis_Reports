@@ -57,7 +57,7 @@ def register_navigation_callbacks(app, pathname_prefix):
         try:
             if not isinstance(url_params, dict):
                 url_params = {}
-            location = url_params.get("Location", [None])[0]
+            location = (url_params.get("Location") or url_params.get("?Location") or [None])[0]
             uuid = url_params.get("uuid", [None])[0]
             user_level = url_params.get("user_level", [None])[0]
             data_route = url_params.get("route", ["default"])[0]

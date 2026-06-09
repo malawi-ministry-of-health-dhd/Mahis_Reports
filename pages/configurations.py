@@ -2041,7 +2041,7 @@ DATA_ROUTE = ""
          Output('main-content', 'children')],
         [Input('url-params-store', 'data')])
 def validate_admin_access(urlparams):
-    location = urlparams.get('Location', [None])[0]
+    location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0]
     data_route = urlparams.get('route', ["default"])[0]
     user_uuid = urlparams.get('uuid', [None])[0]
     DATA_PATH_ = f"data/{data_route}/parquet"

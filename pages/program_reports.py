@@ -276,7 +276,7 @@ def update_filters(selected_program):
     ]
 )
 def generate_chart(n_clicks, urlparams, selected_report, pathname, report_name, start_date, end_date, hf):
-    location = urlparams.get('Location', [None])[0]
+    location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0]
     data_route = urlparams.get('route', ["default"])[0]
     DATA_PATH_ = f"data/{data_route}/parquet"
 

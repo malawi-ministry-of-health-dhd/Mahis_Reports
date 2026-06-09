@@ -66,7 +66,6 @@ def apply_calculated_fields(df, rules_json):
         col = rule["column"]
         expr = rule["expr"]
         try:
-            # Try eval first (numeric expressions)
             df[col] = df.eval(expr, engine="python")
         except Exception:
             # Fallback for string / datetime logic
@@ -361,7 +360,6 @@ def build_filter_query(cols, vals,data_path, unique_column, isSet, start_date, e
             data_value = "" if value_str == "_" else (
                 float(value_str) if "." in value_str else int(value_str)
             ) if value_str.replace(".", "", 1).isdigit() else value_str
-            
             return operator, data_value
         return "=", val_str
     
@@ -378,7 +376,10 @@ def build_filter_query(cols, vals,data_path, unique_column, isSet, start_date, e
         operator, data_value = parse_value(val)
         if operator == "LIKE":
             return f"{col} LIKE '{data_value}'"
-        return f"{col} {operator} '{data_value}'"
+        if (isinstance(data_value, int) or isinstance(data_value, float)):
+            return f"{col} {operator} {data_value}"
+        else:
+            return f"{col} {operator} '{data_value}'"
     
     # Handle paired lists
     if isinstance(cols, list):
@@ -422,6 +423,7 @@ def create_count(query_fiter,data_path, aggregation='count', unique_column=PERSO
         joined_query = (joined_query.replace(unique_column, 
                                             f"({unique_column}), DATEDIFF('minute', MIN({DATE_}), MAX({DATE_})) AS patient_session_minutes")
                                             + f" GROUP BY {unique_column}")
+    # print(joined_query)
     result = DataStorage.query_duckdb(joined_query)
     if aggregation == 'count':
         return len(result[unique_column].dropna().unique())
@@ -742,7 +744,7 @@ def create_time_line_chart(query_fiter,data_path, date_col, y_col, title, x_titl
                       filter_value1=None, filter_col2=None, 
                       filter_value2=None, filter_col3=None, 
                       filter_value3=None, aggregation='count', 
-                      custom_fields=None, height=400, responsive=True,
+                      custom_fields=None, *args, height=400, responsive=True,
                       show_avg_line=True, show_trend_line=False,
                       date_granularity='day', smooth_lines=False,
                       show_annotations=True, forecast_periods=0):
@@ -791,7 +793,7 @@ def create_time_line_chart(query_fiter,data_path, date_col, y_col, title, x_titl
     elif aggregation == 'max':
         agg_expr = f"MAX({y_col})"
     else:
-        agg_expr = f"{aggregation}({y_col})"
+        agg_expr = f"COUNT(DISTINCT {y_col})"
     
     # Date granularity formatting
     date_format_map = {
@@ -819,7 +821,34 @@ def create_time_line_chart(query_fiter,data_path, date_col, y_col, title, x_titl
             f" GROUP BY {date_expr}"
             f" ORDER BY date_trunc"
         )
-
+    # if aggregation is calculated, use queries from the calculated
+    if aggregation == "calculated":
+        queries = []
+        for index, items in enumerate(args[:-1]):
+            query = (
+                    f"SELECT {date_expr} AS date_trunc, {agg_expr} AS query{index+1}"
+                    f" FROM '{data_path}'"
+                    f" {items}" #items will need a where clause
+                    f" GROUP BY {date_expr}"
+                    f" ORDER BY date_trunc"
+                )
+            queries.append(query)
+        if len(queries) > 1:
+            subqueries = []
+            coalesce_parts = []
+            
+            for i, query in enumerate(queries, start=1):
+                subqueries.append(f"({query}) q{i}")
+                coalesce_parts.append(f"COALESCE(q{i}.query{i}, 0) AS query{i}")
+            date_coalesce_parts = [f"q{i}.date_trunc" for i in range(1, len(queries) + 1)]
+            select_clause = f"SELECT COALESCE({', '.join(date_coalesce_parts)}) AS date_trunc, {', '.join(coalesce_parts)}"
+            join_clause = subqueries[0]
+            for i in range(2, len(queries) + 1):
+                join_clause += f" FULL OUTER JOIN ({queries[i-1]}) q{i} ON q{i-1}.date_trunc = q{i}.date_trunc"
+            joined_query = f"{select_clause} FROM {join_clause} ORDER BY date_trunc"  
+        else:
+            joined_query = queries[0]
+        
     summary = DataStorage.query_duckdb(joined_query)
     summary = apply_calculated_fields(summary, custom_fields)
     summary = summary.rename(columns={'metric_value': 'count'})
@@ -1212,7 +1241,7 @@ def create_pie_chart(query_fiter,data_path, names_col, values_col, title,
                      filter_value1=None, filter_col2=None,
                      filter_value2=None, filter_col3=None,
                      filter_value3=None, colormap=None, aggregation='count',
-                     custom_fields=None, height=400, responsive=True,
+                     custom_fields=None,rename = {}, replace={}, height=400, responsive=True,
                      hole_size=0.5, show_legend=True, legend_title=None,
                      sort_by_value=True, max_slices=None):
     """
@@ -1283,6 +1312,8 @@ def create_pie_chart(query_fiter,data_path, names_col, values_col, title,
             paper_bgcolor='#ffffff',
             height=height
         )
+    # apply replace and rename
+    df_summary = df_summary.rename(columns=rename).replace(replace)
 
     # Collapse tail slices into "Other"
     if max_slices and len(df_summary) > max_slices:
@@ -2378,691 +2409,3 @@ def create_sankey_diagram(df, source_col, target_col, value_col, title,
     )
     
     return fig
-
-# def create_heatmap(df, x_col, y_col, values_col, title, x_title, y_title,
-#                    unique_column=PERSON_ID_, filter_col1=None, filter_value1=None,
-#                    filter_col2=None, filter_value2=None, aggregation='count'):
-#     """
-#     Create a heatmap for correlation or density visualization.
-#     Useful for: Time-of-day vs day-of-week patterns, diagnosis by age group, etc.
-#     """
-#     data = df
-    
-#     # Apply filters
-#     data = _apply_filter(data, filter_col1, filter_value1)
-#     data = _apply_filter(data, filter_col2, filter_value2)
-    
-#     # Create pivot for heatmap
-#     pivot_data = data.pivot_table(
-#         index=y_col, 
-#         columns=x_col, 
-#         values=values_col,
-#         aggfunc=aggregation,
-#         fill_value=0
-#     )
-    
-#     fig = px.imshow(
-#         pivot_data,
-#         title=title,
-#         labels=dict(x=x_title, y=y_title, color="Count"),
-#         aspect="auto",
-#         color_continuous_scale="Viridis"
-#     )
-    
-#     fig.update_layout(
-#         xaxis_title=x_title,
-#         yaxis_title=y_title,
-#         template="plotly_white"
-#     )
-    
-#     return fig
-
-# def create_stacked_area_chart(df, date_col, y_col, color_col, title, x_title, y_title,
-#                               unique_column=PERSON_ID_, filter_col1=None, filter_value1=None,
-#                               filter_col2=None, filter_value2=None, aggregation='count'):
-#     """
-#     Create a stacked area chart for cumulative trends over time.
-#     Useful for: Program enrollment over time, disease burden trends, etc.
-#     """
-#     data = df
-    
-#     # Apply filters
-#     data = _apply_filter(data, filter_col1, filter_value1)
-#     data = _apply_filter(data, filter_col2, filter_value2)
-    
-#     # Ensure date column is datetime
-#     data[date_col] = pd.to_datetime(data[date_col])
-    
-#     # Group by date and color column
-#     summary = data.groupby([date_col, color_col])[y_col].agg(aggregation).reset_index()
-    
-#     fig = px.area(
-#         summary,
-#         x=date_col,
-#         y=y_col,
-#         color=color_col,
-#         title=title,
-#         line_group=color_col,
-#         color_discrete_sequence=px.colors.qualitative.Dark2
-#     )
-    
-#     fig.update_layout(
-#         xaxis_title=x_title,
-#         yaxis_title=y_title,
-#         template="plotly_white",
-#         hovermode='x unified'
-#     )
-    
-#     return fig
-
-# def create_box_plot(df, x_col, y_col, title, x_title, y_title,
-#                     unique_column=PERSON_ID_, color=None,
-#                     filter_col1=None, filter_value1=None,
-#                     filter_col2=None, filter_value2=None):
-#     """
-#     Create a box plot showing distribution of numerical values.
-#     Useful for: Age distribution by diagnosis, lab data_value ranges, etc.
-#     """
-#     data = df
-    
-#     # Apply filters
-#     data = _apply_filter(data, filter_col1, filter_value1)
-#     data = _apply_filter(data, filter_col2, filter_value2)
-    
-#     fig = px.box(
-#         data,
-#         x=x_col,
-#         y=y_col,
-#         color=color,
-#         title=title,
-#         color_discrete_sequence=px.colors.qualitative.Dark2,
-#         points="outliers"  # Show only outliers as points
-#     )
-    
-#     fig.update_layout(
-#         xaxis_title=x_title,
-#         yaxis_title=y_title,
-#         template="plotly_white",
-#         boxmode='group' if color else 'overlay'
-#     )
-    
-#     # Add mean markers
-#     means = data.groupby(x_col)[y_col].mean().reset_index()
-#     fig.add_scatter(
-#         x=means[x_col],
-#         y=means[y_col],
-#         mode='markers',
-#         marker=dict(symbol='diamond', size=10, color='red'),
-#         name='Mean'
-#     )
-    
-#     return fig
-
-# def create_scatter_plot(df, x_col, y_col, title, x_title, y_title,
-#                         color=None, size=None, trendline=True,
-#                         unique_column=PERSON_ID_, filter_col1=None, filter_value1=None,
-#                         filter_col2=None, filter_value2=None):
-#     """
-#     Create a scatter plot with optional trend line.
-#     Useful for: Age vs BP correlation, weight vs height, etc.
-#     """
-#     data = df
-    
-#     # Apply filters
-#     data = _apply_filter(data, filter_col1, filter_value1)
-#     data = _apply_filter(data, filter_col2, filter_value2)
-    
-#     # Deduplicate
-#     data = _prepare_data_for_visualization(data, unique_column)
-    
-#     fig = px.scatter(
-#         data,
-#         x=x_col,
-#         y=y_col,
-#         color=color,
-#         size=size,
-#         title=title,
-#         trendline="ols" if trendline else None,
-#         color_discrete_sequence=px.colors.qualitative.Dark2
-#     )
-    
-#     if trendline:
-#         # Customize trendline
-#         fig.update_traces(
-#             line=dict(dash='dash', width=2),
-#             selector=dict(mode='lines')
-#         )
-    
-#     fig.update_layout(
-#         xaxis_title=x_title,
-#         yaxis_title=y_title,
-#         template="plotly_white"
-#     )
-    
-#     return fig
-
-# def create_gauge_chart(data_value, title, min_val=0, max_val=100, 
-#                        threshold_ranges=None, threshold_colors=None):
-#     """
-#     Create a gauge chart for single metric visualization.
-#     Useful for: Bed occupancy, vaccination coverage, target achievement, etc.
-#     """
-#     if threshold_ranges is None:
-#         threshold_ranges = [(0, 50), (50, 80), (80, 100)]
-#         threshold_colors = ["red", "yellow", "green"]
-    
-#     fig = go.Figure(go.Indicator(
-#         mode="gauge+number+delta",
-#         data_value=data_value,
-#         title={'text': title},
-#         delta={'reference': max_val * 0.8},  # 80% target
-#         gauge={
-#             'axis': {'range': [min_val, max_val]},
-#             'bar': {'color': "darkblue"},
-#             'steps': [
-#                 {'range': threshold_ranges[i], 'color': threshold_colors[i]}
-#                 for i in range(len(threshold_ranges))
-#             ],
-#             'threshold': {
-#                 'line': {'color': "red", 'width': 4},
-#                 'thickness': 0.75,
-#                 'data_value': max_val * 0.9  # 90% warning
-#             }
-#         }
-#     ))
-    
-#     fig.update_layout(
-#         height=300,
-#         margin=dict(l=50, r=50, t=50, b=50)
-#     )
-    
-#     return fig
-
-# def create_treemap(df, path_cols, values_col, title,
-#                    unique_column=PERSON_ID_, filter_col1=None, filter_value1=None,
-#                    filter_col2=None, filter_value2=None):
-#     """
-#     Create a treemap for hierarchical data visualization.
-#     Useful for: Program breakdown by location, diagnosis categories, etc.
-#     """
-#     data = df
-    
-#     # Apply filters
-#     data = _apply_filter(data, filter_col1, filter_value1)
-#     data = _apply_filter(data, filter_col2, filter_value2)
-    
-#     # Deduplicate
-#     data = _prepare_data_for_visualization(data, unique_column)
-    
-#     # Aggregate values
-#     summary = data.groupby(path_cols)[values_col].nunique().reset_index()
-    
-#     fig = px.treemap(
-#         summary,
-#         path=path_cols,
-#         values=values_col,
-#         title=title,
-#         color=values_col,
-#         color_continuous_scale='Blues'
-#     )
-    
-#     fig.update_layout(
-#         template="plotly_white"
-#     )
-    
-#     fig.update_traces(
-#         hovertemplate="<b>%{label}</b><br>Count: %{data_value}<br>Parent: %{parent}"
-#     )
-    
-#     return fig
-
-# def create_sunburst_chart(df, path_cols, values_col, title,
-#                           unique_column=PERSON_ID_, filter_col1=None, filter_value1=None,
-#                           filter_col2=None, filter_value2=None):
-#     """
-#     Create a sunburst chart for radial hierarchical visualization.
-#     Useful for: Multi-level program enrollment, diagnosis categories, etc.
-#     """
-#     data = df
-    
-#     # Apply filters
-#     data = _apply_filter(data, filter_col1, filter_value1)
-#     data = _apply_filter(data, filter_col2, filter_value2)
-    
-#     # Deduplicate
-#     data = _prepare_data_for_visualization(data, unique_column)
-    
-#     # Aggregate values
-#     summary = data.groupby(path_cols)[values_col].nunique().reset_index()
-    
-#     fig = px.sunburst(
-#         summary,
-#         path=path_cols,
-#         values=values_col,
-#         title=title,
-#         color=values_col,
-#         color_continuous_scale='RdBu'
-#     )
-    
-#     fig.update_layout(
-#         template="plotly_white"
-#     )
-    
-#     return fig
-
-# def create_funnel_chart(df, stages_col, values_col, title,
-#                         unique_column=PERSON_ID_, filter_col1=None, filter_value1=None,
-#                         filter_col2=None, filter_value2=None):
-#     """
-#     Create a funnel chart for tracking progression through stages.
-#     Useful for: Patient journey (Screening → Diagnosis → Treatment → Outcome)
-#     """
-#     data = df
-    
-#     # Apply filters
-#     data = _apply_filter(data, filter_col1, filter_value1)
-#     data = _apply_filter(data, filter_col2, filter_value2)
-    
-#     # Calculate counts per stage
-#     funnel_data = data.groupby(stages_col)[values_col].nunique().reset_index()
-#     funnel_data = funnel_data.sort_values(by=values_col, ascending=False)
-    
-#     fig = go.Figure(go.Funnel(
-#         y=funnel_data[stages_col],
-#         x=funnel_data[values_col],
-#         textinfo="data_value+percent previous+percent total",
-#         marker=dict(color=["#006401", "#2E8B57", "#3CB371", "#90EE90"]),
-#         connector=dict(line=dict(color="royalblue", dash="dot", width=3))
-#     ))
-    
-#     fig.update_layout(
-#         title=title,
-#         template="plotly_white"
-#     )
-    
-#     return fig
-
-# def create_radar_chart(df, categories_col, values_col, group_col, title,
-#                        unique_column=PERSON_ID_, filter_col1=None, filter_value1=None,
-#                        filter_col2=None, filter_value2=None):
-#     """
-#     Create a radar chart for comparing multiple dimensions.
-#     Useful for: Program performance metrics, patient health indicators, etc.
-#     """
-#     data = df
-    
-#     # Apply filters
-#     data = _apply_filter(data, filter_col1, filter_value1)
-#     data = _apply_filter(data, filter_col2, filter_value2)
-    
-#     # Aggregate by group and category
-#     summary = data.groupby([group_col, categories_col])[values_col].mean().reset_index()
-    
-#     fig = go.Figure()
-    
-#     for group in summary[group_col].unique():
-#         group_data = summary[summary[group_col] == group]
-#         fig.add_trace(go.Scatterpolar(
-#             r=group_data[values_col],
-#             theta=group_data[categories_col],
-#             fill='toself',
-#             name=group
-#         ))
-    
-#     fig.update_layout(
-#         title=title,
-#         polar=dict(radialaxis=dict(visible=True, range=[0, summary[values_col].max()])),
-#         template="plotly_white",
-#         showlegend=True
-#     )
-    
-#     return fig
-
-# def create_waterfall_chart(df, stages_col, values_col, title,
-#                           unique_column=PERSON_ID_, filter_col1=None, filter_value1=None,
-#                           filter_col2=None, filter_value2=None):
-#     """
-#     Create a waterfall chart showing cumulative effect of sequential steps.
-#     Useful for: Patient attrition, stock management, financial tracking.
-#     """
-#     data = df
-    
-#     # Apply filters
-#     data = _apply_filter(data, filter_col1, filter_value1)
-#     data = _apply_filter(data, filter_col2, filter_value2)
-    
-#     # Calculate stage-wise values
-#     stage_values = data.groupby(stages_col)[values_col].sum().reset_index()
-    
-#     fig = go.Figure(go.Waterfall(
-#         name=title,
-#         orientation="v",
-#         measure=["relative"] * len(stage_values),
-#         x=stage_values[stages_col],
-#         y=stage_values[values_col],
-#         textposition="outside",
-#         text=stage_values[values_col],
-#         connector={"line": {"color": "rgb(63, 63, 63)"}},
-#     ))
-    
-#     fig.update_layout(
-#         title=title,
-#         template="plotly_white",
-#         showlegend=False
-#     )
-    
-#     return fig
-
-# def create_bubble_chart(df, x_col, y_col, size_col, color_col, title,
-#                        x_title, y_title, unique_column=PERSON_ID_,
-#                        filter_col1=None, filter_value1=None,
-#                        filter_col2=None, filter_value2=None):
-#     """
-#     Create a bubble chart with three dimensions of data.
-#     Useful for: Program comparison (enrollment, outcomes, cost), etc.
-#     """
-#     data = df
-    
-#     # Apply filters
-#     data = _apply_filter(data, filter_col1, filter_value1)
-#     data = _apply_filter(data, filter_col2, filter_value2)
-    
-#     # Deduplicate and aggregate
-#     summary = data.groupby([color_col, x_col, y_col])[size_col].nunique().reset_index()
-    
-#     fig = px.scatter(
-#         summary,
-#         x=x_col,
-#         y=y_col,
-#         size=size_col,
-#         color=color_col,
-#         title=title,
-#         hover_name=color_col,
-#         size_max=60,
-#         color_discrete_sequence=px.colors.qualitative.Dark2
-#     )
-    
-#     fig.update_layout(
-#         xaxis_title=x_title,
-#         yaxis_title=y_title,
-#         template="plotly_white"
-#     )
-    
-#     return fig
-
-# def create_timeline_chart(df, task_col, start_col, end_col, color_col, title,
-#                           unique_column=PERSON_ID_, filter_col1=None, filter_value1=None,
-#                           filter_col2=None, filter_value2=None):
-#     """
-#     Create a Gantt chart for timeline visualization.
-#     Useful for: Patient stay duration, treatment timelines, etc.
-#     """
-#     data = df
-    
-#     # Apply filters
-#     data = _apply_filter(data, filter_col1, filter_value1)
-#     data = _apply_filter(data, filter_col2, filter_value2)
-    
-#     # Ensure dates are datetime
-#     data[start_col] = pd.to_datetime(data[start_col])
-#     data[end_col] = pd.to_datetime(data[end_col])
-    
-#     fig = px.timeline(
-#         data,
-#         x_start=start_col,
-#         x_end=end_col,
-#         y=task_col,
-#         color=color_col,
-#         title=title,
-#         color_discrete_sequence=px.colors.qualitative.Dark2
-#     )
-    
-#     fig.update_layout(
-#         xaxis_title="Timeline",
-#         yaxis_title="Task/Patient",
-#         template="plotly_white"
-#     )
-    
-#     return fig
-
-# def create_3d_scatter(df, x_col, y_col, z_col, color_col, title,
-#                       unique_column=PERSON_ID_, filter_col1=None, filter_value1=None,
-#                       filter_col2=None, filter_value2=None):
-#     """
-#     Create a 3D scatter plot for multidimensional analysis.
-#     Useful for: Age, BP, BMI correlation; lab data_value clusters, etc.
-#     """
-#     data = df
-    
-#     # Apply filters
-#     data = _apply_filter(data, filter_col1, filter_value1)
-#     data = _apply_filter(data, filter_col2, filter_value2)
-    
-#     # Deduplicate
-#     data = _prepare_data_for_visualization(data, unique_column)
-    
-#     fig = px.scatter_3d(
-#         data,
-#         x=x_col,
-#         y=y_col,
-#         z=z_col,
-#         color=color_col,
-#         title=title,
-#         opacity=0.7,
-#         color_discrete_sequence=px.colors.qualitative.Dark2
-#     )
-    
-#     fig.update_layout(
-#         scene=dict(
-#             xaxis_title=x_col,
-#             yaxis_title=y_col,
-#             zaxis_title=z_col
-#         ),
-#         template="plotly_white"
-#     )
-    
-#     return fig
-
-# def create_violin_plot(df, x_col, y_col, title, x_title, y_title,
-#                        color=None, box=True, points=False,
-#                        unique_column=PERSON_ID_, filter_col1=None, filter_value1=None,
-#                        filter_col2=None, filter_value2=None):
-#     """
-#     Create a violin plot showing distribution density.
-#     Useful for: Comparing distributions across categories.
-#     """
-#     data = df
-    
-#     # Apply filters
-#     data = _apply_filter(data, filter_col1, filter_value1)
-#     data = _apply_filter(data, filter_col2, filter_value2)
-    
-#     fig = px.violin(
-#         data,
-#         x=x_col,
-#         y=y_col,
-#         color=color,
-#         box=box,
-#         points=points,
-#         title=title,
-#         color_discrete_sequence=px.colors.qualitative.Dark2,
-#         violinmode='group' if color else 'overlay'
-#     )
-    
-#     fig.update_layout(
-#         xaxis_title=x_title,
-#         yaxis_title=y_title,
-#         template="plotly_white"
-#     )
-    
-#     return fig
-
-# def create_choropleth_map(df, location_col, values_col, title,
-#                           locations_dict=None, unique_column=PERSON_ID_,
-#                           filter_col1=None, filter_value1=None,
-#                           filter_col2=None, filter_value2=None):
-#     """
-#     Create a choropleth map for geographic data visualization.
-#     Useful for: Disease prevalence by region, facility coverage, etc.
-#     """
-#     data = df
-    
-#     # Apply filters
-#     data = _apply_filter(data, filter_col1, filter_value1)
-#     data = _apply_filter(data, filter_col2, filter_value2)
-    
-#     # Aggregate by location
-#     summary = data.groupby(location_col)[values_col].nunique().reset_index()
-    
-#     # If no custom locations dict, assume coordinates are in data
-#     if locations_dict and 'lat' in locations_dict and 'lon' in locations_dict:
-#         # Use scatter mapbox for point data
-#         fig = px.scatter_mapbox(
-#             summary,
-#             lat=locations_dict['lat'],
-#             lon=locations_dict['lon'],
-#             size=values_col,
-#             color=values_col,
-#             hover_name=location_col,
-#             title=title,
-#             mapbox_style="carto-positron",
-#             zoom=8,
-#             color_continuous_scale="Viridis"
-#         )
-#     else:
-#         # Use density mapbox for heatmap
-#         fig = px.density_mapbox(
-#             summary,
-#             lat=locations_dict.get('lat') if locations_dict else None,
-#             lon=locations_dict.get('lon') if locations_dict else None,
-#             z=values_col,
-#             radius=20,
-#             title=title,
-#             mapbox_style="carto-positron",
-#             zoom=8
-#         )
-    
-#     fig.update_layout(
-#         template="plotly_white"
-#     )
-    
-#     return fig
-
-# def create_bullet_chart(actual, target, title, ranges=None, 
-#                         range_colors=None, measure_name="Current"):
-#     """
-#     Create a bullet chart for performance against targets.
-#     Useful for: KPIs, program targets, etc.
-#     """
-#     if ranges is None:
-#         ranges = [target * 0.7, target * 0.9, target]
-#         range_colors = ["red", "yellow", "green"]
-    
-#     fig = go.Figure(go.Indicator(
-#         mode="number+gauge+delta",
-#         data_value=actual,
-#         delta={'reference': target},
-#         title={'text': title},
-#         gauge={
-#             'shape': "bullet",
-#             'axis': {'range': [0, target * 1.2]},
-#             'bar': {'color': "darkblue"},
-#             'steps': [
-#                 {'range': [0, ranges[0]], 'color': range_colors[0]},
-#                 {'range': [ranges[0], ranges[1]], 'color': range_colors[1]},
-#                 {'range': [ranges[1], ranges[2]], 'color': range_colors[2]}
-#             ],
-#             'threshold': {
-#                 'line': {'color': "red", 'width': 2},
-#                 'thickness': 0.75,
-#                 'data_value': target
-#             }
-#         }
-#     ))
-    
-#     fig.update_layout(
-#         height=200,
-#         margin=dict(l=50, r=50, t=50, b=50)
-#     )
-    
-#     return fig
-
-# # def create_count(df, aggregation='count', unique_column=PERSON_ID_, *filters):
-# #     data = df
-
-# #     filter_cols = [item for item in filters[::2] if item is not None]
-# #     filter_vals = [item for item in filters[1::2] if item is not None]
-# #      #for defaulters
-# #     data["DateValue"] = pd.to_datetime(data[DATE_]).dt.date
-# #     data['datetime'] = data[DATE_]
-
-# #     # Apply all filters using the helper function
-# #     for col, val in zip(filter_cols, filter_vals):
-# #         if col == "defaulter_period":
-# #             continue
-# #         else:
-# #             data = _apply_filter(data, col, val)
-    
-    
-# #     # Remove duplicates based on unique_column and DATE_
-# #     unique_visits = _prepare_data_for_visualization(data, unique_column)
-    
-# #     # Handle different aggregation types
-# #     if aggregation == 'count':
-# #         return len(unique_visits[unique_column].dropna())
-# #     elif aggregation == 'nunique':
-# #         return len(unique_visits.drop_duplicates(subset=unique_column))
-# #     elif aggregation == 'list':
-# #         return unique_visits[unique_column].dropna().unique().tolist()
-# #     elif aggregation == 'time_diff_mins':
-# #         # Calculate time difference between min and max datetime for each patient
-# #         # Note: This assumes there's a 'DATETIME' column in your dataframe
-# #         if 'datetime' not in unique_visits.columns:
-# #             raise ValueError("datetime column is required for time_diff aggregation")
-# #         patient_times = data.groupby([unique_column, DATE_])['datetime'].agg(['min', 'max'])
-# #         patient_times['time_diff'] = (patient_times['max'] - patient_times['min']).dt.total_seconds() / (60)
-# #         patient_times = patient_times[patient_times['time_diff'] < 120]
-# #         mean_val = patient_times['time_diff'].mean()
-# #         if pd.isna(mean_val):
-# #             return 0
-# #         return int(mean_val)
-# #     elif aggregation == 'time_diff_hour':
-# #         if 'datetime' not in unique_visits.columns:
-# #             raise ValueError("datetime column is required for time_diff aggregation")
-# #         patient_times = data.groupby([unique_column, DATE_])['datetime'].agg(['min', 'max'])
-# #         patient_times['time_diff'] = (patient_times['max'] - patient_times['min']).dt.total_seconds() / (60 * 60)
-# #         patient_times = patient_times[patient_times['time_diff'] < 2]
-# #         mean_val = patient_times['time_diff'].mean()
-# #         if pd.isna(mean_val):
-# #             return 0
-# #         return int(mean_val)
-# #     elif aggregation == 'defaulter_count':
-# #         unique_visits['defaulter_period'] = unique_visits[CONCEPT_NAME_]
-# #         # lets maintain individuals who passed through filters
-# #         filtered_ids = set(unique_visits[unique_column].dropna().unique())
-# #         df = df[df[unique_column].isin(filtered_ids)]
-# #         df["start_date"] = pd.to_datetime(df["start_date"],errors='coerce')
-# #         df['value_datetime'] = pd.to_datetime(df['value_datetime'],errors='coerce')
-# #         df = df.dropna(subset=[DATE_, 'value_datetime'])
-# #         df_defaulted_ids = []
-# #         for col,val in zip(filter_cols, filter_vals):
-# #             try:
-# #                 if col == "defaulter_period":
-# #                     default = df[df[col].isin(["Appointment date","Next scheduled visit","Return visit date"])]\
-# #                         .sort_values(by=[PERSON_ID_,DATE_]) #restart the filter
-# #                     default['Duration_to_visit'] = (
-# #                                     default['start_date'] - default["value_datetime"]
-# #                                 ).dt.days
-# #                     # print(default[["Program","concept_name","value_datetime","Duration_to_visit","start_date"]])
-# #                     default = default[default['Duration_to_visit']> val]
-# #                     ids = default[PERSON_ID_].unique().tolist()
-# #                     df_defaulted_ids.extend(ids)
-# #             except Exception as e:
-# #                 print(e)
-# #                 df_defaulted_ids = []
-# #         return len(df_defaulted_ids)
-
-# #     elif aggregation in ['sum', 'mean', 'min', 'max', 'std', 'var']:
-# #         return int(unique_visits[unique_column].agg(aggregation))
-# #     else:
-# #         return len(unique_visits[unique_column].dropna())

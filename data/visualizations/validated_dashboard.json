@@ -2826,93 +2826,32 @@
     "report_id": "report_f6d7d65d",
     "report_name": "Advanced HIV Disease",
     "date_created": "2026-05-06",
+    "count_items_per_row":6,
     "visualization_types": {
       "counts": [
         {
           "id": "count_121400f6",
           "name": "Patients Screened for HIV",
+          "level": "facility",
+          "flag": "ok",
           "filters": {
             "measure": "count",
             "unique": "person_id",
             "variable1": "Program",
-            "value1": [],
             "variable2": "Encounter",
-            "value2": [],
             "variable3": "concept_name",
-            "value3": [
-              "HIV status"
-            ],
+            "value3": "HIV status",
             "variable4": "obs_value_coded",
-            "value4": "",
             "variable5": "ValueN",
-            "value5": "",
             "variable6": "Value",
-            "value6": "",
             "variable7": "Gender",
-            "value7": [],
-            "variable8": "Age",
-            "value8": ""
+            "variable8": "Age"
           }
         },
         {
           "id": "count_1f7400bf",
-          "name": "Patients Screened for HIV - Male",
-          "filters": {
-            "measure": "nunique",
-            "unique": "person_id",
-            "variable1": "Program",
-            "value1": [],
-            "variable2": "Encounter",
-            "value2": [],
-            "variable3": "concept_name",
-            "value3": [
-              "HIV status"
-            ],
-            "variable4": "obs_value_coded",
-            "value4": "",
-            "variable5": "ValueN",
-            "value5": "",
-            "variable6": "Value",
-            "value6": "",
-            "variable7": "Gender",
-            "value7": [
-              "Male"
-            ],
-            "variable8": "Age",
-            "value8": ""
-          }
-        },
-        {
-          "id": "count_60b8d34f",
-          "name": "Patients Screened for HIV - Female",
-          "filters": {
-            "measure": "count",
-            "unique": "person_id",
-            "variable1": "Program",
-            "value1": [],
-            "variable2": "Encounter",
-            "value2": [],
-            "variable3": "concept_name",
-            "value3": [
-              "HIV status"
-            ],
-            "variable4": "obs_value_coded",
-            "value4": "",
-            "variable5": "ValueN",
-            "value5": "",
-            "variable6": "Value",
-            "value6": "",
-            "variable7": "Gender",
-            "value7": [
-              "Female"
-            ],
-            "variable8": "Age",
-            "value8": ""
-          }
-        },
-        {
-          "id": "count_60b8d34fg",
-          "name": "Patients Screened for HIV - HIV Previous Positive",
+          "name": "HIV Status - New Positive",
+          "level": "facility",
           "filters": {
             "measure": "count",
             "unique": "person_id",
@@ -2929,6 +2868,66 @@
             "variable4": "obs_value_coded",
             "value4": [
               "HIV Positive"
+            ],
+            "variable5": "ValueN",
+            "value5": "",
+            "variable6": "Value",
+            "value6": "",
+            "variable7": "Gender",
+            "value7": [],
+            "variable8": "Age",
+            "value8": ""
+          }
+        },
+        {
+          "id": "count_60b8d34f",
+          "name": "HIV Status - Previous Positive",
+          "filters": {
+            "measure": "count",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": [],
+            "variable2": "Encounter",
+            "value2": [
+              "Past medical history"
+            ],
+            "variable3": "concept_name",
+            "value3": [
+              "HIV status"
+            ],
+            "variable4": "obs_value_coded",
+            "value4": [
+              "HIV Positive"
+            ],
+            "variable5": "ValueN",
+            "value5": "",
+            "variable6": "Value",
+            "value6": "",
+            "variable7": "Gender",
+            "value7": [],
+            "variable8": "Age",
+            "value8": ""
+          }
+        },
+        {
+          "id": "count_60b8d34fg",
+          "name": "HIV Status - Unknown/Missing",
+          "filters": {
+            "measure": "count",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": [],
+            "variable2": "Encounter",
+            "value2": [
+              "Past medical history"
+            ],
+            "variable3": "concept_name",
+            "value3": [
+              "HIV status"
+            ],
+            "variable4": "obs_value_coded",
+            "value4": [
+              "Unknown"
             ],
             "variable5": "ValueN",
             "value5": "",
@@ -2994,37 +2993,26 @@
         },
         {
           "id": "count_ea6f5d0d1",
-          "name": "Screened for AHD - WHO Stage 1",
+          "name": "Children <5 Years",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
             "variable1": "Program",
-            "value1": [],
             "variable2": "Encounter",
             "value2": [
               "Ahd hiv staging"
             ],
             "variable3": "concept_name",
-            "value3": [
-              "WHO stage"
-            ],
-            "variable4": "obs_value_coded",
-            "value4": [
-              "*WHO stage I "
-            ],
             "variable5": "ValueN",
-            "value5": "",
             "variable6": "Value",
-            "value6": "",
             "variable7": "Gender",
-            "value7": [],
             "variable8": "Age",
-            "value8": ""
+            "value8": "<5"
           }
         },
         {
           "id": "count_ea6f5d0d2",
-          "name": "Screened for AHD - WHO Stage 2",
+          "name": "Patients with CD4 <200",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -3036,14 +3024,11 @@
             ],
             "variable3": "concept_name",
             "value3": [
-              "WHO stage"
+              "CD4 count"
             ],
             "variable4": "obs_value_coded",
-            "value4": [
-              "*WHO stage II "
-            ],
             "variable5": "ValueN",
-            "value5": "",
+            "value5": "<200",
             "variable6": "Value",
             "value6": "",
             "variable7": "Gender",
@@ -3054,7 +3039,7 @@
         },
         {
           "id": "count_ea6f5d0d3",
-          "name": "Screened for AHD - WHO Stage 3",
+          "name": "WHO Stage 3 or 4 ",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -3070,7 +3055,8 @@
             ],
             "variable4": "obs_value_coded",
             "value4": [
-              "*WHO stage III "
+              "WHO stage III adult","WHO stage III peds",
+              "WHO stage IV adult","WHO stage IV peds"
             ],
             "variable5": "ValueN",
             "value5": "",
@@ -3084,7 +3070,7 @@
         },
         {
           "id": "count_ea6f5d0d4",
-          "name": "Screened for AHD - WHO Stage 4",
+          "name": "Viral Load > 1000 copies",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -3111,12 +3097,47 @@
             "variable8": "Age",
             "value8": ""
           }
+        },
+        {
+          "id": "count_ea6f5d0d4xd",
+          "name": "HIV Admissions",
+          "filters": {
+            "measure": "count_set",
+            "unique": "person_id",
+            "variable1": "Program",
+            "value1": [],
+            "variable2": "Encounter",
+            "variable3": "concept_name",
+            "value3": "HIV status",
+            "variable4": "obs_value_coded",
+            "value4":"HIV Positive",
+            "variable5": "Program",
+            "value5": "*IPD",
+            "variable6": "Value",
+            "value6": "",
+            "variable7": "Gender",
+            "value7": [],
+            "variable8": "Age",
+            "value8": ""
+          }
+        },
+        {
+          "id":"calculated101",
+          "name":"% HIV Patients Screened",
+          "flag":"ok",
+          "filters":
+            {
+              "measure":"calculated",
+              "expression":"count_ea6f5d0d/count_1f7400bf*100"
+
+          }
         }
       ],
       "charts": {
         "sections": [
           {
-            "section_name": "AHD Screening and Results",
+            "section_name": "HIV SCREENING",
+            "chart_items_per_row":2,
             "items": [
               {
                 "id": "chart_d3b7b75a",
@@ -3148,18 +3169,73 @@
               },
               {
                 "id": "chart_6a133940",
-                "name": "Daily HIV Screening - Last 7 Days",
+                "name": "Proportion of Patients Screened for HIV Status",
                 "type": "Line",
+                "filters": {
+                  "measure": "calculated",
+                  "unique": "any",
+                  "duration_default": "7days",
+                  "title": "Proportion of Patients Screened for HIV Status",
+                  "unique_column": "person_id",
+                  "query1":"",
+                  "query2":"WHERE concept_name = 'HIV status'",
+                  "query3":"",
+                  "query4":"",
+                  "query5":"",
+                  "custom_fields":[{"column": "metric_value", "expr": "query2/query1*100"}],
+                  "date_col": "Date",
+                  "y_col": "person_id",
+                  "x_title": "Date",
+                  "y_title": "% Screened for HIV Status",
+                  "legend_title": "Legend"
+                }
+              },
+              {
+                "id": "chart_08380039",
+                "name": "Status of HIV Patients During Screening",
+                "type": "Pie",
+                "level": "facility",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "any",
+                  "title": "Status of HIV Patients During Screening",
+                  "unique_column": "person_id",
+                  "filter_col1": "concept_name",
+                  "filter_val1": "HIV status",
+                  "filter_col2": "obs_value_coded",
+                  "filter_val2": "!=_",
+                  "filter_col3": [],
+                  "filter_val3": "",
+                  "filter_col4": [],
+                  "filter_val4": "",
+                  "filter_col5": [],
+                  "filter_val5": "",
+                  "names_col": "obs_value_coded",
+                  "values_col": "person_id",
+                  "top_n": 10,
+                  "x_title": "",
+                  "y_title": "",
+                  "replace": {"Reactive":"HIV Positive",
+                              "Positive":"HIV Positive",
+                              "Non-reactive": "HIV Negative",
+                              "HIV negative": "HIV Negative",
+                              "HIV unknown": "HIV Unknown",
+                              "Unknown": "HIV Unknown"}
+                }
+              },
+              {
+                "id": "chart_d3b7b75add",
+                "name": "ART Status of HIV Positive Patients",
+                "type": "Column",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
                   "duration_default": "7days",
-                  "title": "Daily HIV Screening - Last 7 Days",
+                  "title": "ART Status of HIV Positive Patients",
                   "unique_column": "person_id",
-                  "filter_col1": [
-                    "concept_name"
-                  ],
-                  "filter_val1": "HIV status",
+                  "filter_col1": ["concept_name"],
+                  "filter_val1": "Is the client on ART?",
                   "filter_col2": [],
                   "filter_val2": "",
                   "filter_col3": [],
@@ -3168,26 +3244,55 @@
                   "filter_val4": "",
                   "filter_col5": [],
                   "filter_val5": "",
-                  "date_col": "Date",
                   "y_col": "person_id",
+                  "x_col": "Value",
                   "x_title": "Date",
                   "y_title": "Number of Patients",
                   "legend_title": "Legend",
-                  "color": "obs_value_coded"
+                  "color": "Value"
+                }
+              }
+            ]
+          },
+          {
+            "section_name": "AHD Screening",
+            "chart_items_per_row":2,
+            "items": [
+              {
+                "id": "chart_6a133940",
+                "name": "Proportion of HIV Positive Patients Screened for AHD",
+                "type": "Line",
+                "filters": {
+                  "measure": "calculated",
+                  "unique": "any",
+                  "duration_default": "7days",
+                  "title": "Proportion of HIV Positive Patients Screened for AHD",
+                  "unique_column": "person_id",
+                  "query1":"WHERE concept_name = 'HIV status' AND obs_value_coded = 'HIV Positive'",
+                  "query2":"WHERE Encounter = 'Ahd hiv staging'",
+                  "query3":"",
+                  "query4":"",
+                  "query5":"",
+                  "custom_fields":[{"column": "metric_value", "expr": "query2/query1*100"}],
+                  "date_col": "Date",
+                  "y_col": "person_id",
+                  "x_title": "Date",
+                  "y_title": "% Screened for HIV Status",
+                  "legend_title": "Legend"
                 }
               },
               {
                 "id": "chart_cdb8f2ec",
-                "name": "AHD Presenting Complaints (Symptoms)",
+                "name": "Top 15 AHD Presenting Complaints (Symptoms)",
                 "type": "Bar",
                 "filters": {
                   "measure": "nunique",
                   "unique": "any",
                   "duration_default": "7days",
-                  "title": "AHD Presenting Complaints (Symptoms)",
+                  "title": "Top 15 AHD Presenting Complaints (Symptoms)",
                   "unique_column": "person_id",
                   "filter_col1": [
-                    "concept_name"
+                    "Encounter"
                   ],
                   "filter_val1": "Ahd presenting complaints",
                   "filter_col2": [],
@@ -3205,6 +3310,73 @@
                   "y_title": "Number of Patients"
                 }
               },
+              {
+                "id": "chart_02d1942a",
+                "name": "AHD WHO Clinical Staging",
+                "type": "Column",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "7days",
+                  "title": "AHD WHO Clinical Staging",
+                  "unique_column": "person_id",
+                  "filter_col1": [
+                    "Encounter"
+                  ],
+                  "filter_val1": "Ahd hiv staging",
+                  "filter_col2": [
+                    "concept_name"
+                  ],
+                  "filter_val2": "WHO stage",
+                  "filter_col3": [],
+                  "filter_val3": "",
+                  "filter_col4": [],
+                  "filter_val4": "",
+                  "filter_col5": [],
+                  "filter_val5": "",
+                  "y_col": "obs_value_coded",
+                  "x_col": "person_id",
+                  "x_title": "Date",
+                  "y_title": "Number of Patients",
+                  "legend_title": "Legend",
+                  "color": ""
+                }
+              },
+              {
+                "id": "chart_0f339442",
+                "name": "AHD LabTests conducted",
+                "type": "Bar",
+                "filters": {
+                  "measure": "nunique",
+                  "unique": "any",
+                  "duration_default": "7days",
+                  "title": "AHD LabTests conducted",
+                  "unique_column": "person_id",
+                  "filter_col1": [
+                    "Encounter"
+                  ],
+                  "filter_val1": "Ahd lab results",
+                  "filter_col2": [],
+                  "filter_val2": "",
+                  "filter_col3": [],
+                  "filter_val3": "",
+                  "filter_col4": [],
+                  "filter_val4": "",
+                  "filter_col5": [],
+                  "filter_val5": "",
+                  "label_col": "Value",
+                  "value_col": "person_id",
+                  "top_n": "10",
+                  "x_title": "Date",
+                  "y_title": "Number of Patients"
+                }
+              }
+            ]
+          },
+          {
+            "section_name": "AHD Screening and Results",
+            "chart_items_per_row":2,
+            "items": [
               {
                 "id": "chart_02d1942a",
                 "name": "AHD WHO Clinical Staging",
