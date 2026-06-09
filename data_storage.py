@@ -190,7 +190,7 @@ class DataStorage:
                 os.makedirs(os.path.dirname(timestamp_file), exist_ok=True)
                 pd.DataFrame({'saving_time': [datetime.now().strftime("%d/%m/%Y, %H:%M:%S")]}).to_csv(timestamp_file, index=False)
 
-                dropdown_json = {"programs":sorted(user_programs.name.dropna().unique().tolist()),
+                dropdown_json = {"programs":sorted(user_programs.name.dropna().unique().tolist()), 
                             "encounters":sorted(encounter_types.name.dropna().unique().tolist()),
                             "concepts":sorted(df.concept_name.dropna().unique().tolist()),
                             "concept_answers":sorted(df.obs_value_coded.dropna().unique().tolist()),

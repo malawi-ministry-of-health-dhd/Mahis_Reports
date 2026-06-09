@@ -341,20 +341,21 @@ class DataFetcher:
                 df = pd.read_sql(query, conn)
                 conn.close()
             
-            # Save to file
             output_path = os.path.join(output_folder, f"{table_name}.{output_format}")
+            # first check if the file exists to prevent overwritting
+            if os.path.exists(output_path):
+                data_length = len(pd.read_csv(output_path))
+                if len(df) <= data_length:
+                    return
             # os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else '.', exist_ok=True)
-            
             if output_format == 'csv':
                 df.to_csv(output_path, index=False)
             elif output_format == 'parquet':
                 df.to_parquet(output_path, index=False, engine='pyarrow')
             else:
                 raise ValueError(f"Unsupported output format: {output_format}")
-            
             logger.info(f"Saved {table_name} to {output_path} ({len(df)} rows)")
-            return df
-            
+            return
         except Exception as e:
             logger.error(f"Error fetching single table {table_name}: {e}")
             raise
