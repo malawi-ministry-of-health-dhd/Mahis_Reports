@@ -367,8 +367,12 @@ def build_filter_query(cols, vals,data_path, unique_column, isSet, start_date, e
         """Build a single WHERE condition."""
         # Handle list values for IN clause
         if isinstance(val, list):
-            placeholders = ", ".join([f"'{v}'" for v in val])
-            return f"{col} IN ({placeholders})"
+            clause_list = []
+            for item in val:
+                operator, data_value = parse_value(item)
+                clause_list.append(f"{col} {operator} '{data_value}'")
+            clause = " OR ".join(clause_list)
+            return clause
         if col == "defaulter_period":
             return f"concept_name = 'Appointment date' AND (NOW() - CAST(value_datetime AS TIMESTAMP)) > INTERVAL {val} DAY"
         if col == "days_before_visit_date":
