@@ -1,5 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500&display=swap');
+
+:root {
+  /* Brand greens */
+  --g9: #052e16; --g8: #14532d; --g7: #15803d;
+  --g6: #16a34a; --g5: #22c55e; --g4: #4ade80;
+  --g2: #bbf7d0; --g1: #dcfce7; --g0: #f0fdf4;
+
+  /* RAG — Traffic Lights */
+  --rag-g: #16a34a; --rag-g-bg: #dcfce7;
+  --rag-a: #d97706; --rag-a-bg: #fef3c7;
+  --rag-r: #dc2626; --rag-r-bg: #fee2e2;
+
+  /* Mortality colours */
+  --mort-mat: #e11d48;  --mort-mat-bg: #fff1f2;  --mort-mat-bdr: #fecdd3;
+  --mort-neo: #d97706;  --mort-neo-bg: #fffbeb;  --mort-neo-bdr: #fde68a;
+  --mort-still: #7c3aed; --mort-still-bg: #f5f3ff; --mort-still-bdr: #ddd6fe;
+
+  /* Neutrals */
+  --n9: #0f172a; --n8: #1e293b; --n7: #334155;
+  --n6: #475569; --n5: #64748b; --n4: #94a3b8;
+  --n3: #cbd5e1; --n2: #e2e8f0; --n1: #f1f5f9; --n0: #f8fafc;
+
+  /* Semantic */
+  --blue: #2563eb; --blue-bg: #eff6ff;
+  --white: #ffffff;
+
+  /* Spacing & shape */
+  --radius: 10px; --radius-lg: 14px; --radius-xl: 18px;
+  --radius-sm: 7px; --radius-xs: 5px;
+  --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.07);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,.10);
+  --border: 1px solid var(--n2);
+
+  /* Layout */
+  --sidebar-w: 224px;
+  --topbar-h: 52px;
+}
+
+*, *::before, *::after {
+  font-family: 'Geist', system-ui, sans-serif !important;
+  box-sizing: border-box;
+}
+
+html { -webkit-font-smoothing: antialiased; }
+body { background: var(--n0) !important; color: var(--n9); }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-thumb { background: var(--n2); border-radius: 99px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
 /* ===================================================================
-  MNID Dashboard â€” MAHIS green design tokens
+  MNID Dashboard — MAHIS green design tokens
    =================================================================== */
 
 /* Smooth scrolling */
@@ -1905,6 +1962,55 @@ html { scroll-behavior: smooth; }
 .mnid-card,
 .mnid-chart-card {
   border-radius: 16px;
+}
+
+/* Executive view section headers */
+.mnid-exec-section-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 12px;
+  margin-top: 8px;
+}
+.mnid-exec-section-bar {
+  width: 3px;
+  height: 12px;
+  background: var(--g6);
+  border-radius: 2px;
+  flex-shrink: 0;
+  display: inline-block;
+}
+.mnid-exec-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--n5);
+  text-transform: uppercase;
+  letter-spacing: .09em;
+}
+
+/* Executive view alert banner */
+.mnid-exec-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  color: #78350f;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* Card hover lift */
+.mantine-Paper-root:hover {
+  box-shadow: var(--shadow-md) !important;
+}
+
+/* Executive page layout */
+.mnid-executive-page {
+  padding-bottom: 24px;
 }
 
 /* Responsive */

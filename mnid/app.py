@@ -12,6 +12,7 @@ import pandas as pd
 pd.options.mode.chained_assignment = None
 import plotly.graph_objects as go
 from datetime import datetime
+from pathlib import Path
 from dash import html, dcc, clientside_callback, callback, callback_context, no_update, Input, Output, State, ALL
 from dash.exceptions import PreventUpdate
 from helpers.helpers import create_count_from_config
@@ -81,9 +82,429 @@ from mnid.layout import (
     _pph_cascade, _topbar, _sidebar, _alert_banner,
     _avg_ring, _count_bar, _kpi, _kpi_row, _section_anchor,
 )
+from mnid.executive_views import render_country_profile, render_operational_readiness
 
+_MNID_UI_CACHE_MAX = 16
+_MNID_UI_CACHE_TTL_SECONDS = 3600
+_MNID_EXECUTIVE_CONTENT_CACHE: dict = {}
 _MNID_WARNED_MESSAGES = set()
 _LOGGER = logging.getLogger(__name__)
+
+_MNID_SCROLLSPY_CLIENTSIDE = """
+function(_tick) {
+    const sections = [
+        '#mnid-summary',
+        '#mnid-trends',
+        '#mnid-performance',
+        '#mnid-heatmap',
+        '#mnid-coverage',
+        '#mnid-comparative',
+        '#mnid-analysis',
+        '#mnid-readiness'
+    ];
+
+    let active = '#mnid-summary';
+    const activationLine = 124;
+    let bestPassed = null;
+    let nextUpcoming = null;
+
+    for (const selector of sections) {
+        const el = document.querySelector(selector);
+        if (!el) {
+            continue;
+        }
+
+        const rect = el.getBoundingClientRect();
+        const top = rect.top;
+
+        if (top <= activationLine) {
+            if (bestPassed === null || top > bestPassed.top) {
+                bestPassed = { selector, top };
+            }
+        } else if (nextUpcoming === null || top < nextUpcoming.top) {
+            nextUpcoming = { selector, top };
+        }
+    }
+
+    if (bestPassed !== null) {
+        active = bestPassed.selector;
+    } else if (nextUpcoming !== null) {
+        active = nextUpcoming.selector;
+    }
+
+    return active;
+}
+"""
+
+
+def _load_mnid_report_config(report_name: str) -> dict | None:
+    try:
+        config_path = Path(__file__).resolve().parents[1] / 'data' / 'visualizations' / 'validated_dashboard.json'
+        with open(config_path, 'r') as fh:
+            dashboards = json.load(fh)
+    except Exception:
+        return None
+
+    return next(
+        (
+            dashboard for dashboard in dashboards
+            if dashboard.get('dashboard_type') == 'mnid'
+            and dashboard.get('report_name') == report_name
+        ),
+        None,
+    )
+
+
+def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
+                                  facility_code, start_date, end_date,
+                                  scope_meta: dict | None = None) -> dict:
+    # Compute normalised period bounds once — used for both date filtering and aggregate queries.
+    try:
+        _s = pd.to_datetime(start_date).normalize() if start_date else None
+        _e = (
+            (pd.to_datetime(end_date).normalize() + pd.Timedelta(days=1) - pd.Timedelta(seconds=1))
+            if end_date else (
+                network_df['Date'].max() if 'Date' in network_df.columns and not network_df.empty
+                else pd.Timestamp.now()
+            )
+        )
+    except Exception:
+        _s = _e = None
+
+    facility_df = network_df
+    if _s is not None and 'Date' in network_df.columns and not network_df.empty:
+        try:
+            date_mask = (network_df['Date'] >= _s) & (network_df['Date'] <= _e)
+            facility_df = network_df[date_mask]
+        except Exception:
+            facility_df = network_df
+
+    selected_facilities = list(tuple(sorted((scope_meta or {}).get('selected_facilities') or [])))
+    selected_districts = list(tuple(sorted((scope_meta or {}).get('selected_districts') or [])))
+    if selected_facilities and 'Facility' in facility_df.columns:
+        facility_df = facility_df[facility_df['Facility'].isin(selected_facilities)]
+    elif selected_districts and 'District' in facility_df.columns:
+        facility_df = facility_df[facility_df['District'].isin(selected_districts)]
+
+    selected_program = (scope_meta or {}).get('mnid_categories')
+    selected_program = selected_program[0] if selected_program else 'All'
+    facility_df.attrs['mnid_program'] = selected_program
+    network_df.attrs['mnid_program'] = selected_program
+    if network_df.empty:
+        network_df = facility_df
+
+    vt = config.get('visualization_types', {})
+    all_inds = config.get('priority_indicators') or vt.get('priority_indicators', [])
+    supply_inds = config.get('supply_indicators') or vt.get('supply_indicators', [])
+    wf_inds = config.get('workforce_indicators') or vt.get('workforce_indicators', [])
+    dq_inds = config.get('data_quality_indicators') or vt.get('data_quality_indicators', [])
+    period = f'{start_date} to {end_date}'
+    period_note = (scope_meta or {}).get('data_period_note')
+
+    requested_categories = (scope_meta or {}).get('mnid_categories')
+    config_categories = config.get('mnid_categories')
+    if config_categories:
+        effective_categories = [c for c in (requested_categories or []) if c in config_categories] or config_categories
+    else:
+        effective_categories = requested_categories
+    all_inds = _resolve_runtime_mnid_indicators(
+        all_inds,
+        facility_df,
+        effective_categories,
+    )
+    _validate_indicator_configs(all_inds)
+    category_order = _resolve_category_order(all_inds, effective_categories)
+    if category_order:
+        allowed = set(category_order)
+        all_inds = [i for i in all_inds if i.get('category') in allowed]
+
+    payload_key = f'{hash((len(network_df), tuple(network_df.columns.tolist()) if not network_df.empty else (), start_date, end_date, tuple(category_order)))}_{start_date}_{end_date}'
+
+    tracked = [i for i in all_inds if i.get('status') == 'tracked']
+    awaiting = [i for i in all_inds if i.get('status') == 'awaiting_baseline']
+    default_cat = category_order[0] if category_order else 'ANC'
+
+    if category_order == ['Newborn']:
+        dashboard_title = 'Neonatal Care Dashboard'
+        dashboard_subtitle = 'Program monitoring for admissions, outcomes, clinical interventions, coverage, and readiness.'
+        dashboard_theme = 'newborn'
+    elif set(category_order) == {'ANC', 'Labour', 'PNC'}:
+        dashboard_title = 'Maternal Health Indicators'
+        dashboard_subtitle = 'ANC, labour, and postnatal performance, comparison, coverage, and readiness.'
+        dashboard_theme = 'default'
+    else:
+        dashboard_title = f"{config.get('report_name', 'Maternal and Child Health')} Indicators"
+        dashboard_subtitle = 'Clean view of performance, comparison, coverage, and readiness.'
+        dashboard_theme = 'default'
+
+    if dashboard_theme == 'newborn' and not (supply_inds or wf_inds or dq_inds):
+        _unavail = {'unique': 'person_id', 'variable1': 'concept_name', 'value1': '__mnid_unavailable__'}
+        wf_inds = [
+            {
+                'label': 'SSNC competency assessed',
+                'target_pct': 80,
+                'numerator_filters': dict(_unavail),
+                'denominator_filters': dict(_unavail),
+            },
+        ]
+        supply_inds = [
+            {
+                'label': 'CPAP equipment available',
+                'target_pct': 80,
+                'numerator_filters': dict(_unavail),
+                'denominator_filters': dict(_unavail),
+            },
+            {
+                'label': 'Phototherapy unit available',
+                'target_pct': 80,
+                'numerator_filters': dict(_unavail),
+                'denominator_filters': dict(_unavail),
+            },
+            {
+                'label': 'Neonatal resuscitation equipment available',
+                'target_pct': 80,
+                'numerator_filters': dict(_unavail),
+                'denominator_filters': dict(_unavail),
+            },
+        ]
+        dq_inds = [
+            {
+                'label': 'Record completeness',
+                'target_pct': 95,
+                'numerator_filters': dict(_unavail),
+                'denominator_filters': dict(_unavail),
+            },
+            {
+                'label': 'Data entered within 7 days',
+                'target_pct': 90,
+                'numerator_filters': dict(_unavail),
+                'denominator_filters': dict(_unavail),
+            },
+        ]
+    hero_title = 'KEY NEONATAL INDICATORS' if dashboard_theme == 'newborn' else f'KEY {_CAT_LABELS.get(default_cat, str(default_cat or "Program")).upper()} INDICATORS'
+
+    _agg = _get_aggregate()
+    _fac_filter = selected_facilities or None
+    _dist_filter = selected_districts or None
+    _kpi_grain = 'daily'
+
+    computed = []
+    for ind in tracked:
+        if _agg is not None and _s is not None:
+            num, den, pct = _agg_coverage(
+                _agg, ind['id'], _s, _e,
+                facility_codes=_fac_filter,
+                districts=_dist_filter if not _fac_filter else None,
+                grain=_kpi_grain,
+            )
+        else:
+            num, den, pct = _cov(facility_df, ind['numerator_filters'], ind['denominator_filters'])
+        computed.append({
+            **ind,
+            'pct': pct,
+            'numerator': num,
+            'denominator': den,
+            'attained_pct': _target_attainment_pct(pct, ind.get('target', 0), ind),
+        })
+
+    try:
+        window = max((_e - _s).days, 1) if _s and _e else 1
+        prev_end = _s - pd.Timedelta(days=1)
+        prev_start = prev_end - pd.Timedelta(days=window - 1)
+    except Exception:
+        prev_start = prev_end = None
+
+    for c in computed:
+        if _agg is not None and prev_start is not None:
+            try:
+                _, _, prev_pct = _agg_coverage(
+                    _agg, c['id'], prev_start, prev_end,
+                    facility_codes=_fac_filter,
+                    districts=_dist_filter if not _fac_filter else None,
+                    grain=_kpi_grain,
+                )
+                c['delta_pct'] = round(c['pct'] - prev_pct, 1)
+            except Exception:
+                c['delta_pct'] = None
+        elif prev_start is not None:
+            try:
+                prev_df = network_df[
+                    (network_df['Date'] >= prev_start) & (network_df['Date'] <= prev_end)
+                ] if 'Date' in network_df.columns and not network_df.empty else pd.DataFrame()
+                if not prev_df.empty and selected_facilities and 'Facility' in prev_df.columns:
+                    prev_df = prev_df[prev_df['Facility'].isin(selected_facilities)]
+                elif not prev_df.empty and selected_districts and 'District' in prev_df.columns:
+                    prev_df = prev_df[prev_df['District'].isin(selected_districts)]
+                _, _, prev_pct = _cov(prev_df, c['numerator_filters'], c['denominator_filters'])
+                c['delta_pct'] = round(c['pct'] - prev_pct, 1)
+            except Exception:
+                c['delta_pct'] = None
+        else:
+            c['delta_pct'] = None
+
+    below = [(c['label'], c['pct']) for c in computed if not _on_target(c['pct'], c['target'], c)]
+    strong = [c['label'] for c in computed if _on_target(c['pct'], c['target'], c)]
+
+    by_cat = {}
+    for ind in all_inds:
+        by_cat.setdefault(ind.get('category', 'Other'), []).append(ind)
+
+    coverage_charts = _coverage_charts_section(
+        by_cat, facility_df, category_order,
+        agg_df=_agg,
+        start_date=str(_s.date()) if _s is not None else start_date,
+        end_date=str(_e.date()) if _e is not None else end_date,
+        facility_codes=list(_fac_filter) if _fac_filter else None,
+        districts=list(_dist_filter) if _dist_filter and not _fac_filter else None,
+        grain=_kpi_grain,
+    )
+
+    # Analysis charts: cached by data identity + date range to avoid recomputing on repeated calls
+    _ac_key = (id(network_df), str(start_date), str(end_date))
+    if _ac_key in _analysis_charts_cache:
+        anc_charts, labour_charts, pnc_charts, nb_charts = _analysis_charts_cache[_ac_key]
+    else:
+        anc_charts    = _anc_charts(facility_df)
+        labour_charts = _labour_charts(facility_df)
+        pnc_charts    = _pnc_charts(facility_df)
+        nb_charts     = _newborn_charts(facility_df)
+        _analysis_charts_cache.clear()
+        _analysis_charts_cache[_ac_key] = (anc_charts, labour_charts, pnc_charts, nb_charts)
+
+    analysis_acc = [
+        _chart_acc_section('ch_anc',    'Antenatal Care',    anc_charts)    if anc_charts and 'ANC' in category_order else None,
+        _chart_acc_section('ch_labour', 'Labour & Delivery', labour_charts) if labour_charts and 'Labour' in category_order else None,
+        _chart_acc_section('ch_pnc',    'Postnatal Care',    pnc_charts)    if pnc_charts and 'PNC' in category_order else None,
+        _chart_acc_section('ch_nb',     'Neonatal Care',     nb_charts)     if nb_charts and 'Newborn' in category_order else None,
+    ]
+    analysis_acc = [a for a in analysis_acc if a]
+
+    # Heatmap store: keyed by data identity + facility + indicators so it's computed once and
+    # reused across date-range changes (date range doesn't affect the heatmap store layout).
+    _heatmap_cache_key = (id(network_df), facility_code, tuple(i['id'] for i in tracked))
+    if _heatmap_cache_key not in _heatmap_store_cache:
+        _heatmap_store_cache.clear()
+        _heatmap_store_cache[_heatmap_cache_key] = _compute_heatmap_store(network_df, tracked, facility_code)
+    performance_div, heatmap_div = _coverage_heatmap_section(
+        all_inds, facility_code, network_df,
+        precomputed_store=_heatmap_store_cache[_heatmap_cache_key],
+    )
+    comparative_div = _comparative_analysis_section(all_inds, facility_code, facility_df, payload_key=payload_key)
+
+    def _sec_header(title, count=None, desc=None, eyebrow=None):
+        return html.Div(className=f'mnid-section-header{" mnid-section-header-newborn" if dashboard_theme == "newborn" else ""}', children=[
+            html.Div([
+                html.Div(eyebrow, className='mnid-section-header-eyebrow') if eyebrow else None,
+                html.Span(title, className='mnid-section-header-title'),
+                html.Div(desc, className='mnid-section-header-desc') if desc else None,
+            ]),
+            html.Span(f'{count} indicators' if count else '', className='mnid-section-header-count'),
+        ])
+
+    total_analysis = sum(
+        len(charts) for cat, charts in [
+            ('ANC', anc_charts),
+            ('Labour', labour_charts),
+            ('PNC', pnc_charts),
+            ('Newborn', nb_charts),
+        ] if cat in category_order
+    )
+
+    indicator_content = html.Div(className=f'mnid-main{" mnid-main-newborn" if dashboard_theme == "newborn" else ""}', children=[
+        _topbar(facility_code, period, len(tracked), len(awaiting), facility_df=facility_df, network_df=network_df, period_note=period_note, title=dashboard_title, subtitle=dashboard_subtitle, theme=dashboard_theme),
+        _sidebar(facility_code, theme=dashboard_theme),
+        _alert_banner(below, strong),
+
+        _section_anchor('mnid-summary'),
+        _sec_header(
+            'Overview',
+            desc='Neonatal program snapshot, priority indicator posture, and facility context.' if dashboard_theme == 'newborn' else f'{len(tracked)} available - {len(awaiting)} awaiting',
+            eyebrow='Overview' if dashboard_theme == 'newborn' else None,
+        ),
+        _kpi_row(computed),
+        _hero_donut_row(computed, preferred_cat=default_cat, section_title=hero_title),
+        _priority_table(computed),
+
+        _section_anchor('mnid-trends'),
+        _sec_header(
+            'Run Charts',
+            desc='Monthly trends for neonatal admissions and outcome-related indicators, with target references where applicable.' if dashboard_theme == 'newborn' else '12-month rolling - dotted line = target',
+            eyebrow='Trends' if dashboard_theme == 'newborn' else None,
+        ),
+        _trend_switcher(facility_df, all_inds, scope_meta=scope_meta, payload_key=payload_key),
+
+        _section_anchor('mnid-performance'),
+        _sec_header(
+            'District Performance' if dashboard_theme == 'newborn' else 'Facility Performance',
+            desc='How this newborn service compares across district and facility peers.' if dashboard_theme == 'newborn' else 'District comparison heatmap for key performance indicators',
+            eyebrow='Performance' if dashboard_theme == 'newborn' else None,
+        ),
+        performance_div,
+
+        _section_anchor('mnid-heatmap'),
+        _sec_header(
+            'Geographic Coverage' if dashboard_theme == 'newborn' else 'Map View',
+            desc='Geographic context for neonatal service delivery and district-level performance.' if dashboard_theme == 'newborn' else 'Geographic coverage map and district/facility context',
+            eyebrow='Map' if dashboard_theme == 'newborn' else None,
+        ),
+        heatmap_div,
+
+        _section_anchor('mnid-coverage'),
+        _sec_header(
+            'Coverage & Quality' if dashboard_theme == 'newborn' else 'Coverage Indicators',
+            sum(len(v) for v in by_cat.values()),
+            desc='Coverage against target across the neonatal care pathway, from stabilization to follow-up.' if dashboard_theme == 'newborn' else 'Coverage % vs target - target threshold shown per chart',
+            eyebrow='Indicators' if dashboard_theme == 'newborn' else None,
+        ),
+        coverage_charts,
+
+        _section_anchor('mnid-comparative'),
+        _sec_header(
+            'Facility Comparison' if dashboard_theme == 'newborn' else 'Facility & District Comparison',
+            desc='Facility and district comparison for neonatal indicators.' if dashboard_theme == 'newborn' else 'Cross-facility and district indicator benchmarking',
+            eyebrow='Comparison' if dashboard_theme == 'newborn' else None,
+        ),
+        comparative_div,
+
+        _section_anchor('mnid-analysis'),
+        _sec_header(
+            'Clinical Interventions' if dashboard_theme == 'newborn' else 'Clinical Analysis',
+            None if dashboard_theme == 'newborn' else total_analysis,
+            desc='Clinical intervention, thermal support, respiratory support, and complication views.' if dashboard_theme == 'newborn' else 'Care-phase deep-dives',
+            eyebrow='Clinical View' if dashboard_theme == 'newborn' else None,
+        ),
+        dmc.Accordion(
+            multiple=True,
+            value=[a.value for a in analysis_acc],
+            variant='separated', radius='md', mb='md',
+            children=analysis_acc,
+            styles={
+                'item': {'backgroundColor': BG, 'border': f'1px solid {BORDER}', 'borderRadius': '12px', 'marginBottom': '8px', 'boxShadow': '0 1px 3px rgba(0,0,0,0.04)'},
+                'control': {'padding': '12px 16px'},
+                'panel': {'padding': '0 16px 2px'},
+            },
+        ),
+    ])
+
+    indicator_content.children.extend([
+        _section_anchor('mnid-readiness'),
+        _sec_header(
+            'Operational Readiness',
+            desc='Devices, staffing, and data quality conditions that support neonatal care delivery.' if dashboard_theme == 'newborn' else 'Equipment - workforce competency - data quality',
+            eyebrow='Readiness' if dashboard_theme == 'newborn' else None,
+        ),
+        _system_readiness(facility_df, supply_inds, wf_inds, dq_inds),
+    ])
+
+    return {
+        'indicator_content': indicator_content,
+        'facility_df': facility_df,
+        'network_df': network_df,
+        'supply_inds': supply_inds,
+        'wf_inds': wf_inds,
+        'dq_inds': dq_inds,
+        'dashboard_theme': dashboard_theme,
+    }
 
 
 def clear_runtime_caches() -> None:
@@ -91,6 +512,12 @@ def clear_runtime_caches() -> None:
     _heatmap_store_cache.clear()
     _analysis_charts_cache.clear()
     _MNID_UI_CACHE.clear()
+    _MNID_EXECUTIVE_CONTENT_CACHE.clear()
+    if _MNID_UI_DISK_CACHE is not None:
+        try:
+            _MNID_UI_DISK_CACHE.clear()
+        except Exception:
+            pass
     from mnid.aggregation.store import invalidate_cache as _agg_invalidate
     _agg_invalidate()
 
@@ -1391,51 +1818,7 @@ def _service_table_switcher(df: pd.DataFrame, categories: list | None = None,
 
 
 clientside_callback(
-    """
-    function(_tick) {
-        const sections = [
-            '#mnid-summary',
-            '#mnid-trends',
-            '#mnid-performance',
-            '#mnid-heatmap',
-            '#mnid-coverage',
-            '#mnid-comparative',
-            '#mnid-analysis',
-            '#mnid-readiness'
-        ];
-
-        let active = '#mnid-summary';
-        const activationLine = 124;
-        let bestPassed = null;
-        let nextUpcoming = null;
-
-        for (const selector of sections) {
-            const el = document.querySelector(selector);
-            if (!el) {
-                continue;
-            }
-
-            const rect = el.getBoundingClientRect();
-            const top = rect.top;
-
-            if (top <= activationLine) {
-                if (bestPassed === null || top > bestPassed.top) {
-                    bestPassed = { selector, top };
-                }
-            } else if (nextUpcoming === null || top < nextUpcoming.top) {
-                nextUpcoming = { selector, top };
-            }
-        }
-
-        if (bestPassed !== null) {
-            active = bestPassed.selector;
-        } else if (nextUpcoming !== null) {
-            active = nextUpcoming.selector;
-        }
-
-        return active;
-    }
-    """,
+    _MNID_SCROLLSPY_CLIENTSIDE,
     Output('mnid-scrollspy-out', 'data'),
     Input('mnid-scrollspy-tick', 'n_intervals'),
 )
@@ -1708,8 +2091,8 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
                     x=xs,
                     y=moving_average,
                     mode='lines+markers',
-                    line=dict(color=color, width=2.4, shape='spline'),
-                    marker=dict(size=6, color=color, line=dict(color='#fff', width=1.0)),
+                    line=dict(color=color, width=2.8, shape='linear'),
+                    marker=dict(size=6, color=color, line=dict(color='#fff', width=1.4)),
                     customdata=[[raw] for raw in ys],
                     hovertemplate=f'<b>{series_name}</b><br>%{{x}}<br>Moving Avg: %{{y:.1f}}%<br>Raw: %{{customdata[0]:.1f}}%<extra></extra>',
                     connectgaps=False,
@@ -1739,27 +2122,41 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
                 ))
 
     fig.update_layout(
-        height=420,
+        height=360,
         barmode='group' if chart_type == 'bar' else None,
         bargap=0.20,
         bargroupgap=0.06,
-        margin=dict(l=10, r=10, t=30, b=10),
-        paper_bgcolor='#ffffff',
-        plot_bgcolor='#ffffff',
-        font=dict(color=TEXT, family=FONT),
-        xaxis=dict(showgrid=False, tickfont=dict(size=11, color=TEXT), linecolor=BORDER, title=dict(text='Time', font=dict(size=11, color='#94A3B8'))),
+        margin=dict(l=8, r=8, t=12, b=24),
+        paper_bgcolor=BG,
+        plot_bgcolor=BG,
+        font=dict(family=FONT, color=TEXT, size=11),
+        hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
+        xaxis=dict(
+            showgrid=False,
+            zeroline=False,
+            showline=False,
+            tickfont=dict(size=10, color=MUTED),
+            title=dict(text='Date', font=dict(size=10, color=MUTED)),
+        ),
         yaxis=dict(
-            title=dict(text='Coverage %', font=dict(size=11, color='#94A3B8')),
+            title=dict(text='Coverage %', font=dict(size=10, color=MUTED)),
             range=[0, 115],
-            showgrid=True, gridcolor=GRID_C,
-            tickfont=dict(size=10, color=DIM),
+            showgrid=True,
+            gridcolor=GRID_C,
+            zeroline=False,
+            showline=False,
+            tickfont=dict(size=10, color=MUTED),
         ),
         legend=dict(
-            orientation='v', x=1.01, y=1,
-            xanchor='left', yanchor='top',
+            orientation='h',
+            x=0,
+            y=1.05,
+            xanchor='left',
+            yanchor='bottom',
             font=dict(size=10, color=DIM),
-            bgcolor='rgba(0,0,0,0)', bordercolor='rgba(0,0,0,0)',
+            bgcolor='rgba(0,0,0,0)',
         ),
+        hovermode='closest' if chart_type == 'bar' else 'x unified',
     )
     toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
     toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
@@ -1941,354 +2338,92 @@ def render_mnid_dashboard(data_opd, config,
         _network_df_cache[_opd_key] = _prepare_mnid_dataframe(data_opd)
     network_df = _network_df_cache[_opd_key]
 
-    # Derive facility_df by filtering the already-prepared network_df instead of re-running
-    # the expensive _prepare_mnid_dataframe on every date change.
-    facility_df = network_df
-    if start_date and 'Date' in network_df.columns and not network_df.empty:
-        try:
-            s = pd.to_datetime(start_date).normalize()
-            # Extend end to end-of-day so records at 16:56 etc. on the last date are included
-            e = (pd.to_datetime(end_date).normalize() + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
-                 if end_date else network_df['Date'].max())
-            date_mask = (network_df['Date'] >= s) & (network_df['Date'] <= e)
-            facility_df = network_df[date_mask]
-        except Exception:
-            facility_df = network_df
-    selected_facilities = list(selected_facilities)
-    selected_districts = list(selected_districts)
-    if selected_facilities and 'Facility' in facility_df.columns:
-        facility_df = facility_df[facility_df['Facility'].isin(selected_facilities)]
-    elif selected_districts and 'District' in facility_df.columns:
-        facility_df = facility_df[facility_df['District'].isin(selected_districts)]
-
-    selected_program = (scope_meta or {}).get('mnid_categories')
-    selected_program = selected_program[0] if selected_program else 'All'
-    facility_df.attrs['mnid_program'] = selected_program
-    network_df.attrs['mnid_program'] = selected_program
-    if network_df.empty:
-        network_df = facility_df
-
-    vt          = config.get('visualization_types', {})
-    all_inds    = config.get('priority_indicators') or vt.get('priority_indicators', [])
-    supply_inds = config.get('supply_indicators') or vt.get('supply_indicators', [])
-    wf_inds     = config.get('workforce_indicators') or vt.get('workforce_indicators', [])
-    dq_inds     = config.get('data_quality_indicators') or vt.get('data_quality_indicators', [])
-    period      = f'{start_date} to {end_date}'
-    period_note = (scope_meta or {}).get('data_period_note')
-
-    requested_categories = (scope_meta or {}).get('mnid_categories')
-    config_categories = config.get('mnid_categories')
-    if config_categories:
-        effective_categories = [c for c in (requested_categories or []) if c in config_categories] or config_categories
-    else:
-        effective_categories = requested_categories
-    all_inds = _resolve_runtime_mnid_indicators(
-        all_inds,
-        facility_df,
-        effective_categories,
+    primary_bundle = _build_mnid_indicator_content(
+        network_df=network_df,
+        config=config,
+        facility_code=facility_code,
+        start_date=start_date,
+        end_date=end_date,
+        scope_meta=scope_meta,
     )
-    _validate_indicator_configs(all_inds)
-    category_order = _resolve_category_order(all_inds, effective_categories)
-    if category_order:
-        allowed = set(category_order)
-        all_inds = [i for i in all_inds if i.get('category') in allowed]
+    facility_df    = primary_bundle['facility_df']
+    dashboard_theme = primary_bundle['dashboard_theme']
 
-    _payload_key = f'{hash(_opd_key)}_{start_date}_{end_date}'
+    maternal_content = primary_bundle['indicator_content']
+    newborn_content  = None
+    country_label    = 'Maternal'
 
-    tracked  = [i for i in all_inds if i.get('status') == 'tracked']
-    awaiting = [i for i in all_inds if i.get('status') == 'awaiting_baseline']
-    default_cat = category_order[0] if category_order else 'ANC'
-
-    if category_order == ['Newborn']:
-        dashboard_title = 'Neonatal Care Dashboard'
-        dashboard_subtitle = 'Program monitoring for admissions, outcomes, clinical interventions, coverage, and readiness.'
-        dashboard_theme = 'newborn'
-    elif set(category_order) == {'ANC', 'Labour', 'PNC'}:
-        dashboard_title = 'Maternal Health Indicators'
-        dashboard_subtitle = 'ANC, labour, and postnatal performance, comparison, coverage, and readiness.'
-        dashboard_theme = 'default'
-    else:
-        dashboard_title = f"{config.get('report_name', 'Maternal and Child Health')} Indicators"
-        dashboard_subtitle = 'Clean view of performance, comparison, coverage, and readiness.'
-        dashboard_theme = 'default'
-
-    if dashboard_theme == 'newborn' and not (supply_inds or wf_inds or dq_inds):
-        zero_filters = {
-            'unique': 'person_id',
-            'variable1': 'concept_name',
-            'value1': '__mnid_unavailable__',
-        }
-        _unavail = {'unique': 'person_id', 'variable1': 'concept_name', 'value1': '__mnid_unavailable__'}
-        wf_inds = [
-            {
-                'label': 'SSNC competency assessed',
-                'target_pct': 80,
-                'numerator_filters': dict(_unavail),
-                'denominator_filters': dict(_unavail),
-            },
-        ]
-        supply_inds = [
-            {
-                'label': 'CPAP equipment available',
-                'target_pct': 80,
-                'numerator_filters': dict(_unavail),
-                'denominator_filters': dict(_unavail),
-            },
-            {
-                'label': 'Phototherapy unit available',
-                'target_pct': 80,
-                'numerator_filters': dict(_unavail),
-                'denominator_filters': dict(_unavail),
-            },
-            {
-                'label': 'Neonatal resuscitation equipment available',
-                'target_pct': 80,
-                'numerator_filters': dict(_unavail),
-                'denominator_filters': dict(_unavail),
-            },
-        ]
-        dq_inds = [
-            {
-                'label': 'Record completeness',
-                'target_pct': 95,
-                'numerator_filters': dict(_unavail),
-                'denominator_filters': dict(_unavail),
-            },
-            {
-                'label': 'Data entered within 7 days',
-                'target_pct': 90,
-                'numerator_filters': dict(_unavail),
-                'denominator_filters': dict(_unavail),
-            },
-        ]
-    hero_title = 'KEY NEONATAL INDICATORS' if dashboard_theme == 'newborn' else f'KEY {_CAT_LABELS.get(default_cat, str(default_cat or "Program")).upper()} INDICATORS'
-
-    # Derive period bounds once — used for both aggregate queries and prev-period delta
-    try:
-        _s = pd.to_datetime(start_date).normalize() if start_date else None
-        _e = (
-            (pd.to_datetime(end_date).normalize() + pd.Timedelta(days=1) - pd.Timedelta(seconds=1))
-            if end_date else (
-                network_df['Date'].max() if 'Date' in network_df.columns and not network_df.empty
-                else pd.Timestamp.now()
+    if config.get('report_name') == 'Maternal Health':
+        newborn_config = _load_mnid_report_config('Newborn')
+        if newborn_config:
+            newborn_scope_meta = dict(scope_meta or {})
+            newborn_scope_meta['mnid_categories'] = newborn_config.get('mnid_categories') or ['Newborn']
+            newborn_bundle = _build_mnid_indicator_content(
+                network_df=network_df,
+                config=newborn_config,
+                facility_code=facility_code,
+                start_date=start_date,
+                end_date=end_date,
+                scope_meta=newborn_scope_meta,
             )
-        )
-    except Exception:
-        _s = _e = None
+            newborn_content = newborn_bundle['indicator_content']
+            country_label   = 'Maternal & Newborn'
 
-    _agg = _get_aggregate()
-    _fac_filter = selected_facilities or None
-    _dist_filter = selected_districts or None
-
-    # Always use daily grain for scalar KPI queries so the number responds to the
-    # exact date range selected (monthly grain maps any sub-month range to the same
-    # full-month record, making data appear static when the user changes dates).
-    _kpi_grain = 'daily'
-
-    computed = []
-    for ind in tracked:
-        if _agg is not None and _s is not None:
-            num, den, pct = _agg_coverage(
-                _agg, ind['id'], _s, _e,
-                facility_codes=_fac_filter,
-                districts=_dist_filter if not _fac_filter else None,
-                grain=_kpi_grain,
-            )
-        else:
-            num, den, pct = _cov(facility_df, ind['numerator_filters'], ind['denominator_filters'])
-        computed.append({
-            **ind,
-            'pct': pct,
-            'numerator': num,
-            'denominator': den,
-            'attained_pct': _target_attainment_pct(pct, ind.get('target', 0), ind),
-        })
-
-    # Compute previous-period delta — same window duration shifted back
-    try:
-        window = max((_e - _s).days, 1) if _s and _e else 1
-        prev_end = _s - pd.Timedelta(days=1)
-        prev_start = prev_end - pd.Timedelta(days=window - 1)
-    except Exception:
-        prev_start = prev_end = None
-
-    for c in computed:
-        if _agg is not None and prev_start is not None:
-            try:
-                _, _, prev_pct = _agg_coverage(
-                    _agg, c['id'], prev_start, prev_end,
-                    facility_codes=_fac_filter,
-                    districts=_dist_filter if not _fac_filter else None,
-                    grain=_kpi_grain,
-                )
-                c['delta_pct'] = round(c['pct'] - prev_pct, 1)
-            except Exception:
-                c['delta_pct'] = None
-        elif prev_start is not None:
-            try:
-                prev_df = network_df[
-                    (network_df['Date'] >= prev_start) & (network_df['Date'] <= prev_end)
-                ] if 'Date' in network_df.columns and not network_df.empty else pd.DataFrame()
-                if not prev_df.empty and selected_facilities and 'Facility' in prev_df.columns:
-                    prev_df = prev_df[prev_df['Facility'].isin(selected_facilities)]
-                elif not prev_df.empty and selected_districts and 'District' in prev_df.columns:
-                    prev_df = prev_df[prev_df['District'].isin(selected_districts)]
-                _, _, prev_pct = _cov(prev_df, c['numerator_filters'], c['denominator_filters'])
-                c['delta_pct'] = round(c['pct'] - prev_pct, 1)
-            except Exception:
-                c['delta_pct'] = None
-        else:
-            c['delta_pct'] = None
-
-    below  = [(c['label'], c['pct']) for c in computed if not _on_target(c['pct'], c['target'], c)]
-    strong = [c['label'] for c in computed if _on_target(c['pct'], c['target'], c)]
-
-    by_cat = {}
-    for ind in all_inds:
-        by_cat.setdefault(ind.get('category','Other'), []).append(ind)
-
-    _cov_grain = _kpi_grain  # reuse the same grain chosen for KPIs
-    coverage_charts = _coverage_charts_section(
-        by_cat, facility_df, category_order,
-        agg_df=_agg, start_date=str(_s.date()) if _s is not None else start_date,
-        end_date=str(_e.date()) if _e is not None else end_date,
-        facility_codes=list(_fac_filter) if _fac_filter else None,
-        districts=list(_dist_filter) if _dist_filter and not _fac_filter else None,
-        grain=_cov_grain,
-    )
-
-    # Pre-build analysis charts — cached by date range so maternal+newborn on same
-    # page share the result, and repeat selections of the same range are instant.
-    _ac_key = (_opd_key, start_date, end_date)
-    if _ac_key in _analysis_charts_cache:
-        anc_charts, labour_charts, pnc_charts, nb_charts = _analysis_charts_cache[_ac_key]
-    else:
-        anc_charts    = _anc_charts(facility_df)
-        labour_charts = _labour_charts(facility_df)
-        pnc_charts    = _pnc_charts(facility_df)
-        nb_charts     = _newborn_charts(facility_df)
-        _analysis_charts_cache.clear()
-        _analysis_charts_cache[_ac_key] = (anc_charts, labour_charts, pnc_charts, nb_charts)
-
-    # All accordion sections open by default
-    analysis_acc = [
-        _chart_acc_section('ch_anc',    'Antenatal Care',    anc_charts)    if anc_charts and 'ANC' in category_order else None,
-        _chart_acc_section('ch_labour', 'Labour & Delivery', labour_charts) if labour_charts and 'Labour' in category_order else None,
-        _chart_acc_section('ch_pnc',    'Postnatal Care',    pnc_charts)    if pnc_charts and 'PNC' in category_order else None,
-        _chart_acc_section('ch_nb',     'Neonatal Care',     nb_charts)     if nb_charts and 'Newborn' in category_order else None,
-    ]
-    analysis_acc = [a for a in analysis_acc if a]
-
-    # Heatmap store is keyed by data version + facility + indicators (not by date range)
-    # so it's computed once per session and reused across all date-range changes.
-    _heatmap_cache_key = (_opd_key, facility_code, tuple(i['id'] for i in tracked))
-    if _heatmap_cache_key not in _heatmap_store_cache:
-        from mnid.heatmap import _compute_heatmap_store as _cms
-        _heatmap_store_cache.clear()
-        _heatmap_store_cache[_heatmap_cache_key] = _cms(network_df, tracked, facility_code)
-    _precomputed_heatmap_store = _heatmap_store_cache[_heatmap_cache_key]
-    performance_div, heatmap_div = _coverage_heatmap_section(
-        all_inds, facility_code, network_df,
-        precomputed_store=_precomputed_heatmap_store,
-    )
-    comparative_div  = _comparative_analysis_section(all_inds, facility_code, facility_df, payload_key=_payload_key)
-
-    def _sec_header(title, count=None, desc=None, eyebrow=None):
-        return html.Div(className=f'mnid-section-header{" mnid-section-header-newborn" if dashboard_theme == "newborn" else ""}', children=[
-            html.Div([
-                html.Div(eyebrow, className='mnid-section-header-eyebrow') if eyebrow else None,
-                html.Span(title, className='mnid-section-header-title'),
-                html.Div(desc, className='mnid-section-header-desc') if desc else None,
-            ]),
-            html.Span(f'{count} indicators' if count else '',
-                      className='mnid-section-header-count'),
-        ])
-
-    total_analysis = sum(
-        len(charts) for cat, charts in [
-            ('ANC', anc_charts),
-            ('Labour', labour_charts),
-            ('PNC', pnc_charts),
-            ('Newborn', nb_charts),
-        ] if cat in category_order
-    )
-
-    main_content = html.Div(className=f'mnid-main{" mnid-main-newborn" if dashboard_theme == "newborn" else ""}', children=[
-
-        _topbar(facility_code, period, len(tracked), len(awaiting), facility_df=facility_df, network_df=network_df, period_note=period_note, title=dashboard_title, subtitle=dashboard_subtitle, theme=dashboard_theme),
-        _sidebar(facility_code, theme=dashboard_theme),
-        _alert_banner(below, strong),
-
-        _section_anchor('mnid-summary'),
-        _sec_header('Overview',
-                    desc='Neonatal program snapshot, priority indicator posture, and facility context.' if dashboard_theme == 'newborn' else f'{len(tracked)} available - {len(awaiting)} awaiting',
-                    eyebrow='Overview' if dashboard_theme == 'newborn' else None),
-        _kpi_row(computed),
-        _hero_donut_row(computed, preferred_cat=default_cat, section_title=hero_title),
-        _priority_table(computed),
-
-        _section_anchor('mnid-trends'),
-        _sec_header('Run Charts',
-                    desc='Monthly trends for neonatal admissions and outcome-related indicators, with target references where applicable.' if dashboard_theme == 'newborn' else '12-month rolling - dotted line = target',
-                    eyebrow='Trends' if dashboard_theme == 'newborn' else None),
-        _trend_switcher(facility_df, all_inds, scope_meta=scope_meta, payload_key=_payload_key),
-
-        _section_anchor('mnid-performance'),
-        _sec_header('District Performance' if dashboard_theme == 'newborn' else 'Facility Performance',
-                    desc='How this newborn service compares across district and facility peers.' if dashboard_theme == 'newborn' else 'District comparison heatmap for key performance indicators',
-                    eyebrow='Performance' if dashboard_theme == 'newborn' else None),
-        performance_div,
-
-        _section_anchor('mnid-heatmap'),
-        _sec_header('Geographic Coverage' if dashboard_theme == 'newborn' else 'Map View',
-                    desc='Geographic context for neonatal service delivery and district-level performance.' if dashboard_theme == 'newborn' else 'Geographic coverage map and district/facility context',
-                    eyebrow='Map' if dashboard_theme == 'newborn' else None),
-        heatmap_div,
-
-        _section_anchor('mnid-coverage'),
-        _sec_header('Coverage & Quality' if dashboard_theme == 'newborn' else 'Coverage Indicators', sum(len(v) for v in by_cat.values()),
-                    desc='Coverage against target across the neonatal care pathway, from stabilization to follow-up.' if dashboard_theme == 'newborn' else 'Coverage % vs target - target threshold shown per chart',
-                    eyebrow='Indicators' if dashboard_theme == 'newborn' else None),
-        coverage_charts,
-
-        _section_anchor('mnid-comparative'),
-        _sec_header('Facility Comparison' if dashboard_theme == 'newborn' else 'Facility & District Comparison',
-                    desc='Facility and district comparison for neonatal indicators.' if dashboard_theme == 'newborn' else 'Cross-facility and district indicator benchmarking',
-                    eyebrow='Comparison' if dashboard_theme == 'newborn' else None),
-        comparative_div,
-
-        _section_anchor('mnid-analysis'),
-        _sec_header('Clinical Interventions' if dashboard_theme == 'newborn' else 'Clinical Analysis',
-                    None if dashboard_theme == 'newborn' else total_analysis,
-                    desc='Clinical intervention, thermal support, respiratory support, and complication views.' if dashboard_theme == 'newborn' else 'Care-phase deep-dives',
-                    eyebrow='Clinical View' if dashboard_theme == 'newborn' else None),
-        dmc.Accordion(
-            multiple=True,
-            value=[a.value for a in analysis_acc],
-            variant='separated', radius='md', mb='md',
-            children=analysis_acc,
-            styles={
-                'item': {'backgroundColor': BG, 'border': f'1px solid {BORDER}',
-                         'borderRadius': '12px', 'marginBottom': '8px',
-                         'boxShadow': '0 1px 3px rgba(0,0,0,0.04)'},
-                'control': {'padding': '12px 16px'},
-                'panel': {'padding': '0 16px 2px'},
-            },
+    executive_content = {
+        'country-profile':        render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label),
+        'operational-readiness':  render_operational_readiness(
+            facility_df,
+            supply_inds=primary_bundle['supply_inds'],
+            wf_inds=primary_bundle['wf_inds'],
+            dq_inds=primary_bundle['dq_inds'],
         ),
+        'maternal-dashboard': maternal_content,
+    }
+    if newborn_content is not None:
+        executive_content['newborn-dashboard'] = newborn_content
 
-    ])
+    executive_token = f'{hash((_opd_key, start_date, end_date, config.get("report_name"), tuple(sorted(executive_content.keys()))))}'
+    _MNID_EXECUTIVE_CONTENT_CACHE.clear()
+    _MNID_EXECUTIVE_CONTENT_CACHE[executive_token] = executive_content
 
-    main_content.children.extend([
-        _section_anchor('mnid-readiness'),
-        _sec_header('Operational Readiness',
-                    desc='Devices, staffing, and data quality conditions that support neonatal care delivery.' if dashboard_theme == 'newborn' else 'Equipment - workforce competency - data quality',
-                    eyebrow='Readiness' if dashboard_theme == 'newborn' else None),
-        _system_readiness(facility_df, supply_inds, wf_inds, dq_inds),
-    ])
+    _tab_style  = {'padding': '10px 18px', 'borderRadius': '12px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#FFFFFF', 'color': TEXT}
+    _tab_active = {'padding': '10px 18px', 'borderRadius': '12px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#F0FDF4', 'color': '#15803D', 'fontWeight': 700}
+    _tab_active2 = dict(_tab_active, backgroundColor='#F8FAFC')
+
+    tab_children = [
+        dcc.Tab(label='Country Profile',        value='country-profile',       style=_tab_style, selected_style=_tab_active),
+        dcc.Tab(label='Operational Readiness',  value='operational-readiness', style=_tab_style, selected_style=_tab_active2),
+        dcc.Tab(label='Maternal',               value='maternal-dashboard',    style=_tab_style, selected_style=_tab_active2),
+    ]
+    if newborn_content is not None:
+        tab_children.append(dcc.Tab(label='Newborn', value='newborn-dashboard', style=_tab_style, selected_style=_tab_active2))
+
+    executive_tabs = dcc.Tabs(
+        id='mnid-executive-tabs',
+        value='country-profile',
+        style={'marginBottom': '18px'},
+        children=tab_children,
+    )
 
     return html.Div(className=f'mnid-bg{" mnid-theme-newborn" if dashboard_theme == "newborn" else ""}', children=[
-        # Hidden components used by the MNID scroll spy callback
         dcc.Interval(id='mnid-scrollspy-tick', interval=250, max_intervals=-1),
         dcc.Store(id='mnid-scrollspy-out'),
-        html.Div(className=f'mnid-shell{" mnid-shell-newborn" if dashboard_theme == "newborn" else ""}', children=[main_content]),
+        dcc.Store(id='mnid-executive-view-store', data=executive_token),
+        html.Div(className=f'mnid-shell{" mnid-shell-newborn" if dashboard_theme == "newborn" else ""}', children=[
+            executive_tabs,
+            html.Div(id='mnid-executive-content', children=[executive_content['country-profile']]),
+        ]),
     ])
+
+
+
+@callback(
+    Output('mnid-executive-content', 'children'),
+    Input('mnid-executive-tabs', 'value'),
+    State('mnid-executive-view-store', 'data'),
+    prevent_initial_call=False,
+)
+def _render_mnid_executive_tab(active_tab, executive_token):
+    views = _MNID_EXECUTIVE_CONTENT_CACHE.get(executive_token) or {}
+    selected = active_tab or 'country-profile'
+    return views.get(selected, views.get('country-profile', html.Div()))
