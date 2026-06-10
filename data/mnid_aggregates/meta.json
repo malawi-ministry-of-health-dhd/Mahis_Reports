@@ -1,12 +1,14 @@
 {
-  "generated_at": "2026-06-10T09:19:10.952326",
-  "elapsed_sec": 450.5,
-  "rows": 44330,
-  "indicators": 31,
+  "generated_at": "2026-06-10T13:35:07.080188",
+  "elapsed_sec": 619.6,
+  "rows": 60060,
+  "indicators": 42,
   "grains": [
     "monthly",
     "weekly",
     "daily"
   ],
-  "data_source": "demo_parquet"
+  "data_source": "demo_parquet",
+  "use_demo_data": true,
+  "last_run_status": "ok"
 }
