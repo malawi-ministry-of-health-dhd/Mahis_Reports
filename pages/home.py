@@ -211,6 +211,12 @@ def normalize_report_name(name, menu_json):
             return "Maternal Health"
     return name
 
+
+def display_report_name(name):
+    if name == "Maternal Health":
+        return "MNH Program"
+    return name
+
 # Load data once to get date range
 min_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 max_date = datetime.now().replace(hour=23, minute=59, second=59, microsecond=0)
@@ -556,7 +562,7 @@ def update_menu(interval, color):
 
     return [
         html.Button(
-            d["report_name"],
+            display_report_name(d["report_name"]),
             className="menu-btn active" if color == d["report_name"] else "menu-btn",
             id={"type": "menu-button", "name": d["report_name"]}
         )
@@ -980,14 +986,14 @@ def update_dashboard(gen, interval, start_date, end_date, level,
                     url_object=url_object
                 )
                 rendered.append(html.Div([
-                    html.H2(report_name, style={"marginTop": "10px"}),
+                    html.H2(display_report_name(report_name), style={"marginTop": "10px"}),
                     section
                 ]))
             except Exception as report_exc:
                 import traceback
                 traceback.print_exc()
                 rendered.append(html.Div([
-                    html.H2(report_name, style={"marginTop": "10px"}),
+                    html.H2(display_report_name(report_name), style={"marginTop": "10px"}),
                     html.Div([
                         html.P("Report section failed.", style={"color": "#475569", "fontWeight": "600"}),
                         html.P(f"{type(report_exc).__name__}", style={"color": "#64748b", "fontSize": "12px", "fontWeight": "600"}),
