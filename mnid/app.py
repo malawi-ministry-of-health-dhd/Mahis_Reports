@@ -76,6 +76,7 @@ from mnid.layout import (
     _pph_cascade, _topbar, _sidebar, _alert_banner,
     _avg_ring, _count_bar, _kpi, _kpi_row, _section_anchor,
 )
+from mnid.executive_views import render_country_profile, render_operational_readiness
 
 _MNID_UI_CACHE_MAX = 16
 _MNID_UI_CACHE_TTL_SECONDS = 3600
@@ -2019,7 +2020,7 @@ def render_mnid_dashboard(data_opd, config,
         ] if cat in category_order
     )
 
-    main_content = html.Div(className=f'mnid-main{" mnid-main-newborn" if dashboard_theme == "newborn" else ""}', children=[
+    indicator_content = html.Div(className=f'mnid-main{" mnid-main-newborn" if dashboard_theme == "newborn" else ""}', children=[
 
         _topbar(facility_code, period, len(tracked), len(awaiting), facility_df=facility_df, network_df=network_df, period_note=period_note, title=dashboard_title, subtitle=dashboard_subtitle, theme=dashboard_theme),
         _sidebar(facility_code, theme=dashboard_theme),
@@ -2078,7 +2079,7 @@ def render_mnid_dashboard(data_opd, config,
 
     ])
 
-    main_content.children.extend([
+    indicator_content.children.extend([
         _section_anchor('mnid-readiness'),
         _sec_header('Operational Readiness',
                     desc='Devices, staffing, and data quality conditions that support neonatal care delivery.' if dashboard_theme == 'newborn' else 'Equipment - workforce competency - data quality',
@@ -2090,5 +2091,5 @@ def render_mnid_dashboard(data_opd, config,
         # Hidden components used by the MNID scroll spy callback
         dcc.Interval(id='mnid-scrollspy-tick', interval=250, max_intervals=-1),
         dcc.Store(id='mnid-scrollspy-out'),
-        html.Div(className=f'mnid-shell{" mnid-shell-newborn" if dashboard_theme == "newborn" else ""}', children=[main_content]),
+        html.Div(className=f'mnid-shell{" mnid-shell-newborn" if dashboard_theme == "newborn" else ""}', children=[indicator_content]),
     ])
