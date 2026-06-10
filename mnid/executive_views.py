@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from dash import dcc, html
 
-from mnid.chart_helpers import _moving_average_values
+from mnid.chart_helpers import _cov, _moving_average_values
 from mnid.constants import BG, BORDER, DIM, FONT, GRID_C, MUTED, OK_C, TEXT, WARN_C
 
 PRIMARY_GREEN = "#15803D"
@@ -637,5 +637,359 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
             ),
             dmc.Text("Mortality Explorer · Interactive", size="sm", fw=700, tt="uppercase", style={"letterSpacing": "0.08em", "marginBottom": "10px"}),
             dmc.Paper(withBorder=True, radius="md", p="md", children=[explorer_tabs]),
+        ],
+    )
+
+
+def _readiness_bar(value: float, color: str) -> html.Div:
+    return html.Div(
+        style={"height": "8px", "background": GRID_C, "borderRadius": "999px", "overflow": "hidden"},
+        children=[html.Div(style={"width": f"{max(min(value, 100), 0)}%", "height": "100%", "background": color, "borderRadius": "999px"})],
+    )
+
+
+def _readiness_status(value: float) -> tuple[str, str]:
+    if value >= 75:
+        return "Ready", SUCCESS_GREEN
+    if value >= 55:
+        return "Watch", WARNING_AMBER
+    return "Support", MORTALITY_ROSE
+
+
+def _readiness_indicator_rows(df: pd.DataFrame, indicators: list[dict]) -> list[dict]:
+    rows = []
+    for ind in indicators or []:
+        num, den, pct = _cov(df, ind.get("numerator_filters", {}), ind.get("denominator_filters", {}))
+        rows.append({
+            "label": ind.get("label", "Indicator"),
+            "num": num,
+            "den": den,
+            "pct": pct,
+            "target": ind.get("target_pct") or ind.get("target") or 0,
+        })
+    return rows
+
+
+def _mean_pct(rows: list[dict]) -> float:
+    valid = [row["pct"] for row in rows if row.get("den", 0) > 0]
+    if not valid:
+        return 0.0
+    return round(sum(valid) / len(valid), 1)
+
+
+def _score_series_by_month(df: pd.DataFrame, indicators: list[dict], months: int = 6) -> list[dict]:
+    if df.empty or "Date" not in df.columns or not indicators:
+        return []
+    periods = pd.to_datetime(df["Date"], errors="coerce").dt.to_period("M")
+    recent = sorted(periods.dropna().unique())[-months:]
+    rows = []
+    for period in recent:
+        period_df = df.loc[periods == period]
+        indicator_rows = _readiness_indicator_rows(period_df, indicators)
+        rows.append({
+            "month": pd.Period(period, "M").strftime("%b %y"),
+            "meeting": _mean_pct(indicator_rows),
+            "support": round(max(100 - _mean_pct(indicator_rows), 0), 1),
+        })
+    return rows
+
+
+def _entity_readiness_scores(df: pd.DataFrame, group_col: str, indicators: list[dict]) -> pd.DataFrame:
+    if df.empty or group_col not in df.columns or not indicators:
+        return pd.DataFrame(columns=[group_col, "national_score"])
+    rows = []
+    for entity, entity_df in df.groupby(group_col):
+        score = _mean_pct(_readiness_indicator_rows(entity_df, indicators))
+        rows.append({group_col: entity, "national_score": score})
+    out = pd.DataFrame(rows)
+    if out.empty:
+        return out
+    return out.sort_values("national_score", ascending=False).reset_index(drop=True)
+
+
+def _facility_readiness_scores(df: pd.DataFrame, indicators: list[dict]) -> pd.DataFrame:
+    if df.empty or "Facility_CODE" not in df.columns or "Facility" not in df.columns or not indicators:
+        return pd.DataFrame(columns=["Facility_CODE", "Facility", "District", "national_score"])
+    rows = []
+    group_cols = ["Facility_CODE", "Facility"] + (["District"] if "District" in df.columns else [])
+    for keys, facility_df in df.groupby(group_cols):
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        score = _mean_pct(_readiness_indicator_rows(facility_df, indicators))
+        row = {
+            "Facility_CODE": keys[0],
+            "Facility": keys[1] if len(keys) > 1 else keys[0],
+            "national_score": score,
+        }
+        if "District" in df.columns:
+            row["District"] = keys[2] if len(keys) > 2 else ""
+        rows.append(row)
+    out = pd.DataFrame(rows)
+    if out.empty:
+        return out
+    return out.sort_values("national_score", ascending=False).reset_index(drop=True)
+
+
+def render_operational_readiness(
+    df: pd.DataFrame,
+    supply_inds: list[dict] | None = None,
+    wf_inds: list[dict] | None = None,
+    dq_inds: list[dict] | None = None,
+) -> html.Div:
+    readiness_inds = list(wf_inds or []) + list(supply_inds or []) + list(dq_inds or [])
+    workforce_rows = _readiness_indicator_rows(df, list(wf_inds or []))
+    supply_rows = _readiness_indicator_rows(df, list(supply_inds or []))
+    dq_rows = _readiness_indicator_rows(df, list(dq_inds or []))
+    all_rows = _readiness_indicator_rows(df, readiness_inds)
+
+    facility_df = _facility_readiness_scores(df, readiness_inds)
+    district_df = _entity_readiness_scores(df, "District", readiness_inds)
+    trend_rows = _score_series_by_month(df, readiness_inds)
+
+    national_score = _mean_pct(all_rows)
+    facilities_assessed = int(df["Facility_CODE"].dropna().astype(str).nunique()) if "Facility_CODE" in df.columns else 0
+    facilities_ready = int((facility_df["national_score"] >= 75).sum()) if not facility_df.empty else 0
+    need_support = max(facilities_assessed - facilities_ready, 0)
+
+    workforce_chart = go.Figure()
+    if not district_df.empty and workforce_rows:
+        workforce_chart.add_trace(go.Bar(
+            x=district_df["national_score"].round(1),
+            y=district_df["District"],
+            orientation="h",
+            marker=dict(color=PRIMARY_GREEN),
+        ))
+        workforce_chart.update_layout(
+            paper_bgcolor=BG,
+            plot_bgcolor=BG,
+            height=250,
+            margin=dict(l=8, r=8, t=12, b=8),
+            font=dict(family=FONT, color=TEXT, size=11),
+            xaxis=dict(showgrid=True, gridcolor=GRID_C, zeroline=False, showline=False, ticksuffix="%"),
+            yaxis=dict(showgrid=False, zeroline=False, showline=False, autorange="reversed"),
+        )
+
+    assessment_chart = go.Figure()
+    if trend_rows:
+        trend_df = pd.DataFrame(trend_rows)
+        assessment_chart.add_trace(go.Bar(x=trend_df["month"], y=trend_df["meeting"], name="Readiness score", marker_color="#4E9F6D"))
+        assessment_chart.add_trace(go.Bar(x=trend_df["month"], y=trend_df["support"], name="Gap to 100%", marker_color="#F19BB1"))
+        assessment_chart.update_layout(
+            barmode="stack",
+            paper_bgcolor=BG,
+            plot_bgcolor=BG,
+            height=260,
+            margin=dict(l=8, r=8, t=12, b=8),
+            font=dict(family=FONT, color=TEXT, size=11),
+            xaxis=dict(showgrid=False, zeroline=False, showline=False, tickfont=dict(size=10, color=MUTED)),
+            yaxis=dict(showgrid=True, gridcolor=GRID_C, zeroline=False, showline=False, tickfont=dict(size=10, color=MUTED)),
+            legend=dict(orientation="h", x=0, y=1.12, xanchor="left", font=dict(size=10, color=DIM)),
+        )
+
+    district_rank_chart = go.Figure()
+    if not district_df.empty:
+        colors = [PRIMARY_GREEN if value >= 60 else WARNING_AMBER if value >= 45 else MORTALITY_ROSE for value in district_df["national_score"]]
+        district_rank_chart.add_trace(go.Bar(
+            x=district_df["national_score"].round(1),
+            y=district_df["District"],
+            orientation="h",
+            marker=dict(color=colors),
+        ))
+        district_rank_chart.update_layout(
+            paper_bgcolor=BG,
+            plot_bgcolor=BG,
+            height=250,
+            margin=dict(l=8, r=8, t=12, b=8),
+            font=dict(family=FONT, color=TEXT, size=11),
+            xaxis=dict(showgrid=True, gridcolor=GRID_C, zeroline=False, showline=False, ticksuffix="%"),
+            yaxis=dict(showgrid=False, zeroline=False, showline=False, autorange="reversed"),
+        )
+
+    commodity_cards = []
+    supply_palette = [PRIMARY_GREEN, WARNING_AMBER, ADMISSIONS_BLUE, MORTALITY_ROSE]
+    for index, row in enumerate(supply_rows[:4]):
+        label, color = row["label"], supply_palette[index % len(supply_palette)]
+        status, _ = _readiness_status(row["pct"])
+        commodity_cards.append((label, row["pct"], color, status))
+
+    equipment_rows = supply_rows[:4]
+    workforce_summary = [
+        ("Workforce score", _mean_pct(workforce_rows), PRIMARY_GREEN),
+        ("Supply score", _mean_pct(supply_rows), NEONATAL_ORANGE),
+        ("Data quality score", _mean_pct(dq_rows), MORTALITY_ROSE),
+        ("Overall readiness", national_score, ADMISSIONS_BLUE),
+    ]
+    procurement = []
+
+    return html.Div(
+        className="mnid-executive-page",
+        children=[
+            dmc.Paper(
+                radius="xl",
+                p="xl",
+                mb="lg",
+                style={
+                    "background": HERO_NAVY,
+                    "color": "#F8FAFC",
+                    "position": "relative",
+                    "overflow": "hidden",
+                },
+                children=[
+                    html.Div(style={"position": "absolute", "right": "-60px", "top": "-60px", "width": "200px", "height": "200px", "borderRadius": "999px", "background": "rgba(20, 184, 166, 0.12)"}),
+                    dmc.Text("National Readiness Score", size="sm", fw=700, c="#94A3B8", tt="uppercase", style={"letterSpacing": "0.08em"}),
+                    dmc.Group(gap="xs", mt="sm", children=[dmc.Text(f"{national_score:.0f}", size="4rem", fw=700, c="#4ADE80", lh=1), dmc.Text("/100", size="xl", c="#94A3B8", mt=14)]),
+                    html.Div(style={"maxWidth": "280px", "marginTop": "14px"}, children=[_readiness_bar(national_score, "#4ADE80")]),
+                    dmc.Group(gap="xl", mt="lg", children=[
+                        dmc.Stack(gap=0, children=[dmc.Text(f"{facilities_assessed:,}", size="xl", fw=700, c="#F8FAFC"), dmc.Text("Facilities assessed", size="sm", c="#94A3B8")]),
+                        dmc.Stack(gap=0, children=[dmc.Text(f"{facilities_ready:,}", size="xl", fw=700, c="#4ADE80"), dmc.Text("Facilities ready", size="sm", c="#94A3B8")]),
+                        dmc.Stack(gap=0, children=[dmc.Text(f"{need_support:,}", size="xl", fw=700, c="#FBBF24"), dmc.Text("Need support", size="sm", c="#94A3B8")]),
+                        dmc.Stack(gap=0, children=[dmc.Text(f"{len([row for row in all_rows if row['den'] > 0]):,}", size="xl", fw=700, c="#4ADE80"), dmc.Text("Readiness indicators with data", size="sm", c="#94A3B8")]),
+                    ]),
+                ],
+            ),
+            dmc.Text("Workforce · Staffing Readiness", size="sm", fw=700, tt="uppercase", style={"letterSpacing": "0.08em", "marginBottom": "10px"}),
+            dmc.SimpleGrid(
+                cols=2,
+                spacing="lg",
+                mb="lg",
+                children=[
+                    dmc.Paper(
+                        withBorder=True,
+                        radius="md",
+                        p="md",
+                        children=[
+                            dmc.Text("Staffing levels", fw=700, size="sm", mb="md"),
+                            *[
+                                dmc.Group(
+                                    justify="space-between",
+                                    align="center",
+                                    mt="md",
+                                    children=[
+                                        dmc.Text(label, size="sm", c=TEXT),
+                                        html.Div(style={"flex": "1", "margin": "0 16px"}, children=[_readiness_bar(value, color)]),
+                                        dmc.Text(f"{value:.0f}%", size="sm", fw=700, c=TEXT),
+                                    ],
+                                )
+                                for label, value, color in workforce_summary
+                            ],
+                        ],
+                    ),
+                    dmc.Paper(withBorder=True, radius="md", p="md", children=[dmc.Text("District readiness by live MNID indicators", fw=700, size="sm", mb="md"), dcc.Graph(figure=workforce_chart, config={"displayModeBar": False})]),
+                ],
+            ),
+            dmc.Text("Commodity Availability · Essential Medicines", size="sm", fw=700, tt="uppercase", style={"letterSpacing": "0.08em", "marginBottom": "10px"}),
+            dmc.SimpleGrid(
+                cols=4,
+                spacing="lg",
+                mb="lg",
+                children=[
+                    dmc.Paper(
+                        withBorder=True,
+                        radius="md",
+                        p="md",
+                        children=[
+                            dmc.Text(label, fw=700, size="sm"),
+                            dmc.Text(f"{value:.0f}%", size="2rem", fw=700, mt="sm"),
+                            html.Div(style={"marginTop": "8px"}, children=[_readiness_bar(value, color)]),
+                            dmc.Badge(status, variant="light", color="green" if color == PRIMARY_GREEN else "yellow" if color == WARNING_AMBER else "red", radius="sm", mt="sm"),
+                        ],
+                    )
+                    for label, value, color, status in commodity_cards
+                ] or [
+                    dmc.Paper(withBorder=True, radius="md", p="md", children=[dmc.Text("No live supply readiness observations in the current MNID source.", size="sm", c=DIM)])
+                ],
+            ),
+            dmc.Text("Equipment Readiness · Functional Status", size="sm", fw=700, tt="uppercase", style={"letterSpacing": "0.08em", "marginBottom": "10px"}),
+            dmc.SimpleGrid(
+                cols=4,
+                spacing="lg",
+                mb="lg",
+                children=[
+                    dmc.Paper(
+                        withBorder=True,
+                        radius="md",
+                        p="md",
+                        children=[
+                            dmc.Text(row["label"], fw=700, size="sm", mb="sm"),
+                            *[
+                                dmc.Group(justify="space-between", mt="xs", children=[
+                                    dmc.Text(metric_label, size="sm"),
+                                    dmc.Text(f"{metric_value:.0f}%", size="sm", fw=700, c=metric_color),
+                                ])
+                                for metric_label, metric_value, metric_color in [
+                                    ("Observed coverage", row["pct"], PRIMARY_GREEN),
+                                    ("Target", row["target"], ADMISSIONS_BLUE),
+                                    ("Gap", max(row["target"] - row["pct"], 0), MORTALITY_ROSE),
+                                ]
+                            ],
+                        ],
+                    )
+                    for row in equipment_rows
+                ] or [
+                    dmc.Paper(withBorder=True, radius="md", p="md", children=[dmc.Text("No live equipment readiness observations in the current MNID source.", size="sm", c=DIM)])
+                ],
+            ),
+            dmc.Text("Facility Assessments · Standards Compliance", size="sm", fw=700, tt="uppercase", style={"letterSpacing": "0.08em", "marginBottom": "10px"}),
+            dmc.SimpleGrid(
+                cols=2,
+                spacing="lg",
+                mb="lg",
+                children=[
+                    dmc.Paper(
+                        withBorder=True,
+                        radius="md",
+                        p="md",
+                        children=[
+                            dmc.Text("Assessment summary", fw=700, size="sm", mb="md"),
+                            dmc.SimpleGrid(
+                                cols=3,
+                                spacing="sm",
+                                children=[
+                                    dmc.Paper(radius="sm", p="md", style={"background": BG}, children=[dmc.Text(f"{facilities_assessed:,}", size="2rem", fw=700, ta="center"), dmc.Text("Assessed", ta="center", size="sm")]),
+                                    dmc.Paper(radius="sm", p="md", style={"background": LIGHT_GREEN}, children=[dmc.Text(f"{facilities_ready:,}", size="2rem", fw=700, ta="center", c=PRIMARY_GREEN), dmc.Text("Ready by live score", ta="center", size="sm")]),
+                                    dmc.Paper(radius="sm", p="md", style={"background": "#FEE2E2"}, children=[dmc.Text(f"{need_support:,}", size="2rem", fw=700, ta="center", c=MORTALITY_ROSE), dmc.Text("Need support", ta="center", size="sm")]),
+                                ],
+                            ),
+                            dcc.Graph(figure=assessment_chart, config={"displayModeBar": False}),
+                        ],
+                    ),
+                    dmc.Paper(withBorder=True, radius="md", p="md", children=[dmc.Text("District compliance ranking", fw=700, size="sm", mb="md"), dcc.Graph(figure=district_rank_chart, config={"displayModeBar": False})]),
+                ],
+            ),
+            dmc.Text("Procurement & Distribution · Supply Chain Status", size="sm", fw=700, tt="uppercase", style={"letterSpacing": "0.08em", "marginBottom": "10px"}),
+            dmc.Stack(
+                gap="md",
+                children=[
+                    dmc.Paper(
+                        withBorder=True,
+                        radius="md",
+                        p="md",
+                        children=[
+                            dmc.Group(
+                                justify="space-between",
+                                children=[
+                                    dmc.Group(gap="md", children=[
+                                        html.Div(style={"width": "32px", "height": "32px", "borderRadius": "8px", "background": {"green": LIGHT_GREEN, "blue": "#DBEAFE", "amber": "#FEF3C7"}.get(item["tone"], SOFT_GREEN)}),
+                                        dmc.Stack(
+                                            gap=2,
+                                            children=[
+                                                dmc.Text(f"{item['title']} — {item['detail']}", fw=700, size="sm"),
+                                                dmc.Text(item["note"], size="sm", c=DIM),
+                                            ],
+                                        ),
+                                    ]),
+                                    dmc.Group(gap="sm", children=[
+                                        dmc.Badge(item["status"], variant="light", color={"Delivered": "green", "In transit": "blue", "Pending": "yellow"}.get(item["status"], "gray")),
+                                        dmc.Text(item["eta"], size="sm", c=TEXT),
+                                    ]),
+                                ],
+                            )
+                        ],
+                    )
+                    for item in procurement
+                ] or [
+                    dmc.Paper(withBorder=True, radius="md", p="md", children=[dmc.Text("No procurement or distribution records are exposed in the current MNID source for this selection.", size="sm", c=DIM)])
+                ],
+            ),
         ],
     )
