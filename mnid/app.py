@@ -82,6 +82,52 @@ _MNID_UI_CACHE_TTL_SECONDS = 3600
 _MNID_WARNED_MESSAGES = set()
 _LOGGER = logging.getLogger(__name__)
 
+_MNID_SCROLLSPY_CLIENTSIDE = """
+function(_tick) {
+    const sections = [
+        '#mnid-summary',
+        '#mnid-trends',
+        '#mnid-performance',
+        '#mnid-heatmap',
+        '#mnid-comparative',
+        '#mnid-analysis',
+        '#mnid-readiness'
+    ];
+
+    let active = '#mnid-summary';
+    const activationLine = 124;
+    let bestPassed = null;
+    let nextUpcoming = null;
+
+    for (const selector of sections) {
+        const el = document.querySelector(selector);
+        if (!el) {
+            continue;
+        }
+
+        const rect = el.getBoundingClientRect();
+        const top = rect.top;
+
+        if (top <= activationLine) {
+            if (bestPassed === null || top > bestPassed.top) {
+                bestPassed = { selector, top };
+            }
+        } else if (nextUpcoming === null || top < nextUpcoming.top) {
+            nextUpcoming = { selector, top };
+        }
+    }
+
+    if (bestPassed !== null) {
+        active = bestPassed.selector;
+    } else if (nextUpcoming !== null) {
+        active = nextUpcoming.selector;
+    }
+
+    return active;
+}
+"""
+
+
 def clear_runtime_caches() -> None:
     _network_df_cache.clear()
     _MNID_UI_CACHE.clear()
@@ -1325,51 +1371,7 @@ def _service_table_switcher(df: pd.DataFrame, categories: list | None = None,
 
 
 clientside_callback(
-    """
-    function(_tick) {
-        const sections = [
-            '#mnid-summary',
-            '#mnid-trends',
-            '#mnid-performance',
-            '#mnid-heatmap',
-            '#mnid-coverage',
-            '#mnid-comparative',
-            '#mnid-analysis',
-            '#mnid-readiness'
-        ];
-
-        let active = '#mnid-summary';
-        const activationLine = 124;
-        let bestPassed = null;
-        let nextUpcoming = null;
-
-        for (const selector of sections) {
-            const el = document.querySelector(selector);
-            if (!el) {
-                continue;
-            }
-
-            const rect = el.getBoundingClientRect();
-            const top = rect.top;
-
-            if (top <= activationLine) {
-                if (bestPassed === null || top > bestPassed.top) {
-                    bestPassed = { selector, top };
-                }
-            } else if (nextUpcoming === null || top < nextUpcoming.top) {
-                nextUpcoming = { selector, top };
-            }
-        }
-
-        if (bestPassed !== null) {
-            active = bestPassed.selector;
-        } else if (nextUpcoming !== null) {
-            active = nextUpcoming.selector;
-        }
-
-        return active;
-    }
-    """,
+    _MNID_SCROLLSPY_CLIENTSIDE,
     Output('mnid-scrollspy-out', 'data'),
     Input('mnid-scrollspy-tick', 'n_intervals'),
 )
@@ -2048,12 +2050,6 @@ def render_mnid_dashboard(data_opd, config,
                     desc='Geographic context for neonatal service delivery and district-level performance.' if dashboard_theme == 'newborn' else 'Geographic coverage map and district/facility context',
                     eyebrow='Map' if dashboard_theme == 'newborn' else None),
         heatmap_div,
-
-        _section_anchor('mnid-coverage'),
-        _sec_header('Coverage & Quality' if dashboard_theme == 'newborn' else 'Coverage Indicators', sum(len(v) for v in by_cat.values()),
-                    desc='Coverage against target across the neonatal care pathway, from stabilization to follow-up.' if dashboard_theme == 'newborn' else 'Coverage % vs target - target threshold shown per chart',
-                    eyebrow='Indicators' if dashboard_theme == 'newborn' else None),
-        coverage_charts,
 
         _section_anchor('mnid-comparative'),
         _sec_header('Facility Comparison' if dashboard_theme == 'newborn' else 'Facility & District Comparison',
