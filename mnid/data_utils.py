@@ -1,10 +1,49 @@
 """MNID dataframe preparation and serialization helpers."""
 
 import json
+import os
 import re
+import uuid
 import numpy as np
 import pandas as pd
 pd.options.mode.chained_assignment = None
+
+try:
+    import diskcache as _diskcache
+    _MNID_UI_DISK_CACHE = _diskcache.Cache(os.path.join('.', 'cache', 'mnid_ui'))
+except Exception:
+    _MNID_UI_DISK_CACHE = None
+
+_MNID_UI_CACHE: dict = {}
+_MNID_UI_CACHE_MAX = 16
+
+
+def _remember_ui_payload(prefix: str, records_or_fn, stable_key: str | None = None) -> str:
+    cache_key = f'{prefix}:{stable_key}' if stable_key else f'{prefix}:{uuid.uuid4().hex}'
+    if cache_key in _MNID_UI_CACHE:
+        return cache_key
+    records = records_or_fn() if callable(records_or_fn) else records_or_fn
+    _MNID_UI_CACHE[cache_key] = records
+    while len(_MNID_UI_CACHE) > _MNID_UI_CACHE_MAX:
+        oldest_key = next(iter(_MNID_UI_CACHE))
+        _MNID_UI_CACHE.pop(oldest_key, None)
+    return cache_key
+
+
+def _restore_ui_dataframe(cache_key: str | None) -> pd.DataFrame:
+    if not cache_key:
+        return pd.DataFrame()
+    obj = _MNID_UI_CACHE.get(cache_key)
+    if obj is None and _MNID_UI_DISK_CACHE is not None:
+        try:
+            obj = _MNID_UI_DISK_CACHE.get(cache_key)
+        except Exception:
+            obj = None
+        if obj is not None:
+            _MNID_UI_CACHE[cache_key] = obj
+    if isinstance(obj, pd.DataFrame):
+        return obj
+    return deserialize_store_df(obj)
 
 from .constants import (
     ALL_DISTRICTS,
