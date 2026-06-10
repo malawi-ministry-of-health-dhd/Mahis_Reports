@@ -2101,6 +2101,13 @@ def render_mnid_dashboard(data_opd, config,
                 children=[render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=indicator_tab_label)],
             ),
             dcc.Tab(
+                label='Operational Readiness',
+                value='operational-readiness',
+                style={'padding': '10px 18px', 'borderRadius': '12px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#FFFFFF', 'color': TEXT},
+                selected_style={'padding': '10px 18px', 'borderRadius': '12px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#F8FAFC', 'color': '#15803D', 'fontWeight': 700},
+                children=[render_operational_readiness(facility_df, supply_inds=supply_inds, wf_inds=wf_inds, dq_inds=dq_inds)],
+            ),
+            dcc.Tab(
                 label=indicator_tab_label,
                 value='indicator-dashboard',
                 style={'padding': '10px 18px', 'borderRadius': '12px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#FFFFFF', 'color': TEXT},
