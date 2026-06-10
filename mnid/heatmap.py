@@ -276,6 +276,163 @@ def _compute_heatmap_store(mch_full: pd.DataFrame, tracked: list,
     return store
 
 
+def _compute_heatmap_store_from_agg(
+    agg_df: pd.DataFrame,
+    tracked: list,
+    facility_code: str,
+) -> dict:
+    """Build the heatmap store from pre-aggregated data instead of raw row scans.
+
+    Replaces _compute_heatmap_store when the aggregate parquet is available,
+    converting seconds of groupby work into millisecond pandas filter+pivot ops.
+    The 'counts' key is returned empty since encounter-type counts are not in the
+    aggregate.
+    """
+    current_district = _FACILITY_DISTRICT.get(facility_code, '')
+
+    ind_ids = {i['id'] for i in tracked}
+    base = agg_df[agg_df['indicator_id'].isin(ind_ids) & (agg_df['grain'] == 'monthly')].copy()
+
+    agg_facs  = sorted(base['facility_code'].dropna().astype(str).unique().tolist())
+    agg_dists = sorted(base['district'].dropna().astype(str).unique().tolist())
+
+    all_facilities = sorted(set(agg_facs) | set(_ALL_FACILITIES))
+    all_districts  = sorted(set(agg_dists) | set(_ALL_DISTRICTS))
+
+    geojson = _load_malawi_district_geojson()
+    geo_districts = sorted({
+        f.get('properties', {}).get('shapeName')
+        for f in (geojson or {}).get('features', [])
+        if f.get('properties', {}).get('shapeName')
+    })
+    all_districts = sorted(set(all_districts) | set(geo_districts))
+
+    if facility_code and str(facility_code) not in all_facilities:
+        all_facilities.insert(0, str(facility_code))
+    if current_district and current_district not in all_districts:
+        all_districts.insert(0, current_district)
+
+    sorted_inds = []
+    for cat in ['ANC', 'Labour', 'Newborn', 'PNC']:
+        sorted_inds.extend(i for i in tracked if i.get('category') == cat)
+    sorted_inds.extend(i for i in tracked if i not in sorted_inds)
+
+    y_labels  = [i['label'][:32] for i in sorted_inds]
+    y_targets = [i['target']     for i in sorted_inds]
+
+    district_facs_map = {
+        d: [f for f in all_facilities if _FACILITY_DISTRICT.get(f) == d]
+        for d in all_districts
+    }
+
+    store = {
+        'y_labels': y_labels, 'y_targets': y_targets,
+        'current_fac': facility_code, 'current_district': current_district,
+        'all_facilities': all_facilities, 'all_districts': all_districts,
+        'facilities_by_district': district_facs_map,
+        'monthly': {}, 'by_facility': {}, 'by_district': {},
+        'by_district_facs': {d: {} for d in all_districts},
+        'yearly': {}, 'district_avgs': {},
+        'counts': {},
+    }
+
+    if base.empty or not sorted_inds:
+        return store
+
+    base['_yr'] = base['period_start'].dt.year
+    years = sorted(base['_yr'].dropna().astype(int).unique().tolist())
+    year_options = {'All years': None, **{str(y): y for y in years}}
+    ind_order = [i['id'] for i in sorted_inds]
+
+    def _pct_dict(sub, group_col):
+        """Return {ind_id: {group_key: pct|None}} via vectorised pivot — no .loc loops."""
+        if sub.empty:
+            return {}
+        g = sub.groupby(['indicator_id', group_col])[['numerator', 'denominator']].sum().reset_index()
+        g['pct'] = (g['numerator'] / g['denominator'].where(g['denominator'] > 0) * 100).round(1)
+        return (
+            g.pivot(index='indicator_id', columns=group_col, values='pct')
+             .where(pd.notna, other=None)
+             .to_dict(orient='index')
+        )
+
+    def _z_matrix(pct_d, keys):
+        """Build z[indicator_idx][key_idx] from a pct dict-of-dicts."""
+        return [[pct_d.get(iid, {}).get(k) for k in keys] for iid in ind_order]
+
+    for ylbl, yval in year_options.items():
+        sub = base[base['_yr'] == yval] if yval else base
+
+        if sub.empty:
+            for key in ['monthly', 'by_facility', 'by_district']:
+                store[key][ylbl] = {'x': [], 'z': [], 'tick_angle': 0}
+            for d in all_districts:
+                store['by_district_facs'][d][ylbl] = {'x': [], 'z': [], 'tick_angle': -30}
+            store['district_avgs'][ylbl] = {d: None for d in all_districts}
+            continue
+
+        # Monthly view: current facility only — pivot over period_start
+        fac_sub = sub[sub['facility_code'] == str(facility_code)]
+        if not fac_sub.empty:
+            gm = fac_sub.groupby(['indicator_id', 'period_start'])[['numerator', 'denominator']].sum().reset_index()
+            gm['pct'] = (gm['numerator'] / gm['denominator'].where(gm['denominator'] > 0) * 100).round(1)
+            piv_m = gm.pivot(index='indicator_id', columns='period_start', values='pct')
+            periods = sorted(piv_m.columns.tolist())
+            x_m = [f"{pd.Timestamp(p).strftime('%b')} {str(pd.Timestamp(p).year)[2:]}" for p in periods]
+            m_dict = piv_m.where(pd.notna, other=None).to_dict(orient='index')
+            z_m = [[m_dict.get(iid, {}).get(p) for p in periods] for iid in ind_order]
+        else:
+            x_m, z_m = [], []
+        store['monthly'][ylbl] = {'x': x_m, 'z': z_m, 'tick_angle': 0}
+
+        # By facility — pivot over facility_code
+        fp = _pct_dict(sub, 'facility_code')
+        x_f = [f'{f}*' if f == str(facility_code) else f for f in all_facilities]
+        z_f = _z_matrix(fp, all_facilities)
+        store['by_facility'][ylbl] = {
+            'x': x_f, 'z': z_f, 'tick_angle': -30,
+            'districts': [_FACILITY_DISTRICT.get(f, '') for f in all_facilities],
+        }
+
+        # By district — pivot over district
+        data_dists = sorted(sub['district'].dropna().astype(str).unique().tolist())
+        if data_dists:
+            dp = _pct_dict(sub, 'district')
+            z_d = _z_matrix(dp, data_dists)
+            d_avgs = {}
+            for di, dist in enumerate(data_dists):
+                vals = [z_d[ii][di] for ii in range(len(sorted_inds))
+                        if ii < len(z_d) and di < len(z_d[ii]) and z_d[ii][di] is not None]
+                d_avgs[dist] = round(sum(vals) / len(vals), 1) if vals else None
+            store['by_district'][ylbl] = {'x': data_dists, 'z': z_d, 'tick_angle': -20}
+            store['district_avgs'][ylbl] = d_avgs
+        else:
+            store['by_district'][ylbl] = {'x': [], 'z': [], 'tick_angle': -20}
+            store['district_avgs'][ylbl] = {}
+
+        # Per-district facility breakdowns — reuse already-computed fp
+        for dist in all_districts:
+            dfacs = district_facs_map[dist]
+            x_df = [f'{f}*' if f == str(facility_code) else f for f in dfacs]
+            z_df = _z_matrix(fp, dfacs)
+            store['by_district_facs'][dist][ylbl] = {'x': x_df, 'z': z_df, 'tick_angle': -30}
+
+    # Yearly view: current facility, year-over-year — pivot over _yr
+    fac_all = base[base['facility_code'] == str(facility_code)]
+    if not fac_all.empty and years:
+        gy = fac_all.groupby(['indicator_id', '_yr'])[['numerator', 'denominator']].sum().reset_index()
+        gy['pct'] = (gy['numerator'] / gy['denominator'].where(gy['denominator'] > 0) * 100).round(1)
+        piv_yr = gy.pivot(index='indicator_id', columns='_yr', values='pct')
+        yr_dict = piv_yr.where(pd.notna, other=None).to_dict(orient='index')
+        store['yearly'] = {
+            'x': [str(y) for y in years],
+            'z': [[yr_dict.get(iid, {}).get(y) for y in years] for iid in ind_order],
+            'tick_angle': 0,
+        }
+
+    return store
+
+
 def _build_facility_performance_heatmap_fig(stored: dict, year: str,
                                             district: str | None = None,
                                             sel_inds: list | None = None,

@@ -60,7 +60,8 @@ from mnid.indicators import (
 )
 from mnid.heatmap import (
     _mask, _matrix_by_group, _matrix_monthly, _cov_color,
-    _compute_heatmap_store, _build_facility_performance_heatmap_fig,
+    _compute_heatmap_store, _compute_heatmap_store_from_agg,
+    _build_facility_performance_heatmap_fig,
     _build_performance_attention_table, _build_heatmap_fig,
     _build_geo_heatmap_fig, _build_district_treemap, _build_malawi_panel,
 )
@@ -378,12 +379,20 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
     ]
     analysis_acc = [a for a in analysis_acc if a]
 
-    # Heatmap store: keyed by data identity + facility + indicators so it's computed once and
-    # reused across date-range changes (date range doesn't affect the heatmap store layout).
+    # Heatmap store: keyed by data identity + facility + indicators.
+    # Use aggregate fast path when available — avoids expensive raw groupby scans.
     _heatmap_cache_key = (id(network_df), facility_code, tuple(i['id'] for i in tracked))
     if _heatmap_cache_key not in _heatmap_store_cache:
         _heatmap_store_cache.clear()
-        _heatmap_store_cache[_heatmap_cache_key] = _compute_heatmap_store(network_df, tracked, facility_code)
+        _agg_for_heatmap = _get_aggregate()
+        if _agg_for_heatmap is not None and not _agg_for_heatmap.empty:
+            _heatmap_store_cache[_heatmap_cache_key] = _compute_heatmap_store_from_agg(
+                _agg_for_heatmap, tracked, facility_code
+            )
+        else:
+            _heatmap_store_cache[_heatmap_cache_key] = _compute_heatmap_store(
+                network_df, tracked, facility_code
+            )
     performance_div, heatmap_div = _coverage_heatmap_section(
         all_inds, facility_code, network_df,
         precomputed_store=_heatmap_store_cache[_heatmap_cache_key],
