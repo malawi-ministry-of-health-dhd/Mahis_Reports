@@ -1,4 +1,3 @@
-import diskcache
 import dash
 from dash import html, dcc, Input, Output, callback, State, no_update, ALL, callback_context
 import pandas as pd
@@ -50,11 +49,32 @@ pd.options.mode.chained_assignment = None
 path = os.getcwd()
 json_path = os.path.join(path, 'data', 'visualizations', 'validated_dashboard.json')
 
-_mnid_disk_cache = diskcache.Cache('./cache/mnid')
 _mnid_full_data_cache: dict = {}
 DEFAULT_DASHBOARD_DAYS = 7
 DEFAULT_RELATIVE_PERIOD = 'Today'
 _LATEST_DATA_DATE_CACHE: dict[str, pd.Timestamp | None] = {}
+
+
+def _start_mnid_prewarm():
+    """Kick off MNID cache pre-warm in a daemon background thread at server startup."""
+    import threading
+    import logging
+    _log = logging.getLogger(__name__)
+
+    def _run():
+        try:
+            from mnid.app import prewarm_cache
+            version = _dataset_version_token()
+            prewarm_cache(dataset_version=version)
+        except Exception as exc:
+            _log.warning('MNID startup pre-warm thread failed: %s', exc)
+
+    t = threading.Thread(target=_run, daemon=True, name='mnid-prewarm')
+    t.start()
+    _log.info('MNID pre-warm thread started')
+
+
+_start_mnid_prewarm()
 
 
 def _latest_available_date() -> pd.Timestamp | None:
@@ -96,10 +116,6 @@ def _dataset_version_token() -> str:
 
 def clear_dashboard_state_cache() -> None:
     _mnid_full_data_cache.clear()
-    try:
-        _mnid_disk_cache.clear()
-    except Exception:
-        pass
 
 
 def _load_user_registry() -> pd.DataFrame:
@@ -884,19 +900,16 @@ def update_dashboard(gen, interval, start_date, end_date, level,
                 if is_mnid:
                     # Use full parquet (no date filter) as the MNID network baseline so that
                     # _prepare_mnid_dataframe is cached once and not re-run on every date change.
+                    # Key on scope only, not on mnid_categories — maternal and newborn
+                    # share the same raw data; category filtering happens inside app.py.
                     _mnid_scope_key = (
                         dataset_version,
                         effective_level,
                         tuple(sorted(districts or [])),
                         tuple(sorted(facilities or [])),
-                        tuple(sorted(mnid_categories or [])),
                     )
-                    _disk_key = f"mnid_full_{'_'.join(str(k) for k in _mnid_scope_key)}"
                     if _mnid_scope_key in _mnid_full_data_cache:
                         _ndata = _mnid_full_data_cache[_mnid_scope_key]
-                    elif _disk_key in _mnid_disk_cache:
-                        _ndata = _mnid_disk_cache[_disk_key]
-                        _mnid_full_data_cache[_mnid_scope_key] = _ndata
                     else:
                         _mnid_cols = ', '.join([
                             'person_id', 'encounter_id', 'Date', 'Program', 'Reporting_Program',
@@ -917,7 +930,6 @@ def update_dashboard(gen, interval, start_date, end_date, level,
                             _full = _full[_full[FACILITY_].isin(facilities)]
                         _mnid_full_data_cache.clear()
                         _mnid_full_data_cache[_mnid_scope_key] = _full
-                        _mnid_disk_cache.set(_disk_key, _full, expire=3600)
                         _ndata = _full
                 else:
                     _ndata = network_data

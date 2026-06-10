@@ -17,13 +17,11 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def run_aggregation_job(
-    data_dir: str | None = None,
     viz_dir: str | None = None,
     output_dir: str | None = None,
 ) -> None:
     """Entry point called by the scheduler. Runs engine then invalidates cache."""
     root = _PROJECT_ROOT
-    data_dir   = data_dir   or str(root / 'data' / 'parquet')
     viz_dir    = viz_dir    or str(root / 'data' / 'visualizations')
     output_dir = output_dir or str(root / 'data' / 'mnid_aggregates')
 
@@ -33,7 +31,6 @@ def run_aggregation_job(
         from mnid.aggregation.store import invalidate_cache
 
         success = run_aggregation(
-            data_dir=data_dir,
             viz_dir=viz_dir,
             output_dir=output_dir,
         )

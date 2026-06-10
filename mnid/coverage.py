@@ -176,12 +176,16 @@ def _facilities_requiring_attention(store, year='All years'):
     ])
 
 
-def _coverage_heatmap_section(indicators: list, facility_code: str,
-                              mch_full: pd.DataFrame) -> html.Div:
+def _coverage_heatmap_section(
+    indicators: list,
+    facility_code: str,
+    mch_full: pd.DataFrame,
+    precomputed_store: dict | None = None,
+) -> tuple:
     """Multi-view indicator heatmap with Malawi district panel and live filters."""
     from mnid.layout import _build_district_gauge_row
     tracked = [i for i in indicators if i.get('status') == 'tracked']
-    store   = _compute_heatmap_store(mch_full, tracked, facility_code)
+    store   = precomputed_store if precomputed_store is not None else _compute_heatmap_store(mch_full, tracked, facility_code)
 
     district_gauges = _build_district_gauge_row(store)
 
@@ -458,8 +462,29 @@ def _clinical_donuts_section(df: pd.DataFrame) -> html.Div:
 
 # # MNID coverage phase bar chart
 
-def _coverage_phase_fig(title: str, indicators: list, df: pd.DataFrame) -> go.Figure:
+def _coverage_phase_fig(
+    title: str,
+    indicators: list,
+    df: pd.DataFrame,
+    agg_df=None,
+    start_date=None,
+    end_date=None,
+    facility_codes=None,
+    districts=None,
+    grain: str = 'monthly',
+) -> go.Figure:
     """Horizontal bar chart: one bar per indicator coloured by status vs target."""
+    if agg_df is not None:
+        from mnid.aggregation.store import query_coverage as _agg_cov
+        def _get_cov(ind):
+            return _agg_cov(agg_df, ind['id'], start_date, end_date,
+                            facility_codes=facility_codes or None,
+                            districts=districts or None,
+                            grain=grain)
+    else:
+        def _get_cov(ind):
+            return _cov(df, ind['numerator_filters'], ind['denominator_filters'])
+
     rows = []
     for ind in indicators:
         if ind.get('status') == 'awaiting_baseline':
@@ -467,7 +492,7 @@ def _coverage_phase_fig(title: str, indicators: list, df: pd.DataFrame) -> go.Fi
                          'target': ind['target'], 'cls': 'await',
                          'sub': 'Awaiting baseline'})
         else:
-            num, den, pct = _cov(df, ind['numerator_filters'], ind['denominator_filters'])
+            num, den, pct = _get_cov(ind)
             cls = _css(pct, ind['target'])
             rows.append({'label': ind['label'][:36], 'pct': pct,
                          'target': ind['target'], 'cls': cls,
@@ -550,8 +575,29 @@ def _no_data_card(message: str = 'No data available for this period.') -> html.D
     ])
 
 
-def _coverage_charts_section(by_cat: dict, df: pd.DataFrame, categories: list | None = None) -> html.Div:
+def _coverage_charts_section(
+    by_cat: dict,
+    df: pd.DataFrame,
+    categories: list | None = None,
+    agg_df=None,
+    start_date=None,
+    end_date=None,
+    facility_codes=None,
+    districts=None,
+    grain: str = 'monthly',
+) -> html.Div:
     """2-column grid of per-phase coverage bar charts (replaces accordion cards)."""
+    if agg_df is not None:
+        from mnid.aggregation.store import query_coverage as _agg_cov
+        def _compute(ind):
+            return _agg_cov(agg_df, ind['id'], start_date, end_date,
+                            facility_codes=facility_codes or None,
+                            districts=districts or None,
+                            grain=grain)
+    else:
+        def _compute(ind):
+            return _cov(df, ind['numerator_filters'], ind['denominator_filters'])
+
     phase_map = {
         'ANC': 'Antenatal Care (ANC)',
         'Labour': 'Labour & Delivery',
@@ -568,8 +614,7 @@ def _coverage_charts_section(by_cat: dict, df: pd.DataFrame, categories: list | 
             continue
         tracked  = [i for i in inds if i.get('status') == 'tracked']
         awaiting = [i for i in inds if i.get('status') == 'awaiting_baseline']
-        computed = [_cov(df, i['numerator_filters'], i['denominator_filters'])
-                    for i in tracked]
+        computed = [_compute(i) for i in tracked]
         avg_pct  = round(sum(c[2] for c in computed) / len(computed), 0) if computed else None
 
         pills = [html.Span(f'{len(tracked)} available', className='mnid-pill mnid-pill-green')]
@@ -579,7 +624,9 @@ def _coverage_charts_section(by_cat: dict, df: pd.DataFrame, categories: list | 
             pc = 'mnid-pill-green' if avg_pct >= 80 else ('mnid-pill-amber' if avg_pct >= 65 else 'mnid-pill-red')
             pills.append(html.Span(f'Avg {_display_pct(avg_pct):.0f}%', className=f'mnid-pill {pc}'))
 
-        fig = _coverage_phase_fig(cat_title, inds, df)
+        fig = _coverage_phase_fig(cat_title, inds, df,
+                                   agg_df=agg_df, start_date=start_date, end_date=end_date,
+                                   facility_codes=facility_codes, districts=districts, grain=grain)
         h   = max(len(inds) * 38 + 70, 180)
 
         cards.append(html.Div(className='mnid-chart-card', children=[

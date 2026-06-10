@@ -19,7 +19,6 @@ import pandas as pd
 
 _LOG = logging.getLogger(__name__)
 
-_DEFAULT_DATA_DIR = os.path.join('data', 'parquet')
 _DEFAULT_VIZ_DIR = os.path.join('data', 'visualizations')
 _DEFAULT_OUT_DIR = os.path.join('data', 'mnid_aggregates')
 
@@ -105,15 +104,17 @@ def _aggregate_grain(prepared_df: pd.DataFrame, indicators: list[dict], grain: s
 
 
 def run_aggregation(
-    data_dir: str = _DEFAULT_DATA_DIR,
     viz_dir: str = _DEFAULT_VIZ_DIR,
     output_dir: str = _DEFAULT_OUT_DIR,
 ) -> bool:
     """
     Full aggregation pipeline. Returns True on success.
+    Loads data from the same source as the live app (DATA_FILE_NAME_ in config).
     Typically called overnight after data_storage.py refreshes the parquet files.
     """
     from mnid.data_utils import prepare_mnid_dataframe as _prepare
+    from config import DATA_FILE_NAME_
+    from data_storage import DataStorage
 
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -123,23 +124,26 @@ def run_aggregation(
     _LOG.info('MNID aggregation started')
     started_at = datetime.utcnow()
 
-    # ── 1. Load raw parquets ──────────────────────────────────────────────────
-    parquet_files = sorted(glob.glob(os.path.join(data_dir, '*.parquet')))
-    if not parquet_files:
-        _LOG.warning('No parquet files in %s — skipping aggregation', data_dir)
+    # ── 1. Load raw data via the same path the app uses ───────────────────────
+    _mnid_cols = ', '.join([
+        'person_id', 'encounter_id', 'Date', 'Program', 'Reporting_Program',
+        'Service_Area', 'Facility', 'Facility_CODE', 'District', 'Encounter',
+        'obs_value_coded', 'concept_name', 'Value', 'ValueN', 'new_revisit',
+        'Home_district', 'TA', 'Village', 'Age', 'Age_Group', 'Gender',
+        'Source_Program',
+    ])
+    try:
+        raw_df = DataStorage.query_duckdb(f"SELECT {_mnid_cols} FROM '{DATA_FILE_NAME_}'")
+        raw_df['Date'] = pd.to_datetime(raw_df['Date'], errors='coerce')
+    except Exception as exc:
+        _LOG.error('Failed to load data from %s: %s', DATA_FILE_NAME_, exc)
         return False
 
-    dfs = []
-    for fp in parquet_files:
-        try:
-            dfs.append(pd.read_parquet(fp))
-        except Exception as exc:
-            _LOG.warning('Skipping %s: %s', fp, exc)
-    if not dfs:
+    if raw_df.empty:
+        _LOG.warning('No data in %s — skipping aggregation', DATA_FILE_NAME_)
         return False
 
-    raw_df = pd.concat(dfs, ignore_index=True)
-    _LOG.info('Loaded %d raw rows from %d files', len(raw_df), len(dfs))
+    _LOG.info('Loaded %d raw rows from %s', len(raw_df), DATA_FILE_NAME_)
 
     # ── 2. Prepare (derive person-level context, clean dates, etc.) ───────────
     prepared_df = _prepare(raw_df)
@@ -168,12 +172,12 @@ def run_aggregation(
 
     elapsed = (datetime.utcnow() - started_at).total_seconds()
     meta = {
-        'generated_at':  started_at.isoformat(),
-        'elapsed_sec':   round(elapsed, 1),
-        'rows':          len(agg_df),
-        'indicators':    len(indicators),
-        'grains':        _GRAINS,
-        'parquet_files': parquet_files,
+        'generated_at': started_at.isoformat(),
+        'elapsed_sec':  round(elapsed, 1),
+        'rows':         len(agg_df),
+        'indicators':   len(indicators),
+        'grains':       _GRAINS,
+        'data_source':  DATA_FILE_NAME_,
     }
     with open(meta_out, 'w', encoding='utf-8') as f:
         json.dump(meta, f, indent=2)
@@ -187,10 +191,8 @@ def run_aggregation(
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
-    # When run directly, resolve paths relative to the project root
     _root = Path(__file__).resolve().parents[2]
     run_aggregation(
-        data_dir=str(_root / 'data' / 'parquet'),
         viz_dir=str(_root / 'data' / 'visualizations'),
         output_dir=str(_root / 'data' / 'mnid_aggregates'),
     )

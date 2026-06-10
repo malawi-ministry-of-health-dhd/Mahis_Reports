@@ -3950,8 +3950,22 @@
         "label": "ANC screened for anaemia",
         "category": "ANC",
         "target": 80,
-        "status": "awaiting_baseline",
-        "note": "Official MNID indicator from the Malawi pathway document. Current parquet does not yet expose the anaemia screening concept required for calculation."
+        "status": "tracked",
+        "note": "Tracked via Anemia screening concept (Yes/No) in ANC encounters.",
+        "numerator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "ANC",
+          "variable2": "concept_name",
+          "value2": "Anemia screening",
+          "variable3": "obs_value_coded",
+          "value3": "Yes"
+        },
+        "denominator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "ANC"
+        }
       },
       {
         "id": "mnid_anc_002",
@@ -3986,11 +4000,29 @@
       },
       {
         "id": "mnid_anc_004",
-        "label": "HIV-tested and screened for anaemia and high blood pressure",
+        "label": "HIV-tested and screened (anaemia + high blood pressure)",
         "category": "ANC",
         "target": 80,
-        "status": "awaiting_baseline",
-        "note": "Composite official indicator. Requires ANC-linked HIV testing plus anaemia and blood-pressure screening concepts in the same care flow."
+        "status": "tracked",
+        "note": "Proxy: ANC clients with confirmed HIV test result. Full composite requires cross-row join not supported in current filter engine.",
+        "numerator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "ANC",
+          "variable2": "concept_name",
+          "value2": "HIV Test",
+          "variable3": "obs_value_coded",
+          "value3": [
+            "Negative",
+            "Positive",
+            "Reactive"
+          ]
+        },
+        "denominator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "ANC"
+        }
       },
       {
         "id": "mnid_anc_005",
@@ -4035,8 +4067,24 @@
         "label": "Eligible women with pre-term labour who received antenatal corticosteroids",
         "category": "Labour",
         "target": 80,
-        "status": "awaiting_baseline",
-        "note": "Official MNID indicator. Eligibility and corticosteroid administration concepts are not yet available as stable report filters."
+        "status": "tracked",
+        "note": "Numerator: corticosteroids given=Yes in Labour. Denominator: corticosteroid eligibility assessed.",
+        "numerator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "Labour",
+          "variable2": "concept_name",
+          "value2": "Antenatal corticosteroids given",
+          "variable3": "obs_value_coded",
+          "value3": "Yes"
+        },
+        "denominator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "Labour",
+          "variable2": "concept_name",
+          "value2": "Antenatal corticosteroids given"
+        }
       },
       {
         "id": "mnid_lab_004",
@@ -4258,6 +4306,143 @@
           "value1": "Breast feeding"
         },
         "note": "Operational labour/newborn transition indicator retained from refactored report indicators."
+      },
+      {
+        "label": "Gestational age method recorded",
+        "category": "ANC",
+        "target": 80,
+        "status": "tracked",
+        "note": "GA recorded via LNMP, palpation, or ultrasound.",
+        "numerator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "ANC",
+          "variable2": "concept_name",
+          "value2": "Gestational age recorded"
+        },
+        "denominator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "ANC"
+        },
+        "id": "mnid_anc_extra_004"
+      },
+      {
+        "label": "ANC clients tested for HIV",
+        "category": "ANC",
+        "target": 95,
+        "status": "tracked",
+        "note": "ANC clients with any documented HIV test result (excludes Not done).",
+        "numerator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "ANC",
+          "variable2": "concept_name",
+          "value2": "HIV Test",
+          "variable3": "obs_value_coded",
+          "value3": [
+            "Negative",
+            "Positive",
+            "Reactive"
+          ]
+        },
+        "denominator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "ANC"
+        },
+        "id": "mnid_anc_extra_005"
+      },
+      {
+        "label": "Delivery details recorded",
+        "category": "Labour",
+        "target": 95,
+        "status": "tracked",
+        "note": "Proxy: Labour encounters where mode of delivery was documented.",
+        "numerator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "Labour",
+          "variable2": "concept_name",
+          "value2": "Mode of delivery"
+        },
+        "denominator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "Labour"
+        },
+        "id": "mnid_lab_extra_004"
+      },
+      {
+        "label": "Births delivered by caesarean section",
+        "category": "Labour",
+        "target": 15,
+        "status": "tracked",
+        "note": "Rate: C-section proportion of deliveries with documented mode.",
+        "numerator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "Labour",
+          "variable2": "concept_name",
+          "value2": "Mode of delivery",
+          "variable3": "obs_value_coded",
+          "value3": "Caesarean section"
+        },
+        "denominator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "Labour",
+          "variable2": "concept_name",
+          "value2": "Mode of delivery"
+        },
+        "id": "mnid_lab_extra_005"
+      },
+      {
+        "label": "PNC visit documented",
+        "category": "PNC",
+        "target": 80,
+        "status": "tracked",
+        "note": "Proxy: PNC clients with postnatal check period recorded.",
+        "numerator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "PNC",
+          "variable2": "concept_name",
+          "value2": "Postnatal check period"
+        },
+        "denominator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "PNC"
+        },
+        "id": "mnid_pnc_extra_001"
+      },
+      {
+        "label": "HIV positive mothers identified in PNC",
+        "category": "PNC",
+        "target": 5,
+        "status": "tracked",
+        "note": "Rate: HIV Positive or Reactive among mothers with Mother HIV Status tested in PNC.",
+        "numerator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "PNC",
+          "variable2": "concept_name",
+          "value2": "Mother HIV Status",
+          "variable3": "obs_value_coded",
+          "value3": [
+            "Positive",
+            "Reactive"
+          ]
+        },
+        "denominator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "PNC",
+          "variable2": "concept_name",
+          "value2": "Mother HIV Status"
+        },
+        "id": "mnid_pnc_extra_002"
       }
     ],
     "mnid_categories": [
@@ -4500,11 +4685,27 @@
       },
       {
         "id": "mnid_nb_002",
-        "label": "Eligible preterm and low birth-weight babies who receive iKMC",
+        "label": "Eligible preterm and low birth-weight babies who received iKMC",
         "category": "Newborn",
         "target": 80,
-        "status": "awaiting_baseline",
-        "note": "Official MNID indicator. iKMC initiation concept is not yet available in the current parquet."
+        "status": "tracked",
+        "note": "Proxy without weight-band filter (1000-1499g band not present in demo data). Tracks iKMC initiated among all Newborn encounters.",
+        "numerator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "Newborn",
+          "variable2": "concept_name",
+          "value2": "iKMC initiated",
+          "variable3": "obs_value_coded",
+          "value3": "Yes"
+        },
+        "denominator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "Newborn",
+          "variable2": "concept_name",
+          "value2": "iKMC initiated"
+        }
       },
       {
         "id": "mnid_nb_003",
@@ -4542,9 +4743,25 @@
         "id": "mnid_nb_007",
         "label": "Babies not hypothermic on admission to the neonatal unit",
         "category": "Newborn",
-        "target": 80,
-        "status": "awaiting_baseline",
-        "note": "Official MNID indicator. Thermal-status-on-admission concept is not yet present in the current parquet."
+        "target": 90,
+        "status": "tracked",
+        "note": "Direct from Thermal status on admission = Not hypothermic.",
+        "numerator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "Newborn",
+          "variable2": "concept_name",
+          "value2": "Thermal status on admission",
+          "variable3": "obs_value_coded",
+          "value3": "Not hypothermic"
+        },
+        "denominator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "Newborn",
+          "variable2": "concept_name",
+          "value2": "Thermal status on admission"
+        }
       },
       {
         "id": "mnid_nb_008",
@@ -4627,6 +4844,82 @@
           "value1": "Newborn"
         },
         "note": "Operational newborn priority retained from refactored report indicators."
+      },
+      {
+        "label": "Resuscitation intervention recorded",
+        "category": "Newborn",
+        "target": 80,
+        "status": "tracked",
+        "note": "Eligible newborns who received any resuscitation (bag+mask, stimulation, or documented Yes).",
+        "numerator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "Newborn",
+          "variable2": "concept_name",
+          "value2": "Neonatal resuscitation provided",
+          "variable3": "obs_value_coded",
+          "value3": [
+            "Yes",
+            "Bag and mask",
+            "Stimulation only"
+          ]
+        },
+        "denominator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "Newborn",
+          "variable2": "concept_name",
+          "value2": "Eligible for neonatal resuscitation"
+        },
+        "id": "mnid_nb_extra_005"
+      },
+      {
+        "label": "KMC support recorded",
+        "category": "Newborn",
+        "target": 80,
+        "status": "tracked",
+        "note": "Derived: Management given to newborn = KMC recorded in Labour encounters.",
+        "numerator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "Labour",
+          "variable2": "concept_name",
+          "value2": "Management given to newborn",
+          "variable3": "obs_value_coded",
+          "value3": "KMC"
+        },
+        "denominator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "Labour",
+          "variable2": "concept_name",
+          "value2": "Management given to newborn"
+        },
+        "id": "mnid_nb_extra_006"
+      },
+      {
+        "label": "Low birthweight newborns",
+        "category": "Newborn",
+        "target": 15,
+        "status": "tracked",
+        "note": "Burden indicator (lower is better). Proxy via Prematurity/Kangaroo = Low birth weight in PNC.",
+        "numerator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "PNC",
+          "variable2": "concept_name",
+          "value2": "Prematurity/Kangaroo",
+          "variable3": "obs_value_coded",
+          "value3": "Low birth weight"
+        },
+        "denominator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "PNC",
+          "variable2": "concept_name",
+          "value2": "Prematurity/Kangaroo"
+        },
+        "id": "mnid_nb_extra_007"
       }
     ],
     "mnid_categories": [

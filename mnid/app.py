@@ -88,6 +88,8 @@ _LOGGER = logging.getLogger(__name__)
 
 def clear_runtime_caches() -> None:
     _network_df_cache.clear()
+    _heatmap_store_cache.clear()
+    _analysis_charts_cache.clear()
     _MNID_UI_CACHE.clear()
     from mnid.aggregation.store import invalidate_cache as _agg_invalidate
     _agg_invalidate()
@@ -1596,7 +1598,8 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
         yaxis=dict(visible=False),
     )
 
-    if not active_inds or mch_full.empty:
+    # Bail only when both data sources are unavailable
+    if not active_inds or (_compare_agg_check is None and mch_full.empty):
         toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
         toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
         entity_options = facility_options if mode == 'facility' else district_options
@@ -1624,7 +1627,7 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
         ind_value_out = no_update if user_changed_indicators else selected_ind_ids
         return _empty_fig, entity_options, [], ind_options, ind_value_out, chart_type, toggle_class, toggle_text
 
-    if 'Date' not in mch_full.columns:
+    if _compare_agg_check is None and 'Date' not in mch_full.columns:
         toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
         toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
         ind_value_out = no_update if user_changed_indicators else selected_ind_ids
@@ -1865,6 +1868,54 @@ def register_mnid_callbacks(app) -> None:
 # MNID dashboard entry point
 
 _network_df_cache: dict = {}
+_heatmap_store_cache: dict = {}
+_analysis_charts_cache: dict = {}
+
+
+def prewarm_cache(dataset_version: str | None = None) -> bool:
+    """
+    Pre-compute and cache the prepared MNID network DataFrame so the first
+    user request hits a warm cache instead of running the 8-9s prepare step.
+
+    Safe to call from a background thread at server startup.
+    Returns True if the cache was populated, False if already warm or failed.
+    """
+    try:
+        from config import DATA_FILE_NAME_
+        from data_storage import DataStorage
+        from mnid.data_utils import prepare_mnid_dataframe as _prep
+
+        _mnid_cols = ', '.join([
+            'person_id', 'encounter_id', 'Date', 'Program', 'Reporting_Program',
+            'Service_Area', 'Facility', 'Facility_CODE', 'District', 'Encounter',
+            'obs_value_coded', 'concept_name', 'Value', 'ValueN', 'new_revisit',
+            'Home_district', 'TA', 'Village', 'Age', 'Age_Group', 'Gender',
+            'Source_Program',
+        ])
+        full = DataStorage.query_duckdb(f"SELECT {_mnid_cols} FROM '{DATA_FILE_NAME_}'")
+        full['Date'] = pd.to_datetime(full['Date'], errors='coerce')
+
+        opd_key = (
+            dataset_version,
+            len(full),
+            tuple(full.columns.tolist()) if not full.empty else (),
+            (),   # selected_facilities — national level, no filter
+            (),   # selected_districts
+        )
+        if opd_key in _network_df_cache:
+            return False  # already warm
+
+        import logging
+        _LOG = logging.getLogger(__name__)
+        _LOG.info('MNID pre-warm: preparing %d rows …', len(full))
+        net_df = _prep(full)
+        _network_df_cache[opd_key] = net_df
+        _LOG.info('MNID pre-warm complete: %d rows cached', len(net_df))
+        return True
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning('MNID pre-warm failed: %s', exc)
+        return False
 
 
 def render_mnid_dashboard(data_opd, config,
@@ -1874,16 +1925,19 @@ def render_mnid_dashboard(data_opd, config,
     selected_programs = tuple(sorted((scope_meta or {}).get('mnid_categories') or []))
     selected_facilities = tuple(sorted((scope_meta or {}).get('selected_facilities') or []))
     selected_districts = tuple(sorted((scope_meta or {}).get('selected_districts') or []))
+    # _prepare_mnid_dataframe doesn't use selected_programs — key on data identity only
+    # so that maternal and newborn dashboards loaded in the same session share the cache.
     _opd_key = (
         dataset_version,
         len(data_opd),
         tuple(data_opd.columns.tolist()) if not data_opd.empty else (),
-        selected_programs,
         selected_facilities,
         selected_districts,
     )
     if _opd_key not in _network_df_cache:
         _network_df_cache.clear()
+        _heatmap_store_cache.clear()
+        _analysis_charts_cache.clear()
         _network_df_cache[_opd_key] = _prepare_mnid_dataframe(data_opd)
     network_df = _network_df_cache[_opd_key]
 
@@ -1892,8 +1946,10 @@ def render_mnid_dashboard(data_opd, config,
     facility_df = network_df
     if start_date and 'Date' in network_df.columns and not network_df.empty:
         try:
-            s = pd.to_datetime(start_date)
-            e = pd.to_datetime(end_date) if end_date else network_df['Date'].max()
+            s = pd.to_datetime(start_date).normalize()
+            # Extend end to end-of-day so records at 16:56 etc. on the last date are included
+            e = (pd.to_datetime(end_date).normalize() + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+                 if end_date else network_df['Date'].max())
             date_mask = (network_df['Date'] >= s) & (network_df['Date'] <= e)
             facility_df = network_df[date_mask]
         except Exception:
@@ -2009,10 +2065,13 @@ def render_mnid_dashboard(data_opd, config,
 
     # Derive period bounds once — used for both aggregate queries and prev-period delta
     try:
-        _s = pd.to_datetime(start_date)
-        _e = pd.to_datetime(end_date) if end_date else (
-            network_df['Date'].max() if 'Date' in network_df.columns and not network_df.empty
-            else pd.Timestamp.now()
+        _s = pd.to_datetime(start_date).normalize() if start_date else None
+        _e = (
+            (pd.to_datetime(end_date).normalize() + pd.Timedelta(days=1) - pd.Timedelta(seconds=1))
+            if end_date else (
+                network_df['Date'].max() if 'Date' in network_df.columns and not network_df.empty
+                else pd.Timestamp.now()
+            )
         )
     except Exception:
         _s = _e = None
@@ -2021,13 +2080,10 @@ def render_mnid_dashboard(data_opd, config,
     _fac_filter = selected_facilities or None
     _dist_filter = selected_districts or None
 
-    # Pick grain based on the selected date span so "today" (span=0) uses daily
-    # records and not monthly records whose period_start is the 1st of the month.
-    if _s is not None and _e is not None:
-        _span_days = max((_e - _s).days, 0)
-        _kpi_grain = 'daily' if _span_days <= 1 else ('weekly' if _span_days <= 14 else 'monthly')
-    else:
-        _kpi_grain = 'monthly'
+    # Always use daily grain for scalar KPI queries so the number responds to the
+    # exact date range selected (monthly grain maps any sub-month range to the same
+    # full-month record, making data appear static when the user changes dates).
+    _kpi_grain = 'daily'
 
     computed = []
     for ind in tracked:
@@ -2091,13 +2147,28 @@ def render_mnid_dashboard(data_opd, config,
     for ind in all_inds:
         by_cat.setdefault(ind.get('category','Other'), []).append(ind)
 
-    coverage_charts  = _coverage_charts_section(by_cat, facility_df, category_order)
+    _cov_grain = _kpi_grain  # reuse the same grain chosen for KPIs
+    coverage_charts = _coverage_charts_section(
+        by_cat, facility_df, category_order,
+        agg_df=_agg, start_date=str(_s.date()) if _s is not None else start_date,
+        end_date=str(_e.date()) if _e is not None else end_date,
+        facility_codes=list(_fac_filter) if _fac_filter else None,
+        districts=list(_dist_filter) if _dist_filter and not _fac_filter else None,
+        grain=_cov_grain,
+    )
 
-    # Pre-build analysis charts
-    anc_charts    = _anc_charts(facility_df)
-    labour_charts = _labour_charts(facility_df)
-    pnc_charts    = _pnc_charts(facility_df)
-    nb_charts     = _newborn_charts(facility_df)
+    # Pre-build analysis charts — cached by date range so maternal+newborn on same
+    # page share the result, and repeat selections of the same range are instant.
+    _ac_key = (_opd_key, start_date, end_date)
+    if _ac_key in _analysis_charts_cache:
+        anc_charts, labour_charts, pnc_charts, nb_charts = _analysis_charts_cache[_ac_key]
+    else:
+        anc_charts    = _anc_charts(facility_df)
+        labour_charts = _labour_charts(facility_df)
+        pnc_charts    = _pnc_charts(facility_df)
+        nb_charts     = _newborn_charts(facility_df)
+        _analysis_charts_cache.clear()
+        _analysis_charts_cache[_ac_key] = (anc_charts, labour_charts, pnc_charts, nb_charts)
 
     # All accordion sections open by default
     analysis_acc = [
@@ -2108,7 +2179,18 @@ def render_mnid_dashboard(data_opd, config,
     ]
     analysis_acc = [a for a in analysis_acc if a]
 
-    performance_div, heatmap_div = _coverage_heatmap_section(all_inds, facility_code, facility_df)
+    # Heatmap store is keyed by data version + facility + indicators (not by date range)
+    # so it's computed once per session and reused across all date-range changes.
+    _heatmap_cache_key = (_opd_key, facility_code, tuple(i['id'] for i in tracked))
+    if _heatmap_cache_key not in _heatmap_store_cache:
+        from mnid.heatmap import _compute_heatmap_store as _cms
+        _heatmap_store_cache.clear()
+        _heatmap_store_cache[_heatmap_cache_key] = _cms(network_df, tracked, facility_code)
+    _precomputed_heatmap_store = _heatmap_store_cache[_heatmap_cache_key]
+    performance_div, heatmap_div = _coverage_heatmap_section(
+        all_inds, facility_code, network_df,
+        precomputed_store=_precomputed_heatmap_store,
+    )
     comparative_div  = _comparative_analysis_section(all_inds, facility_code, facility_df, payload_key=_payload_key)
 
     def _sec_header(title, count=None, desc=None, eyebrow=None):
