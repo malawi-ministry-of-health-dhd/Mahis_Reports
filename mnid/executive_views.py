@@ -406,19 +406,39 @@ def _delta_percent(current: float, previous: float) -> float:
 def _sparkline_figure(series: pd.DataFrame, color: str) -> go.Figure:
     fig = go.Figure()
     if not series.empty:
+        smooth_values, _ = _moving_average_values(series["value"].tolist(), "monthly")
+        valid_values = [value for value in series["value"].tolist() if value is not None]
+        y_min = min(valid_values) if valid_values else 0
+        y_max = max(valid_values) if valid_values else 1
+        y_span = max(y_max - y_min, 1)
+        y_floor = max(y_min - (y_span * 0.18), 0)
+        y_ceiling = y_max + (y_span * 0.12)
+        r = int(color[1:3], 16) if color.startswith("#") and len(color) == 7 else 21
+        g_v = int(color[3:5], 16) if color.startswith("#") and len(color) == 7 else 128
+        b = int(color[5:7], 16) if color.startswith("#") and len(color) == 7 else 61
+
+        fig.add_trace(go.Scatter(
+            x=series["month"],
+            y=smooth_values,
+            mode="lines+markers",
+            line=dict(color=color, width=3, shape="spline", smoothing=1.0),
+            marker=dict(size=5, color=color, line=dict(color="#ffffff", width=1)),
+            fill="tozeroy",
+            fillcolor=f"rgba({r},{g_v},{b},0.10)",
+            hoverinfo="skip",
+        ))
         fig.add_trace(go.Scatter(
             x=series["month"],
             y=series["value"],
             mode="lines",
-            line=dict(color=color, width=2.2, shape="spline", smoothing=1.0),
-            fill="tozeroy",
-            fillcolor=f"rgba({int(color[1:3],16)},{int(color[3:5],16)},{int(color[5:7],16)},0.08)"
-                      if color.startswith("#") and len(color) == 7 else "rgba(21,128,61,0.08)",
+            line=dict(color=color, width=1.4, dash="dot"),
+            opacity=0.42,
             hoverinfo="skip",
         ))
+        fig.update_yaxes(range=[y_floor, y_ceiling])
     fig.update_layout(
-        margin=dict(l=0, r=0, t=0, b=0),
-        height=38,
+        margin=dict(l=0, r=0, t=4, b=0),
+        height=64,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         xaxis=dict(visible=False),
@@ -533,7 +553,7 @@ def _kpi_card(title: str, value: int | float, delta_value: float, series: pd.Dat
             dcc.Graph(
                 figure=_sparkline_figure(series, color),
                 config={"displayModeBar": False, "responsive": True},
-                style={"height": "44px", "marginTop": "8px"},
+                style={"height": "66px", "marginTop": "12px"},
             ),
         ],
     )
