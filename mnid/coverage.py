@@ -978,23 +978,52 @@ def _system_readiness(df, supply_inds, wf_inds, dq_inds):
             rows.append(_stat_row(ind['label'], num, den, pct, ind.get(tgt_key)))
         return rows
 
-    return html.Div([
-        html.Div('SYSTEM READINESS', className='mnid-section-lbl'),
-        html.Div(className='mnid-grid3', children=[
-            html.Div(className='mnid-card', children=[
-                html.Div('Equipment & Supplies', className='mnid-card-title'),
-                *_rows(supply_inds),
-            ]),
-            html.Div(className='mnid-card', children=[
-                html.Div('Workforce Competency', className='mnid-card-title'),
-                *_rows(wf_inds),
-            ]),
-            html.Div(className='mnid-card', children=[
-                html.Div('Data Quality', className='mnid-card-title'),
-                *_rows(dq_inds, 'target_pct'),
-            ]),
-        ]),
-    ])
+    section_specs = [
+        (
+            'Equipment & Supplies',
+            'Supply-side indicators covering medicines, devices, and essential equipment.',
+            _rows(supply_inds),
+        ),
+        (
+            'Workforce Competency',
+            'Live competency and staffing readiness indicators from the current MNID scope.',
+            _rows(wf_inds),
+        ),
+        (
+            'Data Quality',
+            'Completeness and timeliness signals supporting dashboard confidence.',
+            _rows(dq_inds, 'target_pct'),
+        ),
+    ]
+
+    cards = []
+    for title, subtitle, rows in section_specs:
+        cards.append(
+            dmc.Paper(
+                withBorder=True,
+                radius='md',
+                p='md',
+                shadow='xs',
+                style={'borderColor': '#e2e8f0', 'height': '100%'},
+                children=[
+                    html.Div(title, style={'fontSize': '13px', 'fontWeight': '700', 'color': '#0f172a', 'marginBottom': '4px'}),
+                    html.Div(subtitle, style={'fontSize': '11px', 'color': '#64748b', 'lineHeight': '1.45', 'marginBottom': '12px'}),
+                    *(rows or [html.Div(
+                        'No live observations in the current selection.',
+                        style={
+                            'fontSize': '11px',
+                            'color': '#94a3b8',
+                            'border': '1px dashed #cbd5e1',
+                            'borderRadius': '10px',
+                            'padding': '12px 14px',
+                            'background': '#f8fafc',
+                        },
+                    )]),
+                ],
+            )
+        )
+
+    return dmc.SimpleGrid(cols=3, spacing='lg', mb='lg', children=cards)
 
 
 def _compare_status_counts(df: pd.DataFrame, tracked: list) -> dict:
