@@ -447,3 +447,195 @@ def _mortality_distribution_chart(df: pd.DataFrame, title: str, color: str) -> g
     )
     return fig
 
+
+def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, indicator_label: str = "Maternal Indicators") -> html.Div:
+    df = _copy_df(df)
+    prev_df = _prior_period_df(df)
+    current_metrics = _metric_snapshot(df)
+    previous_metrics = _metric_snapshot(prev_df)
+    start, end = _period_bounds(df)
+    period_label = f"{start.strftime('%d %b %Y') if start is not None else 'N/A'} - {end.strftime('%d %b %Y') if end is not None else 'N/A'}"
+    updated_label = end.strftime("%d %b %Y, %H:%M") if end is not None else "Unavailable"
+
+    scope_items = _hierarchy_scope(df, scope_meta, period_label)
+    facilities_reporting = int(df["Facility_CODE"].dropna().astype(str).nunique()) if "Facility_CODE" in df.columns else 0
+
+    kpi_specs = [
+        ("Total Admissions", "total_admissions", ADMISSIONS_BLUE, "12-month reporting window", pd.Series(True, index=df.index)),
+        ("Maternal Admissions", "maternal_admissions", PRIMARY_GREEN, "ANC, labour, and PNC service area", _service_mask(df, ["ANC", "Labour", "PNC"])),
+        ("Neonatal Admissions", "neonatal_admissions", NEONATAL_ORANGE, "Neonatal care service area", _service_mask(df, ["Newborn"])),
+        ("Total Deliveries", "total_deliveries", "#7C3AED", "Labour encounters", _service_mask(df, ["Labour"])),
+        ("Live Births", "live_births", PRIMARY_GREEN, "Outcome of delivery = live birth", _contains_mask(df, "obs_value_coded", ["Live birth", "Live births", "Alive"])),
+        ("Total Births", "total_births", STILLBIRTH_BLUE, "Live births + stillbirths", _contains_mask(df, "concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"])),
+    ]
+
+    kpi_cards = []
+    for label, key, color, note, mask in kpi_specs:
+        series = _monthly_series(df, mask if len(df) else pd.Series(dtype=bool), "encounter_id" if key.endswith("admissions") or key == "total_deliveries" else "person_id")
+        delta = _delta_percent(current_metrics[key], previous_metrics[key])
+        kpi_cards.append(_kpi_card(label, current_metrics[key], delta, series, color, note))
+
+    mortality_specs = [
+        ("Maternal Deaths", current_metrics["maternal_deaths"], "MMR per 100k live births", current_metrics["institutional_mmr"], current_metrics["maternal_deaths"] - previous_metrics["maternal_deaths"], MORTALITY_ROSE, "#FFF1F2"),
+        ("Neonatal Deaths", current_metrics["neonatal_deaths"], "NMR per 1,000 live births", current_metrics["neonatal_mortality_rate"], current_metrics["neonatal_deaths"] - previous_metrics["neonatal_deaths"], NEONATAL_ORANGE, "#FFF8EB"),
+        ("Stillbirths", current_metrics["stillbirths"], "SBR per 1,000 total births", current_metrics["stillbirth_rate"], current_metrics["stillbirths"] - previous_metrics["stillbirths"], STILLBIRTH_BLUE, "#EFF6FF"),
+    ]
+
+    admissions_series = _monthly_series(df, pd.Series(True, index=df.index), "encounter_id")
+    maternal_death_series = _monthly_series(df, _yn_mask(df, "mnid_pnc_maternal_death"), "person_id")
+    neonatal_death_series = _monthly_series(df, _contains_mask(df, "obs_value_coded", ["Died", "Dead", "Death", "Neonatal death"]), "person_id")
+    stillbirth_series = _monthly_series(df, _yn_mask(df, "mnid_labour_stillbirth"), "person_id")
+
+    geography_df = pd.DataFrame()
+    if not df.empty and "District" in df.columns:
+        geo_work = df.copy()
+        geo_work["region"] = geo_work["District"].map(lambda x: DISTRICT_REGION_ZONE.get(str(x), ("Unknown", "Unknown"))[0])
+        geo_group = geo_work.groupby("District", as_index=False).agg(
+            maternal=("mnid_pnc_maternal_death", lambda s: s.fillna("").astype(str).str.lower().isin({"yes", "true", "1"}).sum() if len(s) else 0),
+            neonatal=("obs_value_coded", lambda s: s.fillna("").astype(str).str.lower().isin({"died", "dead", "death", "neonatal death"}).sum() if len(s) else 0),
+            stillbirth=("mnid_labour_stillbirth", lambda s: s.fillna("").astype(str).str.lower().isin({"yes", "true", "1"}).sum() if len(s) else 0),
+        )
+        geo_group["total"] = geo_group[["maternal", "neonatal", "stillbirth"]].sum(axis=1)
+        geography_df = geo_group.sort_values("total", ascending=False).head(6)
+        region_ranking = (
+            geo_work.assign(maternal=_yn_mask(geo_work, "mnid_pnc_maternal_death").astype(int))
+            .groupby("region", as_index=False)["maternal"]
+            .sum()
+            .sort_values("maternal", ascending=False)
+        )
+        region_rows = [(row["region"], int(row["maternal"])) for _, row in region_ranking.iterrows()]
+    else:
+        region_rows = []
+
+    hotspot_rows = [(row["District"], int(row["total"])) for _, row in geography_df.iterrows()] if not geography_df.empty else []
+
+    explorer_specs = [
+        ("Maternal deaths", MORTALITY_ROSE, geography_df.assign(value=geography_df["maternal"]) if not geography_df.empty else pd.DataFrame(), maternal_death_series),
+        ("Neonatal deaths", NEONATAL_ORANGE, geography_df.assign(value=geography_df["neonatal"]) if not geography_df.empty else pd.DataFrame(), neonatal_death_series),
+        ("Stillbirths", STILLBIRTH_BLUE, geography_df.assign(value=geography_df["stillbirth"]) if not geography_df.empty else pd.DataFrame(), stillbirth_series),
+    ]
+
+    explorer_tabs = dcc.Tabs(
+        value="Maternal deaths",
+        className="mnid-exec-subtabs",
+        children=[
+            dcc.Tab(
+                label=label,
+                value=label,
+                className="mnid-exec-subtab",
+                selected_className="mnid-exec-subtab--selected",
+                children=html.Div(
+                    style={"paddingTop": "18px"},
+                    children=[
+                        dmc.SimpleGrid(
+                            cols=2,
+                            spacing="lg",
+                            children=[
+                                dcc.Graph(figure=_mortality_distribution_chart(dist_df[["District", "value"]] if not dist_df.empty else pd.DataFrame(), f"{label} distribution", color), config={"displayModeBar": False}),
+                                dcc.Graph(figure=_moving_average_chart(series_df, f"{label[:-1]} trend", color, None), config={"displayModeBar": False}),
+                            ],
+                        )
+                    ],
+                ),
+            )
+            for label, color, dist_df, series_df in explorer_specs
+        ],
+    )
+
+    return html.Div(
+        className="mnid-executive-page",
+        children=[
+            dmc.Paper(
+                withBorder=True,
+                radius="xl",
+                p="xl",
+                style={"background": BG, "borderColor": BORDER, "marginBottom": "18px"},
+                children=[
+                    dmc.Group(
+                        justify="space-between",
+                        align="flex-start",
+                        children=[
+                            dmc.Stack(
+                                gap=4,
+                                children=[
+                                    dmc.Text("Maternal & Newborn Health Dashboard", size="sm", fw=700, c=PRIMARY_GREEN, tt="uppercase", style={"letterSpacing": "0.08em"}),
+                                    dmc.Title("Malawi National Overview", order=1, c=TEXT),
+                                    dmc.Text(f"{indicator_label} scope · executive summary and national mortality profile", size="sm", c=DIM),
+                                ],
+                            ),
+                            dmc.Stack(
+                                gap=6,
+                                align="flex-end",
+                                children=[
+                                    dmc.Badge("Country Profile", size="lg", radius="sm", color="green", variant="light"),
+                                    dmc.Text(f"Last updated · {updated_label}", size="sm", c=DIM),
+                                    dmc.Text(f"Data completeness · {current_metrics['completeness']:.1f}%", size="sm", c=DIM),
+                                    dmc.Text(f"Facilities reporting · {facilities_reporting}", size="sm", c=DIM),
+                                ],
+                            ),
+                        ],
+                    )
+                ],
+            ),
+            dmc.Paper(
+                withBorder=True,
+                radius="md",
+                p="md",
+                mb="lg",
+                style={"background": SOFT_BACKGROUND, "borderColor": BORDER},
+                children=[
+                    dmc.Text("Scoped by dashboard filters", size="sm", fw=700, mb="sm"),
+                    dmc.SimpleGrid(
+                        cols=5,
+                        spacing="md",
+                        children=[
+                            dmc.Select(label=item["label"], value=item["value"], data=[item["value"]], disabled=True)
+                            for item in scope_items
+                        ],
+                    ),
+                ],
+            ),
+            dmc.Text("Data Volume · 12-Month Period", size="sm", fw=700, tt="uppercase", style={"letterSpacing": "0.08em", "marginBottom": "10px"}),
+            dmc.SimpleGrid(cols=3, spacing="lg", mb="lg", children=kpi_cards),
+            dmc.Text("Mortality Snapshot · Immediate Attention Required", size="sm", fw=700, tt="uppercase", style={"letterSpacing": "0.08em", "marginBottom": "10px"}),
+            dmc.SimpleGrid(
+                cols=3,
+                spacing="md",
+                mb="lg",
+                children=[_mortality_card(*spec) for spec in mortality_specs],
+            ),
+            dmc.Text("National Trends · 12-Month Run Charts", size="sm", fw=700, tt="uppercase", style={"letterSpacing": "0.08em", "marginBottom": "10px"}),
+            dmc.SimpleGrid(
+                cols=2,
+                spacing="lg",
+                mb="lg",
+                children=[
+                    dcc.Graph(figure=_moving_average_chart(admissions_series, "Admissions trend", ADMISSIONS_BLUE, None), config={"displayModeBar": False}),
+                    dcc.Graph(figure=_moving_average_chart(maternal_death_series, "Maternal death trend", MORTALITY_ROSE, current_metrics["institutional_mmr"] / 20 if current_metrics["institutional_mmr"] else None), config={"displayModeBar": False}),
+                    dcc.Graph(figure=_moving_average_chart(neonatal_death_series, "Neonatal death trend", NEONATAL_ORANGE, current_metrics["neonatal_mortality_rate"] * 4 if current_metrics["neonatal_mortality_rate"] else None), config={"displayModeBar": False}),
+                    dcc.Graph(figure=_moving_average_chart(stillbirth_series, "Stillbirth trend", STILLBIRTH_BLUE, current_metrics["stillbirth_rate"] * 4 if current_metrics["stillbirth_rate"] else None), config={"displayModeBar": False}),
+                ],
+            ),
+            dmc.Text("Where is Mortality Happening? · Geographic Breakdown", size="sm", fw=700, tt="uppercase", style={"letterSpacing": "0.08em", "marginBottom": "10px"}),
+            dmc.SimpleGrid(
+                cols=2,
+                spacing="lg",
+                mb="lg",
+                children=[
+                    _ranking_list("Region ranking · maternal deaths", region_rows or [("No data", 0)], [MORTALITY_ROSE, "#FB7185", "#FCA5A5", "#FECACA"]),
+                    dmc.Paper(withBorder=True, radius="md", p="md", children=[dmc.Text("District ranking · all mortality", fw=700, size="sm"), dcc.Graph(figure=_stacked_mortality_chart(geography_df), config={"displayModeBar": False})]),
+                ],
+            ),
+            dmc.SimpleGrid(
+                cols=2,
+                spacing="lg",
+                mb="lg",
+                children=[
+                    _ranking_list("Facility hotspots", hotspot_rows or [("No data", 0)], [MORTALITY_ROSE, "#FB7185", "#FDA4AF", "#FCD34D"]),
+                    dmc.Paper(withBorder=True, radius="md", p="md", children=[dmc.Text("Zone comparison", fw=700, size="sm"), dmc.Text("Derived from district mortality distribution in the current scope.", size="sm", c=DIM, mt="xs")]),
+                ],
+            ),
+            dmc.Text("Mortality Explorer · Interactive", size="sm", fw=700, tt="uppercase", style={"letterSpacing": "0.08em", "marginBottom": "10px"}),
+            dmc.Paper(withBorder=True, radius="md", p="md", children=[explorer_tabs]),
+        ],
+    )
