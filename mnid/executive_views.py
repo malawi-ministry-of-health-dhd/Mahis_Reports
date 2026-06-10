@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 from dash import dcc, html
 
 from mnid.chart_helpers import _cov, _moving_average_values
+from mnid.coverage import _system_readiness
 from mnid.constants import BG, BORDER, DIM, FONT, GRID_C, MUTED, OK_C, TEXT, WARN_C
 
 PRIMARY_GREEN = "#15803D"
@@ -405,19 +406,39 @@ def _delta_percent(current: float, previous: float) -> float:
 def _sparkline_figure(series: pd.DataFrame, color: str) -> go.Figure:
     fig = go.Figure()
     if not series.empty:
+        smooth_values, _ = _moving_average_values(series["value"].tolist(), "monthly")
+        valid_values = [value for value in series["value"].tolist() if value is not None]
+        y_min = min(valid_values) if valid_values else 0
+        y_max = max(valid_values) if valid_values else 1
+        y_span = max(y_max - y_min, 1)
+        y_floor = max(y_min - (y_span * 0.18), 0)
+        y_ceiling = y_max + (y_span * 0.12)
+        r = int(color[1:3], 16) if color.startswith("#") and len(color) == 7 else 21
+        g_v = int(color[3:5], 16) if color.startswith("#") and len(color) == 7 else 128
+        b = int(color[5:7], 16) if color.startswith("#") and len(color) == 7 else 61
+
+        fig.add_trace(go.Scatter(
+            x=series["month"],
+            y=smooth_values,
+            mode="lines+markers",
+            line=dict(color=color, width=3, shape="spline", smoothing=1.0),
+            marker=dict(size=5, color=color, line=dict(color="#ffffff", width=1)),
+            fill="tozeroy",
+            fillcolor=f"rgba({r},{g_v},{b},0.10)",
+            hoverinfo="skip",
+        ))
         fig.add_trace(go.Scatter(
             x=series["month"],
             y=series["value"],
             mode="lines",
-            line=dict(color=color, width=2.2, shape="spline", smoothing=1.0),
-            fill="tozeroy",
-            fillcolor=f"rgba({int(color[1:3],16)},{int(color[3:5],16)},{int(color[5:7],16)},0.08)"
-                      if color.startswith("#") and len(color) == 7 else "rgba(21,128,61,0.08)",
+            line=dict(color=color, width=1.4, dash="dot"),
+            opacity=0.42,
             hoverinfo="skip",
         ))
+        fig.update_yaxes(range=[y_floor, y_ceiling])
     fig.update_layout(
-        margin=dict(l=0, r=0, t=0, b=0),
-        height=38,
+        margin=dict(l=0, r=0, t=4, b=0),
+        height=64,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         xaxis=dict(visible=False),
@@ -532,7 +553,7 @@ def _kpi_card(title: str, value: int | float, delta_value: float, series: pd.Dat
             dcc.Graph(
                 figure=_sparkline_figure(series, color),
                 config={"displayModeBar": False, "responsive": True},
-                style={"height": "44px", "marginTop": "8px"},
+                style={"height": "66px", "marginTop": "12px"},
             ),
         ],
     )
@@ -743,56 +764,59 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
         ("Districts Covered",   f"{districts_covered} / 28",                   "✓ Full coverage" if districts_covered >= 28 else f"{districts_covered} reporting"),
     ]
 
-    hero = html.Div([
-        html.Div("National Health Situation Room", style={
-            "fontSize": "10px", "fontWeight": "700", "color": "#4ade80",
-            "letterSpacing": ".12em", "textTransform": "uppercase",
-            "marginBottom": "8px", "display": "flex", "alignItems": "center", "gap": "7px",
-        }),
-        html.H1([
-            "Maternal & Newborn Health ", html.Br(),
-            html.Span("Intelligence Platform", style={"color": "#4ade80"}),
-        ], style={
-            "fontSize": "26px", "fontWeight": "800", "color": "#fff",
-            "letterSpacing": "-.04em", "lineHeight": "1.15", "marginBottom": "5px",
-        }),
-        html.P(f"Malawi National Overview · {indicator_label} · Evidence for Action · Decision Support", style={
-            "fontSize": "13px", "color": "rgba(255,255,255,0.6)", "marginBottom": "16px",
-        }),
-        html.Div([
-            html.Span("● Live", style={
-                "background": "rgba(74,222,128,.18)", "border": "1px solid rgba(74,222,128,.3)",
-                "color": "#4ade80", "fontSize": "10px", "fontWeight": "700",
-                "padding": "3px 10px", "borderRadius": "99px",
+    hero = dmc.Paper(
+        withBorder=True,
+        radius="lg",
+        shadow="xs",
+        p="xl",
+        style={"marginBottom": "20px", "borderColor": "#e2e8f0"},
+        children=[
+            html.Div("Country Profile", style={
+                "fontSize": "10px", "fontWeight": "700", "color": "#0f766e",
+                "letterSpacing": ".12em", "textTransform": "uppercase",
+                "marginBottom": "10px",
             }),
-            html.Span(f"📅 {period_label}", style={
-                "background": "rgba(255,255,255,.1)", "border": "1px solid rgba(255,255,255,.15)",
-                "color": "rgba(255,255,255,.8)", "fontSize": "10px", "fontWeight": "700",
-                "padding": "3px 10px", "borderRadius": "99px",
-            }),
-            html.Span(f"{districts_covered} Districts · {facilities_reporting} Facilities", style={
-                "background": "rgba(255,255,255,.1)", "border": "1px solid rgba(255,255,255,.15)",
-                "color": "rgba(255,255,255,.8)", "fontSize": "10px", "fontWeight": "700",
-                "padding": "3px 10px", "borderRadius": "99px",
-            }),
-        ], style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginBottom": "24px"}),
-        html.Div([
-            *[html.Div([
-                html.Div(lbl, style={"fontSize": "9px", "color": "rgba(255,255,255,.45)", "textTransform": "uppercase", "letterSpacing": ".08em", "marginBottom": "4px"}),
-                html.Div(val, style={"fontSize": "18px", "fontWeight": "700", "color": "#fff", "letterSpacing": "-.02em"}),
-                html.Div(sub, style={"fontSize": "10px", "color": "rgba(255,255,255,.4)", "marginTop": "2px"}),
-            ], style={"background": "rgba(255,255,255,.06)", "padding": "14px 18px"})
-            for lbl, val, sub in hero_stats],
-        ], style={
-            "display": "grid", "gridTemplateColumns": "repeat(4,1fr)",
-            "gap": "1px", "background": "rgba(255,255,255,.1)",
-            "border": "1px solid rgba(255,255,255,.1)", "borderRadius": "10px", "overflow": "hidden",
-        }),
-    ], style={
-        "background": "linear-gradient(135deg,#0a1f12 0%,#0f2f1a 30%,#15803d 72%,#16a34a 100%)",
-        "borderRadius": "18px", "padding": "36px 40px",
-        "marginBottom": "20px", "position": "relative", "overflow": "hidden",
-    })
+            html.Div([
+                html.Div([
+                    html.H1("Maternal & Newborn Health Intelligence Platform", style={
+                        "fontSize": "26px", "fontWeight": "800", "color": "#0f172a",
+                        "letterSpacing": "-.04em", "lineHeight": "1.15", "marginBottom": "6px",
+                    }),
+                    html.P(f"Malawi national overview · {indicator_label} · Evidence for action · Decision support", style={
+                        "fontSize": "13px", "color": "#64748b", "marginBottom": "16px",
+                    }),
+                    html.Div([
+                        html.Span("Live", style={
+                            "background": "#ecfdf5", "border": "1px solid #bbf7d0",
+                            "color": "#15803d", "fontSize": "10px", "fontWeight": "700",
+                            "padding": "4px 10px", "borderRadius": "99px",
+                        }),
+                        html.Span(period_label, style={
+                            "background": "#f8fafc", "border": "1px solid #e2e8f0",
+                            "color": "#475569", "fontSize": "10px", "fontWeight": "700",
+                            "padding": "4px 10px", "borderRadius": "99px",
+                        }),
+                        html.Span(f"{districts_covered} Districts · {facilities_reporting} Facilities", style={
+                            "background": "#f8fafc", "border": "1px solid #e2e8f0",
+                            "color": "#475569", "fontSize": "10px", "fontWeight": "700",
+                            "padding": "4px 10px", "borderRadius": "99px",
+                        }),
+                    ], style={"display": "flex", "gap": "8px", "flexWrap": "wrap"}),
+                ], style={"flex": "1", "minWidth": "280px"}),
+                html.Div([
+                    *[html.Div([
+                        html.Div(lbl, style={"fontSize": "9px", "color": "#94a3b8", "textTransform": "uppercase", "letterSpacing": ".08em", "marginBottom": "4px"}),
+                        html.Div(val, style={"fontSize": "18px", "fontWeight": "700", "color": "#0f172a", "letterSpacing": "-.02em"}),
+                        html.Div(sub, style={"fontSize": "10px", "color": "#64748b", "marginTop": "2px"}),
+                    ], style={"background": "#f8fafc", "padding": "14px 16px", "border": "1px solid #e2e8f0", "borderRadius": "12px"})
+                    for lbl, val, sub in hero_stats],
+                ], style={
+                    "flex": "1.1", "minWidth": "320px", "display": "grid",
+                    "gridTemplateColumns": "repeat(2, minmax(0, 1fr))", "gap": "12px",
+                }),
+            ], style={"display": "flex", "gap": "18px", "flexWrap": "wrap", "alignItems": "stretch"}),
+        ],
+    )
 
     # ---------- Alert banner ----------
     alert = None
@@ -1145,6 +1169,8 @@ def render_operational_readiness(
             hero,
             _section_header("Domain Readiness Overview"),
             domain_rings,
+            _section_header("System Readiness Detail"),
+            _system_readiness(df, list(supply_inds or []), list(wf_inds or []), list(dq_inds or [])),
             _section_header("Workforce & Domain Score Summary"),
             dmc.SimpleGrid(cols=2, spacing="lg", mb="lg", children=[
                 dmc.Paper(withBorder=True, radius="md", p="md", style={"borderColor": "#e2e8f0"}, children=[
