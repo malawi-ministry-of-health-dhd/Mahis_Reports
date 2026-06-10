@@ -2087,9 +2087,32 @@ def render_mnid_dashboard(data_opd, config,
         _system_readiness(facility_df, supply_inds, wf_inds, dq_inds),
     ])
 
+    indicator_tab_label = 'Newborn Indicators' if dashboard_theme == 'newborn' else 'Maternal Indicators'
+    executive_tabs = dcc.Tabs(
+        id='mnid-executive-tabs',
+        value='country-profile',
+        style={'marginBottom': '18px'},
+        children=[
+            dcc.Tab(
+                label='Country Profile',
+                value='country-profile',
+                style={'padding': '10px 18px', 'borderRadius': '12px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#FFFFFF', 'color': TEXT},
+                selected_style={'padding': '10px 18px', 'borderRadius': '12px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#F0FDF4', 'color': '#15803D', 'fontWeight': 700},
+                children=[render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=indicator_tab_label)],
+            ),
+            dcc.Tab(
+                label=indicator_tab_label,
+                value='indicator-dashboard',
+                style={'padding': '10px 18px', 'borderRadius': '12px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#FFFFFF', 'color': TEXT},
+                selected_style={'padding': '10px 18px', 'borderRadius': '12px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#F8FAFC', 'color': '#15803D', 'fontWeight': 700},
+                children=[indicator_content],
+            ),
+        ],
+    )
+
     return html.Div(className=f'mnid-bg{" mnid-theme-newborn" if dashboard_theme == "newborn" else ""}', children=[
         # Hidden components used by the MNID scroll spy callback
         dcc.Interval(id='mnid-scrollspy-tick', interval=250, max_intervals=-1),
         dcc.Store(id='mnid-scrollspy-out'),
-        html.Div(className=f'mnid-shell{" mnid-shell-newborn" if dashboard_theme == "newborn" else ""}', children=[indicator_content]),
+        html.Div(className=f'mnid-shell{" mnid-shell-newborn" if dashboard_theme == "newborn" else ""}', children=[executive_tabs]),
     ])
