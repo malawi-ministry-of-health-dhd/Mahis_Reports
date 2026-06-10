@@ -203,6 +203,9 @@ def get_dashboard_names():
 def normalize_report_name(name, menu_json):
     if not name:
         return name
+    if name == "Newborn":
+        if any(d.get("report_name") == "Maternal Health" for d in menu_json):
+            return "Maternal Health"
     if name == "Maternal and Child Health":
         if any(d.get("report_name") == "Maternal Health" for d in menu_json):
             return "Maternal Health"
@@ -558,6 +561,7 @@ def update_menu(interval, color):
             id={"type": "menu-button", "name": d["report_name"]}
         )
         for d in menu_json
+        if d.get("report_name") != "Newborn"
     ]
 
 
