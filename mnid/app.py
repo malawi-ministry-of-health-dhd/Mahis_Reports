@@ -13,7 +13,7 @@ pd.options.mode.chained_assignment = None
 import plotly.graph_objects as go
 from datetime import datetime
 from pathlib import Path
-from dash import html, dcc, clientside_callback, callback, callback_context, no_update, Input, Output, State, ALL
+from dash import html, dcc, callback, callback_context, no_update, Input, Output, State, ALL
 from dash.exceptions import PreventUpdate
 from helpers.helpers import create_count_from_config
 from mnid.constants import (
@@ -93,8 +93,7 @@ function(_tick) {
         '#mnid-performance',
         '#mnid-heatmap',
         '#mnid-comparative',
-        '#mnid-analysis',
-        '#mnid-readiness'
+        '#mnid-analysis'
     ];
 
     let active = '#mnid-summary';
@@ -212,7 +211,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         dashboard_subtitle = 'Program monitoring for admissions, outcomes, clinical interventions, coverage, and readiness.'
         dashboard_theme = 'newborn'
     elif set(category_order) == {'ANC', 'Labour', 'PNC'}:
-        dashboard_title = 'Maternal Health Indicators'
+        dashboard_title = 'MNH Program Dashboard'
         dashboard_subtitle = 'ANC, labour, and postnatal performance, comparison, coverage, and readiness.'
         dashboard_theme = 'default'
     else:
@@ -410,16 +409,6 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
                 'panel': {'padding': '0 16px 2px'},
             },
         ),
-    ])
-
-    indicator_content.children.extend([
-        _section_anchor('mnid-readiness'),
-        _sec_header(
-            'Operational Readiness',
-            desc='Devices, staffing, and data quality conditions that support neonatal care delivery.' if dashboard_theme == 'newborn' else 'Equipment - workforce competency - data quality',
-            eyebrow='Readiness' if dashboard_theme == 'newborn' else None,
-        ),
-        _system_readiness(facility_df, supply_inds, wf_inds, dq_inds),
     ])
 
     return {
@@ -1676,27 +1665,6 @@ def _service_table_switcher(df: pd.DataFrame, categories: list | None = None,
     ])
 
 
-clientside_callback(
-    _MNID_SCROLLSPY_CLIENTSIDE,
-    Output('mnid-scrollspy-out', 'data'),
-    Input('mnid-scrollspy-tick', 'n_intervals'),
-)
-
-
-@callback(
-    Output({'type': 'mnid-nav-btn', 'index': ALL}, 'className'),
-    Input('mnid-scrollspy-out', 'data'),
-    State({'type': 'mnid-nav-btn', 'index': ALL}, 'id'),
-    prevent_initial_call=False,
-)
-def sync_mnid_nav_active_state(active_hash, nav_ids):
-    active_hash = active_hash or '#mnid-summary'
-    classes = []
-    for item in nav_ids or []:
-        target = (item or {}).get('index')
-        classes.append('mnid-nav-btn active' if target == active_hash else 'mnid-nav-btn')
-    return classes
-
 # # MNID module-level callback
 
 @callback(
@@ -2001,12 +1969,6 @@ def register_mnid_callbacks(app) -> None:
     if getattr(app, '_mnid_callbacks_registered', False):
         return
 
-    app.clientside_callback(
-        _MNID_SCROLLSPY_CLIENTSIDE,
-        Output('mnid-scrollspy-out', 'data'),
-        Input('mnid-scrollspy-tick', 'n_intervals'),
-    )
-
     app.callback(
         Output('mnid-run-charts-container', 'children'),
         Output('mnid-trend-active-cat', 'data'),
@@ -2038,13 +2000,6 @@ def register_mnid_callbacks(app) -> None:
         State('mnid-service-table-view-store', 'data'),
         prevent_initial_call=False,
     )(update_service_table)
-
-    app.callback(
-        Output({'type': 'mnid-nav-btn', 'index': ALL}, 'className'),
-        Input('mnid-scrollspy-out', 'data'),
-        State({'type': 'mnid-nav-btn', 'index': ALL}, 'id'),
-        prevent_initial_call=False,
-    )(sync_mnid_nav_active_state)
 
     app.callback(
         Output('mnid-heatmap-graph', 'figure'),
@@ -2204,8 +2159,6 @@ def render_mnid_dashboard(data_opd, config,
     )
 
     return html.Div(className=f'mnid-bg{" mnid-theme-newborn" if dashboard_theme == "newborn" else ""}', children=[
-        dcc.Interval(id='mnid-scrollspy-tick', interval=250, max_intervals=-1),
-        dcc.Store(id='mnid-scrollspy-out'),
         dcc.Store(id='mnid-executive-view-store', data=executive_token),
         html.Div(className=f'mnid-shell{" mnid-shell-newborn" if dashboard_theme == "newborn" else ""}', children=[
             executive_tabs,
