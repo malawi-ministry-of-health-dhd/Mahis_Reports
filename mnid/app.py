@@ -26,7 +26,12 @@ from mnid.data_utils import (
     serialize_store_df as _serialize_store_df,
     deserialize_store_df as _deserialize_store_df,
     _remember_ui_payload, _restore_ui_dataframe,
-    _MNID_UI_CACHE, _MNID_UI_DISK_CACHE,
+    _MNID_UI_CACHE,
+)
+from mnid.aggregation.store import (
+    get_aggregate as _get_aggregate,
+    query_coverage as _agg_coverage,
+    query_time_series as _agg_time_series,
 )
 from mnid.geo_utils import (
     load_malawi_district_geojson as _load_malawi_district_geojson,
@@ -77,8 +82,6 @@ from mnid.layout import (
     _avg_ring, _count_bar, _kpi, _kpi_row, _section_anchor,
 )
 
-_MNID_UI_CACHE_MAX = 16
-_MNID_UI_CACHE_TTL_SECONDS = 3600
 _MNID_WARNED_MESSAGES = set()
 _LOGGER = logging.getLogger(__name__)
 
@@ -86,11 +89,8 @@ _LOGGER = logging.getLogger(__name__)
 def clear_runtime_caches() -> None:
     _network_df_cache.clear()
     _MNID_UI_CACHE.clear()
-    if _MNID_UI_DISK_CACHE is not None:
-        try:
-            _MNID_UI_DISK_CACHE.clear()
-        except Exception:
-            pass
+    from mnid.aggregation.store import invalidate_cache as _agg_invalidate
+    _agg_invalidate()
 
 
 def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str, chart_type: str = 'line') -> go.Figure:
@@ -210,17 +210,29 @@ def update_trend_chart(n_clicks_list, location, selected_inds, stored_trend, act
 
     trend_payload = stored_trend or {}
     tracked = trend_payload.get('tracked', [])
-    df = _restore_ui_dataframe(trend_payload.get('data_key'))
     scope_meta = trend_payload.get('scope_meta') or {}
     loc_options = trend_payload.get('loc_options') or [{'label': 'All locations', 'value': 'all'}]
     ind_opts_by_cat = trend_payload.get('ind_opts_by_cat') or {}
     ind_options = ind_opts_by_cat.get(cat, [])
 
+    # Use aggregate fast path; only restore the raw df when aggregate is absent (first run).
+    _agg_now = _get_aggregate()
+    if _agg_now is not None:
+        # Build a minimal stub df with the date range so _run_chart_cards can detect grain.
+        _d_min = trend_payload.get('date_min')
+        _d_max = trend_payload.get('date_max')
+        if _d_min and _d_max:
+            df = pd.DataFrame({'Date': pd.to_datetime([_d_min, _d_max])})
+        else:
+            df = _restore_ui_dataframe(trend_payload.get('data_key'))
+    else:
+        df = _restore_ui_dataframe(trend_payload.get('data_key'))
+
     ind_value_out = None if cat_changed else no_update
 
     cards = _run_chart_cards(df, tracked, cat, location or 'all',
                              selected_inds if not cat_changed else None,
-                             scope_meta)
+                             scope_meta, agg_df=_agg_now)
     classes = ['mnid-filter-btn active' if c == cat else 'mnid-filter-btn' for c in categories]
     return cards, cat, classes, loc_options, ind_options, ind_value_out
 
@@ -244,22 +256,36 @@ def _location_options_for_df(df: pd.DataFrame, scope_meta: dict) -> list[dict]:
 
 def _indicator_run_fig(plot_df: pd.DataFrame, ind: dict, color: str,
                        periods: list, tickfmt: str, hfmt: str,
-                       grain: str = 'monthly') -> go.Figure:
-    """Single-indicator run chart figure for one card."""
-    nm = _mask(plot_df, ind['numerator_filters'])
-    dm = _mask(plot_df, ind['denominator_filters'])
-    pid = 'person_id'
+                       grain: str = 'monthly',
+                       precomputed: pd.DataFrame | None = None) -> go.Figure:
+    """Single-indicator run chart figure for one card.
 
-    xs, ys = [], []
-    n_vals, d_vals = [], []
-    for p in periods:
-        pm = plot_df['_p'] == p
-        n_val = int(plot_df.loc[pm & nm, pid].dropna().nunique()) if pid in plot_df.columns else int((pm & nm).sum())
-        d_val = int(plot_df.loc[pm & dm, pid].dropna().nunique()) if pid in plot_df.columns else int((pm & dm).sum())
-        xs.append(p)
-        ys.append(round(n_val / d_val * 100, 1) if d_val > 0 else None)
-        n_vals.append(n_val)
-        d_vals.append(d_val)
+    When `precomputed` is provided (a DataFrame with period_start/numerator/
+    denominator/pct from the overnight aggregate) the expensive row-scan loop
+    is skipped entirely, cutting render time from seconds to milliseconds.
+    """
+    if precomputed is not None and not precomputed.empty:
+        xs     = precomputed['period_start'].tolist()
+        ys     = precomputed['pct'].tolist()
+        n_vals = precomputed['numerator'].tolist()
+        d_vals = precomputed['denominator'].tolist()
+        # Mark zero-denominator periods as None so gaps render correctly
+        ys = [y if d > 0 else None for y, d in zip(ys, d_vals)]
+    else:
+        nm = _mask(plot_df, ind['numerator_filters'])
+        dm = _mask(plot_df, ind['denominator_filters'])
+        pid = 'person_id'
+
+        xs, ys = [], []
+        n_vals, d_vals = [], []
+        for p in periods:
+            pm = plot_df['_p'] == p
+            n_val = int(plot_df.loc[pm & nm, pid].dropna().nunique()) if pid in plot_df.columns else int((pm & nm).sum())
+            d_val = int(plot_df.loc[pm & dm, pid].dropna().nunique()) if pid in plot_df.columns else int((pm & dm).sum())
+            xs.append(p)
+            ys.append(round(n_val / d_val * 100, 1) if d_val > 0 else None)
+            n_vals.append(n_val)
+            d_vals.append(d_val)
 
     smoothed, _ = _moving_average_values(ys, grain)
     valid_ys = [y for y in smoothed if y is not None]
@@ -336,7 +362,8 @@ def _indicator_run_fig(plot_df: pd.DataFrame, ind: dict, color: str,
 def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
                      location: str | None = None,
                      selected_ids: list | None = None,
-                     scope_meta: dict | None = None) -> list:
+                     scope_meta: dict | None = None,
+                     agg_df: pd.DataFrame | None = None) -> list:
     tracked = [i for i in indicators if i.get('status') == 'tracked' and i.get('category') == cat]
     if selected_ids:
         id_set = set(selected_ids)
@@ -346,12 +373,14 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
                          style={'color': MUTED, 'fontSize': '13px', 'padding': '24px'})]
 
     plot_df = df.copy()
+    fac_filter: list[str] | None = None
     if location and location != 'all':
         for col_name in ('Facility_CODE', 'District'):
             if col_name in df.columns:
                 mask = df[col_name].astype(str) == str(location)
                 if mask.any():
                     plot_df = df[mask].copy()
+                    fac_filter = [str(location)]
                     break
 
     dates = pd.to_datetime(plot_df['Date'], errors='coerce').dropna()
@@ -375,18 +404,39 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
         return [html.Div('No time periods available.',
                          style={'color': MUTED, 'fontSize': '13px', 'padding': '24px'})]
 
+    date_min, date_max = dates.min(), dates.max()
+
+    # Prefer scope_meta facility/district filter when no explicit location given
+    if agg_df is None:
+        agg_df = _get_aggregate()
+    if fac_filter is None and scope_meta:
+        fac_filter = scope_meta.get('selected_facilities') or None
+
     cat_colors = CAT_PALETTES.get(cat, _TREND_SERIES_PALETTE)
     cards = []
     for idx, ind in enumerate(tracked):
         color = cat_colors[idx % len(cat_colors)]
-        fig = _indicator_run_fig(plot_df, ind, color, periods, tickfmt, hfmt, grain)
+
+        # Fast path: use pre-aggregated series when available
+        precomputed = None
+        if agg_df is not None:
+            precomputed = _agg_time_series(
+                agg_df, ind['id'], grain=grain,
+                facility_codes=fac_filter,
+                start_date=date_min, end_date=date_max,
+            )
+
+        fig = _indicator_run_fig(plot_df, ind, color, periods, tickfmt, hfmt, grain, precomputed=precomputed)
         target = ind.get('target')
         target_badge = None
         if target is not None:
-            cls = _css(
-                _cov(plot_df, ind['numerator_filters'], ind['denominator_filters'])[2],
-                target, ind,
-            )
+            # Use aggregate for current-period coverage badge if available
+            if agg_df is not None:
+                cur_pct = _agg_coverage(agg_df, ind['id'], date_min, date_max,
+                                        facility_codes=fac_filter, grain=grain)[2]
+            else:
+                cur_pct = _cov(plot_df, ind['numerator_filters'], ind['denominator_filters'])[2]
+            cls = _css(cur_pct, target, ind)
             badge_colors = {'ok': ('#D1FAE5', '#065F46'), 'warn': ('#FEF3C7', '#92400E'), 'danger': ('#FEE2E2', '#991B1B')}
             bg, fg = badge_colors.get(cls, ('#F1F5F9', '#475569'))
             target_badge = html.Span(
@@ -431,10 +481,23 @@ def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None 
     }
     default_ind_opts = ind_opts_by_cat.get(default_cat, [])
 
-    default_cards = _run_chart_cards(df, tracked, default_cat, 'all', None, scope_meta)
+    _agg = _get_aggregate()
+    default_cards = _run_chart_cards(df, tracked, default_cat, 'all', None, scope_meta, agg_df=_agg)
+
+    # Store date range so callbacks can detect grain without restoring the full df.
+    # data_key is kept as a lightweight fallback for when the aggregate isn't built yet.
+    try:
+        _dates = pd.to_datetime(df['Date'], errors='coerce').dropna() if 'Date' in df.columns else pd.Series([], dtype='datetime64[ns]')
+        _date_min = _dates.min().isoformat() if len(_dates) else None
+        _date_max = _dates.max().isoformat() if len(_dates) else None
+    except Exception:
+        _date_min = _date_max = None
+
     trend_store = {
         'tracked': tracked,
         'data_key': _remember_ui_payload('trend', df, stable_key=payload_key),
+        'date_min': _date_min,
+        'date_max': _date_max,
         'scope_meta': scope_meta or {},
         'loc_options': loc_options,
         'ind_opts_by_cat': ind_opts_by_cat,
@@ -1508,7 +1571,9 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
         chart_type = 'line' if chart_type == 'bar' else 'bar'
     store_payload = stored or {}
     tracked = store_payload.get('tracked', [])
-    mch_full = _restore_ui_dataframe(store_payload.get('data_key'))
+    # Restore raw df only when aggregate isn't available (first run before overnight job).
+    _compare_agg_check = _get_aggregate()
+    mch_full = pd.DataFrame() if _compare_agg_check is not None else _restore_ui_dataframe(store_payload.get('data_key'))
     facility_options = store_payload.get('facility_options', [])
     district_options = store_payload.get('district_options', [])
     current_fac = store_payload.get('current_fac', '')
@@ -1586,24 +1651,48 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
         period_fmt = lambda p: pd.Period(p, 'M').strftime('%b %Y')
         max_periods = 12
 
-    d2 = mch_full
-    d2['_period'] = pd.to_datetime(d2['Date']).dt.to_period(period_code)
-    periods = sorted(d2['_period'].dropna().unique())[-max_periods:]
+    _compare_agg = _get_aggregate()
+
+    # When aggregate is available, skip raw-row scanning entirely.
+    # Fall back to the raw df loop only if no aggregate exists.
+    if _compare_agg is None:
+        d2 = mch_full
+        d2['_period'] = pd.to_datetime(d2['Date']).dt.to_period(period_code)
+        periods = sorted(d2['_period'].dropna().unique())[-max_periods:]
+    else:
+        periods = []  # not used in aggregate path
 
     fig = go.Figure()
     series_idx = 0
     for entity in entities:
-        entity_df = get_df(entity)
-        if entity_df.empty:
-            continue
         for ind in active_inds:
-            xs, ys, texts = [], [], []
-            for period in periods:
-                period_df = entity_df[pd.to_datetime(entity_df['Date']).dt.to_period(period_code) == period]
-                _, den, pct = _cov(period_df, ind['numerator_filters'], ind['denominator_filters'])
-                xs.append(period_fmt(period))
-                ys.append(_display_pct(pct) if den > 0 else None)
-                texts.append(f'{pct:.0f}%' if den > 0 else 'No data')
+            if _compare_agg is not None:
+                fac_arg  = [entity] if mode == 'facility' else None
+                dist_arg = [entity] if mode == 'district' else None
+                series = _agg_time_series(
+                    _compare_agg, ind['id'], grain=time_grain,
+                    facility_codes=fac_arg, districts=dist_arg,
+                )
+                series = series.tail(max_periods)
+                if series.empty:
+                    continue
+                xs = [period_fmt(pd.Period(ts, period_code)) for ts in
+                      pd.to_datetime(series['period_start']).dt.to_period(period_code)]
+                ys = series['pct'].tolist()
+                ys = [y if (series['denominator'].iloc[i] > 0) else None
+                      for i, y in enumerate(ys)]
+                texts = [f'{y:.0f}%' if y is not None else 'No data' for y in ys]
+            else:
+                entity_df = get_df(entity)
+                if entity_df.empty:
+                    continue
+                xs, ys, texts = [], [], []
+                for period in periods:
+                    period_df = entity_df[pd.to_datetime(entity_df['Date']).dt.to_period(period_code) == period]
+                    _, den, pct = _cov(period_df, ind['numerator_filters'], ind['denominator_filters'])
+                    xs.append(period_fmt(period))
+                    ys.append(_display_pct(pct) if den > 0 else None)
+                    texts.append(f'{pct:.0f}%' if den > 0 else 'No data')
             moving_average, _ = _moving_average_values(ys, time_grain)
             if not any(y is not None for y in moving_average):
                 continue
@@ -1918,10 +2007,39 @@ def render_mnid_dashboard(data_opd, config,
         ]
     hero_title = 'KEY NEONATAL INDICATORS' if dashboard_theme == 'newborn' else f'KEY {_CAT_LABELS.get(default_cat, str(default_cat or "Program")).upper()} INDICATORS'
 
+    # Derive period bounds once — used for both aggregate queries and prev-period delta
+    try:
+        _s = pd.to_datetime(start_date)
+        _e = pd.to_datetime(end_date) if end_date else (
+            network_df['Date'].max() if 'Date' in network_df.columns and not network_df.empty
+            else pd.Timestamp.now()
+        )
+    except Exception:
+        _s = _e = None
+
+    _agg = _get_aggregate()
+    _fac_filter = selected_facilities or None
+    _dist_filter = selected_districts or None
+
+    # Pick grain based on the selected date span so "today" (span=0) uses daily
+    # records and not monthly records whose period_start is the 1st of the month.
+    if _s is not None and _e is not None:
+        _span_days = max((_e - _s).days, 0)
+        _kpi_grain = 'daily' if _span_days <= 1 else ('weekly' if _span_days <= 14 else 'monthly')
+    else:
+        _kpi_grain = 'monthly'
+
     computed = []
     for ind in tracked:
-        num, den, pct = _cov(facility_df, ind['numerator_filters'],
-                              ind['denominator_filters'])
+        if _agg is not None and _s is not None:
+            num, den, pct = _agg_coverage(
+                _agg, ind['id'], _s, _e,
+                facility_codes=_fac_filter,
+                districts=_dist_filter if not _fac_filter else None,
+                grain=_kpi_grain,
+            )
+        else:
+            num, den, pct = _cov(facility_df, ind['numerator_filters'], ind['denominator_filters'])
         computed.append({
             **ind,
             'pct': pct,
@@ -1932,24 +2050,33 @@ def render_mnid_dashboard(data_opd, config,
 
     # Compute previous-period delta — same window duration shifted back
     try:
-        s = pd.to_datetime(start_date)
-        e = pd.to_datetime(end_date) if end_date else network_df['Date'].max()
-        window = max((e - s).days, 1)
-        prev_end = s - pd.Timedelta(days=1)
+        window = max((_e - _s).days, 1) if _s and _e else 1
+        prev_end = _s - pd.Timedelta(days=1)
         prev_start = prev_end - pd.Timedelta(days=window - 1)
-        prev_df = network_df[
-            (network_df['Date'] >= prev_start) & (network_df['Date'] <= prev_end)
-        ] if 'Date' in network_df.columns and not network_df.empty else pd.DataFrame()
-        if not prev_df.empty and selected_facilities and 'Facility' in prev_df.columns:
-            prev_df = prev_df[prev_df['Facility'].isin(selected_facilities)]
-        elif not prev_df.empty and selected_districts and 'District' in prev_df.columns:
-            prev_df = prev_df[prev_df['District'].isin(selected_districts)]
     except Exception:
-        prev_df = pd.DataFrame()
+        prev_start = prev_end = None
 
     for c in computed:
-        if not prev_df.empty:
+        if _agg is not None and prev_start is not None:
             try:
+                _, _, prev_pct = _agg_coverage(
+                    _agg, c['id'], prev_start, prev_end,
+                    facility_codes=_fac_filter,
+                    districts=_dist_filter if not _fac_filter else None,
+                    grain=_kpi_grain,
+                )
+                c['delta_pct'] = round(c['pct'] - prev_pct, 1)
+            except Exception:
+                c['delta_pct'] = None
+        elif prev_start is not None:
+            try:
+                prev_df = network_df[
+                    (network_df['Date'] >= prev_start) & (network_df['Date'] <= prev_end)
+                ] if 'Date' in network_df.columns and not network_df.empty else pd.DataFrame()
+                if not prev_df.empty and selected_facilities and 'Facility' in prev_df.columns:
+                    prev_df = prev_df[prev_df['Facility'].isin(selected_facilities)]
+                elif not prev_df.empty and selected_districts and 'District' in prev_df.columns:
+                    prev_df = prev_df[prev_df['District'].isin(selected_districts)]
                 _, _, prev_pct = _cov(prev_df, c['numerator_filters'], c['denominator_filters'])
                 c['delta_pct'] = round(c['pct'] - prev_pct, 1)
             except Exception:

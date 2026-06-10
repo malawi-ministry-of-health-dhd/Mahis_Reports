@@ -113,6 +113,65 @@ End
     ```bash
     deactivate
     ```
+---
+
+## MNID Dashboard
+
+The MNID (Maternal and Neonatal Indicator Dashboard) is a modular Dash dashboard for monitoring maternal and child health indicators across facilities and districts in Malawi.
+
+### Module structure
+
+```
+mnid/
+  app.py              — main renderer, callbacks, layout assembly
+  layout.py           — hero cards, alert banner, KPI row, sidebar
+  chart_helpers.py    — shared chart/figure helpers, moving averages
+  coverage.py         — coverage charts, comparative analysis section
+  indicators.py       — indicator config resolution, category ordering
+  heatmap.py          — facility/district performance heatmaps
+  data_utils.py       — dataframe prep, serialization, lightweight session store
+  constants.py        — colours, facility maps, palette constants
+  aggregation/
+    engine.py         — overnight pre-aggregation pipeline
+    store.py          — aggregate loader and query helpers
+    scheduler.py      — job wrapper called by start_scheduler.py
+```
+
+### Pre-aggregation service
+
+The dashboard pre-computes indicator coverage (`numerator`, `denominator`, `pct`) for every combination of **facility × indicator × period** (daily / weekly / monthly) and writes the result to `data/mnid_aggregates/indicator_aggregates.parquet`.
+
+Dashboard callbacks query this parquet instead of scanning 1.7M+ raw rows on every period change — making period selection near-instant.
+
+**How it runs**
+
+| Trigger | When |
+|---|---|
+| After every `data_storage.py` run | Automatically, in a background thread |
+| Overnight schedule | Daily at **02:00** via `start_scheduler.py` |
+| Manual / one-off | `python mnid/aggregation/engine.py` |
+
+The dashboard always falls back to live row-scan computation if the parquet hasn't been built yet (e.g. first deploy), so no manual step is required before first use.
+
+**Output**
+
+```
+data/mnid_aggregates/
+  indicator_aggregates.parquet   — pre-computed coverage per facility × indicator × period
+  meta.json                      — build timestamp, row count, elapsed time
+```
+
+**What it replaces**
+
+Before this service, every period-change triggered:
+- N × `_cov()` calls on 1.7M raw rows for the KPI/hero section
+- A triple-nested entity × indicator × period loop for the comparison charts
+- Per-indicator period-by-period row masking for every run chart card
+
+After: all three paths do a single filtered read of the ~500K-row aggregate.
+
+---
+
 ### Modifying data in the pages
 To modify data, go to /pages/, select the file to modify and change the filters.
 
