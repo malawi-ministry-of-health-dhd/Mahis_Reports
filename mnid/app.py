@@ -82,7 +82,6 @@ _MNID_UI_CACHE_TTL_SECONDS = 3600
 _MNID_WARNED_MESSAGES = set()
 _LOGGER = logging.getLogger(__name__)
 
-
 def clear_runtime_caches() -> None:
     _network_df_cache.clear()
     _MNID_UI_CACHE.clear()
@@ -1616,8 +1615,8 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
                     x=xs,
                     y=moving_average,
                     mode='lines+markers',
-                    line=dict(color=color, width=2.4, shape='spline'),
-                    marker=dict(size=6, color=color, line=dict(color='#fff', width=1.0)),
+                    line=dict(color=color, width=2.8, shape='linear'),
+                    marker=dict(size=6, color=color, line=dict(color='#fff', width=1.4)),
                     customdata=[[raw] for raw in ys],
                     hovertemplate=f'<b>{series_name}</b><br>%{{x}}<br>Moving Avg: %{{y:.1f}}%<br>Raw: %{{customdata[0]:.1f}}%<extra></extra>',
                     connectgaps=False,
@@ -1647,27 +1646,41 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
                 ))
 
     fig.update_layout(
-        height=420,
+        height=360,
         barmode='group' if chart_type == 'bar' else None,
         bargap=0.20,
         bargroupgap=0.06,
-        margin=dict(l=10, r=10, t=30, b=10),
-        paper_bgcolor='#ffffff',
-        plot_bgcolor='#ffffff',
-        font=dict(color=TEXT, family=FONT),
-        xaxis=dict(showgrid=False, tickfont=dict(size=11, color=TEXT), linecolor=BORDER, title=dict(text='Time', font=dict(size=11, color='#94A3B8'))),
+        margin=dict(l=8, r=8, t=12, b=24),
+        paper_bgcolor=BG,
+        plot_bgcolor=BG,
+        font=dict(family=FONT, color=TEXT, size=11),
+        hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
+        xaxis=dict(
+            showgrid=False,
+            zeroline=False,
+            showline=False,
+            tickfont=dict(size=10, color=MUTED),
+            title=dict(text='Date', font=dict(size=10, color=MUTED)),
+        ),
         yaxis=dict(
-            title=dict(text='Coverage %', font=dict(size=11, color='#94A3B8')),
+            title=dict(text='Coverage %', font=dict(size=10, color=MUTED)),
             range=[0, 115],
-            showgrid=True, gridcolor=GRID_C,
-            tickfont=dict(size=10, color=DIM),
+            showgrid=True,
+            gridcolor=GRID_C,
+            zeroline=False,
+            showline=False,
+            tickfont=dict(size=10, color=MUTED),
         ),
         legend=dict(
-            orientation='v', x=1.01, y=1,
-            xanchor='left', yanchor='top',
+            orientation='h',
+            x=0,
+            y=1.05,
+            xanchor='left',
+            yanchor='bottom',
             font=dict(size=10, color=DIM),
-            bgcolor='rgba(0,0,0,0)', bordercolor='rgba(0,0,0,0)',
+            bgcolor='rgba(0,0,0,0)',
         ),
+        hovermode='closest' if chart_type == 'bar' else 'x unified',
     )
     toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
     toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
