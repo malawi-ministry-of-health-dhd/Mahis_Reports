@@ -172,12 +172,14 @@ def run_aggregation(
 
     elapsed = (datetime.utcnow() - started_at).total_seconds()
     meta = {
-        'generated_at': started_at.isoformat(),
-        'elapsed_sec':  round(elapsed, 1),
-        'rows':         len(agg_df),
-        'indicators':   len(indicators),
-        'grains':       _GRAINS,
-        'data_source':  DATA_FILE_NAME_,
+        'generated_at':    started_at.isoformat(),
+        'elapsed_sec':     round(elapsed, 1),
+        'rows':            len(agg_df),
+        'indicators':      len(indicators),
+        'grains':          _GRAINS,
+        'data_source':     DATA_FILE_NAME_,
+        'use_demo_data':   bool(DATA_FILE_NAME_ == 'demo_parquet'),
+        'last_run_status': 'ok',
     }
     with open(meta_out, 'w', encoding='utf-8') as f:
         json.dump(meta, f, indent=2)

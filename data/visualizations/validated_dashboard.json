@@ -5445,8 +5445,10 @@
         "status": "tracked",
         "numerator_filters": {
           "unique": "person_id",
-          "variable1": "concept_name",
-          "value1": "Gestation in weeks"
+          "variable1": "Service_Area",
+          "value1": "Newborn",
+          "variable2": "concept_name",
+          "value2": "Gestation in weeks"
         },
         "denominator_filters": {
           "unique": "person_id",

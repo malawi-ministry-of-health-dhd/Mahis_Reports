@@ -55,26 +55,22 @@ DEFAULT_RELATIVE_PERIOD = 'Today'
 _LATEST_DATA_DATE_CACHE: dict[str, pd.Timestamp | None] = {}
 
 
-def _start_mnid_prewarm():
+def _start_mnid_prewarm(version: str | None = None):
     """Kick off MNID cache pre-warm in a daemon background thread at server startup."""
     import threading
     import logging
     _log = logging.getLogger(__name__)
 
-    def _run():
+    def _run(v):
         try:
             from mnid.app import prewarm_cache
-            version = _dataset_version_token()
-            prewarm_cache(dataset_version=version)
+            prewarm_cache(dataset_version=v)
         except Exception as exc:
             _log.warning('MNID startup pre-warm thread failed: %s', exc)
 
-    t = threading.Thread(target=_run, daemon=True, name='mnid-prewarm')
+    t = threading.Thread(target=_run, args=(version,), daemon=True, name='mnid-prewarm')
     t.start()
     _log.info('MNID pre-warm thread started')
-
-
-_start_mnid_prewarm()
 
 
 def _latest_available_date() -> pd.Timestamp | None:
@@ -112,6 +108,9 @@ def _dataset_version_token() -> str:
     except Exception:
         parts.append('no-timestamp')
     return '|'.join(parts)
+
+
+_start_mnid_prewarm(_dataset_version_token())
 
 
 def clear_dashboard_state_cache() -> None:

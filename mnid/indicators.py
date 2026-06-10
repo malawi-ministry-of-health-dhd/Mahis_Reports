@@ -24,11 +24,14 @@ def _uses_program_based_mnid_schema(df: pd.DataFrame) -> bool:
     if df is None or df.empty or 'Source_Program' not in df.columns:
         return False
     source_programs = set(df['Source_Program'].dropna().astype(str).str.upper().unique().tolist())
+    # Require at least one ANC/Labour/PNC program name — present only in production MAHIS data.
+    # Demo data uses 'MATERNAL AND CHILD HEALTH' + 'NEONATAL PROGRAM', so this returns False
+    # for demo, preventing program-specific derived columns (mnid_labour_assessment_documented
+    # etc.) from being used when the demo schema doesn't populate them.
     return bool(source_programs & {
         'ANC PROGRAM',
         'LABOUR AND DELIVERY PROGRAM',
         'PNC PROGRAM',
-        'NEONATAL PROGRAM',
     })
 
 
