@@ -22,7 +22,7 @@ from helpers.date_ranges import (
     get_biannual_start_end,
     get_dhis2_period
 )
-from reportlab.lib.pagesizes import letter, A4, portrait
+from reportlab.lib.pagesizes import letter, A4, portrait, landscape
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
@@ -56,7 +56,7 @@ def load_report_options(program=None):
             data = json.load(f)
         # Create concatenated options: "ID - Report Name"
         options = [
-            {'label': f"{report['report_id']} - {report['report_name']}", 
+            {'label': f"{report['report_name']}", 
              'value': report['report_id']}
             for report in data['reports'] 
             if report.get('archived', 'False').lower() == 'false'
@@ -195,19 +195,13 @@ layout = html.Div(
                             className="download-buttons",
                             children=[
                                 html.Button(
-                                    "CSV",
-                                    id="report-btn-csv",
+                                    "📥 XLSX",
+                                    id="report-btn-xlsx",
                                     n_clicks=0,
                                     className="btn-download-csv"
                                 ),
                                 html.Button(
-                                    "JSON",
-                                    id="report-btn-json",
-                                    n_clicks=0,
-                                    className="btn-download-json"
-                                ),
-                                html.Button(
-                                    "PDF",
+                                    "📄 PDF",
                                     id="report-btn-pdf",
                                     n_clicks=0,
                                     className="btn-download-pdf"
@@ -253,10 +247,10 @@ def update_month_options(period_type):
 )
 def update_report_dropdown(urlparams, program):
     data_route = urlparams.get('route', ["default"])[0] if urlparams else None
-    dropdowns_json_path = os.path.join(path, f'data/{data_route}', 'dcc_dropdown_json', 'dropdowns.json')
-    with open(dropdowns_json_path) as x:
+    data_set_programs_path = os.path.join(path, f'data', 'hmis_reports.json')
+    with open(data_set_programs_path) as x:
             dropdowns = json.load(x)
-    prog_options = ['General Reports'] + dropdowns['programs']
+    prog_options = ['General Reports'] + list(set([program["programs"][0] for program in dropdowns['reports']]))
     return prog_options, load_report_options(program)
 
 @callback(
@@ -373,18 +367,37 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, repo
 
         dhis2_period = get_dhis2_period(start_date, period_type)
 
-        builder = ReportTableBuilder(spec_path,start_date,end_date,DATA_PATH_,location, dhis2_period) 
-        
+        builder = ReportTableBuilder(spec_path, start_date, end_date, DATA_PATH_, location, dhis2_period)
         builder.load_spec()
-        components = builder.build_dash_components()
+        components   = builder.build_dash_components()
         section_data = builder.build_section_tables()
-        serializable_data = [
-                {
-                    'section': section_name,
-                    'data': df.to_json(date_format='iso', orient='split')
-                }
-                for section_name, df in section_data
-        ]
+
+        # Read layout meta for the PDF generator
+        num_page_columns = 1
+        design = "portrait"
+        report_title = builder._title() or "HMIS DATASET REPORT"
+        if builder.report_name is not None and not builder.report_name.empty:
+            meta = builder.report_name.iloc[0]
+            try:
+                num_page_columns = int(meta.get("num_page_columns", 1) or 1)
+            except (ValueError, TypeError):
+                num_page_columns = 1
+            num_page_columns = max(1, min(4, num_page_columns))
+            design = str(meta.get("design", "portrait") or "portrait").lower()
+
+        serializable_data = {
+            "meta": {
+                "title":            report_title,
+                "num_page_columns": num_page_columns,
+                "design":           design,
+                "period":           f"{start_date} – {end_date}",
+                "location":         location or "",
+            },
+            "sections": [
+                {"section": name, "data": df.to_json(date_format="iso", orient="split")}
+                for name, df in section_data
+            ],
+        }
         return components, 0, serializable_data
 
     except ValueError as e:
@@ -396,127 +409,253 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, repo
         Output('download-report-blob', 'data'),
         [
         Input('report-data-store', 'data'),
-        Input('report-btn-csv', 'n_clicks'),
-        Input('report-btn-json', 'n_clicks'),
+        Input('report-btn-xlsx', 'n_clicks'),
         Input('report-btn-pdf', 'n_clicks')
         ],
         prevent_initial_call=True
 )
-def get_data(reports_data, csv, json, pdf):
+def get_data(reports_data, xlsx, pdf):
     ctx = dash.callback_context
     if not ctx.triggered:
         return dash.no_update
     if not reports_data:
         return dash.no_update
     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
-    if trigger_id == 'report-btn-csv':
-        all_dfs = []
-        for item in reports_data:
-            section_name = item['section']
-            df = pd.read_json(item['data'], orient='split')
-            df.insert(0, 'Section', section_name)  # Add a column to identify the section
-            all_dfs.append(df)
-        combined_df = pd.concat(all_dfs, ignore_index=True)
-        return dcc.send_data_frame(combined_df.to_csv, 'MaHIS_facility_report.csv',index=False)
-    elif trigger_id == 'report-btn-json':
-        all_dfs = []
-        for item in reports_data:
-            section_name = item['section']
-            df = pd.read_json(item['data'], orient='split')
-            df.insert(0, 'Section', section_name)  # Add a column to identify the section
-            all_dfs.append(df)
-        combined_df = pd.concat(all_dfs, ignore_index=True)
-        return dcc.send_data_frame(combined_df.to_json, 'MaHIS_facility_report.json')
+
+    # Support both old list format and new dict format
+    if isinstance(reports_data, list):
+        sections_raw = reports_data
+        meta = {"title": "HMIS DATASET REPORT", "num_page_columns": 1,
+                "design": "portrait", "period": "", "location": ""}
+    else:
+        sections_raw = reports_data.get("sections", [])
+        meta         = reports_data.get("meta", {})
+
+    if trigger_id == 'report-btn-xlsx':
+        # ── XLSX: one sheet per section (unchanged) ───────────────────────────
+        xlsx_buffer = io.BytesIO()
+        with pd.ExcelWriter(xlsx_buffer, engine='openpyxl') as writer:
+            for item in sections_raw:
+                sheet_name = str(item['section'])[:31]
+                df = pd.read_json(item['data'], orient='split')
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
+        xlsx_buffer.seek(0)
+        return dcc.send_bytes(xlsx_buffer.getvalue(), filename='MaHIS_facility_report.xlsx')
+
     elif trigger_id == 'report-btn-pdf':
-        all_dfs = []
-        for item in reports_data:
-            section_name = item['section']
-            df = pd.read_json(item['data'], orient='split')
-            df.insert(0, 'Section', section_name)
-            all_dfs.append(df)
-        combined_df = pd.concat(all_dfs, ignore_index=True)
-        
-        # Create PDF in memory
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(
-            buffer, 
-            pagesize=portrait(A4), 
-            leftMargin=30, 
-            rightMargin=30, 
-            topMargin=30, 
-            bottomMargin=30
-        )
-        
-        elements = []
-        styles = getSampleStyleSheet()
-        title_text = f"MAHIS FACILITY REPORT"
-        title = Paragraph(title_text, styles["Title"])
-        elements.append(title)
-        current_date = dt.now().strftime("%Y-%m-%d %H:%M:%S")
-        subtitle_text = f"Report | Generated: {current_date}"
-        subtitle = Paragraph(subtitle_text, styles["Heading5"])
-        elements.append(subtitle)
-        elements.append(Spacer(1, 20))
-        # Create wrap style for table cells
+        # ── PDF: mirrors build_dash_components design ─────────────────────────
+        from reportlab.lib.units import mm
+
+        report_title    = meta.get("title", "HMIS DATASET REPORT").upper()
+        num_cols        = int(meta.get("num_page_columns", 1) or 1)
+        num_cols        = max(1, min(4, num_cols))
+        is_landscape    = str(meta.get("design", "portrait")).lower() == "landscape"
+        period_str      = meta.get("period", "")
+        location_str    = meta.get("location", "")
+        page_size       = landscape(A4) if is_landscape else portrait(A4)
+        page_w, page_h  = page_size
+        margin          = 18 * mm
+        usable_w        = page_w - 2 * margin
+        col_usable_w    = (usable_w - (num_cols - 1) * 6 * mm) / num_cols
+
+        # ── Colour palette matching _create_modern_table ──────────────────────
+        C_GREEN   = colors.HexColor("#006401")   # section title bar
+        C_HEADER  = colors.HexColor("#374151")   # column header row
+        C_DE_HDR  = colors.HexColor("#1f2937")   # Data Element header cell
+        C_DE_CELL = colors.HexColor("#f9fafb")   # Data Element column background
+        C_ODD     = colors.HexColor("#f9fafb")   # odd data rows
+        C_EVEN    = colors.white
+        C_BORDER  = colors.HexColor("#e5e7eb")
+        C_WHITE   = colors.white
+
+        styles     = getSampleStyleSheet()
         wrap_style = ParagraphStyle(
-            name='WrapStyle',
-            parent=styles['Normal'],
-            fontSize=8,
-            leading=9,
-            wordWrap='LTR',
-            spaceBefore=2,
-            spaceAfter=2,
+            "Wrap", parent=styles["Normal"],
+            fontSize=7, leading=9, wordWrap="LTR", spaceBefore=1, spaceAfter=1,
         )
-        pdf_columns = combined_df.columns.tolist()
-        table_data = [pdf_columns]
-        for _, row in combined_df.iterrows():
-            table_row = []
-            for col in pdf_columns:
-                value = row.get(col, '')
-                if isinstance(value, str) and len(str(value)) > 30:
-                    table_row.append(Paragraph(str(value), wrap_style))
-                else:
-                    table_row.append(str(value))
-            table_data.append(table_row)
-        col_widths = []
-        for col in pdf_columns:
-            base_width = len(str(col)) * 5
-            col_widths.append(min(base_width + 20, 150))  # Max 150 points
-        t = Table(table_data, repeatRows=1)
-        t.setStyle(TableStyle([
-            # Header
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#198754')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 9),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
-            
-            # Data
-            ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-            
-            # Alternating row colors
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
-            
-            # Cell padding
-            ('LEFTPADDING', (0, 0), (-1, -1), 4),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-            ('TOPPADDING', (0, 0), (-1, -1), 3),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-        ]))
-        
-        elements.append(t)
-        elements.append(Spacer(1, 20))
-        footer_text = f"Page 1 of 1 | Generated through MaHIS"
-        footer = Paragraph(footer_text, styles["Normal"])
-        elements.append(footer)
+        de_style = ParagraphStyle(
+            "DE", parent=styles["Normal"],
+            fontSize=7, leading=9, wordWrap="LTR", fontName="Helvetica-Bold",
+        )
+
+        def _make_section_table(section_name: str, df: pd.DataFrame) -> list:
+            """Return a list of ReportLab flowables for one report section."""
+            df = df.dropna(how="all", axis=0).dropna(how="all", axis=1)
+            if df.empty:
+                return []
+
+            value_cols = [c for c in df.columns if c != "Data Element"]
+
+            # ── Dynamic column widths proportional to content ─────────────────
+            de_max  = max((len(str(x)) for x in df["Data Element"].tolist()), default=12)
+            de_w    = min(de_max * 4.5 + 20, col_usable_w * 0.45)
+            val_total = col_usable_w - de_w
+            val_w   = val_total / max(len(value_cols), 1)
+            col_widths_pt = [de_w] + [val_w] * len(value_cols)
+
+            # ── Section title bar (green, full width) ─────────────────────────
+            title_data  = [[Paragraph(f"<b>{section_name.upper()}</b>",
+                                      ParagraphStyle("TBar", parent=styles["Normal"],
+                                                     fontSize=8, leading=10,
+                                                     textColor=C_WHITE,
+                                                     fontName="Helvetica-Bold"))]]
+            title_table = Table(title_data, colWidths=[col_usable_w])
+            title_table.setStyle(TableStyle([
+                ("BACKGROUND",   (0, 0), (-1, -1), C_GREEN),
+                ("LEFTPADDING",  (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING",   (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING",(0, 0), (-1, -1), 4),
+                ("ROUNDEDCORNERS", [3, 3, 0, 0]),
+            ]))
+
+            # ── Column header row ──────────────────────────────────────────────
+            hdr_row = [
+                Paragraph("<b>Data Element</b>",
+                          ParagraphStyle("HDR", parent=styles["Normal"],
+                                         fontSize=7, leading=9, textColor=C_WHITE,
+                                         fontName="Helvetica-Bold")),
+            ] + [
+                Paragraph(f"<b>{col.upper()}</b>",
+                          ParagraphStyle("HDR", parent=styles["Normal"],
+                                         fontSize=7, leading=9, textColor=C_WHITE,
+                                         fontName="Helvetica-Bold", alignment=1))
+                for col in value_cols
+            ]
+
+            # ── Data rows ──────────────────────────────────────────────────────
+            data_rows = [hdr_row]
+            for row_idx, (_, row) in enumerate(df.iterrows()):
+                de_val  = str(row.get("Data Element", ""))
+                de_cell = Paragraph(de_val, de_style)
+                val_cells = [
+                    Paragraph(str(row.get(col, "")), wrap_style)
+                    for col in value_cols
+                ]
+                data_rows.append([de_cell] + val_cells)
+
+            t = Table(data_rows, colWidths=col_widths_pt, repeatRows=1,
+                      splitByRow=True)
+            # Apply styling row by row for zebra effect
+            ts = TableStyle([
+                # Header row
+                ("BACKGROUND",    (0, 0), (-1, 0), C_HEADER),
+                ("BACKGROUND",    (0, 0), (0, 0),  C_DE_HDR),
+                ("TEXTCOLOR",     (0, 0), (-1, 0), C_WHITE),
+                ("ALIGN",         (1, 0), (-1, 0), "CENTER"),
+                ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE",      (0, 0), (-1, 0), 7),
+                # Data cells
+                ("ALIGN",         (1, 1), (-1, -1), "CENTER"),
+                ("FONTNAME",      (0, 1), (-1, -1), "Helvetica"),
+                ("FONTSIZE",      (0, 1), (-1, -1), 7),
+                # Data Element column
+                ("BACKGROUND",    (0, 1), (0, -1), C_DE_CELL),
+                ("FONTNAME",      (0, 1), (0, -1), "Helvetica-Bold"),
+                ("LINEAFTER",     (0, 0), (0, -1), 1, colors.HexColor("#d1d5db")),
+                # Grid
+                ("GRID",          (0, 0), (-1, -1), 0.4, C_BORDER),
+                # Padding
+                ("LEFTPADDING",   (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING",  (0, 0), (-1, -1), 4),
+                ("TOPPADDING",    (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ])
+            # Zebra rows
+            for row_idx in range(1, len(data_rows)):
+                bg = C_ODD if row_idx % 2 == 1 else C_EVEN
+                ts.add("BACKGROUND", (1, row_idx), (-1, row_idx), bg)
+            t.setStyle(ts)
+
+            return [title_table, t, Spacer(1, 6 * mm)]
+
+        # ── Build all section flowables ────────────────────────────────────────
+        all_section_flowables = []
+        for item in sections_raw:
+            df = pd.read_json(item["data"], orient="split")
+            if len(df.columns) <= 1:
+                continue
+            all_section_flowables.append((item["section"], df))
+
+        # ── Assemble PDF ───────────────────────────────────────────────────────
+        buffer = io.BytesIO()
+        doc    = SimpleDocTemplate(
+            buffer, pagesize=page_size,
+            leftMargin=margin, rightMargin=margin,
+            topMargin=margin, bottomMargin=margin,
+        )
+
+        elements = []
+        header_style = ParagraphStyle(
+            "RptTitle", parent=styles["Normal"],
+            fontSize=13, fontName="Helvetica-Bold",
+            textColor=C_GREEN, alignment=1, spaceAfter=4,
+        )
+        sub_style = ParagraphStyle(
+            "RptSub", parent=styles["Normal"],
+            fontSize=8, textColor=colors.HexColor("#6b7280"), alignment=1,
+        )
+        elements.append(Paragraph(report_title, header_style))
+        elements.append(Paragraph(
+            f"{location_str}  |  {period_str}  |  "
+            f"Generated: {dt.now().strftime('%Y-%m-%d %H:%M')}",
+            sub_style,
+        ))
+        elements.append(Spacer(1, 4 * mm))
+        # Divider
+        elements.append(Table([[""]], colWidths=[usable_w],
+                               style=TableStyle([
+                                   ("LINEABOVE", (0, 0), (-1, -1), 1.5, C_GREEN),
+                               ])))
+        elements.append(Spacer(1, 4 * mm))
+
+        if num_cols == 1:
+            # Single column — stack sections vertically
+            for sec_name, df in all_section_flowables:
+                elements.extend(_make_section_table(sec_name, df))
+        else:
+            # Multi-column — group sections in rows of num_cols
+            from reportlab.platypus import KeepInFrame
+            groups = [all_section_flowables[i:i + num_cols]
+                      for i in range(0, len(all_section_flowables), num_cols)]
+            for group in groups:
+                # Pad group to full width
+                while len(group) < num_cols:
+                    group.append(None)
+                row_cells = []
+                for item in group:
+                    if item is None:
+                        row_cells.append("")
+                    else:
+                        sec_name, df = item
+                        inner = _make_section_table(sec_name, df)
+                        frame = KeepInFrame(col_usable_w, 999 * mm, inner,
+                                            mode="shrink")
+                        row_cells.append(frame)
+                col_w_list = [col_usable_w] * num_cols
+                grid_gap   = 6 * mm
+                col_w_list_with_gap = []
+                for k, w in enumerate(col_w_list):
+                    col_w_list_with_gap.append(w)
+                    if k < num_cols - 1:
+                        col_w_list_with_gap.append(grid_gap)
+                        row_cells.insert(2 * k + 1, "")  # gap cell
+                multi_table = Table(
+                    [row_cells], colWidths=col_w_list_with_gap,
+                )
+                multi_table.setStyle(TableStyle([
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+                    ("TOPPADDING",    (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ]))
+                elements.append(multi_table)
+                elements.append(Spacer(1, 4 * mm))
+
         doc.build(elements)
         buffer.seek(0)
-        filename = f"MaHIS_facility_report.pdf"
-        
-        return dcc.send_bytes(buffer.getvalue(), filename=filename)
+        return dcc.send_bytes(buffer.getvalue(), filename="MaHIS_facility_report.pdf")
+
     else:
         return dash.no_update

@@ -235,7 +235,7 @@ layout = html.Div(
 
 def update_filters(selected_program):
     path_program_reports = os.path.join(path, 'data','visualizations','validated_prog_reports.json')
-    dropdowns_json_path = os.path.join(path, 'data/default', 'dcc_dropdown_json', 'dropdowns.json') 
+    program_reports_progs_path = os.path.join(path, f'data/validated_prog_reports.json')
     with open(path_program_reports) as x:
         program_reports_data = json.load(x)
     filtered_reports_list = [r for r in program_reports_data["reports"] if r.get("program") == selected_program or selected_program in (r.get("programs") or [])]
@@ -281,7 +281,7 @@ def generate_chart(n_clicks, urlparams, selected_report, pathname, report_name, 
     DATA_PATH_ = f"data/{data_route}/parquet"
 
     path_program_reports = os.path.join(path, 'data','visualizations','validated_prog_reports.json')
-    dropdowns_json_path = os.path.join(path, f'data/{data_route}', 'dcc_dropdown_json', 'dropdowns.json')
+    program_reports_progs_path = os.path.join(path, f'data/visualizations/validated_prog_reports.json')
 
     user_data_path = os.path.join(path, f'data/{data_route}','single_tables', 'users_data.csv')
     if not os.path.exists(user_data_path):
@@ -330,9 +330,9 @@ def generate_chart(n_clicks, urlparams, selected_report, pathname, report_name, 
         except Exception:
             hf_options = []
         try:
-            with open(dropdowns_json_path) as x:
+            with open(program_reports_progs_path) as x:
                 dropdowns = json.load(x)
-            prog_options = dropdowns['programs'] + ["+ Create a Report"]
+            prog_options = list(set([program['program'] for program in dropdowns['reports']])) + ["+ Create a Report"]
         except Exception:
             prog_options = []
 

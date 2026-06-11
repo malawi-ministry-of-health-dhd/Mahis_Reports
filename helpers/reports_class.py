@@ -414,181 +414,244 @@ class ReportTableBuilder:
     
     
     def build_dash_components(self) -> List[Any]:
-        title = self._title() or "Report"
+        title = self._title() or "HMIS DATASET REPORT (UNNAMED)"
         sections = self.build_section_tables()
-        children: List[Any] = [
-            html.Div(
-                children=[
-                    html.H2(title, style={"text-align":"center"}),
-                ]
-            )
-        ]
+
+        num_page_columns = 1
+        design = "portrait"
+        if self.report_name is not None and not self.report_name.empty:
+            meta = self.report_name.iloc[0]
+            try:
+                num_page_columns = int(meta.get("num_page_columns", 1) or 1)
+            except (ValueError, TypeError):
+                num_page_columns = 1
+            num_page_columns = max(1, min(4, num_page_columns))
+            design = str(meta.get("design", "portrait") or "portrait").lower()
+            if design not in ("portrait", "landscape"):
+                design = "portrait"
+
+        is_landscape = design == "landscape"
+        container_style = {
+            "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+            "maxWidth": "1400px" if is_landscape else "960px",
+            "margin": "0 auto",
+        }
+
+        header = html.Div(
+            style={"textAlign": "center", "marginBottom": "18px",
+                   "paddingBottom": "10px",
+                   "borderBottom": "2px solid #006401"},
+            children=[
+                html.H3(title.upper(),
+                        style={"margin": "0 0 4px", "color": "#006401",
+                               "fontSize": "15px", "fontWeight": "700",
+                               "letterSpacing": "0.5px"}),
+                html.Span(
+                    f"{'Landscape' if is_landscape else 'Portrait'}  ·  "
+                    f"{num_page_columns}-column layout",
+                    style={"fontSize": "11px", "color": "#6b7280"}
+                ),
+            ],
+        )
+
+        # ── Build section list ─────────────────────────────────────────────────
+        section_divs: List[Any] = []
         for section_idx, (subtitle, subdf) in enumerate(sections):
             subdf = self._apply_dhis_mapping(subdf)
-            if len(subdf.columns) <=1: #skip if the column has nothing in place of data. Only allow the forms that have value1x1,etc to be previewed
+            if len(subdf.columns) <= 1:
                 continue
-            if subtitle:
-                children.append(
-                    html.Div(
-                        className="report-section",
-                        children=[
-                            html.H3(subtitle, className="section-title"),
-                            self._create_modern_table(subdf, section_idx)
-                        ]
-                    )
+            section_divs.append(
+                html.Div(
+                    style={"breakInside": "avoid", "pageBreakInside": "avoid",
+                           "marginBottom": "16px"},
+                    children=[self._create_modern_table(subdf, section_idx, subtitle)],
                 )
-            else:
-                children.append(self._create_modern_table(subdf, section_idx))
+            )
+
+        # ── Column layout ──────────────────────────────────────────────────────
+        if num_page_columns == 1:
+            body = html.Div(section_divs)
+        else:
+            body = html.Div(
+                style={
+                    "display": "grid",
+                    "gridTemplateColumns": f"repeat({num_page_columns}, 1fr)",
+                    "gap": "16px",
+                    "alignItems": "start",
+                },
+                children=section_divs,
+            )
+
+        children: List[Any] = [header, body]
 
         if self._errors:
             children.append(
                 html.Div(
-                    className="report-errors",
+                    style={"marginTop": "14px", "padding": "10px 14px",
+                           "background": "#fef2f2", "border": "1px solid #fecaca",
+                           "borderRadius": "6px"},
                     children=[
-                        html.I(className="fas fa-exclamation-triangle"),
-                        html.Span(" Validation Notes:"),
-                        html.Ul([html.Li(e) for e in self._errors])
-                    ]
+                        html.Strong("⚠ Validation Notes", style={"color": "#dc2626"}),
+                        html.Ul([html.Li(e, style={"fontSize": "12px"})
+                                 for e in self._errors]),
+                    ],
                 )
             )
 
-        return children
-    
-    def _create_modern_table(self, df: pd.DataFrame, section_idx: int) -> html.Div:
-        """Create a modern, well-aligned table with proper column widths and no internal scrolling"""
-        df = df.dropna(how='all', axis=0).dropna(how='all', axis=1)
+        return [html.Div(children, style=container_style)]
+
+    def _create_modern_table(self, df: pd.DataFrame, section_idx: int, section_title: str) -> html.Div:
+        """Render a report section as a clean, branded table."""
+        df = df.dropna(how="all", axis=0).dropna(how="all", axis=1)
         if df.empty:
-            return html.Div("No data available", className="empty-table-message")
-        value_cols = [c for c in df.columns if c != "Data Element"]
-        column_widths = {}
-        # Data Element column
-        max_data_element_len = max(
-            [len(str(x)) for x in df["Data Element"].tolist()] + [len("Data Element")]
-        )
-        column_widths["Data Element"] = min((len(value_cols) +1) * 8, 350)
-        # Value columns
-        for col in value_cols:
-            max_val_len = max(
-                [len(str(x)) for x in df[col].tolist()] + [len(str(col))]
+            return html.Div(
+                "No data available",
+                style={"color": "#9ca3af", "fontSize": "12px",
+                       "padding": "8px 0", "fontStyle": "italic"},
             )
-            column_widths[col] = min(max_val_len * 8, 250)
-        
-        # Create table without filters and page controls
-        return html.Div(
-            className="report-table-wrapper",
+
+        value_cols = [c for c in df.columns if c != "Data Element"]
+
+        # ── Dynamic column widths ──────────────────────────────────────────────
+        de_width   = min(max(len(str(x)) for x in df["Data Element"].tolist()) * 7 + 30, 340)
+        val_widths = {
+            col: min(max(len(str(x)) for x in df[col].tolist()) * 7 + 20, 160)
+            for col in value_cols
+        }
+
+        # ── Section title bar ──────────────────────────────────────────────────
+        title_bar = html.Div(
+            section_title.upper() if section_title else "",
             style={
-                "overflowX": "auto",  # Only horizontal scroll if needed
-                "overflowY": "visible",  # No vertical scroll
-                "marginBottom": "20px"
+                "background": "#006401",
+                "color": "#ffffff",
+                "fontSize": "11px",
+                "fontWeight": "700",
+                "letterSpacing": "0.6px",
+                "padding": "7px 12px",
+                "borderRadius": "4px 4px 0 0",
             },
-            children=[
-                dash_table.DataTable(
-                    id=f"report-table-{section_idx}",
-                    data=df.to_dict("records"),
-                    columns=[{"name": "Data Element", "id": "Data Element"}] + 
-                            [{"name": col, "id": col} for col in value_cols],
-                    style_table={
-                        "overflowX": "auto",
-                        "overflowY": "visible",
-                        "borderRadius": "12px",
-                        "boxShadow": "0 1px 3px rgba(0,0,0,0.1)",
-                        "minWidth": "100%"
-                    },
-                    style_cell={
-                        "padding": "12px 16px",
-                        "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
-                        "fontSize": "13px",
-                        "border": "1px solid #e9ecef",
-                        "textAlign": "left",
-                        "whiteSpace": "normal",
-                        "wordBreak": "break-word",
-                        "height": "auto",  # Allow height to adjust to content
-                        "minHeight": "45px"
-                    },
-                    style_cell_conditional=[
-                        {
-                            "if": {"column_id": "Data Element"},
-                            "fontWeight": "600",
-                            "backgroundColor": "#f8f9fa",
-                            "width": f"{column_widths['Data Element']}px",
-                            "minWidth": "200px",
-                            "position": "sticky",
-                            "left": 0,
-                            "zIndex": 1
-                        },
-                        *[
-                            {
-                                "if": {"column_id": col},
-                                "textAlign": "center",
-                                "width": f"{column_widths[col]}px",
-                                "minWidth": "100px"
-                            }
-                            for col in value_cols
-                        ]
-                    ],
-                    style_header={
-                        "backgroundColor": "#AAAAAA",
-                        "fontWeight": "600",
-                        "border": "1px solid #dee2e6",
-                        "color": "#ffffff",
-                        "padding": "12px 16px",
-                        "fontSize": "14px",
+        )
+
+        table = dash_table.DataTable(
+            id=f"report-table-{section_idx}",
+            data=df.to_dict("records"),
+            columns=(
+                [{"name": section_title.upper(), "id": "Data Element"}]
+                + [{"name": col.upper(), "id": col} for col in value_cols]
+            ),
+            # ── Table container ─────────────────────────────────────────────
+            style_table={
+                "overflowX": "auto",
+                "overflowY": "visible",
+                "minWidth": "100%",
+                "borderRadius": "0 0 4px 4px",
+                "border": "1px solid #d1d5db",
+                "borderTop": "none",
+            },
+            # ── Cell base ───────────────────────────────────────────────────
+            style_cell={
+                "fontFamily": "'Segoe UI', Tahoma, sans-serif",
+                "fontSize": "12px",
+                "padding": "8px 12px",
+                "border": "1px solid #e5e7eb",
+                "textAlign": "left",
+                "whiteSpace": "normal",
+                "wordBreak": "break-word",
+                "height": "auto",
+                "minHeight": "28px",
+                "lineHeight": "1.4",
+            },
+            # ── Per-column overrides ─────────────────────────────────────────
+            style_cell_conditional=[
+                {
+                    "if": {"column_id": "Data Element"},
+                    "fontWeight": "600",
+                    "color": "#1f2937",
+                    "backgroundColor": "#f9fafb",
+                    "width": f"{de_width}px",
+                    "minWidth": "180px",
+                    "position": "sticky",
+                    "left": 0,
+                    "zIndex": 1,
+                    "borderRight": "2px solid #d1d5db",
+                },
+                *[
+                    {
+                        "if": {"column_id": col},
                         "textAlign": "center",
-                        "position": "sticky",
-                        "top": 0,
-                        "zIndex": 2
-                    },
-                    style_data={
-                        "whiteSpace": "normal",
-                        "height": "auto",
-                        "minHeight": "45px"
-                    },
-                    style_data_conditional=[
-                        # Zebra striping
-                        {
-                            "if": {"row_index": "odd"},
-                            "backgroundColor": "#f8f9fa"
-                        },
-                        *[
-                            {
-                                "if": {"filter_query": f"{{{col}}} = ''"},
-                                "backgroundColor": "#f1f3f4",
-                                # "color": "#adb5bd"
-                            }
-                            for col in value_cols
-                        ],
-                        # Empty cell styling for Data Element column
-                        {
-                            "if": {"filter_query": "{Data Element} = ''"},
-                            "backgroundColor": "#f1f3f4"
-                        }
-                    ],
-                    css=[{
-                        'selector': '.dash-spreadsheet td div',
-                        'rule': '''
-                            line-height: 1.4;
-                            max-height: none;
-                            overflow: visible;
-                            white-space: normal;
-                        '''
-                    }],
-                    tooltip_data=[
-                        {
-                            column: {'value': str(value), 'type': 'markdown'}
-                            for column, value in row.items()
-                            if value and len(str(value)) > 50
-                        }
-                        for row in df.to_dict('records')
-                    ],
-                    tooltip_duration=None,
-                    style_as_list_view=True,
-                    # Remove all filtering and pagination features
-                    filter_action="none",
-                    sort_action="native",
-                    sort_mode="single",
-                    page_action="none",
-                    virtualization=False,  # Disable virtualization to show all rows
-                    fixed_rows={'headers': True},  # Only header is fixed
-                )
-            ]
+                        "width": f"{val_widths[col]}px",
+                        "minWidth": "80px",
+                        "color": "#374151",
+                    }
+                    for col in value_cols
+                ],
+            ],
+            # ── Header ──────────────────────────────────────────────────────
+            style_header={
+                "backgroundColor": "#374151",
+                "color": "#f9fafb",
+                "fontWeight": "700",
+                "fontSize": "11px",
+                "textAlign": "center",
+                "padding": "9px 12px",
+                "border": "1px solid #4b5563",
+                "letterSpacing": "0.4px",
+                "position": "sticky",
+                "top": 0,
+                "zIndex": 2,
+            },
+            style_header_conditional=[
+                {
+                    "if": {"column_id": "Data Element"},
+                    "textAlign": "left",
+                    "backgroundColor": "#1f2937",
+                }
+            ],
+            # ── Data rows ───────────────────────────────────────────────────
+            style_data={
+                "whiteSpace": "normal",
+                "height": "auto",
+                "minHeight": "32px",
+            },
+            style_data_conditional=[
+                {"if": {"row_index": "odd"}, "backgroundColor": "#f9fafb"},
+                {"if": {"row_index": "even"}, "backgroundColor": "#ffffff"},
+                *[
+                    {"if": {"filter_query": f"{{{col}}} = ''",
+                             "column_id": col},
+                     "backgroundColor": "#f3f4f6", "color": "#d1d5db"}
+                    for col in value_cols
+                ],
+                {
+                    "if": {"filter_query": "{Data Element} = ''"},
+                    "backgroundColor": "#f3f4f6",
+                },
+            ],
+            css=[{
+                "selector": ".dash-spreadsheet td div",
+                "rule": "line-height: 1.4; max-height: none; "
+                        "overflow: visible; white-space: normal;",
+            }],
+            tooltip_data=[
+                {
+                    col: {"value": str(val), "type": "markdown"}
+                    for col, val in row.items()
+                    if val and len(str(val)) > 50
+                }
+                for row in df.to_dict("records")
+            ],
+            tooltip_duration=None,
+            style_as_list_view=False,
+            filter_action="none",
+            sort_action="native",
+            sort_mode="single",
+            page_action="none",
+            virtualization=False,
+            fixed_rows={"headers": True},
+        )
+
+        return html.Div(
+            style={"marginBottom": "0", "breakInside": "avoid"},
+            children=[table],
         )

@@ -2173,7 +2173,7 @@ def create_line_list(
         merge_methods: Optional[List[str]] = None,
         message=None,
         custom_fields=None,
-        mask_names: bool = False,
+        mask_names: bool = True,
         **kwargs):
 
     # ── helper: strip date filter for cohort (all-time history) queries ──────
@@ -2318,9 +2318,9 @@ def create_line_list(
 
     # Mask personal name columns for unauthorised users
     if mask_names and not final_df.empty:
-        for name_col in (FIRST_NAME_, LAST_NAME_):
+        for name_col in (FIRST_NAME_, LAST_NAME_,"First Name", "Last Name"):
             if name_col in final_df.columns:
-                final_df[name_col] = "****"
+                final_df[name_col] = "******"
 
     final_df = final_df.fillna("") if not final_df.empty else final_df
     table = html.Div([

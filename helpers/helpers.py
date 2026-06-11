@@ -709,7 +709,7 @@ def create_linelist_from_config(query_fiter,data_path, filters, user_role=None, 
 
     # Resolve whether this user should have name columns masked
     mask_names = False
-    if authorized_user != "Any":
+    if authorized_user:
         if isinstance(authorized_user, list):
             mask_names = user_role not in authorized_user
         elif isinstance(authorized_user, str):
