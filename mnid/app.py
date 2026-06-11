@@ -88,8 +88,12 @@ from mnid.executive_views import render_country_profile, render_operational_read
 _MNID_UI_CACHE_MAX = 16
 _MNID_UI_CACHE_TTL_SECONDS = 3600
 _MNID_EXECUTIVE_CONTENT_CACHE: dict = {}
+_MNID_EXECUTIVE_DATA_CACHE: dict = {}
 _MNID_WARNED_MESSAGES = set()
 _LOGGER = logging.getLogger(__name__)
+_NETWORK_DF_CACHE_MAX = 6
+_HEATMAP_CACHE_MAX = 6
+_ANALYSIS_CACHE_MAX = 10
 
 _MNID_SCROLLSPY_CLIENTSIDE = """
 function(_tick) {
@@ -137,6 +141,80 @@ function(_tick) {
 """
 
 
+def _aggregate_grain_for_window(start_ts, end_ts) -> str:
+    """Pick the cheapest aggregate grain that still matches the visible window."""
+    try:
+        if start_ts is None or end_ts is None:
+            return 'daily'
+        span_days = max(int((pd.Timestamp(end_ts) - pd.Timestamp(start_ts)).days), 0)
+    except Exception:
+        return 'daily'
+    if span_days <= 45:
+        return 'daily'
+    if span_days <= 180:
+        return 'weekly'
+    return 'monthly'
+
+
+def _trim_cache(cache: dict, max_entries: int) -> None:
+    while len(cache) > max_entries:
+        try:
+            cache.pop(next(iter(cache)))
+        except Exception:
+            break
+
+
+def _resolve_scope_filters(df: pd.DataFrame, scope_meta: dict | None = None) -> tuple[list[str], list[str], list[str]]:
+    """
+    Split the current scope into facility names, facility codes, and districts.
+
+    UI scope currently stores facility names, while aggregate parquet queries
+    filter by Facility_CODE. Resolve both once so raw-row and aggregate paths
+    stay aligned.
+    """
+    scope_meta = scope_meta or {}
+    selected_facilities = [
+        str(value).strip() for value in (scope_meta.get('selected_facilities') or [])
+        if str(value).strip()
+    ]
+    selected_districts = [
+        str(value).strip() for value in (scope_meta.get('selected_districts') or [])
+        if str(value).strip()
+    ]
+    selected_facility_codes: list[str] = []
+
+    if df is not None and not df.empty and 'Facility_CODE' in df.columns:
+        code_series = df['Facility_CODE'].dropna().astype(str).str.strip()
+        known_codes = set(code_series[code_series.ne('')].unique().tolist())
+
+        if selected_facilities:
+            direct_codes = [value for value in selected_facilities if value in known_codes]
+            selected_facility_codes.extend(direct_codes)
+
+            if 'Facility' in df.columns:
+                fac_meta = (
+                    df[['Facility', 'Facility_CODE']]
+                    .dropna(subset=['Facility', 'Facility_CODE'])
+                    .assign(
+                        Facility=lambda x: x['Facility'].astype(str).str.strip(),
+                        Facility_CODE=lambda x: x['Facility_CODE'].astype(str).str.strip(),
+                    )
+                )
+                name_to_codes: dict[str, list[str]] = {}
+                for facility_name, facility_code in fac_meta.itertuples(index=False):
+                    if not facility_name or not facility_code:
+                        continue
+                    name_to_codes.setdefault(facility_name, [])
+                    if facility_code not in name_to_codes[facility_name]:
+                        name_to_codes[facility_name].append(facility_code)
+                for facility_name in selected_facilities:
+                    selected_facility_codes.extend(name_to_codes.get(facility_name, []))
+
+        selected_facility_codes = list(dict.fromkeys(selected_facility_codes))
+
+    return selected_facilities, selected_facility_codes, selected_districts
+
+
 def _load_mnid_report_config(report_name: str) -> dict | None:
     try:
         config_path = Path(__file__).resolve().parents[1] / 'data' / 'visualizations' / 'validated_dashboard.json'
@@ -157,7 +235,8 @@ def _load_mnid_report_config(report_name: str) -> dict | None:
 
 def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
                                   facility_code, start_date, end_date,
-                                  scope_meta: dict | None = None) -> dict:
+                                  scope_meta: dict | None = None,
+                                  include_content: bool = True) -> dict:
     # Compute normalised period bounds once — used for both date filtering and aggregate queries.
     try:
         _s = pd.to_datetime(start_date).normalize() if start_date else None
@@ -179,8 +258,10 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         except Exception:
             facility_df = network_df
 
-    selected_facilities = list(tuple(sorted((scope_meta or {}).get('selected_facilities') or [])))
-    selected_districts = list(tuple(sorted((scope_meta or {}).get('selected_districts') or [])))
+    selected_facilities, selected_facility_codes, selected_districts = _resolve_scope_filters(
+        network_df,
+        scope_meta,
+    )
     if selected_facilities and 'Facility' in facility_df.columns:
         facility_df = facility_df[facility_df['Facility'].isin(selected_facilities)]
     elif selected_districts and 'District' in facility_df.columns:
@@ -283,10 +364,22 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         ]
     hero_title = 'KEY NEONATAL INDICATORS' if dashboard_theme == 'newborn' else f'KEY {_CAT_LABELS.get(default_cat, str(default_cat or "Program")).upper()} INDICATORS'
 
+    if not include_content:
+        return {
+            'indicator_content': None,
+            'facility_df': facility_df,
+            'network_df': network_df,
+            'supply_inds': supply_inds,
+            'wf_inds': wf_inds,
+            'dq_inds': dq_inds,
+            'dashboard_theme': dashboard_theme,
+        }
+
     _agg = _get_aggregate()
-    _fac_filter = selected_facilities or None
+    _fac_filter = selected_facility_codes or None
     _dist_filter = selected_districts or None
     _kpi_grain = 'daily'
+    _coverage_grain = _aggregate_grain_for_window(_s, _e)
 
     computed = []
     for ind in tracked:
@@ -296,6 +389,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
                 facility_codes=_fac_filter,
                 districts=_dist_filter if not _fac_filter else None,
                 grain=_kpi_grain,
+                indicator_label=ind.get('label'),
             )
         else:
             num, den, pct = _cov(facility_df, ind['numerator_filters'], ind['denominator_filters'])
@@ -322,6 +416,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
                     facility_codes=_fac_filter,
                     districts=_dist_filter if not _fac_filter else None,
                     grain=_kpi_grain,
+                    indicator_label=c.get('label'),
                 )
                 c['delta_pct'] = round(c['pct'] - prev_pct, 1)
             except Exception:
@@ -356,7 +451,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         end_date=str(_e.date()) if _e is not None else end_date,
         facility_codes=list(_fac_filter) if _fac_filter else None,
         districts=list(_dist_filter) if _dist_filter and not _fac_filter else None,
-        grain=_kpi_grain,
+        grain=_coverage_grain,
     )
 
     # Analysis charts: cached by data identity + date range to avoid recomputing on repeated calls
@@ -368,8 +463,8 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         labour_charts = _labour_charts(facility_df)
         pnc_charts    = _pnc_charts(facility_df)
         nb_charts     = _newborn_charts(facility_df)
-        _analysis_charts_cache.clear()
         _analysis_charts_cache[_ac_key] = (anc_charts, labour_charts, pnc_charts, nb_charts)
+        _trim_cache(_analysis_charts_cache, _ANALYSIS_CACHE_MAX)
 
     analysis_acc = [
         _chart_acc_section('ch_anc',    'Antenatal Care',    anc_charts)    if anc_charts and 'ANC' in category_order else None,
@@ -383,7 +478,6 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
     # Use aggregate fast path when available — avoids expensive raw groupby scans.
     _heatmap_cache_key = (id(network_df), facility_code, tuple(i['id'] for i in tracked))
     if _heatmap_cache_key not in _heatmap_store_cache:
-        _heatmap_store_cache.clear()
         _agg_for_heatmap = _get_aggregate()
         if _agg_for_heatmap is not None and not _agg_for_heatmap.empty:
             _heatmap_store_cache[_heatmap_cache_key] = _compute_heatmap_store_from_agg(
@@ -393,6 +487,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
             _heatmap_store_cache[_heatmap_cache_key] = _compute_heatmap_store(
                 network_df, tracked, facility_code
             )
+        _trim_cache(_heatmap_store_cache, _HEATMAP_CACHE_MAX)
     performance_div, heatmap_div = _coverage_heatmap_section(
         all_inds, facility_code, network_df,
         precomputed_store=_heatmap_store_cache[_heatmap_cache_key],
@@ -801,14 +896,18 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
 
     plot_df = df.copy()
     fac_filter: list[str] | None = None
+    dist_filter: list[str] | None = None
     if location and location != 'all':
-        for col_name in ('Facility_CODE', 'District'):
-            if col_name in df.columns:
-                mask = df[col_name].astype(str) == str(location)
-                if mask.any():
-                    plot_df = df[mask].copy()
-                    fac_filter = [str(location)]
-                    break
+        if 'Facility_CODE' in df.columns:
+            mask = df['Facility_CODE'].astype(str) == str(location)
+            if mask.any():
+                plot_df = df[mask].copy()
+                fac_filter = [str(location)]
+        if fac_filter is None and 'District' in df.columns:
+            mask = df['District'].astype(str) == str(location)
+            if mask.any():
+                plot_df = df[mask].copy()
+                dist_filter = [str(location)]
 
     dates = pd.to_datetime(plot_df['Date'], errors='coerce').dropna()
     if dates.empty:
@@ -836,8 +935,10 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
     # Prefer scope_meta facility/district filter when no explicit location given
     if agg_df is None:
         agg_df = _get_aggregate()
-    if fac_filter is None and scope_meta:
-        fac_filter = scope_meta.get('selected_facilities') or None
+    if fac_filter is None and dist_filter is None and scope_meta:
+        _, fac_codes, districts = _resolve_scope_filters(plot_df, scope_meta)
+        fac_filter = fac_codes or None
+        dist_filter = districts or None
 
     cat_colors = CAT_PALETTES.get(cat, _TREND_SERIES_PALETTE)
     cards = []
@@ -850,7 +951,9 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
             precomputed = _agg_time_series(
                 agg_df, ind['id'], grain=grain,
                 facility_codes=fac_filter,
+                districts=dist_filter if not fac_filter else None,
                 start_date=date_min, end_date=date_max,
+                indicator_label=ind.get('label'),
             )
 
         fig = _indicator_run_fig(plot_df, ind, color, periods, tickfmt, hfmt, grain, precomputed=precomputed)
@@ -860,7 +963,10 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
             # Use aggregate for current-period coverage badge if available
             if agg_df is not None:
                 cur_pct = _agg_coverage(agg_df, ind['id'], date_min, date_max,
-                                        facility_codes=fac_filter, grain=grain)[2]
+                                        facility_codes=fac_filter,
+                                        districts=dist_filter if not fac_filter else None,
+                                        grain=grain,
+                                        indicator_label=ind.get('label'))[2]
             else:
                 cur_pct = _cov(plot_df, ind['numerator_filters'], ind['denominator_filters'])[2]
             cls = _css(cur_pct, target, ind)
@@ -1945,6 +2051,8 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
     district_options = store_payload.get('district_options', [])
     current_fac = store_payload.get('current_fac', '')
     current_dist = store_payload.get('current_dist', '')
+    compare_date_min = pd.to_datetime(store_payload.get('date_min'), errors='coerce')
+    compare_date_max = pd.to_datetime(store_payload.get('date_max'), errors='coerce')
 
     ind_options = [{'label': i['label'], 'value': i['id']} for i in tracked]
     valid_ind_ids = {opt['value'] for opt in ind_options}
@@ -2040,6 +2148,9 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
                 series = _agg_time_series(
                     _compare_agg, ind['id'], grain=time_grain,
                     facility_codes=fac_arg, districts=dist_arg,
+                    start_date=None if pd.isna(compare_date_min) else compare_date_min,
+                    end_date=None if pd.isna(compare_date_max) else compare_date_max,
+                    indicator_label=ind.get('label'),
                 )
                 series = series.tail(max_periods)
                 if series.empty:
@@ -2303,10 +2414,8 @@ def render_mnid_dashboard(data_opd, config,
         selected_districts,
     )
     if _opd_key not in _network_df_cache:
-        _network_df_cache.clear()
-        _heatmap_store_cache.clear()
-        _analysis_charts_cache.clear()
         _network_df_cache[_opd_key] = _prepare_mnid_dataframe(data_opd)
+        _trim_cache(_network_df_cache, _NETWORK_DF_CACHE_MAX)
     network_df = _network_df_cache[_opd_key]
 
     primary_bundle = _build_mnid_indicator_content(
@@ -2316,46 +2425,44 @@ def render_mnid_dashboard(data_opd, config,
         start_date=start_date,
         end_date=end_date,
         scope_meta=scope_meta,
+        include_content=False,
     )
     facility_df    = primary_bundle['facility_df']
     dashboard_theme = primary_bundle['dashboard_theme']
 
-    maternal_content = primary_bundle['indicator_content']
-    newborn_content  = None
     country_label    = 'Maternal'
+    newborn_scope_meta = None
 
     if config.get('report_name') == 'Maternal Health':
         newborn_config = _load_mnid_report_config('Newborn')
         if newborn_config:
             newborn_scope_meta = dict(scope_meta or {})
             newborn_scope_meta['mnid_categories'] = newborn_config.get('mnid_categories') or ['Newborn']
-            newborn_bundle = _build_mnid_indicator_content(
-                network_df=network_df,
-                config=newborn_config,
-                facility_code=facility_code,
-                start_date=start_date,
-                end_date=end_date,
-                scope_meta=newborn_scope_meta,
-            )
-            newborn_content = newborn_bundle['indicator_content']
             country_label   = 'Maternal & Newborn'
+    else:
+        newborn_config = None
 
     executive_content = {
-        'country-profile':        render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label),
-        'operational-readiness':  render_operational_readiness(
-            facility_df,
-            supply_inds=primary_bundle['supply_inds'],
-            wf_inds=primary_bundle['wf_inds'],
-            dq_inds=primary_bundle['dq_inds'],
-        ),
-        'maternal-dashboard': maternal_content,
+        'country-profile': render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label),
     }
-    if newborn_content is not None:
-        executive_content['newborn-dashboard'] = newborn_content
-
     executive_token = f'{hash((_opd_key, start_date, end_date, config.get("report_name"), tuple(sorted(executive_content.keys()))))}'
-    _MNID_EXECUTIVE_CONTENT_CACHE.clear()
     _MNID_EXECUTIVE_CONTENT_CACHE[executive_token] = executive_content
+    _MNID_EXECUTIVE_DATA_CACHE[executive_token] = {
+        'network_df': network_df,
+        'config': config,
+        'facility_code': facility_code,
+        'start_date': start_date,
+        'end_date': end_date,
+        'scope_meta': scope_meta,
+        'facility_df': facility_df,
+        'supply_inds': primary_bundle['supply_inds'],
+        'wf_inds': primary_bundle['wf_inds'],
+        'dq_inds': primary_bundle['dq_inds'],
+        'newborn_config': newborn_config,
+        'newborn_scope_meta': newborn_scope_meta,
+    }
+    _trim_cache(_MNID_EXECUTIVE_CONTENT_CACHE, _MNID_UI_CACHE_MAX)
+    _trim_cache(_MNID_EXECUTIVE_DATA_CACHE, _MNID_UI_CACHE_MAX)
 
     _tab_style  = {'padding': '10px 18px', 'borderRadius': '12px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#FFFFFF', 'color': TEXT}
     _tab_active = {'padding': '10px 18px', 'borderRadius': '12px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#F0FDF4', 'color': '#15803D', 'fontWeight': 700}
@@ -2366,7 +2473,7 @@ def render_mnid_dashboard(data_opd, config,
         dcc.Tab(label='Operational Readiness',  value='operational-readiness', style=_tab_style, selected_style=_tab_active2),
         dcc.Tab(label='Maternal',               value='maternal-dashboard',    style=_tab_style, selected_style=_tab_active2),
     ]
-    if newborn_content is not None:
+    if newborn_config is not None:
         tab_children.append(dcc.Tab(label='Newborn', value='newborn-dashboard', style=_tab_style, selected_style=_tab_active2))
 
     executive_tabs = dcc.Tabs(
@@ -2378,6 +2485,7 @@ def render_mnid_dashboard(data_opd, config,
 
     return html.Div(className=f'mnid-bg{" mnid-theme-newborn" if dashboard_theme == "newborn" else ""}', children=[
         dcc.Store(id='mnid-executive-view-store', data=executive_token),
+        dcc.Interval(id='mnid-executive-preload', interval=150, n_intervals=0, max_intervals=1),
         html.Div(className=f'mnid-shell{" mnid-shell-newborn" if dashboard_theme == "newborn" else ""}', children=[
             executive_tabs,
             html.Div(id='mnid-executive-content', children=[executive_content['country-profile']]),
@@ -2395,4 +2503,115 @@ def render_mnid_dashboard(data_opd, config,
 def _render_mnid_executive_tab(active_tab, executive_token):
     views = _MNID_EXECUTIVE_CONTENT_CACHE.get(executive_token) or {}
     selected = active_tab or 'country-profile'
-    return views.get(selected, views.get('country-profile', html.Div()))
+    if selected in views:
+        return views.get(selected, views.get('country-profile', html.Div()))
+
+    state = _MNID_EXECUTIVE_DATA_CACHE.get(executive_token) or {}
+    network_df = state.get('network_df')
+    config = state.get('config')
+    facility_code = state.get('facility_code')
+    start_date = state.get('start_date')
+    end_date = state.get('end_date')
+    scope_meta = state.get('scope_meta')
+    facility_df = state.get('facility_df')
+    supply_inds = state.get('supply_inds')
+    wf_inds = state.get('wf_inds')
+    dq_inds = state.get('dq_inds')
+
+    if selected == 'operational-readiness' and facility_df is not None:
+        views[selected] = render_operational_readiness(
+            facility_df,
+            supply_inds=supply_inds,
+            wf_inds=wf_inds,
+            dq_inds=dq_inds,
+        )
+        return views[selected]
+
+    if selected == 'maternal-dashboard' and network_df is not None and config is not None:
+        bundle = _build_mnid_indicator_content(
+            network_df=network_df,
+            config=config,
+            facility_code=facility_code,
+            start_date=start_date,
+            end_date=end_date,
+            scope_meta=scope_meta,
+            include_content=True,
+        )
+        views[selected] = bundle.get('indicator_content', html.Div())
+        return views[selected]
+
+    if selected == 'newborn-dashboard':
+        newborn_config = state.get('newborn_config')
+        newborn_scope_meta = state.get('newborn_scope_meta')
+        if network_df is not None and newborn_config is not None:
+            bundle = _build_mnid_indicator_content(
+                network_df=network_df,
+                config=newborn_config,
+                facility_code=facility_code,
+                start_date=start_date,
+                end_date=end_date,
+                scope_meta=newborn_scope_meta,
+                include_content=True,
+            )
+            views[selected] = bundle.get('indicator_content', html.Div())
+            return views[selected]
+
+    return views.get('country-profile', html.Div())
+
+
+@callback(
+    Output('mnid-executive-preload', 'disabled'),
+    Input('mnid-executive-preload', 'n_intervals'),
+    State('mnid-executive-view-store', 'data'),
+    prevent_initial_call=False,
+)
+def _preload_mnid_executive_tabs(_tick, executive_token):
+    state = _MNID_EXECUTIVE_DATA_CACHE.get(executive_token) or {}
+    if not state:
+        return True
+
+    views = _MNID_EXECUTIVE_CONTENT_CACHE.setdefault(executive_token, {})
+
+    facility_df = state.get('facility_df')
+    if facility_df is not None and 'operational-readiness' not in views:
+        views['operational-readiness'] = render_operational_readiness(
+            facility_df,
+            supply_inds=state.get('supply_inds'),
+            wf_inds=state.get('wf_inds'),
+            dq_inds=state.get('dq_inds'),
+        )
+
+    network_df = state.get('network_df')
+    config = state.get('config')
+    facility_code = state.get('facility_code')
+    start_date = state.get('start_date')
+    end_date = state.get('end_date')
+    scope_meta = state.get('scope_meta')
+    if network_df is not None and config is not None and 'maternal-dashboard' not in views:
+        bundle = _build_mnid_indicator_content(
+            network_df=network_df,
+            config=config,
+            facility_code=facility_code,
+            start_date=start_date,
+            end_date=end_date,
+            scope_meta=scope_meta,
+            include_content=True,
+        )
+        views['maternal-dashboard'] = bundle.get('indicator_content', html.Div())
+
+    newborn_config = state.get('newborn_config')
+    newborn_scope_meta = state.get('newborn_scope_meta')
+    if network_df is not None and newborn_config is not None and 'newborn-dashboard' not in views:
+        bundle = _build_mnid_indicator_content(
+            network_df=network_df,
+            config=newborn_config,
+            facility_code=facility_code,
+            start_date=start_date,
+            end_date=end_date,
+            scope_meta=newborn_scope_meta,
+            include_content=True,
+        )
+        views['newborn-dashboard'] = bundle.get('indicator_content', html.Div())
+
+    _trim_cache(_MNID_EXECUTIVE_CONTENT_CACHE, _MNID_UI_CACHE_MAX)
+    return True

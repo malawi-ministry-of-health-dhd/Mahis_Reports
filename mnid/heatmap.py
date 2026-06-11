@@ -461,9 +461,9 @@ def _build_facility_performance_heatmap_fig(stored: dict, year: str,
                                             sel_inds: list | None = None,
                                             facility_type: str | None = None) -> html.Div:
     """
-    Two-level display:
-      • No district selected  → national view: one row per DISTRICT (district aggregates)
-      • District(s) selected  → drill-down: one row per FACILITY within the selected district(s)
+    Facility-first display:
+      • No district selected  → all facilities
+      • District(s) selected  → facilities within the selected district(s)
     """
     all_labels = stored.get('y_labels', [])
     if sel_inds:
@@ -479,34 +479,24 @@ def _build_facility_performance_heatmap_fig(stored: dict, year: str,
     else:
         focus_districts = []
 
-    drill_down = bool(focus_districts)
+    row_keys, z_raw = _filter_by_fac_data(stored, year, focus_districts)
+    row_label = 'Facility'
 
-    if drill_down:
-        # Facility-level: facilities belonging to the selected district(s)
-        row_keys, z_raw = _filter_by_fac_data(stored, year, focus_districts)
-        row_label = 'Facility'
-        def _row_name(key):
-            code = str(key or '').rstrip('*')
-            return _FACILITY_NAMES.get(code, code)
-        def _is_current(key):
-            return str(key or '').rstrip('*') == str(stored.get('current_fac', ''))
-        def _kind(key):
-            return _infer_facility_type(str(key or '').rstrip('*'))
-    else:
-        # District-level: one row per district (national overview)
-        dist_data = stored.get('by_district', {}).get(year, {})
-        row_keys = dist_data.get('x', [])
-        z_raw    = dist_data.get('z', [])
-        row_label = 'District'
-        def _row_name(key): return str(key or '')
-        def _is_current(_): return False
-        def _kind(_): return 'All'
+    def _row_name(key):
+        code = str(key or '').rstrip('*')
+        return _FACILITY_NAMES.get(code, code)
+
+    def _is_current(key):
+        return str(key or '').rstrip('*') == str(stored.get('current_fac', ''))
+
+    def _kind(key):
+        return _infer_facility_type(str(key or '').rstrip('*'))
 
     selected_type = facility_type or 'All'
     table_rows = []
     for col_idx, row_key in enumerate(row_keys):
         kind = _kind(row_key)
-        if drill_down and selected_type != 'All' and kind != selected_type:
+        if selected_type != 'All' and kind != selected_type:
             continue
         row_vals = [
             _display_pct(z_raw[row_idx][col_idx])
@@ -594,8 +584,7 @@ def _build_performance_attention_table(stored: dict, year: str,
                                        sel_inds: list | None = None) -> html.Div:
     """
     Shows the worst performers.
-    • No district → national view: worst DISTRICTS
-    • District selected → drill-down: worst FACILITIES in those district(s)
+    Always facility-based, optionally filtered to selected district(s).
     """
     all_labels = stored.get('y_labels', [])
     all_targets = stored.get('y_targets', [])
@@ -611,33 +600,22 @@ def _build_performance_attention_table(stored: dict, year: str,
     else:
         focus_districts = []
 
-    drill_down = bool(focus_districts)
-
-    if drill_down:
-        row_keys, z_raw = _filter_by_fac_data(stored, year, focus_districts)
-        def _name(key):
-            code = str(key or '').rstrip('*')
-            return _FACILITY_NAMES.get(code, code)
-        def _dist(key):
-            return _FACILITY_DISTRICT.get(str(key or '').rstrip('*'), '')
-        def _ftype(key):
-            return _infer_facility_type(str(key or '').rstrip('*'))
-        label_col = 'Facility'
-    else:
-        dist_data = stored.get('by_district', {}).get(year, {})
-        row_keys = dist_data.get('x', [])
-        z_raw    = dist_data.get('z', [])
-        def _name(key): return str(key or '')
-        def _dist(_): return ''
-        def _ftype(_): return ''
-        label_col = 'District'
+    row_keys, z_raw = _filter_by_fac_data(stored, year, focus_districts)
+    def _name(key):
+        code = str(key or '').rstrip('*')
+        return _FACILITY_NAMES.get(code, code)
+    def _dist(key):
+        return _FACILITY_DISTRICT.get(str(key or '').rstrip('*'), '')
+    def _ftype(key):
+        return _infer_facility_type(str(key or '').rstrip('*'))
+    label_col = 'Facility'
 
     selected_type = facility_type or 'All'
     rows = []
     for col_idx, row_key in enumerate(row_keys):
-        if drill_down and selected_type != 'All' and _ftype(row_key) != selected_type:
+        if selected_type != 'All' and _ftype(row_key) != selected_type:
             continue
-        if drill_down and str(row_key or '').rstrip('*') == str(stored.get('current_fac', '')):
+        if str(row_key or '').rstrip('*') == str(stored.get('current_fac', '')):
             continue
 
         values = []
@@ -675,13 +653,13 @@ def _build_performance_attention_table(stored: dict, year: str,
     rows.sort(key=lambda row: (row['worst_pct'], row['worst_gap'], -row['critical_count'], row['avg'], row['name']))
     rows = rows[:5]
 
-    second_col = 'District' if drill_down else ''
-    third_col  = 'Facility Type' if drill_down else ''
+    second_col = 'District'
+    third_col  = 'Facility Type'
     header = html.Tr([
         html.Th('#', className='mnid-attention-th mnid-attention-rank'),
         html.Th(label_col, className='mnid-attention-th'),
-        *([html.Th(second_col, className='mnid-attention-th'),
-           html.Th(third_col, className='mnid-attention-th')] if drill_down else []),
+        html.Th(second_col, className='mnid-attention-th'),
+        html.Th(third_col, className='mnid-attention-th'),
         html.Th('Critical Indicator(s)', className='mnid-attention-th'),
         html.Th('Average Performance', className='mnid-attention-th'),
     ])
@@ -711,7 +689,7 @@ def _build_performance_attention_table(stored: dict, year: str,
         extra_cells = [
             html.Td(row['district'],  className='mnid-attention-td'),
             html.Td(row['type'],      className='mnid-attention-td'),
-        ] if drill_down else []
+        ]
         body.append(html.Tr([
             html.Td(str(idx), className='mnid-attention-td mnid-attention-rank'),
             html.Td(row['name'], className='mnid-attention-td mnid-attention-facility'),
@@ -724,7 +702,7 @@ def _build_performance_attention_table(stored: dict, year: str,
             ),
         ]))
 
-    title = 'FACILITIES REQUIRING ATTENTION' if drill_down else 'DISTRICTS REQUIRING ATTENTION'
+    title = 'FACILITIES REQUIRING ATTENTION'
     return html.Div(className='mnid-performance-attention-wrap', children=[
         html.Div(title, className='mnid-attention-title'),
         html.Table(className='mnid-attention-table', children=[

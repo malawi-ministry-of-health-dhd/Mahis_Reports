@@ -507,7 +507,8 @@ def _coverage_phase_fig(
             return _agg_cov(agg_df, ind['id'], start_date, end_date,
                             facility_codes=facility_codes or None,
                             districts=districts or None,
-                            grain=grain)
+                            grain=grain,
+                            indicator_label=ind.get('label'))
     else:
         def _get_cov(ind):
             return _cov(df, ind['numerator_filters'], ind['denominator_filters'])
@@ -620,7 +621,8 @@ def _coverage_charts_section(
             return _agg_cov(agg_df, ind['id'], start_date, end_date,
                             facility_codes=facility_codes or None,
                             districts=districts or None,
-                            grain=grain)
+                            grain=grain,
+                            indicator_label=ind.get('label'))
     else:
         def _compute(ind):
             return _cov(df, ind['numerator_filters'], ind['denominator_filters'])
@@ -1237,6 +1239,12 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
     default_facs = ([facility_code] if facility_code in all_facs else all_facs[:4]) or []
     default_dists = ([current_dist] if current_dist in all_dists else all_dists[:4]) or []
     default_inds = [ind['id'] for ind in tracked[:3]]
+    try:
+        compare_dates = pd.to_datetime(mch_full['Date'], errors='coerce').dropna() if 'Date' in mch_full.columns else pd.Series([], dtype='datetime64[ns]')
+        compare_date_min = compare_dates.min().isoformat() if len(compare_dates) else None
+        compare_date_max = compare_dates.max().isoformat() if len(compare_dates) else None
+    except Exception:
+        compare_date_min = compare_date_max = None
     _lbl_style = {
         'fontSize': '11px', 'fontWeight': '600', 'color': '#94A3B8',
         'textTransform': 'uppercase', 'letterSpacing': '0.05em',
@@ -1335,6 +1343,8 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
             'district_options': dist_opts,
             'current_fac': facility_code,
             'current_dist': current_dist,
+            'date_min': compare_date_min,
+            'date_max': compare_date_max,
         }),
         dcc.Store(id='mnid-compare-chart-type-store', data='line'),
         html.Div(className='mnid-chart-grid', children=[compare_card]),

@@ -50,9 +50,20 @@ path = os.getcwd()
 json_path = os.path.join(path, 'data', 'visualizations', 'validated_dashboard.json')
 
 _mnid_full_data_cache: dict = {}
+_dashboard_data_cache: dict = {}
 DEFAULT_DASHBOARD_DAYS = 7
 DEFAULT_RELATIVE_PERIOD = 'Today'
 _LATEST_DATA_DATE_CACHE: dict[str, pd.Timestamp | None] = {}
+_MNID_FULL_CACHE_MAX = 6
+_DASHBOARD_DATA_CACHE_MAX = 4
+
+
+def _trim_cache(cache: dict, max_entries: int) -> None:
+    while len(cache) > max_entries:
+        try:
+            cache.pop(next(iter(cache)))
+        except Exception:
+            break
 
 
 def _start_mnid_prewarm(version: str | None = None):
@@ -115,6 +126,7 @@ _start_mnid_prewarm(_dataset_version_token())
 
 def clear_dashboard_state_cache() -> None:
     _mnid_full_data_cache.clear()
+    _dashboard_data_cache.clear()
 
 
 def _load_user_registry() -> pd.DataFrame:
@@ -637,6 +649,15 @@ def update_dashboard(gen, interval, start_date, end_date, level,
             prop_dict = json.loads(triggered_id.split('.')[0])
             clicked_name = prop_dict['name']
 
+        menu_json = load_dashboard_menu()
+        if overview:
+            selected_reports = overview
+        else:
+            selected_reports = [clicked_name] if clicked_name else [menu_json[0]["report_name"] if menu_json else "Dashboard"]
+        selected_reports = list(dict.fromkeys(normalize_report_name(r, menu_json) for r in selected_reports))
+        selected_dashboards = [d for d in menu_json if d.get('report_name') in selected_reports]
+        mnid_only_request = bool(selected_dashboards) and all(d.get('dashboard_type') == 'mnid' for d in selected_dashboards)
+
         # Date Logic
         default_start, default_end = _default_date_window()
         start_dt = pd.to_datetime(start_date or default_start).replace(hour=0, minute=0, second=0)
@@ -684,29 +705,76 @@ def update_dashboard(gen, interval, start_date, end_date, level,
         level = _title_level(effective_level)
 
 
-        sql_comment = f"-- version:{_dataset_version_token()} scope:{user_level} level:{effective_level}"
-        if user_level == 'facility':
-            SQL = f"""
-                {sql_comment}
-                SELECT *
-                FROM '{DATA_FILE_NAME_}'
-                WHERE Date >= TIMESTAMP '{default_start_date}'
-                AND Date <= TIMESTAMP '{end_dt}'
-                AND {FACILITY_CODE_} = '{location}'
-                """
-        else:
-            SQL = f"""
-                {sql_comment}
-                SELECT *
-                FROM '{DATA_FILE_NAME_}'
-                WHERE Date >= TIMESTAMP '{default_start_date}'
-                AND Date <= TIMESTAMP '{end_dt}'
-                """
+        dataset_version = _dataset_version_token()
+        data = None
+        if mnid_only_request:
+            district_col_for_scope = "District"
+            _mnid_scope_key = (
+                dataset_version,
+                effective_level,
+                tuple(sorted(districts or [])),
+                tuple(sorted(facilities or [])),
+            )
+            if _mnid_scope_key in _mnid_full_data_cache:
+                data = _mnid_full_data_cache[_mnid_scope_key].copy()
+            else:
+                _mnid_cols = ', '.join([
+                    'person_id', 'encounter_id', 'Date', 'Program', 'Reporting_Program',
+                    'Service_Area', 'Facility', 'Facility_CODE', 'District', 'Encounter',
+                    'obs_value_coded', 'concept_name', 'Value', 'ValueN', 'new_revisit',
+                    'Home_district', 'TA', 'Village', 'Age', 'Age_Group', 'Gender',
+                    'Source_Program',
+                ])
+                _sql_full = f"SELECT {_mnid_cols} FROM '{DATA_FILE_NAME_}'"
+                _full = DataStorage.query_duckdb(_sql_full)
+                _full[DATE_] = pd.to_datetime(_full[DATE_], errors='coerce')
+                _full = _apply_scope_to_data(_full, scope, district_col_for_scope)
+                if effective_level != 'national' and district_col_for_scope in _full.columns and districts:
+                    _full = _full[_full[district_col_for_scope].isin(districts)]
+                if effective_level == 'facility' and facilities:
+                    _full = _full[_full[FACILITY_].isin(facilities)]
+                elif effective_level == 'district' and facilities:
+                    _full = _full[_full[FACILITY_].isin(facilities)]
+                _mnid_full_data_cache[_mnid_scope_key] = _full.copy()
+                _trim_cache(_mnid_full_data_cache, _MNID_FULL_CACHE_MAX)
+                data = _full
+
+        sql_comment = f"-- version:{dataset_version} scope:{user_level} level:{effective_level}"
+        if data is None:
+            if user_level == 'facility':
+                SQL = f"""
+                    {sql_comment}
+                    SELECT *
+                    FROM '{DATA_FILE_NAME_}'
+                    WHERE Date >= TIMESTAMP '{default_start_date}'
+                    AND Date <= TIMESTAMP '{end_dt}'
+                    AND {FACILITY_CODE_} = '{location}'
+                    """
+            else:
+                SQL = f"""
+                    {sql_comment}
+                    SELECT *
+                    FROM '{DATA_FILE_NAME_}'
+                    WHERE Date >= TIMESTAMP '{default_start_date}'
+                    AND Date <= TIMESTAMP '{end_dt}'
+                    """
+            data_cache_key = (
+                dataset_version,
+                user_level,
+                effective_level,
+                location,
+                str(default_start_date),
+                str(end_dt),
+            )
         try:
-            
-            data = DataStorage.query_duckdb(SQL)
+            if data is None:
+                if data_cache_key in _dashboard_data_cache:
+                    data = _dashboard_data_cache[data_cache_key].copy()
+                else:
+                    data = DataStorage.query_duckdb(SQL)
+                    _dashboard_data_cache[data_cache_key] = data.copy()
+                    _trim_cache(_dashboard_data_cache, _DASHBOARD_DATA_CACHE_MAX)
             # data.to_excel("data/archive/hmis.xlsx")
-            
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -743,7 +811,8 @@ def update_dashboard(gen, interval, start_date, end_date, level,
                 data['new_revisit'] = 'Unknown'
             return data
         
-        data = num_days_patient_seen(data)
+        if 'new_revisit' not in data.columns or data['new_revisit'].isna().all():
+            data = num_days_patient_seen(data)
         today = dt.today().date()
         # data["months"] = ((pd.Timestamp(today) - pd.to_datetime(data["DateValue"])).dt.days // 30).clip(lower=0)
 
@@ -885,13 +954,6 @@ def update_dashboard(gen, interval, start_date, end_date, level,
             filtered_data_mnid = filtered_data_mnid[filtered_data_mnid[FACILITY_].isin(facilities)]
 
         # Determine report selection
-        menu_json = load_dashboard_menu()
-        if overview:
-            selected_reports = overview
-        else:
-            selected_reports = [clicked_name] if clicked_name else [menu_json[0]["report_name"] if menu_json else "Dashboard"]
-        selected_reports = list(dict.fromkeys(normalize_report_name(r, menu_json) for r in selected_reports))
-        dataset_version = _dataset_version_token()
     
         rendered = []
         for report_name in selected_reports:
@@ -937,8 +999,8 @@ def update_dashboard(gen, interval, start_date, end_date, level,
                             _full = _full[_full[FACILITY_].isin(facilities)]
                         elif effective_level == 'district' and facilities:
                             _full = _full[_full[FACILITY_].isin(facilities)]
-                        _mnid_full_data_cache.clear()
                         _mnid_full_data_cache[_mnid_scope_key] = _full
+                        _trim_cache(_mnid_full_data_cache, _MNID_FULL_CACHE_MAX)
                         _ndata = _full
                 else:
                     _ndata = network_data

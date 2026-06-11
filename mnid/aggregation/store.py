@@ -66,12 +66,51 @@ def invalidate_cache() -> None:
 # ── Query helpers ─────────────────────────────────────────────────────────────
 
 _GRAIN_PERIOD_CODE = {'daily': 'D', 'weekly': 'W', 'monthly': 'M'}
+_GRAIN_FALLBACKS = {
+    'daily': ['daily', 'weekly', 'monthly'],
+    'weekly': ['weekly', 'monthly'],
+    'monthly': ['monthly'],
+}
 
 
 def _floor_to_period(ts, grain: str) -> pd.Timestamp:
     """Floor a timestamp to the start of its containing period for the given grain."""
     code = _GRAIN_PERIOD_CODE.get(grain, 'M')
     return pd.Timestamp(ts).to_period(code).start_time
+
+
+def _candidate_grains(grain: str) -> list[str]:
+    return _GRAIN_FALLBACKS.get(str(grain or '').strip().lower(), [grain or 'monthly'])
+
+
+def resolve_indicator_id(
+    agg_df: pd.DataFrame,
+    indicator_id: str,
+    indicator_label: str | None = None,
+) -> str:
+    """
+    Return an aggregate-backed indicator ID.
+
+    Some runtime MNID views now synthesize fallback/program-based indicator IDs
+    that differ from older IDs stored in the aggregate parquet. Prefer the
+    requested ID when present, otherwise fall back to a label match.
+    """
+    if agg_df is None or agg_df.empty:
+        return indicator_id
+
+    requested_id = str(indicator_id or '').strip()
+    if requested_id and agg_df['indicator_id'].astype(str).eq(requested_id).any():
+        return requested_id
+
+    wanted_label = str(indicator_label or '').strip()
+    if not wanted_label:
+        return requested_id
+
+    label_mask = agg_df['indicator_label'].fillna('').astype(str).str.strip().eq(wanted_label)
+    matches = agg_df.loc[label_mask, 'indicator_id'].dropna().astype(str)
+    if matches.empty:
+        return requested_id
+    return matches.iloc[0]
 
 
 def query_coverage(
@@ -82,6 +121,7 @@ def query_coverage(
     facility_codes: list[str] | None = None,
     districts: list[str] | None = None,
     grain: str = 'monthly',
+    indicator_label: str | None = None,
 ) -> tuple[int, int, float]:
     """
     Return (numerator, denominator, pct) summed over the date window.
@@ -90,19 +130,23 @@ def query_coverage(
     grain='monthly' for today always finds the current month's record even
     when today is not the first of the month.
     """
-    period_floor = _floor_to_period(start_date, grain)
-    mask = (
-        (agg_df['indicator_id'] == indicator_id)
-        & (agg_df['grain'] == grain)
-        & (agg_df['period_start'] >= period_floor)
-        & (agg_df['period_start'] <= pd.Timestamp(end_date))
-    )
-    if facility_codes:
-        mask &= agg_df['facility_code'].isin([str(f) for f in facility_codes])
-    elif districts:
-        mask &= agg_df['district'].isin([str(d) for d in districts])
-
-    sub = agg_df[mask]
+    resolved_indicator_id = resolve_indicator_id(agg_df, indicator_id, indicator_label)
+    sub = pd.DataFrame()
+    for candidate_grain in _candidate_grains(grain):
+        period_floor = _floor_to_period(start_date, candidate_grain)
+        mask = (
+            (agg_df['indicator_id'] == resolved_indicator_id)
+            & (agg_df['grain'] == candidate_grain)
+            & (agg_df['period_start'] >= period_floor)
+            & (agg_df['period_start'] <= pd.Timestamp(end_date))
+        )
+        if facility_codes:
+            mask &= agg_df['facility_code'].isin([str(f) for f in facility_codes])
+        elif districts:
+            mask &= agg_df['district'].isin([str(d) for d in districts])
+        sub = agg_df[mask]
+        if not sub.empty:
+            break
     if sub.empty:
         return 0, 0, 0.0
 
@@ -120,6 +164,7 @@ def query_time_series(
     districts: list[str] | None = None,
     start_date=None,
     end_date=None,
+    indicator_label: str | None = None,
 ) -> pd.DataFrame:
     """
     Return a period-by-period coverage DataFrame with columns:
@@ -129,19 +174,24 @@ def query_time_series(
     start_date is floored to the period boundary so narrow ranges (e.g. today)
     still find the enclosing period's record.
     """
-    mask = (agg_df['indicator_id'] == indicator_id) & (agg_df['grain'] == grain)
+    resolved_indicator_id = resolve_indicator_id(agg_df, indicator_id, indicator_label)
+    sub = pd.DataFrame()
+    for candidate_grain in _candidate_grains(grain):
+        mask = (agg_df['indicator_id'] == resolved_indicator_id) & (agg_df['grain'] == candidate_grain)
 
-    if facility_codes:
-        mask &= agg_df['facility_code'].isin([str(f) for f in facility_codes])
-    elif districts:
-        mask &= agg_df['district'].isin([str(d) for d in districts])
+        if facility_codes:
+            mask &= agg_df['facility_code'].isin([str(f) for f in facility_codes])
+        elif districts:
+            mask &= agg_df['district'].isin([str(d) for d in districts])
 
-    if start_date is not None:
-        mask &= agg_df['period_start'] >= _floor_to_period(start_date, grain)
-    if end_date is not None:
-        mask &= agg_df['period_start'] <= pd.Timestamp(end_date)
+        if start_date is not None:
+            mask &= agg_df['period_start'] >= _floor_to_period(start_date, candidate_grain)
+        if end_date is not None:
+            mask &= agg_df['period_start'] <= pd.Timestamp(end_date)
 
-    sub = agg_df[mask]
+        sub = agg_df[mask]
+        if not sub.empty:
+            break
     if sub.empty:
         return pd.DataFrame(columns=['period_start', 'numerator', 'denominator', 'pct'])
 
