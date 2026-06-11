@@ -106,6 +106,7 @@ def _aggregate_grain(prepared_df: pd.DataFrame, indicators: list[dict], grain: s
 def run_aggregation(
     viz_dir: str = _DEFAULT_VIZ_DIR,
     output_dir: str = _DEFAULT_OUT_DIR,
+    grains: list[str] | None = None,
 ) -> bool:
     """
     Full aggregation pipeline. Returns True on success.
@@ -154,11 +155,12 @@ def run_aggregation(
     if not indicators:
         _LOG.warning('No indicators found in %s — nothing to aggregate', viz_dir)
         return False
-    _LOG.info('Aggregating %d indicators across grains: %s', len(indicators), _GRAINS)
+    active_grains = grains if grains is not None else _GRAINS
+    _LOG.info('Aggregating %d indicators across grains: %s', len(indicators), active_grains)
 
     # ── 4. Aggregate per grain ────────────────────────────────────────────────
     parts = []
-    for grain in _GRAINS:
+    for grain in active_grains:
         _LOG.info('  grain=%s ...', grain)
         part = _aggregate_grain(prepared_df, indicators, grain)
         _LOG.info('  grain=%s → %d rows', grain, len(part))

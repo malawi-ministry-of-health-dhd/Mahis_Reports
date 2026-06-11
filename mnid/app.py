@@ -1874,22 +1874,27 @@ def sync_district_focus_from_treemap(click_data, stored):
     Output('mnid-performance-aggregate', 'children'),
     Output('mnid-performance-attention', 'children'),
     Input('mnid-performance-indicators', 'value'),
+    Input('mnid-performance-district', 'value'),
+    Input('mnid-performance-year', 'value'),
     State('mnid-heatmap-store', 'data'),
     prevent_initial_call=True,
 )
-def update_performance_heatmap(sel_inds, stored):
+def update_performance_heatmap(sel_inds, sel_districts, sel_year, stored):
     if not stored:
         return html.Div(), html.Div(), html.Div()
+    year = sel_year or 'All years'
+    district = sel_districts or None  # None means all districts
     table = _build_facility_performance_heatmap_fig(
         stored,
-        'All years',
+        year,
+        district,
         sel_inds,
     )
-    gauges = _build_district_gauge_row(stored, 'All years')
+    gauges = _build_district_gauge_row(stored, year)
     attention = _build_performance_attention_table(
         stored,
-        'All years',
-        'All',
+        year,
+        district,
         'All',
         sel_inds,
     )
@@ -2201,6 +2206,8 @@ def register_mnid_callbacks(app) -> None:
         Output('mnid-performance-aggregate', 'children'),
         Output('mnid-performance-attention', 'children'),
         Input('mnid-performance-indicators', 'value'),
+        Input('mnid-performance-district', 'value'),
+        Input('mnid-performance-year', 'value'),
         State('mnid-heatmap-store', 'data'),
         prevent_initial_call=True,
     )(update_performance_heatmap)

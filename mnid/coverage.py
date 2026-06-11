@@ -208,31 +208,58 @@ def _coverage_heatmap_section(
     _lbl_style = {'fontSize': '10px', 'color': MUTED, 'fontWeight': '600',
                   'marginBottom': '3px'}
 
+    perf_data_districts = [d for d in dyn_districts if d]
+    perf_dist_opts = [{'label': d, 'value': d} for d in perf_data_districts]
+
     performance_card = html.Div(className='mnid-card mnid-performance-block',
                     style={'marginBottom': '12px'}, children=[
         dcc.Store(id='mnid-heatmap-store', data=store),
         html.Div('FACILITY PERFORMANCE', className='mnid-section-lbl'),
         html.Div(style={'fontSize': '11px', 'color': DIM, 'marginBottom': '10px'},
-                 children='District comparison heatmap for key performance indicators.'),
+                 children='Facility-level coverage heatmap. Filter by district, year, or indicators.'),
         html.Div(className='mnid-performance-shell', children=[
             html.Div(id='mnid-performance-aggregate', className='mnid-performance-aggregate',
                      children=_build_district_gauge_row(store, 'All years')),
             html.Div(className='mnid-performance-table-card', children=[
-                html.Div(className='mnid-performance-filter', style={'marginBottom': '10px'}, children=[
-                    html.Div('Indicators', style=_lbl_style),
-                    dcc.Dropdown(
-                        id='mnid-performance-indicators',
-                        options=ind_opts,
-                        value=default_perf_inds,
-                        multi=True,
-                        placeholder='Select indicators...',
-                        style=_dd_style,
-                    ),
+                html.Div(style={'display': 'grid', 'gridTemplateColumns': '1fr 1fr 1.6fr',
+                                'gap': '8px', 'marginBottom': '10px'}, children=[
+                    html.Div([
+                        html.Div('Districts', style=_lbl_style),
+                        dcc.Dropdown(
+                            id='mnid-performance-district',
+                            options=perf_dist_opts,
+                            value=None,
+                            multi=True,
+                            placeholder='All districts',
+                            style=_dd_style,
+                        ),
+                    ]),
+                    html.Div([
+                        html.Div('Year', style=_lbl_style),
+                        dcc.Dropdown(
+                            id='mnid-performance-year',
+                            options=year_opts,
+                            value='All years',
+                            clearable=False,
+                            style=_dd_style,
+                        ),
+                    ]),
+                    html.Div([
+                        html.Div('Indicators', style=_lbl_style),
+                        dcc.Dropdown(
+                            id='mnid-performance-indicators',
+                            options=ind_opts,
+                            value=default_perf_inds,
+                            multi=True,
+                            placeholder='Select indicators...',
+                            style=_dd_style,
+                        ),
+                    ]),
                 ]),
                 html.Div(
                     id='mnid-performance-heatmap-table',
                     className='mnid-performance-heatmap-graph',
-                    children=_build_facility_performance_heatmap_fig(store, 'All years', 'All', default_perf_inds, 'All'),
+                    children=_build_facility_performance_heatmap_fig(store, 'All years', None, default_perf_inds, 'All'),
                 ),
                 html.Div(className='mnid-performance-key', children=[
                     html.Div('Performance Color Scale', className='mnid-performance-key-title'),
@@ -243,7 +270,7 @@ def _coverage_heatmap_section(
                 html.Div(
                     id='mnid-performance-attention',
                     className='mnid-performance-attention',
-                    children=_build_performance_attention_table(store, 'All years', 'All', 'All', default_perf_inds),
+                    children=_build_performance_attention_table(store, 'All years', None, 'All', default_perf_inds),
                 ),
             ]),
         ]),
