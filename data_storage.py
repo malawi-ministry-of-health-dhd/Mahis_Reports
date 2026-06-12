@@ -328,64 +328,68 @@ if __name__ == "__main__":
             json.dump(global_configurations, f, indent=2)
 
     for items in global_configurations:
-        BASE_QUERY = items.get("base_query")
-        DATA_ROUTE = f"data/{items.get('data_path')}"
-        DB_CONFIG = items.get("db_config")
-        SSH_CONFIG = items.get("ssh_config")
-        USE_LOCALHOST = items.get("use_localhost", True)
-        BATCH_SIZE = items.get("batch_size", 1000)
-        LOAD_FRESH_DATA = items.get("load_fresh_data", True)
-        START_DATE = items.get("start_date", "2026-01-01")
 
-        # skip if data source is paused
-        if items.get("pause_data_source"):
-            continue
-        
-        programs = DataStorage(query=QUERY_PROGRAMS,data_dir=DATA_ROUTE,
-                               db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
-        programs.fetch_and_save_single_table(table_name="programs_data")
+        try:
+            BASE_QUERY = items.get("base_query")
+            DATA_ROUTE = f"data/{items.get('data_path')}"
+            DB_CONFIG = items.get("db_config")
+            SSH_CONFIG = items.get("ssh_config")
+            USE_LOCALHOST = items.get("use_localhost", True)
+            BATCH_SIZE = items.get("batch_size", 1000)
+            LOAD_FRESH_DATA = items.get("load_fresh_data", True)
+            START_DATE = items.get("start_date", "2026-01-01")
 
-        concepts = DataStorage(query=QUERY_CONCEPT_NAMES,data_dir=DATA_ROUTE,
-                               db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
-        concepts.fetch_and_save_single_table(table_name="concept_names_data")
-
-        encounter_types = DataStorage(query=QUERY_ENCOUNTER_TYPES,data_dir=DATA_ROUTE,
-                                      db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
-        encounter_types.fetch_and_save_single_table(table_name="encounter_types_data")
-
-        locations = DataStorage(query=QUERY_LOCATIONS,data_dir=DATA_ROUTE,
+            # skip if data source is paused
+            if items.get("pause_data_source"):
+                continue
+            
+            programs = DataStorage(query=QUERY_PROGRAMS,data_dir=DATA_ROUTE,
                                 db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
-        locations.fetch_and_save_single_table(table_name="locations_data")
+            programs.fetch_and_save_single_table(table_name="programs_data")
 
-        # if not IS_HARMONIZED_MAHIS:
-        #     facilities = DataStorage(query=QUERY_FACILITIES)
-        #     facilities.fetch_and_save_single_table(table_name="facilities_data")
+            concepts = DataStorage(query=QUERY_CONCEPT_NAMES,data_dir=DATA_ROUTE,
+                                db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
+            concepts.fetch_and_save_single_table(table_name="concept_names_data")
 
-        drugs = DataStorage(query=QUERY_DRUGS,data_dir=DATA_ROUTE,
-                            db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
-        drugs.fetch_and_save_single_table(table_name="drugs_data")
+            encounter_types = DataStorage(query=QUERY_ENCOUNTER_TYPES,data_dir=DATA_ROUTE,
+                                        db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
+            encounter_types.fetch_and_save_single_table(table_name="encounter_types_data")
 
-        order_types = DataStorage(query=QUERY_ORDER_TYPES,data_dir=DATA_ROUTE,
-                                  db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
-        order_types.fetch_and_save_single_table(table_name="order_types_data")
-
-
-        users = DataStorage(query=QUERY_USERS,data_dir=DATA_ROUTE,
-                            db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
-        users.fetch_and_save_single_table(table_name="users_data")
-
-        user_programs = DataStorage(query=QUERY_USER_PROGRAMS,data_dir=DATA_ROUTE,
+            locations = DataStorage(query=QUERY_LOCATIONS,data_dir=DATA_ROUTE,
                                     db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
-        user_programs.fetch_and_save_single_table(table_name="user_programs")
+            locations.fetch_and_save_single_table(table_name="locations_data")
 
-        # bids = DataStorage(query=QUERY_BIDS)
-        # bids.fetch_and_save_single_table(table_name="bids")
+            # if not IS_HARMONIZED_MAHIS:
+            #     facilities = DataStorage(query=QUERY_FACILITIES)
+            #     facilities.fetch_and_save_single_table(table_name="facilities_data")
 
-        transactional = DataStorage(query=BASE_QUERY, data_dir=DATA_ROUTE,
-                                    db_config=DB_CONFIG, ssh_config=SSH_CONFIG, 
-                                    use_localhost=USE_LOCALHOST,batch_size=BATCH_SIZE, 
-                                    load_fresh_data=LOAD_FRESH_DATA, start_date=START_DATE)
-        transactional.fetch_transactional_data(date_column="encounter_datetime", incremental_id_column="encounter_id")
+            drugs = DataStorage(query=QUERY_DRUGS,data_dir=DATA_ROUTE,
+                                db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
+            drugs.fetch_and_save_single_table(table_name="drugs_data")
+
+            order_types = DataStorage(query=QUERY_ORDER_TYPES,data_dir=DATA_ROUTE,
+                                    db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
+            order_types.fetch_and_save_single_table(table_name="order_types_data")
+
+
+            users = DataStorage(query=QUERY_USERS,data_dir=DATA_ROUTE,
+                                db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
+            users.fetch_and_save_single_table(table_name="users_data")
+
+            user_programs = DataStorage(query=QUERY_USER_PROGRAMS,data_dir=DATA_ROUTE,
+                                        db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
+            user_programs.fetch_and_save_single_table(table_name="user_programs")
+
+            # bids = DataStorage(query=QUERY_BIDS)
+            # bids.fetch_and_save_single_table(table_name="bids")
+
+            transactional = DataStorage(query=BASE_QUERY, data_dir=DATA_ROUTE,
+                                        db_config=DB_CONFIG, ssh_config=SSH_CONFIG, 
+                                        use_localhost=USE_LOCALHOST,batch_size=BATCH_SIZE, 
+                                        load_fresh_data=LOAD_FRESH_DATA, start_date=START_DATE)
+            transactional.fetch_transactional_data(date_column="encounter_datetime", incremental_id_column="encounter_id")
+        except Exception as e:
+            print(e)
 
 
         # if CONCEPTS:
