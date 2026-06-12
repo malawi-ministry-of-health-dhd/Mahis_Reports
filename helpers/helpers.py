@@ -108,11 +108,11 @@ def parse_filter_value(filter_val):
                 return filter_val
         return filter_val
 
-def create_count_from_config(df,data_path, filters): 
+def create_count_from_config(df, data_path, filters): 
     """Create count based on JSON filter configuration"""
 
     unique_col = filters.get("unique", "")
-    aggregation = filters.get("measure", "")
+    aggregation = filters.get("measure", "count")
 
     # Extract variables and values
     variables = [
@@ -149,6 +149,7 @@ def create_count_from_config(df,data_path, filters):
         return create_count(df,data_path,aggregation, unique_col)
     # if active_filters[0][0] != filters.get("variable1"):
     #     return create_count(df, unique_col)  # failsafe
+    
     args = []
     for var, val in active_filters:
         args.extend([var, val])

@@ -1227,7 +1227,8 @@ def _build_compare_heatmap(title: str, df: 'pd.DataFrame', tracked: list) -> go.
 
 def _comparative_analysis_section(indicators: list, facility_code: str,
                                   mch_full: pd.DataFrame,
-                                  payload_key: str | None = None) -> html.Div:
+                                  payload_key: str | None = None,
+                                  data_path: str | None = None) -> html.Div:
     """Time-aware comparison across selected facilities or districts and indicators."""
     tracked = [i for i in indicators if i.get('status') == 'tracked']
     all_facs  = sorted(mch_full['Facility_CODE'].dropna().astype(str).unique().tolist()) if len(mch_full) and 'Facility_CODE' in mch_full.columns else sorted(_ALL_FACILITIES[:])
@@ -1345,6 +1346,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
             'current_dist': current_dist,
             'date_min': compare_date_min,
             'date_max': compare_date_max,
+            'data_path': data_path,
         }),
         dcc.Store(id='mnid-compare-chart-type-store', data='line'),
         html.Div(className='mnid-chart-grid', children=[compare_card]),

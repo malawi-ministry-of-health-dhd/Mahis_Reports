@@ -18,7 +18,7 @@ from mnid.constants import (
     ALL_DISTRICTS as _ALL_DISTRICTS,
     FACILITY_NAMES as _FACILITY_NAMES,
 )
-from mnid.chart_helpers import _display_pct, _infer_facility_type, _contrast_text
+from mnid.chart_helpers import _display_pct, _infer_facility_type, _contrast_text, _mask
 from mnid.geo_utils import (
     load_malawi_district_geojson as _load_malawi_district_geojson,
     build_geo_reference as _build_geo_reference,
@@ -27,19 +27,6 @@ from mnid.geo_utils import (
 
 _LOGGER = logging.getLogger(__name__)
 
-
-def _mask(df: pd.DataFrame, cfg: dict) -> pd.Series:
-    """Build boolean row mask from a filter config dict without calling create_count."""
-    mask = pd.Series(True, index=df.index)
-    for i in range(1, 11):
-        var = cfg.get(f'variable{i}')
-        val = cfg.get(f'value{i}')
-        if not var or not val:
-            break
-        if var not in df.columns:
-            return pd.Series(False, index=df.index)
-        mask &= df[var].isin(val) if isinstance(val, list) else (df[var] == val)
-    return mask
 
 
 def _matrix_by_group(df: pd.DataFrame, inds: list,

@@ -1328,7 +1328,7 @@ def create_pie_chart(query_fiter,data_path, names_col, values_col, title,
         df_summary = pd.concat([top, other_row], ignore_index=True)
 
     color_sequence = (
-        list(colormap.values()) if colormap
+        list(colormap.values()) if isinstance(colormap, dict)
         else THEME["gender"]
     )
 

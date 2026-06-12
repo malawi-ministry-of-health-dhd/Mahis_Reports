@@ -49,7 +49,7 @@ from mnid.chart_helpers import (
     _CHART_LAYOUT, _TREND_SERIES_PALETTE, _TREND_ACCENT, _ANALYSIS_PALETTE,
     _CAT_LABELS, _CAT_ORDER,
     _warn_once, _moving_average_window, _moving_average_values,
-    _filter_columns_missing, _cov, _monthly, _css, _CLR, _target_label,
+    _filter_columns_missing, _mask, _cov, _monthly, _css, _CLR, _target_label,
     _on_target, _target_attainment_pct, _target_mode, _is_inverse_indicator,
     _display_pct, _axis_wrap, _infer_facility_type, _contrast_text,
     _value_counts, _flag_value_counts, _monthly_visits,
@@ -62,7 +62,7 @@ from mnid.indicators import (
     _enrich_program_based_mnid_indicators, _resolve_runtime_mnid_indicators,
 )
 from mnid.heatmap import (
-    _mask, _matrix_by_group, _matrix_monthly, _cov_color,
+    _matrix_by_group, _matrix_monthly, _cov_color,
     _compute_heatmap_store, _compute_heatmap_store_from_agg,
     _build_facility_performance_heatmap_fig,
     _build_performance_attention_table, _build_heatmap_fig,
@@ -239,7 +239,7 @@ def _load_mnid_report_config(report_name: str) -> dict | None:
     )
 
 
-def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
+def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,data_path: str,
                                   facility_code, start_date, end_date,
                                   scope_meta: dict | None = None,
                                   include_content: bool = True) -> dict:
@@ -398,7 +398,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
                 indicator_label=ind.get('label'),
             )
         else:
-            num, den, pct = _cov(facility_df, ind['numerator_filters'], ind['denominator_filters'])
+            num, den, pct = _cov(facility_df, ind['numerator_filters'], ind['denominator_filters'],data_path)
         computed.append({
             **ind,
             'pct': pct,
@@ -436,7 +436,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
                     prev_df = prev_df[prev_df['Facility'].isin(selected_facilities)]
                 elif not prev_df.empty and selected_districts and 'District' in prev_df.columns:
                     prev_df = prev_df[prev_df['District'].isin(selected_districts)]
-                _, _, prev_pct = _cov(prev_df, c['numerator_filters'], c['denominator_filters'])
+                _, _, prev_pct = _cov(prev_df, c['numerator_filters'], c['denominator_filters'], data_path)
                 c['delta_pct'] = round(c['pct'] - prev_pct, 1)
             except Exception:
                 c['delta_pct'] = None
@@ -498,7 +498,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         all_inds, facility_code, network_df,
         precomputed_store=_heatmap_store_cache[_heatmap_cache_key],
     )
-    comparative_div = _comparative_analysis_section(all_inds, facility_code, facility_df, payload_key=payload_key)
+    comparative_div = _comparative_analysis_section(all_inds, facility_code, facility_df, payload_key=payload_key, data_path=data_path)
 
     def _sec_header(title, count=None, desc=None, eyebrow=None):
         return html.Div(className=f'mnid-section-header{" mnid-section-header-newborn" if dashboard_theme == "newborn" else ""}', children=[
@@ -540,7 +540,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
             desc='Monthly trends for neonatal admissions and outcome-related indicators, with target references where applicable.' if dashboard_theme == 'newborn' else '12-month rolling - dotted line = target',
             eyebrow='Trends' if dashboard_theme == 'newborn' else None,
         ),
-        _trend_switcher(facility_df, all_inds, scope_meta=scope_meta, payload_key=payload_key),
+        _trend_switcher(facility_df, all_inds, scope_meta=scope_meta, payload_key=payload_key, data_path=data_path),
 
         _section_anchor('mnid-performance'),
         _sec_header(
@@ -742,6 +742,7 @@ def update_trend_chart(n_clicks_list, location, selected_inds, stored_trend, act
     loc_options = trend_payload.get('loc_options') or [{'label': 'All locations', 'value': 'all'}]
     ind_opts_by_cat = trend_payload.get('ind_opts_by_cat') or {}
     ind_options = ind_opts_by_cat.get(cat, [])
+    data_path = trend_payload.get('data_path')
 
     # Use aggregate fast path; only restore the raw df when aggregate is absent (first run).
     _agg_now = _get_aggregate()
@@ -760,7 +761,7 @@ def update_trend_chart(n_clicks_list, location, selected_inds, stored_trend, act
 
     cards = _run_chart_cards(df, tracked, cat, location or 'all',
                              selected_inds if not cat_changed else None,
-                             scope_meta, agg_df=_agg_now)
+                             scope_meta, agg_df=_agg_now, data_path=data_path)
     classes = ['mnid-filter-btn active' if c == cat else 'mnid-filter-btn' for c in categories]
     return cards, cat, classes, loc_options, ind_options, ind_value_out
 
@@ -891,7 +892,8 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
                      location: str | None = None,
                      selected_ids: list | None = None,
                      scope_meta: dict | None = None,
-                     agg_df: pd.DataFrame | None = None) -> list:
+                     agg_df: pd.DataFrame | None = None,
+                     data_path: str | None = None) -> list:
     tracked = [i for i in indicators if i.get('status') == 'tracked' and i.get('category') == cat]
     if selected_ids:
         id_set = set(selected_ids)
@@ -995,7 +997,7 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
                                         grain=grain,
                                         indicator_label=ind.get('label'))[2]
             else:
-                cur_pct = _cov(plot_df, ind['numerator_filters'], ind['denominator_filters'])[2]
+                cur_pct = _cov(plot_df, ind['numerator_filters'], ind['denominator_filters'], data_path)[2]
             cls = _css(cur_pct, target, ind)
             badge_colors = {'ok': ('#D1FAE5', '#065F46'), 'warn': ('#FEF3C7', '#92400E'), 'danger': ('#FEE2E2', '#991B1B')}
             bg, fg = badge_colors.get(cls, ('#F1F5F9', '#475569'))
@@ -1028,7 +1030,8 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
 def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None = None,
                     default_cat: str | None = None,
                     scope_meta: dict | None = None,
-                    payload_key: str | None = None) -> html.Div:
+                    payload_key: str | None = None,
+                    data_path: str | None = None) -> html.Div:
     tracked = [i for i in indicators if i.get('status') == 'tracked']
     cat_order = _resolve_category_order(tracked, categories)
     default_cat = default_cat if default_cat in cat_order else (cat_order[0] if cat_order else 'ANC')
@@ -1042,7 +1045,7 @@ def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None 
     default_ind_opts = ind_opts_by_cat.get(default_cat, [])
 
     _agg = _get_aggregate()
-    default_cards = _run_chart_cards(df, tracked, default_cat, 'all', None, scope_meta, agg_df=_agg)
+    default_cards = _run_chart_cards(df, tracked, default_cat, 'all', None, scope_meta, agg_df=_agg, data_path=data_path)
 
     # Store date range so callbacks can detect grain without restoring the full df.
     # data_key is kept as a lightweight fallback for when the aggregate isn't built yet.
@@ -1061,6 +1064,7 @@ def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None 
         'scope_meta': scope_meta or {},
         'loc_options': loc_options,
         'ind_opts_by_cat': ind_opts_by_cat,
+        'data_path': data_path,
     }
 
     return html.Div(className='mnid-card', style={'marginBottom': '12px'}, children=[
@@ -1710,7 +1714,8 @@ def _service_snapshot_view(section: dict, view_mode: str) -> html.Div:
 
 def _location_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str,
                         chart_type: str = 'line',
-                        scope_meta: dict | None = None) -> go.Figure:
+                        scope_meta: dict | None = None,
+                        data_path: str | None = None) -> go.Figure:
     fig = go.Figure()
     if not len(df) or not cat_inds or 'Date' not in df.columns:
         fig.add_annotation(text='No trend data available for this selection',
@@ -1762,7 +1767,7 @@ def _location_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str,
         xs, ys = [], []
         for p in periods:
             period_df = d2[d2['_period'] == p]
-            _, den, pct = _cov(period_df, ind['numerator_filters'], ind['denominator_filters'])
+            _, den, pct = _cov(period_df, ind['numerator_filters'], ind['denominator_filters'], data_path)
             xs.append(pd.Period(p, freq).to_timestamp().to_pydatetime())
             ys.append(_display_pct(pct) if den > 0 else None)
         moving_average, ma_window = _moving_average_values(ys, period_label)
@@ -2078,6 +2083,7 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
     district_options = store_payload.get('district_options', [])
     current_fac = store_payload.get('current_fac', '')
     current_dist = store_payload.get('current_dist', '')
+    data_path = store_payload.get('data_path')
     compare_date_min = pd.to_datetime(store_payload.get('date_min'), errors='coerce')
     compare_date_max = pd.to_datetime(store_payload.get('date_max'), errors='coerce')
 
@@ -2195,7 +2201,7 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
                 xs, ys, texts = [], [], []
                 for period in periods:
                     period_df = entity_df[pd.to_datetime(entity_df['Date']).dt.to_period(period_code) == period]
-                    _, den, pct = _cov(period_df, ind['numerator_filters'], ind['denominator_filters'])
+                    _, den, pct = _cov(period_df, ind['numerator_filters'], ind['denominator_filters'], data_path)
                     xs.append(period_fmt(period))
                     ys.append(_display_pct(pct) if den > 0 else None)
                     texts.append(f'{pct:.0f}%' if den > 0 else 'No data')
@@ -2423,12 +2429,14 @@ def prewarm_cache(dataset_version: str | None = None) -> bool:
         logging.getLogger(__name__).warning('MNID pre-warm failed: %s', exc)
         return False
 
-_MNID_SQL_COLUMNS = ', '.join([
-    'person_id', 'encounter_id', 'Date', 'Program', 'Reporting_Program',
-    'Service_Area', 'Facility', 'Facility_CODE', 'District', 'Encounter',
-    'obs_value_coded', 'concept_name', 'Value', 'ValueN', 'new_revisit',
-    'Home_district', 'TA', 'Village', 'Age', 'Age_Group', 'Gender', 'Source_Program',
-])
+# _MNID_SQL_COLUMNS = ', '.join([
+#     'person_id', 'encounter_id', 'Date', 'Program', 'Reporting_Program',
+#     'Service_Area', 'Facility', 'Facility_CODE', 'District', 'Encounter',
+#     'obs_value_coded', 'concept_name', 'Value', 'ValueN', 'new_revisit',
+#     'Home_district', 'TA', 'Village', 'Age', 'Age_Group', 'Gender', 'Source_Program',
+# ])
+
+_MNID_SQL_COLUMNS = "*" #kept all for now
 
 def render_mnid_dashboard(filtered, data_opd, data_path, config, 
                           facility_code, start_date, end_date,
@@ -2463,6 +2471,7 @@ def render_mnid_dashboard(filtered, data_opd, data_path, config,
     primary_bundle = _build_mnid_indicator_content(
         network_df=network_df,
         config=config,
+        data_path = data_path,
         facility_code=facility_code,
         start_date=start_date,
         end_date=end_date,
@@ -2544,10 +2553,14 @@ def render_mnid_dashboard(filtered, data_opd, data_path, config,
 @callback(
     Output('mnid-executive-content', 'children'),
     Input('mnid-executive-tabs', 'value'),
+    State('url-params-store', 'data'),
     State('mnid-executive-view-store', 'data'),
     prevent_initial_call=False,
 )
-def _render_mnid_executive_tab(active_tab, executive_token):
+def _render_mnid_executive_tab(active_tab, urlparams, executive_token):
+    route = urlparams.get('route', ["default"])[0]
+    data_path = f"data/{route}/parquet"
+
     views = _MNID_EXECUTIVE_CONTENT_CACHE.get(executive_token) or {}
     selected = active_tab or 'country-profile'
     if selected in views:
@@ -2578,6 +2591,7 @@ def _render_mnid_executive_tab(active_tab, executive_token):
         bundle = _build_mnid_indicator_content(
             network_df=network_df,
             config=config,
+            data_path = data_path,
             facility_code=facility_code,
             start_date=start_date,
             end_date=end_date,
@@ -2594,6 +2608,7 @@ def _render_mnid_executive_tab(active_tab, executive_token):
             bundle = _build_mnid_indicator_content(
                 network_df=network_df,
                 config=newborn_config,
+                data_path = data_path,
                 facility_code=facility_code,
                 start_date=start_date,
                 end_date=end_date,
@@ -2609,10 +2624,15 @@ def _render_mnid_executive_tab(active_tab, executive_token):
 @callback(
     Output('mnid-executive-preload', 'disabled'),
     Input('mnid-executive-preload', 'n_intervals'),
+    State('url-params-store', 'data'),
     State('mnid-executive-view-store', 'data'),
     prevent_initial_call=False,
 )
-def _preload_mnid_executive_tabs(_tick, executive_token):
+def _preload_mnid_executive_tabs(_tick, urlparams, executive_token):
+
+    route = urlparams.get('route', ["default"])[0]
+    data_path = f"data/{route}/parquet"
+
     state = _MNID_EXECUTIVE_DATA_CACHE.get(executive_token) or {}
     if not state:
         return True
@@ -2638,6 +2658,7 @@ def _preload_mnid_executive_tabs(_tick, executive_token):
         bundle = _build_mnid_indicator_content(
             network_df=network_df,
             config=config,
+            data_path = data_path,
             facility_code=facility_code,
             start_date=start_date,
             end_date=end_date,
@@ -2652,6 +2673,7 @@ def _preload_mnid_executive_tabs(_tick, executive_token):
         bundle = _build_mnid_indicator_content(
             network_df=network_df,
             config=newborn_config,
+            data_path = data_path,
             facility_code=facility_code,
             start_date=start_date,
             end_date=end_date,
