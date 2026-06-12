@@ -10,7 +10,7 @@ import io
 import uuid
 from data_storage import DataStorage
 from config import (actual_keys_in_data, 
-                    DATA_FILE_NAME_, 
+                    DATA_PATH_, 
                     DATE_, PERSON_ID_, ENCOUNTER_ID_,
                     FACILITY_, AGE_GROUP_, AGE_,
                     GENDER_, ENCOUNTER_, PROGRAM_,
@@ -27,9 +27,16 @@ from config import (actual_keys_in_data,
                     VALUE_NAME_)
 
 path = os.getcwd()
-path_dcc_json = os.path.join(path, 'data', 'dcc_dropdown_json','dropdowns.json')
-with open(path_dcc_json) as r:
-    dcc_json = json.load(r)
+path_dcc_json = os.path.join(path, 'data/default', 'dcc_dropdown_json','dropdowns.json')
+if os.path.exists(path_dcc_json):
+    with open(path_dcc_json) as r:
+        dcc_json = json.load(r)
+else:
+    dcc_json = {
+        "programs": [],
+        "encounters": [],
+        "concepts": []
+    }
 
 drop_down_programs = dcc_json['programs']
 drop_down_encounters = dcc_json['encounters']
@@ -48,7 +55,7 @@ def validate_excel_file(contents):
         excel_file = pd.ExcelFile(io.BytesIO(decoded))
         
         # Check required sheets
-        required_sheets = ['VARIABLE_NAMES', 'FILTERS', 'DESIGN', 'REPORT_NAME']
+        required_sheets = ['VARIABLE_NAMES', 'FILTERS', 'REPORT_NAME']
         missing_sheets = [sheet for sheet in required_sheets if sheet not in excel_file.sheet_names]
         
         if missing_sheets:
@@ -230,7 +237,7 @@ def upload_dashboard_json(contents):
 
     return "Upload successful!"
 
-# Program Reports Upload and Dry Run
+# Clinical Reports Upload and Dry Run
 def validate_prog_reports_json(contents):
     """
     Validates that the uploaded JSON file:
@@ -429,19 +436,6 @@ def archive_report(report_id):
     
     save_reports_data(data)
 
-# Preview Data
-def load_preview_data():
-    """Load preview data from parquet file"""
-    file_path = os.path.join("data", "concepts_data.csv")
-    if not os.path.exists(file_path):
-        return pd.DataFrame(), "Empty Reference"
-    
-    try:
-        df = pd.read_csv(file_path)
-        return df, None
-    except Exception as e:
-        return None, f"Error loading data: {str(e)}"
-
 # DASHBOARDS 
 def create_chart_fields(chart_type, chart_data=None, section_index=None, chart_index=None):
     chart_data = chart_data or {}
@@ -620,35 +614,90 @@ def create_chart_fields(chart_type, chart_data=None, section_index=None, chart_i
     
     return html.Div(className="chart-grid", children=grid_items)
 
+def render_filter_rows(count_idx, filter_pairs):
+    """Render the dynamic variable/value filter rows for a count item."""
+    col_options = [{"label": k, "value": k} for k in actual_keys_in_data]
+    rows = []
+    for fi, (var, val) in enumerate(filter_pairs):
+        remove_btn = html.Button(
+            "×",
+            id={"type": "count-remove-filter", "count": count_idx, "filter": fi},
+            n_clicks=0,
+            className="btn-danger btn-small",
+            style={"flexShrink": "0", "height": "32px"},
+        ) if len(filter_pairs) > 1 else html.Div(style={"width": "32px"})
+
+        rows.append(html.Div(
+            style={"display": "flex", "gap": "6px", "alignItems": "center", "marginBottom": "6px"},
+            children=[
+                dcc.Dropdown(
+                    id={"type": "count-var", "count": count_idx, "filter": fi},
+                    value=var if var else None,
+                    options=col_options,
+                    placeholder="Select column",
+                    className="form-input",
+                    clearable=True,
+                    style={"flex": "1", "minWidth": "140px"},
+                ),
+                dcc.Input(
+                    id={"type": "count-val", "count": count_idx, "filter": fi},
+                    value=str(val) if val not in (None, "") else "",
+                    placeholder="Value (use * prefix for wildcard)",
+                    className="form-input",
+                    type="text",
+                    style={"flex": "1"},
+                ),
+                remove_btn,
+            ]
+        ))
+    return rows
+
+
 def create_count_item(count_data=None, index=None):
-    def ensure_list(value):
-        if value is None:
-            return []
-
-        if isinstance(value, list):
-            return value
-
-        if isinstance(value, str):
-            return [value]
-
-        try:
-            return list(value)
-        except TypeError:
-            return [value]
     count_data = count_data or {}
-    value1 =  ensure_list(count_data.get('filters', {}).get('value1', []))
-    value2 = ensure_list(count_data.get('filters', {}).get('value2', []))
-    value3 = ensure_list(count_data.get('filters', {}).get('value3', []))
+    filters = count_data.get("filters", {})
 
+    # Collect existing variable/value pairs from the filters dict
+    filter_pairs = []
+    for i in range(1, 11):
+        var_key = f"variable{i}"
+        val_key = f"value{i}"
+        if var_key in filters:
+            var = filters[var_key] or ""
+            val = filters.get(val_key, "")
+            if isinstance(val, list):
+                val = ", ".join(str(v) for v in val if v not in (None, ""))
+            filter_pairs.append((var, str(val) if val not in (None, "") else ""))
+    if not filter_pairs:
+        filter_pairs = [("", "")]
 
     return html.Div(className="count-item", children=[
-        html.Div(style={"display": "flex","gap":"5px"}, children=[
+        # ── Close bar ────────────────────────────────────────────────────────
+        html.Div(
+            style={"display": "flex", "justifyContent": "space-between", "alignItems": "center",
+                   "marginBottom": "8px", "paddingBottom": "6px", "borderBottom": "1px solid #e5e7eb"},
+            children=[
+                html.Span(
+                    f"Metric: {count_data.get('name', 'New Metric') or 'New Metric'}",
+                    style={"fontSize": "13px", "fontWeight": "600", "color": "#374151"},
+                ),
+                html.Button(
+                    "✕ Close",
+                    id={"type": "close-count-form", "index": index},
+                    n_clicks=0,
+                    className="btn-secondary btn-small",
+                    title="Close this form",
+                    style={"fontSize": "12px"},
+                ),
+            ],
+        ),
+        # ── Row 1: metadata ──────────────────────────────────────────────────
+        html.Div(style={"display": "flex", "gap": "5px", "flexWrap": "wrap"}, children=[
             html.Div(className="count-col", style={"display": "none"}, children=[
                 html.Label("ID *", className="form-label-disabled"),
                 dcc.Input(
                     id={"type": "count-id", "index": index},
-                    value=count_data.get('id', f'count_{uuid.uuid4().hex[:8]}'),
-                    placeholder="unique_id",
+                    value=count_data.get("id", f"count_{uuid.uuid4().hex[:8]}"),
                     disabled=True,
                     className="form-input",
                 ),
@@ -657,215 +706,116 @@ def create_count_item(count_data=None, index=None):
                 html.Label("Metric Title *", className="form-label"),
                 dcc.Input(
                     id={"type": "count-name", "index": index},
-                    value=count_data.get('name', ''),
-                    placeholder="",
-                    className="form-input"
+                    value=count_data.get("name", ""),
+                    placeholder="e.g. All Attendance",
+                    className="form-input",
                 ),
             ]),
             html.Div(className="count-col", children=[
                 html.Label("Aggregation", className="form-label"),
                 dcc.Dropdown(
                     id={"type": "count-aggregations", "index": index},
-                    value=count_data.get('filters', {}).get('measure', 'count'),
-                    options=[
-                        {'label': item, 'value': item}
-                        for item in aggregations
-                    ],
-                    className="form-input"
+                    value=filters.get("measure", "nunique"),
+                    options=[{"label": a, "value": a} for a in aggregations],
+                    className="form-input",
+                    clearable=False,
                 ),
             ]),
             html.Div(className="count-col", children=[
-                html.Label("Aggregate using", className="form-label"),
+                html.Label("Using Column", className="form-label"),
                 dcc.Dropdown(
                     id={"type": "count-unique", "index": index},
-                    value=count_data.get('filters', {}).get('unique', 'person_id'),
-                    options=[
-                        {'label': item, 'value': item}
-                        for item in actual_keys_in_data
-                    ],
-                    className="form-input"
+                    value=filters.get("unique", "person_id"),
+                    options=[{"label": k, "value": k} for k in actual_keys_in_data],
+                    className="form-input",
+                    clearable=False,
+                ),
+            ]),
+            html.Div(className="count-col", children=[
+                html.Label("Level", className="form-label"),
+                dcc.Dropdown(
+                    id={"type": "count-level", "index": index},
+                    value=count_data.get("level", "facility"),
+                    options=[{"label": v, "value": v} for v in ["facility", "district", "national"]],
+                    className="form-input",
+                    clearable=False,
+                ),
+            ]),
+            html.Div(className="count-col", children=[
+                html.Label("Flag", className="form-label"),
+                dcc.Dropdown(
+                    id={"type": "count-flag", "index": index},
+                    value=count_data.get("flag", None),
+                    options=[{"label": v, "value": v} for v in ["ok", "warn", "danger"]],
+                    className="form-input",
+                    clearable=True,
+                    placeholder="None",
+                ),
+            ]),
+            html.Div(className="count-col", children=[
+                html.Label("Display Average", className="form-label"),
+                dcc.Dropdown(
+                    id={"type": "count-display-average", "index": index},
+                    value=count_data.get("display_average", None),
+                    options=[{"label": "Yes", "value": "True"}, {"label": "No", "value": "False"}],
+                    className="form-input",
+                    clearable=True,
+                    placeholder="None",
+                ),
+            ]),
+            html.Div(className="count-col", children=[
+                html.Label("Link (href)", className="form-label"),
+                dcc.Input(
+                    id={"type": "count-href", "index": index},
+                    value=count_data.get("href", ""),
+                    placeholder="e.g. program_reports",
+                    className="form-input",
+                ),
+            ]),
+            html.Div(className="count-col", children=[
+                html.Label("Link Label", className="form-label"),
+                dcc.Input(
+                    id={"type": "count-href-name", "index": index},
+                    value=count_data.get("href_name", ""),
+                    placeholder="e.g. view patients",
+                    className="form-input",
                 ),
             ]),
             html.Div(className="count-col", children=[
                 html.Label("Actions", className="form-label"),
-                html.Button("Save", 
-                          id={"type": "save-count", "index": index},
-                          n_clicks=0,
-                          className="btn-save btn-small"),
-                html.Button("🗑️", 
-                          id={"type": "remove-count", "index": index},
-                          n_clicks=0,
-                          className="btn-danger btn-small")
+                html.Button(
+                    "Save",
+                    id={"type": "save-count", "index": index},
+                    n_clicks=0,
+                    className="btn-save btn-small",
+                ),
+                html.Button(
+                    "🗑️",
+                    id={"type": "remove-count", "index": index},
+                    n_clicks=0,
+                    className="btn-danger btn-small",
+                ),
             ]),
         ]),
 
-        # Level 1 Filters
-        html.Div(style={"display": "flex","gap":"5px"}, children=[
-            html.Div(className="count-col", style={"display": "none"},  children=[
-                html.Label("Filter Variable 1", className="form-label"),
-                dcc.Input(
-                    id={"type": "count-var1", "index": index},
-                    value=count_data.get('filters', {}).get('variable1', 'Program'),
-                    className="form-input",
-
+        # ── Row 2: dynamic filters ────────────────────────────────────────────
+        html.Div(style={"marginTop": "10px", "padding": "10px", "background": "#f9fafb",
+                         "borderRadius": "6px", "border": "1px solid #e5e7eb"}, children=[
+            html.Div(style={"display": "flex", "alignItems": "center", "marginBottom": "8px",
+                             "gap": "10px"}, children=[
+                html.Label("Filters", className="form-label",
+                           style={"margin": "0", "fontWeight": "600"}),
+                html.Button(
+                    "+ Add Filter",
+                    id={"type": "count-add-filter", "count": index},
+                    n_clicks=0,
+                    className="btn-primary btn-small",
                 ),
             ]),
-            html.Div(className="count-col", children=[
-                html.Label("Program", className="form-label"),
-                dcc.Dropdown(
-                    id={"type": "count-val1", "index": index},
-                    value=value1,
-                    multi=True,
-                    options=[
-                        {'label': item, 'value': item}
-                        for item in drop_down_programs
-                    ],
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="count-col",style={"display": "none"}, children=[
-                html.Label("Filter Variable 2",  className="form-label"),
-                dcc.Input(
-                    id={"type": "count-var2", "index": index},
-                    value=count_data.get('filters', {}).get('variable2', 'Encounter'),
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Encounter Name", className="form-label"),
-                dcc.Dropdown(
-                    id={"type": "count-val2", "index": index},
-                    value=value2,
-                    multi=True,
-                    options=[
-                        {'label': item, 'value': item}
-                        for item in drop_down_encounters
-                    ],
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="count-col",style={"display": "none"}, children=[
-                html.Label("Filter Variable 3", className="form-label"),
-                dcc.Input(
-                    id={"type": "count-var3", "index": index},
-                    value=count_data.get('filters', {}).get('variable3', 'concept_name'),
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Concept Question", className="form-label"),
-                dcc.Dropdown(
-                    id={"type": "count-val3", "index": index},
-                    value=value3,
-                    multi=True,
-                    options=[
-                        {'label': item, 'value': item}
-                        for item in drop_down_concepts
-                    ],
-                    className="form-input"
-                ),
-            ])
-            ,
-            html.Div(className="count-col",style={"display": "none"}, children=[
-                html.Label("Filter Variable 4", className="form-label"),
-                dcc.Input(
-                    id={"type": "count-var4", "index": index},
-                    value=count_data.get('filters', {}).get('variable4', 'obs_value_coded'),
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Concept (Obs Value Coded)", className="form-label"),
-                dcc.Dropdown(
-                    id={"type": "count-val4", "index": index},
-                    value=count_data.get('filters', {}).get('value4', ''),
-                    multi=True,
-                    options=[
-                        {'label': item, 'value': item}
-                        for item in dcc_json['concept_answers']
-                    ],
-                    className="form-input"
-                ),
-            ])
-        ]),
-
-        # Level 2 filters
-        html.Div(style={"display": "flex","gap":"5px"}, children=[
-            html.Div(className="count-col",style={"display": "none"}, children=[
-                html.Label("Filter Variable 6",  className="form-label"),
-                dcc.Input(
-                    id={"type": "count-var6", "index": index},
-                    value=count_data.get('filters', {}).get('variable6', 'Value'),
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Drug Name", className="form-label"),
-                dcc.Dropdown(
-                    id={"type": "count-val6", "index": index},
-                    value=count_data.get('filters', {}).get('value6', ''),
-                    multi=True,
-                    options=[
-                        {'label': item, 'value': item}
-                        for item in dcc_json['DrugName']
-                    ],
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="count-col",style={"display": "none"}, children=[
-                html.Label("Filter Variable 7", className="form-label"),
-                dcc.Input(
-                    id={"type": "count-var7", "index": index},
-                    value=count_data.get('filters', {}).get('variable7', 'Gender'),
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Gender", className="form-label"),
-                dcc.Dropdown(
-                    id={"type": "count-val7", "index": index},
-                    value=count_data.get('filters', {}).get('value7', ''),
-                    multi=True,
-                    options=[
-                        {'label': item, 'value': item}
-                        for item in dcc_json['gender']
-                    ],
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="count-col", style={"display": "none"},  children=[
-                html.Label("Filter Variable 5", className="form-label"),
-                dcc.Input(
-                    id={"type": "count-var5", "index": index},
-                    value=count_data.get('filters', {}).get('variable5', 'ValueN'),
-                    className="form-input",
-
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Obs Value Numeric", className="form-label"),
-                dcc.Input(
-                    id={"type": "count-val5", "index": index},
-                    value=count_data.get('filters', {}).get('value5', ''),
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="count-col",style={"display": "none"}, children=[
-                html.Label("Filter Variable 8", className="form-label"),
-                dcc.Input(
-                    id={"type": "count-var8", "index": index},
-                    value=count_data.get('filters', {}).get('variable8', 'Age'),
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Age", className="form-label"),
-                dcc.Input(
-                    id={"type": "count-val8", "index": index},
-                    value=count_data.get('filters', {}).get('value8', ''),
-                    className="form-input"
-                ),
-            ])
+            html.Div(
+                id={"type": "count-filters-container", "count": index},
+                children=render_filter_rows(index, filter_pairs),
+            ),
         ]),
     ])
 
@@ -905,6 +855,16 @@ def create_chart_item(chart_data=None, section_index=None, chart_index=None):
                 ),
             ]),
             html.Div(className="chart-col", children=[
+                html.Label("Level", className="form-label"),
+                dcc.Dropdown(
+                    id={"type": "chart-level", "section": section_index, "index": chart_index},
+                    value=chart_data.get('level', 'facility'),
+                    options=[{'label': v, 'value': v} for v in ['facility', 'district', 'national']],
+                    className="dropdown",
+                    clearable=False,
+                ),
+            ]),
+            html.Div(className="chart-col", children=[
                 html.Label("Actions", className="form-label"),
                 html.Button(
                     "Save", 
@@ -926,15 +886,21 @@ def create_chart_item(chart_data=None, section_index=None, chart_index=None):
         ),
     ])
 
-def create_section(section_data=None, index=None):
+def create_section(section_data=None, index=None, active_chart_index=None):
     section_data = section_data or {}
-    
-    # Create initial charts for this section
-    initial_charts = []
-    if section_data.get('items'):
-        for i, chart_data in enumerate(section_data['items']):
-            initial_charts.append(create_chart_item(chart_data, index, i))
-    
+    items = section_data.get('items', [])
+
+    # Only render the one active chart (or none)
+    if active_chart_index is not None and 0 <= active_chart_index < len(items):
+        initial_charts = [create_chart_item(items[active_chart_index], index, active_chart_index)]
+    else:
+        initial_charts = []
+
+    chart_count_label = html.Span(
+        f"{len(items)} chart(s) in section — click a chart in the list to edit",
+        style={"fontSize": "12px", "color": "#6b7280", "marginLeft": "8px"}
+    ) if items and not initial_charts else None
+
     return html.Div(className="section-item", children=[
         html.Div(className="card-header", children=[
             html.Div(className="section-header", children=[
@@ -948,20 +914,42 @@ def create_section(section_data=None, index=None):
                     ),
                 ]),
                 html.Div(className="section-col", children=[
+                    html.Label("Charts Per Row", className="form-label"),
+                    dcc.Input(
+                        id={"type": "section-chart-items-per-row", "index": index},
+                        value=section_data.get('chart_items_per_row', 2),
+                        type="number",
+                        min=1,
+                        max=6,
+                        placeholder="2",
+                        className="form-input",
+                        style={"width": "80px"},
+                    ),
+                ]),
+                html.Div(className="section-col", children=[
                     html.Label("Actions", className="form-label"),
-                    html.Button("🗑️ Remove Section", 
+                    html.Button("🗑️ Remove Section",
                               id={"type": "remove-section", "index": index},
                               n_clicks=0,
-                              className="btn-danger")
+                              className="btn-danger"),
+                    html.Button("✕ Close",
+                              id={"type": "close-section-form", "index": index},
+                              n_clicks=0,
+                              className="btn-secondary btn-small",
+                              title="Close this form",
+                              style={"marginLeft": "6px", "fontSize": "12px"}),
                 ]),
             ]),
         ]),
         html.Div(className="card-body", children=[
-            html.Button("+ Add Chart", 
-                      id={"type": "add-chart-btn", "index": index},
-                      n_clicks=0,
-                      className="btn-primary"),
-            html.Div(id={"type": "charts-container", "index": index, "section": index}, 
+            html.Div(style={"display": "flex", "alignItems": "center", "marginBottom": "8px"}, children=[
+                html.Button("+ Add Chart",
+                          id={"type": "add-chart-btn", "index": index},
+                          n_clicks=0,
+                          className="btn-primary"),
+                chart_count_label,
+            ]),
+            html.Div(id={"type": "charts-container", "index": index, "section": index},
                     className="charts-container",
                     children=initial_charts),
         ]),

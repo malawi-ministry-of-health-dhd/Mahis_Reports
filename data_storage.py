@@ -10,11 +10,11 @@ import duckdb
 import pyarrow.parquet as pq
 import pyarrow as pa
 import warnings
+import sys
 warnings.filterwarnings("ignore")
 
 logging.basicConfig(level=logging.DEBUG)
 
-QUERY_OBS_OLD = cfg.QUERY_OBS_OLD
 QUERY_OBS_HARMONIZED = cfg.QUERY_OBS_HARMONIZED
 QUERY_PROGRAMS = cfg.QUERY_PROGRAMS
 QUERY_CONCEPT_NAMES = cfg.QUERY_CONCEPT_NAMES
@@ -36,45 +36,50 @@ CUSTOM_MNID_MAP_SERVICE_AREA = cfg.CUSTOM_MNID_MAP_SERVICE_AREA
 CUSTOM_GENDER_MAP = cfg.CUSTOM_GENDER_MAP
 
 USE_LOCALHOST = cfg.USE_LOCALHOST
-DATA_FILE_NAME_ = cfg.DATA_FILE_NAME_
+DATA_PATH_ = cfg.DATA_PATH_
 CONCEPTS = getattr(cfg, "CONCEPTS", None)
-
+KEYS_IN_DATA = cfg.actual_keys_in_data
 
 class DataStorage:
     def __init__ (self, 
-                  query=QUERY_OBS_OLD,
-                  data_dir="data",
-                  tables_dir = "data/single_tables", 
-                  filename=DATA_FILE_NAME_):
+                  query=QUERY_OBS_HARMONIZED,
+                  data_dir=DATA_PATH_, db_config=cfg.DB_CONFIG, ssh_config=cfg.SSH_CONFIG,
+                  load_fresh_data=cfg.LOAD_FRESH_DATA, use_localhost=USE_LOCALHOST,
+                  batch_size=cfg.BATCH_SIZE, start_date=cfg.START_DATE):
         self.query = query
         self.script_dir = os.path.dirname(os.path.realpath(__file__))
         os.chdir(self.script_dir)
         logging.debug(f"Working directory set to: {os.getcwd()}")
         self.data_dir = os.path.join(self.script_dir, data_dir)
-        self.tables_dir = os.path.join(self.script_dir, tables_dir)
+        self.tables_dir = os.path.join(self.script_dir, data_dir, "single_tables")
+        self.parquet_path = os.path.join(self.script_dir, data_dir, "parquet")
+        self.dropdown_path = os.path.join(self.script_dir, data_dir, "dcc_dropdown_json")
         os.makedirs(self.data_dir, exist_ok=True)
-        os.makedirs(os.path.join(self.script_dir, tables_dir), exist_ok=True)
+        os.makedirs(os.path.join(self.tables_dir), exist_ok=True)
+        os.makedirs(os.path.join(self.parquet_path), exist_ok=True)
+        os.makedirs(os.path.join(self.dropdown_path), exist_ok=True)
 
-        if os.path.isabs(filename):
-            self.filepath = filename
-        else:
-            self.filepath = os.path.join(self.script_dir, filename)
+        self.use_localhost = use_localhost
+        self.load_fresh_data = load_fresh_data
+        self.ssh_config = ssh_config
+        self.db_config = db_config
+        self.batch_size = batch_size
+        self.start_date = start_date
 
-        # Treat DATA_FILE_NAME_ as a parquet directory path.
-        if self.filepath.lower().endswith('.parquet'):
-            self.filepath = os.path.dirname(self.filepath)
-        os.makedirs(self.filepath, exist_ok=True)
-
-        self.dropdown_filepath = os.path.join(self.data_dir, 'dcc_dropdown_json', 'dropdowns.json')
+        self.dropdown_filepath = os.path.join(self.data_dir, self.dropdown_path, 'dropdowns.json')
+        self.facillities_dropdown_filepath = os.path.join(self.data_dir, self.dropdown_path, 'facilities_dropdowns.json')
 
     def fetch_transactional_data(self, date_column, incremental_id_column):
         """Fetch fresh data from DB and save to Parquet."""
         logging.info("Fetching Transactional Tables.")
-        fetcher = DataFetcher(use_localhost=USE_LOCALHOST)
+        fetcher = DataFetcher(use_localhost=self.use_localhost, ssh_config=self.ssh_config, 
+                 db_config=self.db_config, db_config_local=self.db_config,start_date=self.start_date, 
+                 load_fresh_data=self.load_fresh_data, single_tables_folder=self.tables_dir,
+                 batch_size=self.batch_size)
 
         df = fetcher.fetch_data(
             query_template = self.query,
-            parquet_output=self.filepath,
+            parquet_output=self.parquet_path,
             date_column=date_column,
             id_column=incremental_id_column
         )
@@ -89,6 +94,8 @@ class DataStorage:
         encounter_types_dict = encounter_types.set_index('encounter_type_id')['name'].to_dict()
 
         locations = pd.read_csv(os.path.join(self.script_dir,self.tables_dir, "locations_data.csv"))
+        locations_dict = (locations[(locations['county_district'].notna())&(locations['name'].notna())]
+                          .groupby('county_district')['name'].apply(list).to_dict())
     
         # check if facilities or locations can be used to map facility names, if not create empty dicts and log a warning
         facilities_path = os.path.join(self.script_dir,self.tables_dir, "facilities_data.csv")
@@ -154,7 +161,7 @@ class DataStorage:
 
                 df['month_key'] = df[date_column].dt.strftime('%Y%m')
                 for month, month_df in df.groupby('month_key'):
-                    month_file = os.path.join(self.filepath, f"data_{month}.parquet")
+                    month_file = os.path.join(self.parquet_path, f"data_{month}.parquet")
                     if os.path.exists(month_file):
                         existing_df = pd.read_parquet(month_file, engine='pyarrow')
                         for col in existing_df.columns:
@@ -172,27 +179,30 @@ class DataStorage:
                 # df = df.drop_duplicates()
                 # df.to_parquet(self.filepath, index=False, engine='pyarrow')
                 
-                print(self.filepath)
-                print("exists:", os.path.exists(self.filepath))
-                print("size:", os.path.getsize(self.filepath))
+                print(self.parquet_path)
+                print("exists:", os.path.exists(self.parquet_path))
+                print("size:", os.path.getsize(self.parquet_path))
 
                 DataStorage.invalidate_query_cache()
-                logging.info(f"Data saved to {self.filepath} (Parquet format)")
+                logging.info(f"Data saved to {self.parquet_path} (Parquet format)")
 
                 timestamp_file = os.path.join(self.data_dir,'TimeStamp.csv')
                 os.makedirs(os.path.dirname(timestamp_file), exist_ok=True)
                 pd.DataFrame({'saving_time': [datetime.now().strftime("%d/%m/%Y, %H:%M:%S")]}).to_csv(timestamp_file, index=False)
 
-                dropdown_json = {"programs":sorted(user_programs.name.dropna().unique().tolist()),
+                dropdown_json = {"programs":sorted(user_programs.name.dropna().unique().tolist()), 
                             "encounters":sorted(encounter_types.name.dropna().unique().tolist()),
                             "concepts":sorted(df.concept_name.dropna().unique().tolist()),
                             "concept_answers":sorted(df.obs_value_coded.dropna().unique().tolist()),
                             "gender":sorted(df.Gender.dropna().unique().tolist()),
                             #  "age_group":sorted(df.Age_Group.dropna().unique().tolist()),
-                            "DrugName":sorted(drugs.name.dropna().unique().tolist())
+                            "DrugName":sorted(drugs.name.dropna().unique().tolist()),
                             }
                 with open(self.dropdown_filepath, 'w') as r:
                     json.dump(dropdown_json, r, indent=2)
+                with open(self.facillities_dropdown_filepath, 'w') as f:
+                    json.dump(locations_dict, f, indent=2)
+                
             else:
                 logging.warning("No data fetched from database.")
         except Exception as e:
@@ -283,52 +293,105 @@ class DataStorage:
         return fetcher.fetch_single_table(
             query=self.query,
             table_name=table_name,
+            output_folder=self.tables_dir,
             output_format=format
         )
 
 
 if __name__ == "__main__":
-
-    programs = DataStorage(query=QUERY_PROGRAMS)
-    programs.fetch_and_save_single_table(table_name="programs_data")
-
-    concepts = DataStorage(query=QUERY_CONCEPT_NAMES)
-    concepts.fetch_and_save_single_table(table_name="concept_names_data")
-
-    encounter_types = DataStorage(query=QUERY_ENCOUNTER_TYPES)
-    encounter_types.fetch_and_save_single_table(table_name="encounter_types_data")
-
-    locations = DataStorage(query=QUERY_LOCATIONS)
-    locations.fetch_and_save_single_table(table_name="locations_data")
-
-    if not IS_HARMONIZED_MAHIS:
-        facilities = DataStorage(query=QUERY_FACILITIES)
-        facilities.fetch_and_save_single_table(table_name="facilities_data")
-
-    drugs = DataStorage(query=QUERY_DRUGS)
-    drugs.fetch_and_save_single_table(table_name="drugs_data")
-
-    order_types = DataStorage(query=QUERY_ORDER_TYPES)
-    order_types.fetch_and_save_single_table(table_name="order_types_data")
-
-
-    users = DataStorage(query=QUERY_USERS)
-    users.fetch_and_save_single_table(table_name="users_data")
-
-    user_programs = DataStorage(query=QUERY_USER_PROGRAMS)
-    user_programs.fetch_and_save_single_table(table_name="user_programs")
-
-    # bids = DataStorage(query=QUERY_BIDS)
-    # bids.fetch_and_save_single_table(table_name="bids")
-
-    if not IS_HARMONIZED_MAHIS:
-        transactional = DataStorage(query=QUERY_OBS_OLD, filename=DATA_FILE_NAME_)
-        transactional.fetch_transactional_data(date_column="encounter_datetime", incremental_id_column="encounter_id")
+    # check if config file exists and load it, if not log an error and exit
+    if os.path.exists(os.path.join(os.path.dirname(os.path.realpath(__file__)), "configurations.json")):
+        with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "configurations.json")) as f:
+            global_configurations = json.load(f)
+        # JSON serialises tuples as arrays; restore remote_bind_address to tuple
+        for _cfg in global_configurations:
+            _ssh = _cfg.get("ssh_config") or _cfg.get("SSH_CONFIG")
+            if isinstance(_ssh, dict) and isinstance(_ssh.get("remote_bind_address"), list):
+                _ssh["remote_bind_address"] = tuple(_ssh["remote_bind_address"])
     else:
-        transactional = DataStorage(query=QUERY_OBS_HARMONIZED, filename=DATA_FILE_NAME_)
-        transactional.fetch_transactional_data(date_column="encounter_datetime", incremental_id_column="encounter_id")
+        global_configurations = [
+            {
+                "uuid": "uuid_default",
+                "name": "Default Configuration",
+                "use_localhost": cfg.USE_LOCALHOST,
+                "start_date": cfg.START_DATE,
+                "load_fresh_data": cfg.LOAD_FRESH_DATA,
+                "data_path": "default",
+                "base_query": cfg.QUERY_OBS_HARMONIZED,
+                "pause_data_source": False,
+                "batch_size": cfg.BATCH_SIZE,
+                "db_config": cfg.DB_CONFIG,
+                "ssh_config": cfg.SSH_CONFIG, 
+                }
+        ]
+        with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "configurations.json"), 'w') as f:
+            json.dump(global_configurations, f, indent=2)
+
+    for items in global_configurations:
+
+        try:
+            BASE_QUERY = items.get("base_query")
+            DATA_ROUTE = f"data/{items.get('data_path')}"
+            DB_CONFIG = items.get("db_config")
+            SSH_CONFIG = items.get("ssh_config")
+            USE_LOCALHOST = items.get("use_localhost", True)
+            BATCH_SIZE = items.get("batch_size", 1000)
+            LOAD_FRESH_DATA = items.get("load_fresh_data", True)
+            START_DATE = items.get("start_date", "2026-01-01")
+
+            # skip if data source is paused
+            if items.get("pause_data_source"):
+                continue
+            
+            programs = DataStorage(query=QUERY_PROGRAMS,data_dir=DATA_ROUTE,
+                                db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
+            programs.fetch_and_save_single_table(table_name="programs_data")
+
+            concepts = DataStorage(query=QUERY_CONCEPT_NAMES,data_dir=DATA_ROUTE,
+                                db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
+            concepts.fetch_and_save_single_table(table_name="concept_names_data")
+
+            encounter_types = DataStorage(query=QUERY_ENCOUNTER_TYPES,data_dir=DATA_ROUTE,
+                                        db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
+            encounter_types.fetch_and_save_single_table(table_name="encounter_types_data")
+
+            locations = DataStorage(query=QUERY_LOCATIONS,data_dir=DATA_ROUTE,
+                                    db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
+            locations.fetch_and_save_single_table(table_name="locations_data")
+
+            # if not IS_HARMONIZED_MAHIS:
+            #     facilities = DataStorage(query=QUERY_FACILITIES)
+            #     facilities.fetch_and_save_single_table(table_name="facilities_data")
+
+            drugs = DataStorage(query=QUERY_DRUGS,data_dir=DATA_ROUTE,
+                                db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
+            drugs.fetch_and_save_single_table(table_name="drugs_data")
+
+            order_types = DataStorage(query=QUERY_ORDER_TYPES,data_dir=DATA_ROUTE,
+                                    db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
+            order_types.fetch_and_save_single_table(table_name="order_types_data")
 
 
-    if CONCEPTS:
-        concepts = DataStorage(query=CONCEPTS)
-        concepts.fetch_and_save_single_table(table_name="concepts_data")
+            users = DataStorage(query=QUERY_USERS,data_dir=DATA_ROUTE,
+                                db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
+            users.fetch_and_save_single_table(table_name="users_data")
+
+            user_programs = DataStorage(query=QUERY_USER_PROGRAMS,data_dir=DATA_ROUTE,
+                                        db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
+            user_programs.fetch_and_save_single_table(table_name="user_programs")
+
+            # bids = DataStorage(query=QUERY_BIDS)
+            # bids.fetch_and_save_single_table(table_name="bids")
+
+            transactional = DataStorage(query=BASE_QUERY, data_dir=DATA_ROUTE,
+                                        db_config=DB_CONFIG, ssh_config=SSH_CONFIG, 
+                                        use_localhost=USE_LOCALHOST,batch_size=BATCH_SIZE, 
+                                        load_fresh_data=LOAD_FRESH_DATA, start_date=START_DATE)
+            transactional.fetch_transactional_data(date_column="encounter_datetime", incremental_id_column="encounter_id")
+        except Exception as e:
+            print(e)
+
+
+        # if CONCEPTS:
+        #     concepts = DataStorage(query=CONCEPTS)
+        #     concepts.fetch_and_save_single_table(table_name="concepts_data")

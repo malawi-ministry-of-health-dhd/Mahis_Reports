@@ -612,9 +612,9 @@ def clear_runtime_caches() -> None:
     _analysis_charts_cache.clear()
     _MNID_UI_CACHE.clear()
     _MNID_EXECUTIVE_CONTENT_CACHE.clear()
-    if _MNID_UI_DISK_CACHE is not None:
+    if _MNID_UI_CACHE is not None:
         try:
-            _MNID_UI_DISK_CACHE.clear()
+            _MNID_UI_CACHE.clear()
         except Exception:
             pass
     from mnid.aggregation.store import invalidate_cache as _agg_invalidate
@@ -2423,10 +2423,25 @@ def prewarm_cache(dataset_version: str | None = None) -> bool:
         logging.getLogger(__name__).warning('MNID pre-warm failed: %s', exc)
         return False
 
+_MNID_SQL_COLUMNS = ', '.join([
+    'person_id', 'encounter_id', 'Date', 'Program', 'Reporting_Program',
+    'Service_Area', 'Facility', 'Facility_CODE', 'District', 'Encounter',
+    'obs_value_coded', 'concept_name', 'Value', 'ValueN', 'new_revisit',
+    'Home_district', 'TA', 'Village', 'Age', 'Age_Group', 'Gender', 'Source_Program',
+])
 
-def render_mnid_dashboard(data_opd, config,
+def render_mnid_dashboard(filtered, data_opd, data_path, config, 
                           facility_code, start_date, end_date,
                           scope_meta: dict | None = None):
+    
+    if isinstance(filtered, str):
+        from data_storage import DataStorage as _DS
+        filtered = _DS.query_duckdb(
+            f"SELECT {_MNID_SQL_COLUMNS} FROM '{data_path}' WHERE {filtered}"
+        )
+        data_opd = _DS.query_duckdb(
+            f"SELECT {_MNID_SQL_COLUMNS} FROM '{data_path}' WHERE {data_opd}"
+        )
     dataset_version = (scope_meta or {}).get('dataset_version')
     selected_programs = tuple(sorted((scope_meta or {}).get('mnid_categories') or []))
     selected_facilities = tuple(sorted((scope_meta or {}).get('selected_facilities') or []))

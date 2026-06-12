@@ -821,7 +821,12 @@ def prepare_mnid_dataframe(df: pd.DataFrame | None) -> pd.DataFrame:
 
 
 def serialize_store_df(df: pd.DataFrame) -> list[dict]:
-    """Convert dataframe rows to JSON-safe records for Dash stores."""
+    """Convert dataframe rows to JSON-safe records for Dash stores.
+
+    Uses to_dict instead of to_json to avoid the Python recursion limit
+    that to_json hits on large DataFrames.  Datetime columns are converted
+    to ISO strings before the dict conversion.
+    """
     if df is None or df.empty:
         return []
     safe_df = df.copy()

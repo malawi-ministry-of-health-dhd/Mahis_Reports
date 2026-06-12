@@ -8,7 +8,6 @@ BATCH_SIZE = 1000 # Number of records to fetch per batch when loading from datab
 IS_HARMONIZED_MAHIS = True # Set to True if using the harmonized MAHIS database schema, False for legacy schema
 DEMO_UUID = "m3his@dhd"
 DEMO_LOCATION = "LL040033"
-
 RELATIVE_DAYS = [ 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'This Week', 'Last Week', 'This Month', 'Last Month' ]
 
 # REFERENTIAL COLUMNS - THESE SHOULD MATCH THE QUERY OUTPUT COLUMNS
@@ -82,6 +81,7 @@ actual_keys_in_data = ['person_id', 'visit_id', 'date_started', 'date_stopped', 
                        'value_coded_name_id', 'DrugName', 'value_datetime', 'ValueN', 'Value', 'Order_Type', 'Order_Name', 
                        'Source_Program', 'Reporting_Program', 'Service_Area', 'new_revisit', 'DrugUnits', 'User', 'Facility_CODE', 
                        'Facility', 'District', 'month_key']
+
 
 QUERY_OBS_HARMONIZED = """
 SELECT

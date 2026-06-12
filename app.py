@@ -4,7 +4,7 @@ from dash import dcc, html, page_container
 import threading
 import time
 
-from config import PREFIX_NAME, DATA_FILE_NAME_
+from config import PREFIX_NAME, DATA_PATH_
 from helpers.api_routes import register_api_routes
 from helpers.navigation_callbacks import register_navigation_callbacks
 from mnid.app import register_mnid_callbacks
@@ -23,7 +23,7 @@ app.layout = dmc.MantineProvider(
     children=html.Div(
         [
             dcc.Location(id="url", refresh=False),
-            dcc.Store(id="url-params-store", storage_type="session"),
+            dcc.Store(id="url-params-store", storage_type="memory"),
             html.Div(id="nav-container"),
             page_container,
         ],
@@ -42,7 +42,7 @@ def _prewarm_mnid_cache():
         import pandas as pd
         from data_storage import DataStorage
         from mnid.app import _network_df_cache, _prepare_mnid_dataframe
-        sql = f"SELECT * FROM 'data/{DATA_FILE_NAME_}'"
+        sql = f"SELECT * FROM '{DATA_PATH_}/parquet'"
         df = DataStorage.query_duckdb(sql)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         key = (len(df), tuple(df.columns.tolist()))

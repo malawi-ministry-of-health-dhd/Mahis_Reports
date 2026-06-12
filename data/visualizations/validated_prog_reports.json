@@ -2,8 +2,8 @@
   "reports": [
     {
       "id": "1",
-      "report_name": "LINE LIST OF OPD Dispensing AND DIAGNOSES",
-      "authorized_user": ["Clinician", "Nurse"],
+      "report_name": "LINELIST OF OPD DISPENSING AND DIAGNOSES",
+      "authorized_user": "Any",
       "message": "Names have been masked. Visible only to : ",
       "program": "OPD Program",
       "type": "LineList",
@@ -49,7 +49,7 @@
       "message": "Names have been masked. Visible only to : ",
       "program": "OPD Program",
       "type": "LineList",
-      "unique_col": ["person_id", "Date"],
+      "unique_col": "person_id",
       "filters": {
         "unique": "any"
       },
@@ -74,10 +74,10 @@
         "Medication Given"
       ],
       "merge_methods": ["inner", "left"],
-      "group_cols1": ["given_name", "family_name", "Gender", "Age", "Home_district", "TA", "Village"],
-      "group1_filters": {"Program": "OPD Program", "Village": "!=''"},
+      "group_cols1": ["Date","given_name", "family_name", "Gender", "Age", "Home_district", "TA", "Village"],
+      "group1_filters": {"Program": "OPD Program"},
       "group_cols2": ["obs_value_coded"],
-      "group2_filters": {"Program": "OPD Program", "Encounter": "PRESENTING COMPLAINTS", "concept_name": "Presenting complaint"},
+      "group2_filters": {"Program": "OPD Program","concept_name": "Presenting complaint"},
       "group2_aggr": {"obs_value_coded": "join"},
       "group2_rename": {"obs_value_coded": "Complaint"},
       "group_cols3": ["obs_value_coded"],
@@ -94,7 +94,7 @@
       "authorized_user": ["Clinician", "Nurse"],
       "program": "OPD Program",
       "type": "LineList",
-      "unique_col": ["person_id", "Date"],
+      "unique_col": "person_id",
       "filters": {
         "unique": "any"
       },
@@ -115,20 +115,20 @@
         "TA",
         "Village",
         "Complaint",
-        "MRDT Result",
+        "Result",
         "Drug Given"
       ],
       "merge_methods": ["left", "inner", "left"],
       "group_cols1": ["Date", "given_name", "family_name", "Gender", "Age", "Home_district", "TA", "Village"],
-      "group1_filters": {"Program": "OPD Program", "Village": "!in:''"},
+      "group1_filters": {"Program": "OPD Program"},
       "group_cols2": ["obs_value_coded"],
-      "group2_filters": {"Program": "OPD Program", "Encounter": "Presenting complaints", "concept_name": "Presenting complaint"},
+      "group2_filters": {"Program": "OPD Program", "concept_name": "Presenting complaint"},
       "group2_aggr": {"obs_value_coded": "join"},
       "group2_rename": {"obs_value_coded": "Complaint"},
       "group_cols3": ["Value"],
       "group3_filters": {"Program": "OPD Program", "Encounter": "Lab results", "concept_name": "Malaria Rapid Diagonostic Test"},
       "group3_aggr": {"Value": "join"},
-      "group3_rename": {"Value": "MRDT Result"},
+      "group3_rename": {"Value": "Result"},
 
       "group_cols4": ["DrugName"],
       "group4_filters": {"Program": "OPD Program", "Encounter": "Dispensing"},
@@ -146,7 +146,7 @@
         "unique": "any",
         "duration_default": "any",
         "index_col1": "DrugName",
-        "columns": ["Encounter"],
+        "columns": "Encounter",
         "values_col": "ValueN",
         "title": "DRUGS AND QUANTITIES",
         "unique_column": "encounter_id",
@@ -192,7 +192,7 @@
     {
       "id": "6",
       "report_name": "OPD DIAGNOSES, GENDER AND AGE GROUPS",
-      "authorized_user": "Any",
+      "authorized_user": ["Clinician", "Nurse"],
       "program": "OPD Program",
       "date_created": "2025-12-04",
       "type": "CrossTab",
@@ -246,11 +246,11 @@
     {
       "id": "8",
       "report_name": "NCD LINELIST - HYPERTENSION",
-      "authorized_user": [],
+      "authorized_user": ["Clinician", "Nurse"],
       "message": "NOTE: This patient data only comprise selected data columns. To view more, visit the patient profile. Names have been masked. Visible only to : ",
       "program": "NCD PROGRAM",
       "type": "LineList",
-      "unique_col": ["person_id", "Date"],
+      "unique_col": "person_id",
       "filters": {
         "unique": "any"
       },
@@ -271,37 +271,37 @@
         "District",
         "TA",
         "Village",
-        "Patient Drinks Alcohol",
-        "Patient Smokes",
-        "Visit Type",
+        "Patient_Drinks_Alcohol",
+        "Patient_Smokes",
+        "Visit_Type",
         "SBP",
         "DBP",
         "Diagnosis",
-        "Medication Given"
+        "Medication_Given"
       ],
-      "merge_methods": ["inner", "left", "left","left", "left","left","left","left"],
-      "group_cols1": ["identifier","given_name", "family_name", "Gender", "Age", "Home_district", "TA", "Village"],
-      "group1_filters": {"Program": "NCD PROGRAM", "Village": "!=''"},
+      "merge_methods": ["left", "left", "left","left", "left","left","left","left"],
+      "group_cols1": ["Date","identifier","given_name", "family_name", "Gender", "Age", "Home_district", "TA", "Village"],
+      "group1_filters": {"Program": "NCD PROGRAM"},
 
       "group_cols2": ["obs_value_coded"],
-      "group2_filters": {"Program": "NCD PROGRAM", "Encounter": "Diagnosis", "obs_value_coded": "in:HTN"},
-      "group2_aggr": {"obs_value_coded": "join"},
+      "group2_filters": {"Program": "NCD PROGRAM", "Encounter": "Diagnosis", "obs_value_coded": ["HTN"]},
+      "group2_aggr": {"obs_value_coded": "join_cohort"},
       "group2_rename": {"obs_value_coded": "Diagnosis"},
 
       "group_cols3": ["obs_value_coded"],
       "group3_filters": {"Program": "NCD PROGRAM", "Encounter": "Assessment", "concept_name": "Does the patient drink alcohol?"},
       "group3_aggr": {"obs_value_coded": "first"},
-      "group3_rename": {"obs_value_coded": "Patient Drinks Alcohol"},
+      "group3_rename": {"obs_value_coded": "Patient_Drinks_Alcohol"},
 
       "group_cols4": ["obs_value_coded"],
       "group4_filters": {"Program": "NCD PROGRAM", "Encounter": "Assessment", "concept_name": "Smoking history"},
       "group4_aggr": {"obs_value_coded": "first"},
-      "group4_rename": {"obs_value_coded": "Patient Smokes"},
+      "group4_rename": {"obs_value_coded": "Patient_Smokes"},
 
       "group_cols5": ["obs_value_coded"],
       "group5_filters": {"Program": "NCD PROGRAM", "Encounter": "Patient registration", "concept_name": "Visit type"},
       "group5_aggr": {"obs_value_coded": "join"},
-      "group5_rename": {"obs_value_coded": "Visit Type"},
+      "group5_rename": {"obs_value_coded": "Visit_Type"},
       
       
       "group_cols6": ["ValueN"],
@@ -317,17 +317,17 @@
       "group_cols8": ["obs_value_coded"],
       "group8_filters": {"Program": "NCD PROGRAM", "Encounter": "Patient registration", "concept_name": "Visit type"},
       "group8_aggr": {"obs_value_coded": "join"},
-      "group8_rename": {"obs_value_coded": "Visit Type"},
+      "group8_rename": {"obs_value_coded": "Visit_Type"},
 
       "group_cols9": ["Order_Name"],
       "group9_filters": {"Program": "NCD PROGRAM", "Encounter": "Treatment"},
       "group9_aggr": {"Order_Name": "join"},
-      "group9_rename": {"Order_Name": "Medication Given"}
+      "group9_rename": {"Order_Name": "Medication_Given"}
     },
     {
       "id": "9",
       "report_name": "NCD LINELIST - DIABETES",
-      "authorized_user": [],
+      "authorized_user": ["Clinician", "Nurse"],
       "message": "NOTE: This patient data only comprise selected data columns. To view more, visit the patient profile. Names have been masked. Visible only to : ",
       "program": "NCD PROGRAM",
       "type": "LineList",
@@ -409,7 +409,7 @@
     {
       "id": "10",
       "report_name": "HTS PROGRAM - LINELIST",
-      "authorized_user": [],
+      "authorized_user": ["Clinician", "Nurse"],
       "message": "NOTE: This patient data only comprise selected data columns. To view more, visit the patient profile. Names have been masked. Visible only to : ",
       "program": "HTS PROGRAM",
       "type": "LineList",
@@ -487,6 +487,84 @@
       "group9_filters": {"Program": "NCD PROGRAM", "Encounter": "Treatment"},
       "group9_aggr": {"Order_Name": "join"},
       "group9_rename": {"Order_Name": "Medication Given"}
+    },
+    {
+      "id": "11",
+      "report_name": "AHD PROGRAM PATIENT LINE LIST",
+      "authorized_user": ["Clinician", "Nurse"],
+      "message": "NOTE: This patient data only comprise selected data columns. To view more, visit the patient profile. Names have been masked. Visible only to : ",
+      "program": "HIV PROGRAM",
+      "type": "LineList",
+      "unique_col": "person_id",
+      "filters": {
+        "unique": "any"
+      },
+      "rename": {
+        "given_name": "First Name",
+        "family_name": "Last Name",
+        "Home_district": "District",
+        "DrugName": "Medication Given",
+        "ValueN": "Quantity Dispensed"
+      },
+      "cols_order": [
+        "Date",
+        "ID",
+        "First Name",
+        "Last Name",
+        "Gender",
+        "Age",
+        "HIV Status",
+        "ART Status",
+        "Patient_Smokes",
+        "Visit_Type",
+        "SBP",
+        "DBP",
+        "Medication_Given"
+      ],
+      "merge_methods": ["left", "left", "left","left", "left","left","left","left"],
+      "group_cols1": ["Date","identifier","given_name", "family_name", "Gender", "Age"],
+      "group1_filters": {"Encounter": "Ahd hiv staging"},
+
+      "group_cols2": ["obs_value_coded"],
+      "group2_filters": {"concept_name": "HIV status"},
+      "group2_aggr": {"obs_value_coded": "join_cohort"},
+      "group2_rename": {"obs_value_coded": "'HIV Status'"},
+
+      "group_cols3": ["obs_value_coded"],
+      "group3_filters": {"concept_name": "Is the client on ART?"},
+      "group3_aggr": {"obs_value_coded": "join_cohort"},
+      "group3_rename": {"obs_value_coded": "'ART Status'"},
+
+      "group_cols4": ["obs_value_coded"],
+      "group4_filters": {"Encounter": "Assessment", "concept_name": "Smoking history"},
+      "group4_aggr": {"obs_value_coded": "first"},
+      "group4_rename": {"obs_value_coded": "Patient_Smokes"},
+
+      "group_cols5": ["obs_value_coded"],
+      "group5_filters": {"Encounter": "Patient registration", "concept_name": "Visit type"},
+      "group5_aggr": {"obs_value_coded": "join"},
+      "group5_rename": {"obs_value_coded": "Visit_Type"},
+      
+      
+      "group_cols6": ["ValueN"],
+      "group6_filters": {"Encounter": "Vitals", "concept_name": "Systolic"},
+      "group6_aggr": {"ValueN": "max"},
+      "group6_rename": {"ValueN": "SBP"},
+
+      "group_cols7": ["ValueN"],
+      "group7_filters": {"Encounter": "Vitals", "concept_name": "Diastolic"},
+      "group7_aggr": {"ValueN": "max"},
+      "group7_rename": {"ValueN": "DBP"},
+
+      "group_cols8": ["obs_value_coded"],
+      "group8_filters": {"Encounter": "Patient registration", "concept_name": "Visit type"},
+      "group8_aggr": {"obs_value_coded": "join"},
+      "group8_rename": {"obs_value_coded": "Visit_Type"},
+
+      "group_cols9": ["Order_Name"],
+      "group9_filters": {"Encounter": "Treatment"},
+      "group9_aggr": {"Order_Name": "join"},
+      "group9_rename": {"Order_Name": "Medication_Given"}
     }
   ]
 }
