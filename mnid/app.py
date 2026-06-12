@@ -33,6 +33,9 @@ from mnid.aggregation.store import (
     get_aggregate as _get_aggregate,
     query_coverage as _agg_coverage,
     query_time_series as _agg_time_series,
+    _floor_to_period as _agg_floor_period,
+    _candidate_grains as _agg_candidate_grains,
+    resolve_indicator_id as _agg_resolve_id,
 )
 from mnid.geo_utils import (
     load_malawi_district_geojson as _load_malawi_district_geojson,
@@ -94,6 +97,9 @@ _LOGGER = logging.getLogger(__name__)
 _NETWORK_DF_CACHE_MAX = 6
 _HEATMAP_CACHE_MAX = 6
 _ANALYSIS_CACHE_MAX = 10
+# Country profile is independent of category — cache by (opd_key, start, end, report_name)
+_country_profile_cache: dict = {}
+_COUNTRY_PROFILE_CACHE_MAX = 12
 
 _MNID_SCROLLSPY_CLIENTSIDE = """
 function(_tick) {
@@ -811,20 +817,21 @@ def _indicator_run_fig(plot_df: pd.DataFrame, ind: dict, color: str,
 
     smoothed, _ = _moving_average_values(ys, grain)
     valid_ys = [y for y in smoothed if y is not None]
-    fig = go.Figure()
     if not valid_ys:
-        fig.update_layout(paper_bgcolor=BG, plot_bgcolor=BG, height=200,
-                          margin=dict(l=8, r=8, t=4, b=4),
-                          annotations=[dict(text='No data for this period',
-                                            xref='paper', yref='paper', x=0.5, y=0.5,
-                                            showarrow=False, font=dict(size=11, color=MUTED))])
-        return fig
+        return go.Figure(layout={
+            'paper_bgcolor': BG, 'plot_bgcolor': BG, 'height': 200,
+            'margin': {'l': 8, 'r': 8, 't': 4, 'b': 4},
+            'annotations': [{'text': 'No data for this period',
+                              'xref': 'paper', 'yref': 'paper', 'x': 0.5, 'y': 0.5,
+                              'showarrow': False, 'font': {'size': 11, 'color': MUTED}}],
+        })
 
     target = ind.get('target')
+    traces = []
     if target is not None:
-        fig.add_trace(go.Scatter(
+        traces.append(go.Scatter(
             x=xs, y=[target] * len(xs), mode='lines',
-            line=dict(color='#94A3B8', width=1.5, dash='dot'),
+            line={'color': '#94A3B8', 'width': 1.5, 'dash': 'dot'},
             showlegend=False,
             hovertemplate=f'Target: {target}%<extra></extra>',
         ))
@@ -835,20 +842,20 @@ def _indicator_run_fig(plot_df: pd.DataFrame, ind: dict, color: str,
         if pt[0] not in kp_set:
             kp_set.add(pt[0])
             key_pts.append(pt)
-    fig.add_trace(go.Scatter(
+    traces.append(go.Scatter(
         x=[p[0] for p in key_pts], y=[p[1] for p in key_pts],
         mode='markers+text',
         text=[f'{p[1]:.0f}%' for p in key_pts],
         textposition='top center',
-        textfont=dict(size=9, color='#374151'),
-        marker=dict(size=7, color='#1e293b'),
+        textfont={'size': 9, 'color': '#374151'},
+        marker={'size': 7, 'color': '#1e293b'},
         showlegend=False,
         hovertemplate=f'%{{x|{hfmt}}}: %{{y:.0f}}%<extra></extra>',
     ))
-    fig.add_trace(go.Scatter(
+    traces.append(go.Scatter(
         x=xs, y=smoothed, mode='lines+markers',
-        line=dict(color=color, width=2.4, shape='linear'),
-        marker=dict(size=5, color=color, line=dict(color='#fff', width=1.2)),
+        line={'color': color, 'width': 2.4, 'shape': 'linear'},
+        marker={'size': 5, 'color': color, 'line': {'color': '#fff', 'width': 1.2}},
         connectgaps=False, showlegend=False,
         customdata=list(zip(n_vals, d_vals)),
         hovertemplate=(
@@ -860,25 +867,24 @@ def _indicator_run_fig(plot_df: pd.DataFrame, ind: dict, color: str,
     ))
     layout_annotations = []
     if target is not None:
-        layout_annotations.append(dict(
-            x=1.0, y=target / 112, xref='paper', yref='paper',
-            text=f'<b>target {target:.0f}%</b>',
-            showarrow=False, font=dict(size=9, color='#64748B'),
-            xanchor='left', yanchor='middle',
-        ))
-    fig.update_layout(
-        paper_bgcolor=BG, plot_bgcolor=BG,
-        font=dict(family=FONT, color=TEXT, size=10),
-        height=200, margin=dict(l=6, r=80, t=6, b=24),
-        showlegend=False,
-        hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
-        xaxis=dict(showgrid=False, zeroline=False, showline=False,
-                   tickformat=tickfmt, tickfont=dict(size=9, color=MUTED)),
-        yaxis=dict(showgrid=True, gridcolor=GRID_C, zeroline=False, showline=False,
-                   tickfont=dict(size=9, color=MUTED), ticksuffix='%', range=[0, 112]),
-        annotations=layout_annotations,
-    )
-    return fig
+        layout_annotations.append({
+            'x': 1.0, 'y': target / 112, 'xref': 'paper', 'yref': 'paper',
+            'text': f'<b>target {target:.0f}%</b>',
+            'showarrow': False, 'font': {'size': 9, 'color': '#64748B'},
+            'xanchor': 'left', 'yanchor': 'middle',
+        })
+    return go.Figure(data=traces, layout={
+        'paper_bgcolor': BG, 'plot_bgcolor': BG,
+        'font': {'family': FONT, 'color': TEXT, 'size': 10},
+        'height': 200, 'margin': {'l': 6, 'r': 80, 't': 6, 'b': 24},
+        'showlegend': False,
+        'hoverlabel': {'bgcolor': '#fff', 'bordercolor': BORDER, 'font_size': 11},
+        'xaxis': {'showgrid': False, 'zeroline': False, 'showline': False,
+                  'tickformat': tickfmt, 'tickfont': {'size': 9, 'color': MUTED}},
+        'yaxis': {'showgrid': True, 'gridcolor': GRID_C, 'zeroline': False, 'showline': False,
+                  'tickfont': {'size': 9, 'color': MUTED}, 'ticksuffix': '%', 'range': [0, 112]},
+        'annotations': layout_annotations,
+    })
 
 
 def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
@@ -940,6 +946,27 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
         fac_filter = fac_codes or None
         dist_filter = districts or None
 
+    # Pre-slice aggregate once to only the relevant indicators + grains + date window.
+    # This reduces per-card pandas filter work from O(22k rows) to O(~100 rows).
+    _agg_slice = None
+    if agg_df is not None and not agg_df.empty:
+        _ind_ids = {_agg_resolve_id(agg_df, i['id'], i.get('label')) for i in tracked}
+        _grain_set = set(_agg_candidate_grains(grain))
+        # Use the earliest period floor across all candidate grains so fallback grains
+        # (e.g. monthly when primary is weekly) are not cut off by the slice.
+        _pf = min(_agg_floor_period(date_min, g) for g in _grain_set)
+        _smask = (
+            agg_df['grain'].isin(_grain_set)
+            & agg_df['indicator_id'].isin(_ind_ids)
+            & (agg_df['period_start'] >= _pf)
+            & (agg_df['period_start'] <= pd.Timestamp(date_max))
+        )
+        if fac_filter:
+            _smask &= agg_df['facility_code'].isin([str(f) for f in fac_filter])
+        elif dist_filter:
+            _smask &= agg_df['district'].isin([str(d) for d in dist_filter])
+        _agg_slice = agg_df[_smask].reset_index(drop=True)
+
     cat_colors = CAT_PALETTES.get(cat, _TREND_SERIES_PALETTE)
     cards = []
     for idx, ind in enumerate(tracked):
@@ -947,9 +974,9 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
 
         # Fast path: use pre-aggregated series when available
         precomputed = None
-        if agg_df is not None:
+        if _agg_slice is not None:
             precomputed = _agg_time_series(
-                agg_df, ind['id'], grain=grain,
+                _agg_slice, ind['id'], grain=grain,
                 facility_codes=fac_filter,
                 districts=dist_filter if not fac_filter else None,
                 start_date=date_min, end_date=date_max,
@@ -960,9 +987,9 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
         target = ind.get('target')
         target_badge = None
         if target is not None:
-            # Use aggregate for current-period coverage badge if available
-            if agg_df is not None:
-                cur_pct = _agg_coverage(agg_df, ind['id'], date_min, date_max,
+            # Use pre-sliced aggregate for current-period coverage badge
+            if _agg_slice is not None:
+                cur_pct = _agg_coverage(_agg_slice, ind['id'], date_min, date_max,
                                         facility_codes=fac_filter,
                                         districts=dist_filter if not fac_filter else None,
                                         grain=grain,
@@ -2442,9 +2469,14 @@ def render_mnid_dashboard(data_opd, config,
     else:
         newborn_config = None
 
-    executive_content = {
-        'country-profile': render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label),
-    }
+    # Country profile doesn't depend on mnid_categories — cache by (opd_key, dates, report).
+    _cp_key = (_opd_key, start_date, end_date, config.get('report_name'))
+    if _cp_key not in _country_profile_cache:
+        _country_profile_cache[_cp_key] = render_country_profile(
+            facility_df, scope_meta=scope_meta, indicator_label=country_label
+        )
+        _trim_cache(_country_profile_cache, _COUNTRY_PROFILE_CACHE_MAX)
+    executive_content = {'country-profile': _country_profile_cache[_cp_key]}
     executive_token = f'{hash((_opd_key, start_date, end_date, config.get("report_name"), tuple(sorted(executive_content.keys()))))}'
     _MNID_EXECUTIVE_CONTENT_CACHE[executive_token] = executive_content
     _MNID_EXECUTIVE_DATA_CACHE[executive_token] = {

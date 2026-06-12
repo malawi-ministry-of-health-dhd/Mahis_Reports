@@ -52,7 +52,7 @@ json_path = os.path.join(path, 'data', 'visualizations', 'validated_dashboard.js
 _mnid_full_data_cache: dict = {}
 _dashboard_data_cache: dict = {}
 DEFAULT_DASHBOARD_DAYS = 7
-DEFAULT_RELATIVE_PERIOD = 'Today'
+DEFAULT_RELATIVE_PERIOD = 'This Month'
 _LATEST_DATA_DATE_CACHE: dict[str, pd.Timestamp | None] = {}
 _MNID_FULL_CACHE_MAX = 6
 _DASHBOARD_DATA_CACHE_MAX = 4
@@ -611,7 +611,6 @@ def update_menu(interval, color):
      Output('active-button-store', 'data')],
     [
         Input('dashboard-btn-generate', 'n_clicks'),
-        Input('dashboard-interval-update-today', 'n_intervals'),
         Input('dashboard-date-range-picker', 'start_date'),
         Input('dashboard-date-range-picker', 'end_date'),
         Input('dashboard-level-filter', 'value'),
@@ -628,9 +627,9 @@ def update_menu(interval, color):
         State('active-button-store', 'data')
     ],
 )
-def update_dashboard(gen, interval, start_date, end_date, level, 
-                     districts, facilities, overview, category, 
-                     menu_clicks,pathname, urlparams, age, current_active):
+def update_dashboard(gen, start_date, end_date, level,
+                     districts, facilities, overview, category,
+                     menu_clicks, pathname, urlparams, age, current_active):
     try:
         ctx = callback_context
         triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else None
@@ -741,39 +740,29 @@ def update_dashboard(gen, interval, start_date, end_date, level,
 
         sql_comment = f"-- version:{dataset_version} scope:{user_level} level:{effective_level}"
         if data is None:
+            # SQL has no date filter — date is applied in Python so the cache key stays
+            # stable as the user changes the relative period (no repeated DuckDB scans).
             if user_level == 'facility':
-                SQL = f"""
-                    {sql_comment}
-                    SELECT *
-                    FROM '{DATA_FILE_NAME_}'
-                    WHERE Date >= TIMESTAMP '{default_start_date}'
-                    AND Date <= TIMESTAMP '{end_dt}'
-                    AND {FACILITY_CODE_} = '{location}'
-                    """
+                SQL = f"{sql_comment}\nSELECT * FROM '{DATA_FILE_NAME_}' WHERE {FACILITY_CODE_} = '{location}'"
             else:
-                SQL = f"""
-                    {sql_comment}
-                    SELECT *
-                    FROM '{DATA_FILE_NAME_}'
-                    WHERE Date >= TIMESTAMP '{default_start_date}'
-                    AND Date <= TIMESTAMP '{end_dt}'
-                    """
-            data_cache_key = (
-                dataset_version,
-                user_level,
-                effective_level,
-                location,
-                str(default_start_date),
-                str(end_dt),
-            )
+                SQL = f"{sql_comment}\nSELECT * FROM '{DATA_FILE_NAME_}'"
+            data_cache_key = (dataset_version, user_level, effective_level, location)
         try:
             if data is None:
                 if data_cache_key in _dashboard_data_cache:
-                    data = _dashboard_data_cache[data_cache_key].copy()
+                    _data_full = _dashboard_data_cache[data_cache_key]
                 else:
-                    data = DataStorage.query_duckdb(SQL)
-                    _dashboard_data_cache[data_cache_key] = data.copy()
+                    _data_full = DataStorage.query_duckdb(SQL)
+                    # Pre-process once and store — subsequent date changes hit cache and skip this
+                    _data_full[DATE_] = pd.to_datetime(_data_full[DATE_], format='mixed').dt.normalize()
+                    _data_full[GENDER_] = _data_full[GENDER_].replace(CUSTOM_GENDER_MAP)
+                    _dashboard_data_cache[data_cache_key] = _data_full
                     _trim_cache(_dashboard_data_cache, _DASHBOARD_DATA_CACHE_MAX)
+                # Date filter applied in pandas — instant from the in-memory cache
+                data = _data_full[
+                    (_data_full[DATE_] >= default_start_date) &
+                    (_data_full[DATE_] <= end_dt)
+                ].copy()
             # data.to_excel("data/archive/hmis.xlsx")
         except Exception as e:
             import traceback
@@ -793,9 +782,7 @@ def update_dashboard(gen, interval, start_date, end_date, level,
                 [],
                 current_active or dash.no_update,
             )
-        data[DATE_] = pd.to_datetime(data[DATE_], format='mixed')
-        data[GENDER_] = data[GENDER_].replace(CUSTOM_GENDER_MAP)
-        data[DATE_] = data[DATE_].dt.normalize()
+        # data[DATE_] and data[GENDER_] are pre-processed when stored in _dashboard_data_cache.
         # data.to_excel("data/archive/hmis.xlsx", index=False)
 
         def num_days_patient_seen(data):
@@ -1089,6 +1076,8 @@ def update_dashboard(gen, interval, start_date, end_date, level,
             facilities,
             clicked_name
         )
+    except PreventUpdate:
+        raise
     except Exception as e:
         import traceback
         traceback.print_exc()

@@ -101,9 +101,16 @@ def _derive_contextual_concepts(out: pd.DataFrame) -> pd.DataFrame:
     if out.empty or 'concept_name' not in out.columns:
         return out
 
-    concept_series = out['concept_name'].fillna('').astype(str).str.strip()
-    obs_series = out['obs_value_coded'].fillna('').astype(str).str.strip() if 'obs_value_coded' in out.columns else pd.Series('', index=out.index)
-    val_series = out['Value'].fillna('').astype(str).str.strip() if 'Value' in out.columns else pd.Series('', index=out.index)
+    def _cstr(col: str) -> pd.Series:
+        if col not in out.columns:
+            return pd.Series('', index=out.index)
+        s = out[col].fillna('').astype('category')
+        s = s.cat.rename_categories(dict(zip(s.cat.categories, s.cat.categories.astype(str).str.strip())))
+        return s.astype(str)
+
+    concept_series = _cstr('concept_name')
+    obs_series     = _cstr('obs_value_coded')
+    val_series     = _cstr('Value')
     combined_value = obs_series.where(obs_series.ne(''), val_series)
 
     treatment_thermal = concept_series.eq('Treatment') & combined_value.str.fullmatch('Thermal Care', case=False, na=False)
@@ -174,18 +181,31 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
     if out.empty or 'person_id' not in out.columns:
         return out
 
-    concept = out['concept_name'].fillna('').astype(str).str.strip() if 'concept_name' in out.columns else pd.Series('', index=out.index)
-    obs = out['obs_value_coded'].fillna('').astype(str).str.strip() if 'obs_value_coded' in out.columns else pd.Series('', index=out.index)
-    value = out['Value'].fillna('').astype(str).str.strip() if 'Value' in out.columns else pd.Series('', index=out.index)
-    value_n = pd.to_numeric(out['ValueN'], errors='coerce') if 'ValueN' in out.columns else pd.Series(np.nan, index=out.index)
-    service = out['Service_Area'].fillna('').astype(str).str.strip() if 'Service_Area' in out.columns else pd.Series('', index=out.index)
-    encounter = out['Encounter'].fillna('').astype(str).str.strip() if 'Encounter' in out.columns else pd.Series('', index=out.index)
-    program = out['Program'].fillna('').astype(str).str.strip().str.upper() if 'Program' in out.columns else pd.Series('', index=out.index)
+    def _cat_str(col: str, transform=None) -> pd.Series:
+        """Build a categorical string series from out[col].
+        Categorical means str.contains/str.lower etc. operate on unique values only (~50×
+        speedup when there are few unique concept/obs values vs many rows)."""
+        if col not in out.columns:
+            return pd.Series('', index=out.index)
+        s = out[col].fillna('').astype('category')
+        cats = s.cat.categories.astype(str).str.strip()
+        if transform:
+            cats = transform(cats)
+        s = s.cat.rename_categories(dict(zip(s.cat.categories, cats)))
+        return s.astype(str)
+
+    concept  = _cat_str('concept_name')
+    obs      = _cat_str('obs_value_coded')
+    value    = _cat_str('Value')
+    value_n  = pd.to_numeric(out['ValueN'], errors='coerce') if 'ValueN' in out.columns else pd.Series(np.nan, index=out.index)
+    service  = _cat_str('Service_Area')
+    encounter = _cat_str('Encounter')
+    program  = _cat_str('Program', transform=lambda s: s.str.upper())
     combined = obs.where(obs.ne(''), value)
-    concept_lower = concept.str.lower()
-    combined_lower = combined.str.lower()
+    concept_lower   = concept.str.lower()
+    combined_lower  = combined.str.lower()
     encounter_upper = encounter.str.upper()
-    encounter_source = out['Encounter_Source'].fillna('').astype(str).str.strip() if 'Encounter_Source' in out.columns else encounter
+    encounter_source = _cat_str('Encounter_Source') if 'Encounter_Source' in out.columns else encounter
     encounter_source_lower = encounter_source.str.lower()
 
     person_ctx = pd.DataFrame({'person_id': out['person_id'].dropna().astype(str).unique()})
