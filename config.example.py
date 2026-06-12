@@ -10,9 +10,10 @@ DEMO_UUID = "m3his@dhd"
 DEMO_LOCATION = "LL040033"
 
 RELATIVE_DAYS = [ 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'This Week', 'Last Week', 'This Month', 'Last Month' ]
+USE_DEMO_DATA = True
 
 # REFERENTIAL COLUMNS - THESE SHOULD MATCH THE QUERY OUTPUT COLUMNS
-DATA_FILE_NAME_ = "data/parquet"
+DATA_FILE_NAME_ = "demo_parquet" if USE_DEMO_DATA else "data/parquet"
 
 FIRST_NAME_ = 'given_name'
 LAST_NAME_ = 'family_name'
@@ -40,7 +41,7 @@ PROGRAM_ = 'Program'
 ENCOUNTER_ = 'Encounter'
 
 # HANDLE GLOBAL IMPORT OF DATA FROM PARQUET FILE AND MANAGE AS CACHE FILES
-PARQUET_FILE_PATH = os.path.join(os.getcwd(), 'data', 'latest_data_opd.parquet')
+PARQUET_FILE_PATH = os.path.join(os.getcwd(), DATA_FILE_NAME_)
 CACHE_FILE_PATH = os.path.join(os.getcwd(), 'data', 'cache_opd.parquet')
 TIMESTAMP_FILE_PATH = os.path.join(os.getcwd(), 'data', 'TimeStamp.csv')
 
