@@ -55,7 +55,7 @@ def validate_excel_file(contents):
         excel_file = pd.ExcelFile(io.BytesIO(decoded))
         
         # Check required sheets
-        required_sheets = ['VARIABLE_NAMES', 'FILTERS', 'DESIGN', 'REPORT_NAME']
+        required_sheets = ['VARIABLE_NAMES', 'FILTERS', 'REPORT_NAME']
         missing_sheets = [sheet for sheet in required_sheets if sheet not in excel_file.sheet_names]
         
         if missing_sheets:

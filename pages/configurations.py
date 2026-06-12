@@ -5128,7 +5128,7 @@ def _extract_identifiers(sql: str) -> list[str]:
     sql_clean = _re.sub(r"--[^\n]*", " ", sql_clean)
     # SQL keywords to skip
     _KEYWORDS = {
-        "select","from","where","and","or","not","in","is","null","like",
+        "select","from","where","and","or","not","in","is","null","like","data",
         "limit","offset","group","by","order","having","join","on","as",
         "distinct","count","sum","avg","min","max","between","case","when",
         "then","else","end","with","inner","left","right","outer","cross",
@@ -5197,8 +5197,13 @@ def run_preview_query(n_clicks,urlparams, sql):
     try:
         route = urlparams.get('route', ["default"])[0]
 
-        sql = sql.replace("data", f"'data/{route}/parquet'") + " LIMIT 100"
+        sql = sql.replace("data", f"'data/{route}/parquet'")
+        if ("LIMIT" or "limit") not in sql:
+            sql = sql  + " LIMIT 100"
         df = DataStorage.query_duckdb(sql.strip())
+        sensitive_columns=["given_name", "family_name","User"]
+        df = df.drop(columns=[col for col in sensitive_columns if col in df.columns])
+
     except Exception as exc:
         err_msg = str(exc)
         error_div = html.Div([

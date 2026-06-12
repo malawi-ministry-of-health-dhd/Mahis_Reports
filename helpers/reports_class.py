@@ -227,6 +227,18 @@ class ReportTableBuilder:
         vals = [str(v).strip() for v in self.report_name["name"].tolist() if str(v).strip()]
         return vals[0] if vals else "Report"
     
+    def _page_design(self) -> str:
+        if self.report_name is None or "page_design" not in self.report_name.columns:
+            return "portrait"
+        vals = [str(v).strip() for v in self.report_name["page_design"].tolist() if str(v).strip()]
+        return vals[0] if vals else "portrait"
+    
+    def _page_columns(self) -> int:
+        if self.report_name is None or "page_columns" not in self.report_name.columns:
+            return 1
+        vals = [str(v).strip() for v in self.report_name["page_columns"].tolist() if str(v).strip()]
+        return int(vals[0]) if vals else 1
+    
     def _generate_dhis_params(self) -> Dict:
         if "dhis2_id" in self.report_name.columns:
             dataSetID = self.report_name['dhis2_id'].iloc[0]
@@ -415,22 +427,23 @@ class ReportTableBuilder:
     
     def build_dash_components(self) -> List[Any]:
         title = self._title() or "HMIS DATASET REPORT (UNNAMED)"
+        page_design = self._page_design()
+        page_columns = self._page_columns() or 1
         sections = self.build_section_tables()
 
         num_page_columns = 1
-        design = "portrait"
         if self.report_name is not None and not self.report_name.empty:
-            meta = self.report_name.iloc[0]
             try:
-                num_page_columns = int(meta.get("num_page_columns", 1) or 1)
+                num_page_columns = page_columns
             except (ValueError, TypeError):
                 num_page_columns = 1
             num_page_columns = max(1, min(4, num_page_columns))
-            design = str(meta.get("design", "portrait") or "portrait").lower()
+            design = str(page_design).lower()
             if design not in ("portrait", "landscape"):
                 design = "portrait"
+            
 
-        is_landscape = design == "landscape"
+        is_landscape = page_design == "landscape"
         container_style = {
             "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
             "maxWidth": "1400px" if is_landscape else "960px",
@@ -468,7 +481,6 @@ class ReportTableBuilder:
                 )
             )
 
-        # ── Column layout ──────────────────────────────────────────────────────
         if num_page_columns == 1:
             body = html.Div(section_divs)
         else:
