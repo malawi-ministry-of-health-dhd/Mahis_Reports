@@ -827,7 +827,6 @@ def update_dashboard(gen, start_date, end_date, level,
             'dataset_version':     dataset_version,
         }
 
-        # ── Render each selected dashboard ────────────────────────────────────
         rendered = []
         for report_name in selected_reports:
             dashboard_json = next((d for d in menu_json if d['report_name'] == report_name), None)

@@ -4,7 +4,7 @@ from dash import dcc, html, page_container
 import threading
 import time
 
-from config import PREFIX_NAME, DATA_PATH_
+from config import PREFIX_NAME, DATA_PATH_, DEMO_UUID
 from helpers.api_routes import register_api_routes
 from helpers.navigation_callbacks import register_navigation_callbacks
 from mnid.app import register_mnid_callbacks
@@ -54,4 +54,5 @@ def _prewarm_mnid_cache():
 threading.Thread(target=_prewarm_mnid_cache, daemon=True).start()
 
 if __name__ == "__main__":
+    print(f"Start your app on: http://localhost:8050/home?route=default&Location=1&uuid={DEMO_UUID}&user_level=national")
     app.run(host="0.0.0.0", port=8050, debug=True)
