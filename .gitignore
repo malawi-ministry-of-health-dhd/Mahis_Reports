@@ -40,3 +40,12 @@ docs/
 generate_demo_parquet.py
 scripts/generate_demo_mnid_data.py
 data/mnid_aggregates/
+data/default
+data/batches
+data/local
+data/mahistest
+data/mahisdev
+data/mahisuat
+data/parquet
+data/visualizations
+data/configurations.json

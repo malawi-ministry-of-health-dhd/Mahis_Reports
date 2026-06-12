@@ -54,5 +54,5 @@ def _prewarm_mnid_cache():
 threading.Thread(target=_prewarm_mnid_cache, daemon=True).start()
 
 if __name__ == "__main__":
-    print(f"Start your app on: http://localhost:8050/home?route=default&Location=1&uuid={DEMO_UUID}&user_level=national")
+    print(f"Start your app on: http://localhost:8050/home?route=default&Location=1833&uuid={DEMO_UUID}&user_level=national")
     app.run(host="0.0.0.0", port=8050, debug=True)
