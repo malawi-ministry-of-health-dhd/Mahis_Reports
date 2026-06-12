@@ -341,33 +341,41 @@ if __name__ == "__main__":
         if items.get("pause_data_source"):
             continue
         
-        programs = DataStorage(query=QUERY_PROGRAMS,data_dir=DATA_ROUTE)
+        programs = DataStorage(query=QUERY_PROGRAMS,data_dir=DATA_ROUTE,
+                               db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
         programs.fetch_and_save_single_table(table_name="programs_data")
 
-        concepts = DataStorage(query=QUERY_CONCEPT_NAMES,data_dir=DATA_ROUTE)
+        concepts = DataStorage(query=QUERY_CONCEPT_NAMES,data_dir=DATA_ROUTE,
+                               db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
         concepts.fetch_and_save_single_table(table_name="concept_names_data")
 
-        encounter_types = DataStorage(query=QUERY_ENCOUNTER_TYPES,data_dir=DATA_ROUTE)
+        encounter_types = DataStorage(query=QUERY_ENCOUNTER_TYPES,data_dir=DATA_ROUTE,
+                                      db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
         encounter_types.fetch_and_save_single_table(table_name="encounter_types_data")
 
-        locations = DataStorage(query=QUERY_LOCATIONS,data_dir=DATA_ROUTE)
+        locations = DataStorage(query=QUERY_LOCATIONS,data_dir=DATA_ROUTE,
+                                db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
         locations.fetch_and_save_single_table(table_name="locations_data")
 
         # if not IS_HARMONIZED_MAHIS:
         #     facilities = DataStorage(query=QUERY_FACILITIES)
         #     facilities.fetch_and_save_single_table(table_name="facilities_data")
 
-        drugs = DataStorage(query=QUERY_DRUGS,data_dir=DATA_ROUTE)
+        drugs = DataStorage(query=QUERY_DRUGS,data_dir=DATA_ROUTE,
+                            db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
         drugs.fetch_and_save_single_table(table_name="drugs_data")
 
-        order_types = DataStorage(query=QUERY_ORDER_TYPES,data_dir=DATA_ROUTE)
+        order_types = DataStorage(query=QUERY_ORDER_TYPES,data_dir=DATA_ROUTE,
+                                  db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
         order_types.fetch_and_save_single_table(table_name="order_types_data")
 
 
-        users = DataStorage(query=QUERY_USERS,data_dir=DATA_ROUTE)
+        users = DataStorage(query=QUERY_USERS,data_dir=DATA_ROUTE,
+                            db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
         users.fetch_and_save_single_table(table_name="users_data")
 
-        user_programs = DataStorage(query=QUERY_USER_PROGRAMS,data_dir=DATA_ROUTE)
+        user_programs = DataStorage(query=QUERY_USER_PROGRAMS,data_dir=DATA_ROUTE,
+                                    db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
         user_programs.fetch_and_save_single_table(table_name="user_programs")
 
         # bids = DataStorage(query=QUERY_BIDS)

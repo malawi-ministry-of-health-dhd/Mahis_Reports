@@ -278,37 +278,8 @@
           },
           {
             "section_name": "Encounters and Trend",
-            "chart_items_per_row": 3,
+            "chart_items_per_row": 2,
             "items": [
-              {
-                "id": "chart_10b29018",
-                "name": "Patient Encounters",
-                "type": "Column",
-                "level": "facility",
-                "filters": {
-                  "measure": "nunique",
-                  "unique": "any",
-                  "duration_default": "any",
-                  "title": "Patient Encounters at the Facility",
-                  "x_col": "Encounter",
-                  "y_col": "person_id",
-                  "x_title": "Encounters at the Facility",
-                  "y_title": "Number of patients",
-                  "unique_column": "person_id",
-                  "legend_title": "Legend",
-                  "color": "",
-                  "filter_col1": "",
-                  "filter_val1": "",
-                  "filter_col2": "",
-                  "filter_val2": "",
-                  "filter_col3": "",
-                  "filter_val3": "",
-                  "filter_col4": "",
-                  "filter_val4": "",
-                  "filter_col5": "",
-                  "filter_val5": ""
-                }
-              },
               {
                 "id": "chart_3faf4437",
                 "name": "Daily OPD Attendance - Last 7 Days",
