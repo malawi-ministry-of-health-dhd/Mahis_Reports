@@ -7,6 +7,7 @@ import time
 from config import PREFIX_NAME, DATA_FILE_NAME_
 from helpers.api_routes import register_api_routes
 from helpers.navigation_callbacks import register_navigation_callbacks
+from mnid.app import register_mnid_callbacks
 
 pathname_prefix = PREFIX_NAME if PREFIX_NAME else "/"
 
@@ -31,6 +32,7 @@ app.layout = dmc.MantineProvider(
 )
 
 register_navigation_callbacks(app, pathname_prefix)
+# register_mnid_callbacks(app)
 register_api_routes(server)
 
 

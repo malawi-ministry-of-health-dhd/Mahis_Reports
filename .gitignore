@@ -1,5 +1,5 @@
 config.py
-data/latest_data_opd.parquet
+# data/latest_data_opd.parquet
 data/archive
 test.ipynb
 ssh/
@@ -33,5 +33,10 @@ cache
 latest_data_opd.parquet.backup
 data/single_tables
 venv
-data/parquet
+# data/parquet
 data/dcc_dropdown_json
+demo_parquet/
+docs/
+generate_demo_parquet.py
+scripts/generate_demo_mnid_data.py
+data/mnid_aggregates/

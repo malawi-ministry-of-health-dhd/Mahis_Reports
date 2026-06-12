@@ -1368,6 +1368,175 @@ body {
     }
 }
 
+/* ── MNID animations ─────────────────────────────────────── */
 
+/* Animatable custom property for donut fill */
+@property --mnid-p {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
 
+/* Donut fill-in: sweeps from 0 to the target value set via --mnid-p */
+@keyframes mnid-donut-in {
+  from { --mnid-p: 0; }
+}
+
+@keyframes mnid-fade-in-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes mnid-pulse-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+  50%       { box-shadow: 0 0 0 5px rgba(239,68,68,0.18); }
+}
+
+@keyframes mnid-dot-blink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(1.35); }
+}
+
+@keyframes mnid-ticker {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes mnid-ok-pop {
+  0%   { transform: scale(0.85); opacity: 0; }
+  60%  { transform: scale(1.08); }
+  100% { transform: scale(1);    opacity: 1; }
+}
+
+/* Hero card staggered entrance */
+.mnid-hero-card {
+  animation: mnid-fade-in-up 0.45s cubic-bezier(.22,.68,0,1.2) both;
+}
+.mnid-hero-card:nth-child(1) { animation-delay: 0.04s; }
+.mnid-hero-card:nth-child(2) { animation-delay: 0.10s; }
+.mnid-hero-card:nth-child(3) { animation-delay: 0.16s; }
+.mnid-hero-card:nth-child(4) { animation-delay: 0.22s; }
+.mnid-hero-card:nth-child(5) { animation-delay: 0.28s; }
+
+/* Alert banner — one-at-a-time rotation keyframes (N=1..15) */
+@keyframes mnid-alert-rotate-1 {
+  0%       { opacity:0; transform:translateY(-9px); }
+  18.00%   { opacity:1; transform:translateY(0); }
+  82.00%   { opacity:1; transform:translateY(0); }
+  100%     { opacity:0; transform:translateY(9px); }
+}
+@keyframes mnid-alert-rotate-2 {
+  0%      { opacity:0; transform:translateY(-9px); }
+  9.00%   { opacity:1; transform:translateY(0); }
+  41.00%  { opacity:1; transform:translateY(0); }
+  50.00%  { opacity:0; transform:translateY(9px); }
+  100%    { opacity:0; }
+}
+@keyframes mnid-alert-rotate-3 {
+  0%      { opacity:0; transform:translateY(-9px); }
+  6.00%   { opacity:1; transform:translateY(0); }
+  27.33%  { opacity:1; transform:translateY(0); }
+  33.33%  { opacity:0; transform:translateY(9px); }
+  100%    { opacity:0; }
+}
+@keyframes mnid-alert-rotate-4 {
+  0%      { opacity:0; transform:translateY(-9px); }
+  4.50%   { opacity:1; transform:translateY(0); }
+  20.50%  { opacity:1; transform:translateY(0); }
+  25.00%  { opacity:0; transform:translateY(9px); }
+  100%    { opacity:0; }
+}
+@keyframes mnid-alert-rotate-5 {
+  0%      { opacity:0; transform:translateY(-9px); }
+  3.60%   { opacity:1; transform:translateY(0); }
+  16.40%  { opacity:1; transform:translateY(0); }
+  20.00%  { opacity:0; transform:translateY(9px); }
+  100%    { opacity:0; }
+}
+@keyframes mnid-alert-rotate-6 {
+  0%      { opacity:0; transform:translateY(-9px); }
+  3.00%   { opacity:1; transform:translateY(0); }
+  13.67%  { opacity:1; transform:translateY(0); }
+  16.67%  { opacity:0; transform:translateY(9px); }
+  100%    { opacity:0; }
+}
+@keyframes mnid-alert-rotate-7 {
+  0%      { opacity:0; transform:translateY(-9px); }
+  2.57%   { opacity:1; transform:translateY(0); }
+  11.71%  { opacity:1; transform:translateY(0); }
+  14.29%  { opacity:0; transform:translateY(9px); }
+  100%    { opacity:0; }
+}
+@keyframes mnid-alert-rotate-8 {
+  0%      { opacity:0; transform:translateY(-9px); }
+  2.25%   { opacity:1; transform:translateY(0); }
+  10.25%  { opacity:1; transform:translateY(0); }
+  12.50%  { opacity:0; transform:translateY(9px); }
+  100%    { opacity:0; }
+}
+@keyframes mnid-alert-rotate-9 {
+  0%      { opacity:0; transform:translateY(-9px); }
+  2.00%   { opacity:1; transform:translateY(0); }
+  9.11%   { opacity:1; transform:translateY(0); }
+  11.11%  { opacity:0; transform:translateY(9px); }
+  100%    { opacity:0; }
+}
+@keyframes mnid-alert-rotate-10 {
+  0%      { opacity:0; transform:translateY(-9px); }
+  1.80%   { opacity:1; transform:translateY(0); }
+  8.20%   { opacity:1; transform:translateY(0); }
+  10.00%  { opacity:0; transform:translateY(9px); }
+  100%    { opacity:0; }
+}
+@keyframes mnid-alert-rotate-11 {
+  0%      { opacity:0; transform:translateY(-9px); }
+  1.64%   { opacity:1; transform:translateY(0); }
+  7.45%   { opacity:1; transform:translateY(0); }
+  9.09%   { opacity:0; transform:translateY(9px); }
+  100%    { opacity:0; }
+}
+@keyframes mnid-alert-rotate-12 {
+  0%      { opacity:0; transform:translateY(-9px); }
+  1.50%   { opacity:1; transform:translateY(0); }
+  6.83%   { opacity:1; transform:translateY(0); }
+  8.33%   { opacity:0; transform:translateY(9px); }
+  100%    { opacity:0; }
+}
+@keyframes mnid-alert-rotate-13 {
+  0%      { opacity:0; transform:translateY(-9px); }
+  1.38%   { opacity:1; transform:translateY(0); }
+  6.31%   { opacity:1; transform:translateY(0); }
+  7.69%   { opacity:0; transform:translateY(9px); }
+  100%    { opacity:0; }
+}
+@keyframes mnid-alert-rotate-14 {
+  0%      { opacity:0; transform:translateY(-9px); }
+  1.29%   { opacity:1; transform:translateY(0); }
+  5.86%   { opacity:1; transform:translateY(0); }
+  7.14%   { opacity:0; transform:translateY(9px); }
+  100%    { opacity:0; }
+}
+@keyframes mnid-alert-rotate-15 {
+  0%      { opacity:0; transform:translateY(-9px); }
+  1.20%   { opacity:1; transform:translateY(0); }
+  5.47%   { opacity:1; transform:translateY(0); }
+  6.67%   { opacity:0; transform:translateY(9px); }
+  100%    { opacity:0; }
+}
+
+/* Hero delta badge */
+.mnid-hero-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  margin-top: 4px;
+  letter-spacing: 0.02em;
+}
+.mnid-hero-delta-up   { background: #F0FDF4; color: #16A34A; }
+.mnid-hero-delta-down { background: #FEF2F2; color: #DC2626; }
+.mnid-hero-delta-flat { background: #F8FAFC; color: #64748B; }
 

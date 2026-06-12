@@ -37,6 +37,12 @@ def _prepare_data_for_visualization(df, unique_column, apply_deduplication=True)
             data = data.drop_duplicates(subset=[unique_column, DATE_])
             return data
 
+
+def _moving_average_series(values, window):
+    series = pd.Series(values, dtype='float64')
+    smoothed = series.rolling(window=max(int(window), 1), min_periods=1).mean()
+    return [None if pd.isna(value) else float(value) for value in smoothed.tolist()]
+
 def apply_calculated_fields(df, rules_json):
     df = df
     if not rules_json:
@@ -634,23 +640,32 @@ def create_line_chart(df, date_col, y_col, title, x_title,
     
     
     summary = summary.sort_values('date_only').reset_index(drop=True)
+    moving_average_window = 7
+    if color:
+        summary['moving_average'] = (
+            summary.groupby(color, sort=False)['count']
+            .transform(lambda values: pd.Series(values).rolling(window=moving_average_window, min_periods=1).mean())
+        )
+    else:
+        summary['moving_average'] = _moving_average_series(summary['count'].tolist(), moving_average_window)
 
     # Identify key points
     try:
-        summary = summary.sort_values('date_only').reset_index(drop=True)
+        if color:
+            key_points = pd.DataFrame(columns=summary.columns)
+        else:
+            idx_start = 0
+            idx_end = len(summary) - 1
+            idx_max = (
+                summary['moving_average'].idxmax()
+                if 'moving_average' in summary and summary['moving_average'].notna().any()
+                else None
+            )
+            key_indices = {idx_start, idx_end}
+            if idx_max is not None:
+                key_indices.add(idx_max)
 
-        idx_start = 0
-        idx_end = len(summary) - 1
-        idx_max = (
-            summary['count'].idxmax()
-            if 'count' in summary and summary['count'].notna().any()
-            else None
-        )
-        key_indices = {idx_start, idx_end}
-        if idx_max is not None:
-            key_indices.add(idx_max)
-
-        key_points = summary.loc[list(key_indices)]
+            key_points = summary.loc[list(key_indices)]
 
     except Exception:
         key_points = pd.DataFrame(columns=summary.columns)
@@ -658,7 +673,7 @@ def create_line_chart(df, date_col, y_col, title, x_title,
     fig = px.line(
         summary,
         x='date_only',
-        y='count',
+        y='moving_average',
         color=color if color else None,
         color_discrete_sequence=px.colors.qualitative.Dark2,
         title=title
@@ -666,30 +681,33 @@ def create_line_chart(df, date_col, y_col, title, x_title,
 
     fig.update_traces(
         mode='lines',
-        hovertemplate="<b>Date:</b> %{x|%Y-%m-%d}<br><b>Count:</b> %{y}<extra></extra>"
+        customdata=summary[['count']].to_numpy(),
+        hovertemplate="<b>Date:</b> %{x|%Y-%m-%d}<br><b>Moving Avg:</b> %{y:.1f}<br><b>Raw Count:</b> %{customdata[0]}<extra></extra>"
     )
 
-    fig.add_scatter(
-        x=key_points['date_only'],
-        y=key_points['count'],
-        mode='markers+text',
-        text=key_points['count'],
-        textposition='top center',
-        marker=dict(size=10, color='black'),
-        showlegend=False,
-        hovertemplate="<b>Date:</b> %{x|%Y-%m-%d}<br><b>Count:</b> %{y}<extra></extra>"
-    )
+    if not key_points.empty:
+        fig.add_scatter(
+            x=key_points['date_only'],
+            y=key_points['moving_average'],
+            mode='markers+text',
+            text=[f"{value:.1f}" for value in key_points['moving_average']],
+            textposition='top center',
+            marker=dict(size=10, color='black'),
+            showlegend=False,
+            customdata=key_points[['count']].to_numpy(),
+            hovertemplate="<b>Date:</b> %{x|%Y-%m-%d}<br><b>Moving Avg:</b> %{y:.1f}<br><b>Raw Count:</b> %{customdata[0]}<extra></extra>"
+        )
 
 
 
     
     if not summary.empty:
-        avg_val = summary['count'].mean()
+        avg_val = summary['moving_average'].mean()
         fig.add_hline(
             y=avg_val,
             line_dash="dash",
             line_color="red",
-            annotation_text=f"Average = {avg_val:.0f}",
+            annotation_text=f"Moving Avg = {avg_val:.1f}",
             annotation_position="top right"
         )
     
