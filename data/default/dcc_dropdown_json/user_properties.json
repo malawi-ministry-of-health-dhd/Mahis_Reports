@@ -1,0 +1,15 @@
+{
+  "users": [
+    {
+      "username": "innocentwowa",
+      "properties": {
+        "uuid": "2fdb97bf-3ed4-4d89-9ba6-9f717c1d826f",
+        "role": "reports_admin",
+        "user_level": "national",
+        "district": null,
+        "facility_name": null,
+        "facility_code": "1833"
+      }
+    }
+  ]
+}
