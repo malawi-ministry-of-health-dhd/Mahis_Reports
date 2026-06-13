@@ -1,37 +1,57 @@
+# Config & secrets
 config.py
-# data/latest_data_opd.parquet
-data/archive
-test.ipynb
+config.wowa.py
 ssh/
+
+# Python
 __pycache__/
-pages/__pycache__/
-assets/__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
 venv/
+venv
+.venv/
+
+# Data files
+data/parquet/
+data/archive/
+data/uploads/
+# data/single_tables/
+# data/dcc_dropdown_json/
+# data/mnid_aggregates/
+# data/TimeStamp.csv
+# data/users_data.csv
+# data/concepts_data.csv
+# data/Template_Reports.xlsx
+# data/report_template_hmis15.xlsx
+# data/dashboards.json
+# data/visualizations/dashboards_duplicate.json
+# data/visualizations/home.json
+# data/visualizations/master.json
+# data/visualizations/opd.json
+
+# Demo & generated data
+demo_parquet/
+generate_demo_parquet.py
+scripts/generate_demo_mnid_data.py
+
+# Docs
+docs/
+
+# Cache
+cache/
+.tmp/
+
+# Archived / unused pages
+# pages/archived/
+# pages/reports_config/
+
+# Misc project files
+test.ipynb
 app copy.py
 dashboardsxx.json
-pages/archived
-# data/hmis_reports.json
-data/visualizations/dashboards_duplicate.json
-data/visualizations/home.json
-data/visualizations/master.json
-data/visualizations/opd.json
-data/dashboards.json
-data/Template_Reports.xlsx
-data/report_template_hmis15.xlsx
-data/uploads
-config.wowa.py
 models.py
-pages/reports_config
-nav_drawer.py
-data/TimeStamp.csv
-# start_prod.sh
-# start_dev.sh
-data/users_data.csv
-data/TimeStamp.csv
-data/concepts_data.csv
-cache
-latest_data_opd.parquet.backup
-data/single_tables
-venv
-# data/parquet
-data/dcc_dropdown_json
+# nav_drawer.py
+# latest_data_opd.parquet.backup
