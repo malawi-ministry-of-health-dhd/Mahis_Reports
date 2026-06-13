@@ -290,7 +290,7 @@ class DataStorage:
     def fetch_and_save_single_table(self, table_name, format="csv"):
         """Fetch fresh data from DB and save to CSV."""
         fetcher = DataFetcher(use_localhost=USE_LOCALHOST, 
-                              sh_config=self.ssh_config, 
+                              ssh_config=self.ssh_config, 
                                 db_config=self.db_config)
         return fetcher.fetch_single_table(
             query=self.query,
