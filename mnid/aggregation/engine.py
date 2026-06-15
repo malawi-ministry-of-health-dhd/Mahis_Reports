@@ -163,7 +163,7 @@ def run_aggregation(
     for grain in active_grains:
         _LOG.info('  grain=%s ...', grain)
         part = _aggregate_grain(prepared_df, indicators, grain)
-        _LOG.info('  grain=%s → %d rows', grain, len(part))
+        _LOG.info('  grain=%s: %d rows', grain, len(part))
         parts.append(part)
 
     agg_df = pd.concat(parts, ignore_index=True)
@@ -187,7 +187,7 @@ def run_aggregation(
         json.dump(meta, f, indent=2)
 
     _LOG.info(
-        'Aggregation complete: %d rows, %.0fs elapsed → %s',
+        'Aggregation complete: %d rows, %.0fs elapsed, written to %s',
         len(agg_df), elapsed, parquet_out,
     )
     return True

@@ -412,7 +412,7 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
     )
     _assign_flag(
         'mnid_pnc_maternal_death',
-        pnc_mask & concept.eq('Status of the mother') & combined_lower.isin(['death', 'died', 'dead']),
+        pnc_mask & concept.eq('Status of the mother') & combined_lower.isin(['death', 'died', 'dead', 'deceased']),
     )
 
     _assign_flag(

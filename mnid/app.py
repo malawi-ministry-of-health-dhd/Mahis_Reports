@@ -75,7 +75,6 @@ from mnid.coverage import (
     _ind_card, _phase_gauge_fig, _phase_gauge_row,
     _clinical_donuts_section, _coverage_phase_fig, _no_data_card,
     _coverage_charts_section, _acc_section, _chart_acc_section,
-    _anc_charts, _labour_charts, _pnc_charts, _newborn_charts,
     _stat_row, _system_readiness, _compare_status_counts,
     _validate_indicator_configs, _build_compare_pie, _build_compare_bar,
     _build_compare_heatmap, _comparative_analysis_section,
@@ -96,15 +95,58 @@ _MNID_WARNED_MESSAGES = set()
 _LOGGER = logging.getLogger(__name__)
 _NETWORK_DF_CACHE_MAX = 6
 _HEATMAP_CACHE_MAX = 6
-_ANALYSIS_CACHE_MAX = 10
 # Country profile is independent of category — cache by (opd_key, start, end, report_name)
 _country_profile_cache: dict = {}
 _COUNTRY_PROFILE_CACHE_MAX = 12
+
+# ── Startup aggregation ────────────────────────────────────────────────────────
+# Build the indicator aggregate parquet in a background thread at startup when
+# it doesn't yet exist or is stale (dev mode: scheduler not running, first deployment, etc.)
+def _maybe_build_aggregate_on_startup() -> None:
+    import threading
+    from pathlib import Path as _Path
+
+    _agg_path = _Path('data') / 'mnid_aggregates' / 'indicator_aggregates.parquet'
+    _lock_path = _Path('data') / 'mnid_aggregates' / '.agg_running'
+
+    # Skip if aggregate already exists (store.py validates source on load)
+    if _agg_path.exists():
+        return
+
+    def _build():
+        import time as _time
+        _time.sleep(15)  # let the app finish booting before starting the background build
+        # Clear any stale lock left by a crashed previous run before starting
+        try:
+            if _lock_path.exists():
+                import datetime as _dt
+                age = _dt.datetime.utcnow().timestamp() - _lock_path.stat().st_mtime
+                if not (0 <= age < 3600):
+                    _lock_path.unlink(missing_ok=True)
+                    _LOGGER.info('Cleared stale aggregation lock before startup build.')
+        except Exception:
+            pass
+        try:
+            from mnid.aggregation.scheduler import run_aggregation_job
+            _LOGGER.info('Aggregate parquet not found — building monthly grain in background...')
+            ok = run_aggregation_job(grains=['monthly'])
+            if ok:
+                _LOGGER.info('Startup aggregation complete (monthly grain).')
+            else:
+                _LOGGER.warning('Startup aggregation returned False — check data source and indicators.')
+        except Exception as _exc:
+            _LOGGER.warning('Startup aggregation failed: %s', _exc)
+
+    t = threading.Thread(target=_build, daemon=True, name='mnid-startup-agg')
+    t.start()
+
+_maybe_build_aggregate_on_startup()
 
 _MNID_SCROLLSPY_CLIENTSIDE = """
 function(_tick) {
     const sections = [
         '#mnid-summary',
+        '#mnid-coverage',
         '#mnid-trends',
         '#mnid-performance',
         '#mnid-heatmap',
@@ -314,7 +356,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         dashboard_subtitle = 'Program monitoring for admissions, outcomes, clinical interventions, coverage, and readiness.'
         dashboard_theme = 'newborn'
     elif set(category_order) == {'ANC', 'Labour', 'PNC'}:
-        dashboard_title = 'MNH Program Dashboard'
+        dashboard_title = 'Maternal Health Dashboard'
         dashboard_subtitle = 'ANC, labour, and postnatal performance, comparison, coverage, and readiness.'
         dashboard_theme = 'default'
     else:
@@ -458,18 +500,6 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         grain=_coverage_grain,
     )
 
-    # Analysis charts: cached by data identity + date range to avoid recomputing on repeated calls
-    _ac_key = (id(network_df), str(start_date), str(end_date))
-    if _ac_key in _analysis_charts_cache:
-        anc_charts, labour_charts, pnc_charts, nb_charts = _analysis_charts_cache[_ac_key]
-    else:
-        anc_charts    = _anc_charts(facility_df)
-        labour_charts = _labour_charts(facility_df)
-        pnc_charts    = _pnc_charts(facility_df)
-        nb_charts     = _newborn_charts(facility_df)
-        _analysis_charts_cache[_ac_key] = (anc_charts, labour_charts, pnc_charts, nb_charts)
-        _trim_cache(_analysis_charts_cache, _ANALYSIS_CACHE_MAX)
-
     comparative_div = _comparative_analysis_section(all_inds, facility_code, facility_df, payload_key=payload_key)
     geo_section_store = dcc.Store(
         id='mnid-deferred-geo-store',
@@ -503,6 +533,8 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         ),
         _kpi_row(computed),
         _hero_donut_row(computed, preferred_cat=default_cat, section_title=hero_title),
+
+        _section_anchor('mnid-coverage'),
         _sec_header(
             'Coverage & Quality' if dashboard_theme == 'newborn' else 'Coverage Indicators',
             sum(len(v) for v in by_cat.values()),
@@ -559,7 +591,6 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
 def clear_runtime_caches() -> None:
     _network_df_cache.clear()
     _heatmap_store_cache.clear()
-    _analysis_charts_cache.clear()
     _MNID_UI_CACHE.clear()
     _MNID_EXECUTIVE_CONTENT_CACHE.clear()
     if _MNID_UI_DISK_CACHE is not None:
@@ -991,9 +1022,6 @@ def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None 
     }
     default_ind_opts = ind_opts_by_cat.get(default_cat, [])
 
-    _agg = _get_aggregate()
-    default_cards = _run_chart_cards(df, tracked, default_cat, 'all', None, scope_meta, agg_df=_agg)
-
     # Store date range so callbacks can detect grain without restoring the full df.
     # data_key is kept as a lightweight fallback for when the aggregate isn't built yet.
     try:
@@ -1051,10 +1079,14 @@ def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None 
         dcc.Store(id='mnid-trend-store', data=trend_store),
         dcc.Store(id='mnid-trend-active-cat', data=default_cat),
         dcc.Store(id='mnid-trend-cats-store', data=cat_order),
-        html.Div(
-            id='mnid-run-charts-container',
-            className='mnid-chart-grid',
-            children=default_cards,
+        dcc.Loading(
+            html.Div(
+                id='mnid-run-charts-container',
+                className='mnid-chart-grid',
+                children=[],
+            ),
+            type='circle',
+            color='#15803d',
         ),
     ])
 
@@ -2324,7 +2356,6 @@ def register_mnid_callbacks(app) -> None:
 
 _network_df_cache: dict = {}
 _heatmap_store_cache: dict = {}
-_analysis_charts_cache: dict = {}
 
 
 def prewarm_cache(dataset_version: str | None = None) -> bool:
@@ -2498,43 +2529,55 @@ def _render_mnid_executive_tab(active_tab, executive_token):
     wf_inds = state.get('wf_inds')
     dq_inds = state.get('dq_inds')
 
-    if selected == 'operational-readiness' and facility_df is not None:
-        views[selected] = render_operational_readiness(
-            facility_df,
-            supply_inds=supply_inds,
-            wf_inds=wf_inds,
-            dq_inds=dq_inds,
-        )
-        return views[selected]
+    try:
+        if selected == 'operational-readiness' and facility_df is not None:
+            views[selected] = render_operational_readiness(
+                facility_df,
+                supply_inds=supply_inds,
+                wf_inds=wf_inds,
+                dq_inds=dq_inds,
+            )
+            return views[selected]
 
-    if selected == 'maternal-dashboard' and network_df is not None and config is not None:
-        bundle = _build_mnid_indicator_content(
-            network_df=network_df,
-            config=config,
-            facility_code=facility_code,
-            start_date=start_date,
-            end_date=end_date,
-            scope_meta=scope_meta,
-            include_content=True,
-        )
-        views[selected] = bundle.get('indicator_content', html.Div())
-        return views[selected]
-
-    if selected == 'newborn-dashboard':
-        newborn_config = state.get('newborn_config')
-        newborn_scope_meta = state.get('newborn_scope_meta')
-        if network_df is not None and newborn_config is not None:
+        if selected == 'maternal-dashboard' and network_df is not None and config is not None:
             bundle = _build_mnid_indicator_content(
                 network_df=network_df,
-                config=newborn_config,
+                config=config,
                 facility_code=facility_code,
                 start_date=start_date,
                 end_date=end_date,
-                scope_meta=newborn_scope_meta,
+                scope_meta=scope_meta,
                 include_content=True,
             )
             views[selected] = bundle.get('indicator_content', html.Div())
             return views[selected]
+
+        if selected == 'newborn-dashboard':
+            newborn_config = state.get('newborn_config')
+            newborn_scope_meta = state.get('newborn_scope_meta')
+            if network_df is not None and newborn_config is not None:
+                bundle = _build_mnid_indicator_content(
+                    network_df=network_df,
+                    config=newborn_config,
+                    facility_code=facility_code,
+                    start_date=start_date,
+                    end_date=end_date,
+                    scope_meta=newborn_scope_meta,
+                    include_content=True,
+                )
+                views[selected] = bundle.get('indicator_content', html.Div())
+                return views[selected]
+
+    except Exception as _exc:
+        _LOGGER.exception('Failed to render executive tab %s: %s', selected, _exc)
+        return html.Div(
+            f'Tab failed to load ({selected}): {_exc}',
+            style={'padding': '24px', 'color': '#dc2626', 'fontSize': '13px'},
+        )
+
+    if state and selected not in ('country-profile',):
+        _LOGGER.warning('Executive tab %s: no data in cache (token=%s). network_df=%s, config=%s',
+                        selected, executive_token, network_df is not None, config is not None)
 
     return views.get('country-profile', html.Div())
 

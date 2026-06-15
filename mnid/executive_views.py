@@ -71,17 +71,75 @@ def _section_header(title: str) -> html.Div:
     ], style={"display": "flex", "alignItems": "center", "gap": "7px", "marginBottom": "12px", "marginTop": "8px"})
 
 
-def _exec_alert_banner(message: str) -> html.Div:
-    return html.Div([
-        html.Span("⚠️", style={"fontSize": "14px", "flexShrink": "0", "marginTop": "1px"}),
-        html.Div([html.Strong("Mortality Alert — "), message],
-                 style={"fontSize": "12px", "lineHeight": "1.55"}),
-    ], style={
-        "display": "flex", "alignItems": "flex-start", "gap": "12px",
-        "background": "#fffbeb", "border": "1px solid #fde68a",
-        "borderRadius": "10px", "padding": "12px 16px",
-        "marginBottom": "20px", "color": "#78350f",
-    })
+def _exec_alert_banner(maternal_deaths: int, mmr: float, neonatal_deaths: int, stillbirths: int) -> html.Div:
+    items = []
+    if maternal_deaths > 0:
+        items.append(("Maternal Deaths", maternal_deaths, f"MMR {mmr:.0f}/100k"))
+    if neonatal_deaths > 0:
+        items.append(("Neonatal Deaths", neonatal_deaths, "this period"))
+    if stillbirths > 0:
+        items.append(("Stillbirths", stillbirths, "this period"))
+    if not items:
+        return html.Div()
+
+    n = len(items)
+    slot = 3.5
+    total = n * slot
+    kf_name = f'mnid-alert-rotate-{min(n, 15)}'
+
+    def _item(label, count, sub, i):
+        return html.Div(
+            style={
+                "position": "absolute", "top": "0", "left": "0",
+                "display": "flex", "alignItems": "center", "gap": "6px",
+                "opacity": 0,
+                "animation": f"{kf_name} {total:.1f}s {i * slot:.1f}s ease-in-out infinite",
+                "animationFillMode": "both",
+            },
+            children=[
+                html.Span(f"▼ {label}", style={
+                    "fontSize": "12px", "fontWeight": "600", "color": "#991B1B",
+                    "background": "#FEE2E2", "padding": "3px 10px",
+                    "borderRadius": "999px", "whiteSpace": "nowrap",
+                }),
+                html.Span(f"{count}", style={
+                    "fontSize": "13px", "fontWeight": "800", "color": "#991B1B",
+                }),
+                html.Span(sub, style={
+                    "fontSize": "11px", "color": "#9A3412",
+                }),
+            ]
+        )
+
+    return html.Div(
+        style={
+            "display": "flex", "alignItems": "center", "gap": "12px",
+            "background": "#FFF7ED", "border": "1px solid #FED7AA",
+            "borderRadius": "10px", "padding": "10px 14px",
+            "marginBottom": "20px",
+        },
+        children=[
+            html.Div(style={
+                "display": "flex", "flexDirection": "column",
+                "alignItems": "center", "gap": "3px", "flexShrink": "0",
+            }, children=[
+                html.Div(style={
+                    "width": "10px", "height": "10px", "borderRadius": "50%",
+                    "background": "#EF4444",
+                    "animation": "mnid-dot-blink 1.3s ease-in-out infinite",
+                }),
+                html.Span(f"{sum(c for _, c, _ in items)}", style={
+                    "fontSize": "15px", "fontWeight": "800", "color": "#DC2626", "lineHeight": "1",
+                }),
+                html.Span("alert", style={"fontSize": "8px", "color": "#9A3412", "lineHeight": "1"}),
+            ]),
+            html.Div(style={"width": "1px", "height": "38px", "background": "#FED7AA", "flexShrink": "0"}),
+            html.Div(
+                style={"position": "relative", "height": "28px", "flex": "1", "minWidth": "0"},
+                children=[_item(lbl, cnt, sub, i) for i, (lbl, cnt, sub) in enumerate(items)],
+            ),
+        ]
+    )
 
 
 def _readiness_ring_card(icon: str, name: str, score: float, col: str) -> dmc.Paper:
@@ -800,7 +858,7 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
             }),
             html.Div([
                 html.Div([
-                    html.H1("Maternal & Newborn Health Intelligence Platform", style={
+                    html.H1("Maternal & Neonatal Health", style={
                         "fontSize": "26px", "fontWeight": "800", "color": "#0f172a",
                         "letterSpacing": "-.04em", "lineHeight": "1.15", "marginBottom": "6px",
                     }),
@@ -842,10 +900,15 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
 
     # ---------- Alert banner ----------
     alert = None
-    if current_metrics["maternal_deaths"] > 0:
+    _md = current_metrics["maternal_deaths"]
+    _nd = current_metrics["neonatal_deaths"]
+    _sb = current_metrics["stillbirths"]
+    if _md > 0 or _nd > 0 or _sb > 0:
         alert = _exec_alert_banner(
-            f"Maternal deaths: {current_metrics['maternal_deaths']:,} recorded this period. "
-            f"MMR: {current_metrics['institutional_mmr']:.1f} per 100k live births. Immediate review recommended."
+            maternal_deaths=_md,
+            mmr=current_metrics["institutional_mmr"],
+            neonatal_deaths=_nd,
+            stillbirths=_sb,
         )
 
     # ---------- Scope info band ----------

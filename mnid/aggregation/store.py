@@ -21,6 +21,29 @@ _AGG_DF: pd.DataFrame | None = None
 _LOADED = False
 
 
+def _meta_source_matches(output_dir: str) -> bool:
+    """Return False if the stored aggregate was built from a different data source."""
+    import json
+    try:
+        from config import USE_DEMO_DATA
+        meta_path = Path(output_dir) / 'meta.json'
+        if not meta_path.exists():
+            return True  # no meta to check — trust the parquet
+        with open(meta_path, encoding='utf-8') as f:
+            meta = json.load(f)
+        agg_is_demo = bool(meta.get('use_demo_data', True))
+        if agg_is_demo != bool(USE_DEMO_DATA):
+            _LOG.warning(
+                'Aggregate was built from %s data but app is using %s data — discarding stale aggregate.',
+                'demo' if agg_is_demo else 'live',
+                'demo' if USE_DEMO_DATA else 'live',
+            )
+            return False
+    except Exception:
+        pass
+    return True
+
+
 def load_aggregate(output_dir: str = _DEFAULT_OUT_DIR) -> pd.DataFrame | None:
     """Read the aggregate parquet from disk into memory. Returns None if absent."""
     global _AGG_DF, _LOADED
@@ -30,6 +53,11 @@ def load_aggregate(output_dir: str = _DEFAULT_OUT_DIR) -> pd.DataFrame | None:
     path = Path(output_dir) / _PARQUET_NAME
     if not path.exists():
         _LOG.debug('Aggregate not found at %s — falling back to live compute', path)
+        _LOADED = True
+        _AGG_DF = None
+        return None
+
+    if not _meta_source_matches(output_dir):
         _LOADED = True
         _AGG_DF = None
         return None

@@ -519,19 +519,21 @@ def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=N
 def _sidebar(facility_code: str, theme: str = 'default') -> html.Div:
     if theme == 'newborn':
         nav_items = [
-            ('Overview', '#mnid-summary'),
-            ('Run Charts', '#mnid-trends'),
+            ('Overview',             '#mnid-summary'),
+            ('Coverage',             '#mnid-coverage'),
+            ('Run Charts',           '#mnid-trends'),
             ('District Performance', '#mnid-performance'),
-            ('Geographic Coverage', '#mnid-heatmap'),
-            ('Facility Comparison', '#mnid-comparative'),
+            ('Geographic Coverage',  '#mnid-heatmap'),
+            ('Facility Comparison',  '#mnid-comparative'),
         ]
     else:
         nav_items = [
-            ('Overview', '#mnid-summary'),
-            ('Run Charts', '#mnid-trends'),
+            ('Overview',    '#mnid-summary'),
+            ('Coverage',    '#mnid-coverage'),
+            ('Run Charts',  '#mnid-trends'),
             ('Performance', '#mnid-performance'),
-            ('Map View', '#mnid-heatmap'),
-            ('Comparison', '#mnid-comparative'),
+            ('Map View',    '#mnid-heatmap'),
+            ('Comparison',  '#mnid-comparative'),
         ]
     return html.Div(className='mnid-nav', children=[
         html.A(

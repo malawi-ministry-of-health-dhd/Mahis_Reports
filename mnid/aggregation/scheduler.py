@@ -53,6 +53,7 @@ def _write_meta_error(output_dir: str, error: str) -> None:
 def run_aggregation_job(
     viz_dir: str | None = None,
     output_dir: str | None = None,
+    grains: list | None = None,
 ) -> bool:
     """
     Entry point called by the scheduler (and directly after data refresh).
@@ -67,10 +68,11 @@ def run_aggregation_job(
     # ── Concurrency guard ────────────────────────────────────────────────
     if _LOCK_FILE.exists():
         age = datetime.utcnow().timestamp() - _LOCK_FILE.stat().st_mtime
-        if age < 3600:           # stale after 1 hour
+        # Negative age = file mtime is in the future (timezone/clock skew) — treat as stale
+        if 0 <= age < 3600:
             _LOG.warning('Aggregation already running (lock age %.0fs) — skipping', age)
             return False
-        _LOG.warning('Stale lock file found (%.0f min old) — removing and continuing', age / 60)
+        _LOG.warning('Stale lock file found (age %.0fs) — removing and continuing', age)
         _LOCK_FILE.unlink(missing_ok=True)
 
     _LOCK_FILE.touch()
@@ -81,7 +83,7 @@ def run_aggregation_job(
         from mnid.aggregation.engine import run_aggregation
         from mnid.aggregation.store  import invalidate_cache
 
-        success = run_aggregation(viz_dir=viz_dir, output_dir=output_dir)
+        success = run_aggregation(viz_dir=viz_dir, output_dir=output_dir, grains=grains)
 
         if success:
             invalidate_cache()
