@@ -423,7 +423,7 @@ def _pph_cascade(df):
 # MNID header, alert, KPI, and section navigation components
 
 def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=None,
-            period_note=None,
+            period_note=None, scope_meta=None,
             title='Maternal and Child Health Indicators', subtitle='Clean view of performance, comparison, coverage, and readiness.',
             theme='default'):
     facility_name = _FACILITY_NAMES.get(facility, facility or 'Network view')
@@ -452,6 +452,14 @@ def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=N
         requested = getattr(facility_df, 'attrs', {}).get('mnid_program')
         if requested and theme != 'newborn':
             selected_program = requested
+
+    scope_meta = scope_meta or {}
+    selected_facilities = [str(v).strip() for v in (scope_meta.get('selected_facilities') or []) if str(v).strip()]
+    selected_districts = [str(v).strip() for v in (scope_meta.get('selected_districts') or []) if str(v).strip()]
+    if selected_facilities:
+        facility_name = selected_facilities[0] if len(selected_facilities) == 1 else f'{len(selected_facilities)} selected facilities'
+    if selected_districts:
+        district = selected_districts[0] if len(selected_districts) == 1 else ', '.join(selected_districts[:2]) + (f' +{len(selected_districts) - 2}' if len(selected_districts) > 2 else '')
 
     topbar_label = 'N-NID Dashboard' if theme == 'newborn' else 'M-NID Dashboard'
     newborn_focus = None

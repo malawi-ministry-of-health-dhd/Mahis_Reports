@@ -66,6 +66,24 @@ _DASHBOARD_TAB_CONFIG_DEFAULTS = {
 }
 
 
+def _dashboard_loading_placeholder():
+    return html.Div(
+        className="dashboard-loading-placeholder",
+        children=[
+            html.Div(className="dashboard-loading-hero"),
+            html.Div(
+                className="dashboard-loading-grid",
+                children=[
+                    html.Div(className="dashboard-loading-card"),
+                    html.Div(className="dashboard-loading-card"),
+                    html.Div(className="dashboard-loading-card"),
+                ],
+            ),
+            html.Div(className="dashboard-loading-wide"),
+        ],
+    )
+
+
 def _trim_cache(cache: dict, max_entries: int) -> None:
     while len(cache) > max_entries:
         try:
@@ -200,6 +218,22 @@ def _normalize_level(value: str | None) -> str:
 
 def _title_level(value: str) -> str:
     return {'national': 'National', 'district': 'District', 'facility': 'Facility'}.get(value, 'Facility')
+
+
+def _districts_for_facilities(data: pd.DataFrame, facilities: list[str], district_col: str | None) -> list[str]:
+    if data is None or data.empty or not facilities or not district_col or district_col not in data.columns or FACILITY_ not in data.columns:
+        return []
+    subset = data[data[FACILITY_].isin(facilities)]
+    if subset.empty:
+        return []
+    return (
+        subset[district_col]
+        .dropna()
+        .astype(str)
+        .sort_values()
+        .unique()
+        .tolist()
+    )
 
 
 def _resolve_user_scope(urlparams, user_data: pd.DataFrame):
@@ -611,7 +645,7 @@ layout = html.Div(
                             html.Div(
                                 className="home-loading-copy",
                                 children=[
-                                    html.Div("Refreshing dashboard", className="home-loading-title"),
+                                    html.Div("Please wait", className="home-loading-title"),
                                     html.Div("Applying the current filters and charts.", className="home-loading-subtitle"),
                                 ],
                             ),
@@ -623,15 +657,18 @@ layout = html.Div(
                     ),
                     overlay_style={
                         "visibility": "visible",
-                        "opacity": 0.45,
-                        "backgroundColor": "rgba(255,255,255,0.82)",
-                        "borderRadius": "16px",
-                        "zIndex": 10,
+                        "opacity": 1,
+                        "position": "fixed",
+                        "inset": 0,
+                        "backgroundColor": "transparent",
+                        "borderRadius": "0",
+                        "zIndex": 1200,
                     },
                     delay_show=150,
                     children=html.Div(
                         id='dashboard-container',
-                        className="dashboard-content-modern"
+                        className="dashboard-content-modern",
+                        children=_dashboard_loading_placeholder(),
                     )
                 ),
             ]
@@ -839,11 +876,9 @@ def update_dashboard(gen, start_date, end_date, level,
                 _full = DataStorage.query_duckdb(_sql_full)
                 _full[DATE_] = pd.to_datetime(_full[DATE_], errors='coerce')
                 _full = _apply_scope_to_data(_full, scope, district_col_for_scope)
-                if effective_level != 'national' and district_col_for_scope in _full.columns and districts:
+                if district_col_for_scope in _full.columns and districts:
                     _full = _full[_full[district_col_for_scope].isin(districts)]
-                if effective_level == 'facility' and facilities:
-                    _full = _full[_full[FACILITY_].isin(facilities)]
-                elif effective_level == 'district' and facilities:
+                if facilities:
                     _full = _full[_full[FACILITY_].isin(facilities)]
                 _mnid_full_data_cache[_mnid_scope_key] = _full.copy()
                 _trim_cache(_mnid_full_data_cache, _MNID_FULL_CACHE_MAX)
@@ -944,12 +979,12 @@ def update_dashboard(gen, start_date, end_date, level,
             if district_col else []
         )
 
+        requested_level_value = effective_level
         districts = districts or []
         facilities = facilities or []
         overview = overview or []
         if effective_level == 'national':
-            districts = []
-            facilities = []
+            districts = [d for d in districts if d in all_districts]
         elif effective_level == 'district':
             scope_district = scope.get('district')
             if scope_district:
@@ -986,7 +1021,11 @@ def update_dashboard(gen, start_date, end_date, level,
                     )
                 facilities = assigned_facilities[:1]
 
-        if effective_level == 'district' and facilities and district_col:
+        inferred_districts = _districts_for_facilities(base_data, facilities, district_col)
+        if facilities and inferred_districts:
+            districts = inferred_districts
+
+        if facilities and district_col and districts:
             allowed_facilities = set(
                 base_data[base_data[district_col].isin(districts)][FACILITY_]
                 .dropna()
@@ -996,12 +1035,10 @@ def update_dashboard(gen, start_date, end_date, level,
             facilities = [f for f in facilities if f in allowed_facilities]
 
         # Facility options based on selected districts
-        if effective_level == "national":
-            facilities_pool = base_data
+        if district_col and districts:
+            facilities_pool = base_data[base_data[district_col].isin(districts)]
         elif effective_level == "district" and district_col and not districts:
             facilities_pool = base_data.iloc[0:0]
-        elif district_col and districts:
-            facilities_pool = base_data[base_data[district_col].isin(districts)]
         else:
             facilities_pool = base_data
         all_facilities = (
@@ -1009,15 +1046,25 @@ def update_dashboard(gen, start_date, end_date, level,
             if FACILITY_ in facilities_pool.columns else []
         )
 
-        show_district_filter = effective_level == "national"
+        if facilities:
+            effective_level = 'facility'
+        elif districts:
+            effective_level = 'district'
+        else:
+            effective_level = requested_level_value
+        level = _title_level(effective_level)
+
+        show_district_filter = effective_level in {"national", "district"}
         district_group_style = {} if show_district_filter else {"display": "none"}
-        district_disabled = not show_district_filter
+        district_disabled = effective_level == "facility"
         district_note = ""
-        if not show_district_filter:
-            districts = []
+        if effective_level == "district":
+            district_note = "Facility selections are constrained to the selected district(s)."
+        elif effective_level == "facility" and districts:
+            district_note = f"Facility selection resolved to: {', '.join(districts)}"
 
         # Keep selected facilities consistent with selected districts
-        if effective_level == "district" and district_col and districts:
+        if district_col and districts:
             allowed_facilities = set(
                 base_data[base_data[district_col].isin(districts)][FACILITY_]
                 .dropna()
@@ -1032,23 +1079,19 @@ def update_dashboard(gen, start_date, end_date, level,
 
         # Filter network and facility data
         network_data = base_data
-        if effective_level != 'national' and district_col and districts:
+        if district_col and districts:
             network_data = network_data[network_data[district_col].isin(districts)]
         filtered_data = network_data
-        if effective_level == 'facility' and facilities:
-            filtered_data = filtered_data[filtered_data[FACILITY_].isin(facilities)]
-        elif effective_level == 'district' and facilities:
+        if facilities:
             filtered_data = filtered_data[filtered_data[FACILITY_].isin(facilities)]
         
         # MNID-specific data paths: no Encounter pre-filter so all program observations are present.
         # The MNID renderer uses Service_Area (derived from Program/Encounter) for internal scoping.
         network_data_mnid = base_data_mnid
-        if effective_level != 'national' and district_col and districts:
+        if district_col and districts:
             network_data_mnid = network_data_mnid[network_data_mnid[district_col].isin(districts)]
         filtered_data_mnid = network_data_mnid
-        if effective_level == 'facility' and facilities:
-            filtered_data_mnid = filtered_data_mnid[filtered_data_mnid[FACILITY_].isin(facilities)]
-        elif effective_level == 'district' and facilities:
+        if facilities:
             filtered_data_mnid = filtered_data_mnid[filtered_data_mnid[FACILITY_].isin(facilities)]
 
         # Determine report selection
@@ -1091,11 +1134,9 @@ def update_dashboard(gen, start_date, end_date, level,
                         _full = DataStorage.query_duckdb(_sql_full)
                         _full[DATE_] = pd.to_datetime(_full[DATE_], errors='coerce')
                         _full = _apply_scope_to_data(_full, scope, district_col)
-                        if effective_level != 'national' and district_col and districts:
+                        if district_col and districts:
                             _full = _full[_full[district_col].isin(districts)]
-                        if effective_level == 'facility' and facilities:
-                            _full = _full[_full[FACILITY_].isin(facilities)]
-                        elif effective_level == 'district' and facilities:
+                        if facilities:
                             _full = _full[_full[FACILITY_].isin(facilities)]
                         _mnid_full_data_cache[_mnid_scope_key] = _full
                         _trim_cache(_mnid_full_data_cache, _MNID_FULL_CACHE_MAX)
@@ -1123,13 +1164,10 @@ def update_dashboard(gen, start_date, end_date, level,
                     else:
                         facility_code_display = mnid_location or location
 
-                if effective_level == 'facility' and facilities:
+                if facilities:
                     scope_label = 'Facility' if len(facilities) == 1 else 'Facilities'
                     scope_value = facilities[0] if len(facilities) == 1 else f'{len(facilities)} selected facilities'
-                elif effective_level == 'district' and facilities:
-                    scope_label = 'Facility' if len(facilities) == 1 else 'Facilities'
-                    scope_value = facilities[0] if len(facilities) == 1 else f'{len(facilities)} selected facilities'
-                elif effective_level == 'district' and districts:
+                elif districts:
                     scope_label = 'District' if len(districts) == 1 else 'Districts'
                     scope_value = ', '.join(districts)
                 else:

@@ -191,9 +191,9 @@ def _coverage_heatmap_section(
 
     district_gauges = _build_district_gauge_row(store)
 
-    initial_fig   = _build_heatmap_fig(store, 'by_district', 'All years')
     dyn_districts = store.get('all_districts', [])
     cur_dist   = store.get('current_district', dyn_districts[0] if dyn_districts else '')
+    initial_fig   = _build_heatmap_fig(store, 'by_district', 'All years', cur_dist if cur_dist else None)
     all_labels = store.get('y_labels', [])
     years = ['All years']
     if len(mch_full) and 'Date' in mch_full.columns:
@@ -210,6 +210,8 @@ def _coverage_heatmap_section(
 
     perf_data_districts = [d for d in dyn_districts if d]
     perf_dist_opts = [{'label': d, 'value': d} for d in perf_data_districts]
+    perf_default_districts = [cur_dist] if cur_dist and cur_dist in perf_data_districts else None
+    heatmap_default_district = cur_dist if cur_dist and cur_dist in dyn_districts else 'All'
 
     performance_card = html.Div(className='mnid-card mnid-performance-block',
                     style={'marginBottom': '12px'}, children=[
@@ -228,7 +230,7 @@ def _coverage_heatmap_section(
                         dcc.Dropdown(
                             id='mnid-performance-district',
                             options=perf_dist_opts,
-                            value=None,
+                            value=perf_default_districts,
                             multi=True,
                             placeholder='All districts',
                             style=_dd_style,
@@ -259,7 +261,7 @@ def _coverage_heatmap_section(
                 html.Div(
                     id='mnid-performance-heatmap-table',
                     className='mnid-performance-heatmap-graph',
-                    children=_build_facility_performance_heatmap_fig(store, 'All years', None, default_perf_inds, 'All'),
+                    children=_build_facility_performance_heatmap_fig(store, 'All years', perf_default_districts, default_perf_inds, 'All'),
                 ),
                 html.Div(className='mnid-performance-key', children=[
                     html.Div('Performance Color Scale', className='mnid-performance-key-title'),
@@ -270,7 +272,7 @@ def _coverage_heatmap_section(
                 html.Div(
                     id='mnid-performance-attention',
                     className='mnid-performance-attention',
-                    children=_build_performance_attention_table(store, 'All years', None, 'All', default_perf_inds),
+                    children=_build_performance_attention_table(store, 'All years', perf_default_districts, 'All', default_perf_inds),
                 ),
             ]),
         ]),
@@ -302,7 +304,7 @@ def _coverage_heatmap_section(
                     dcc.Dropdown(
                         id='mnid-heatmap-district',
                         options=district_opts,
-                        value='All',
+                        value=heatmap_default_district,
                         clearable=False,
                         style=_dd_style,
                     ),

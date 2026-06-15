@@ -99,6 +99,24 @@ _HEATMAP_CACHE_MAX = 6
 _country_profile_cache: dict = {}
 _COUNTRY_PROFILE_CACHE_MAX = 12
 
+
+def _mnid_loading_placeholder() -> html.Div:
+    return html.Div(
+        className='mnid-loading-surface',
+        children=[
+            html.Div(className='mnid-loading-surface-hero'),
+            html.Div(
+                className='mnid-loading-surface-grid',
+                children=[
+                    html.Div(className='mnid-loading-surface-card'),
+                    html.Div(className='mnid-loading-surface-card'),
+                    html.Div(className='mnid-loading-surface-card'),
+                ],
+            ),
+            html.Div(className='mnid-loading-surface-wide'),
+        ],
+    )
+
 # ── Startup aggregation ────────────────────────────────────────────────────────
 # Build the indicator aggregate parquet in a background thread at startup when
 # it doesn't yet exist or is stale (dev mode: scheduler not running, first deployment, etc.)
@@ -583,9 +601,10 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
     geo_section_store = dcc.Store(
         id='mnid-deferred-geo-store',
         data={
-            'data_key': _remember_ui_payload('mnid-geo', network_df, stable_key=f'geo:{payload_key}'),
+            'data_key': _remember_ui_payload('mnid-geo', facility_df, stable_key=f'geo:{payload_key}'),
             'all_inds': all_inds,
             'facility_code': facility_code,
+            'scope_meta': scope_meta or {},
         },
     )
 
@@ -600,7 +619,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         ])
 
     indicator_content = html.Div(className=f'mnid-main{" mnid-main-newborn" if dashboard_theme == "newborn" else ""}', children=[
-        _topbar(facility_code, period, len(tracked), len(awaiting), facility_df=facility_df, network_df=network_df, period_note=period_note, title=dashboard_title, subtitle=dashboard_subtitle, theme=dashboard_theme),
+        _topbar(facility_code, period, len(tracked), len(awaiting), facility_df=facility_df, network_df=network_df, period_note=period_note, scope_meta=scope_meta, title=dashboard_title, subtitle=dashboard_subtitle, theme=dashboard_theme),
         _sidebar(facility_code, theme=dashboard_theme),
         _alert_banner(below, strong),
 
@@ -2580,20 +2599,19 @@ def render_mnid_dashboard(data_opd, config,
         children=tab_children,
     )
 
-    # When opening on a non-CP tab, start the content div empty so the callback
-    # fills it without a country-profile flash. dcc.Loading shows a spinner.
+    # Avoid pre-rendering a heavy dashboard section just to show a loading state.
+    # Country profile can render immediately; other tabs get a lightweight skeleton
+    # behind the fixed loading overlay.
     _target_tab = initial_tab or 'country-profile'
-    _initial_ec = [executive_content['country-profile']] if _target_tab == 'country-profile' else []
+    _initial_ec = [executive_content['country-profile']] if _target_tab == 'country-profile' else [
+        _mnid_loading_placeholder()
+    ]
 
     return html.Div(className=f'mnid-bg{" mnid-theme-newborn" if dashboard_theme == "newborn" else ""}', children=[
         dcc.Store(id='mnid-executive-view-store', data=executive_token),
         html.Div(className=f'mnid-shell{" mnid-shell-newborn" if dashboard_theme == "newborn" else ""}', children=[
             executive_tabs,
-            dcc.Loading(
-                html.Div(id='mnid-executive-content', children=_initial_ec),
-                type='circle',
-                color='#15803d',
-            ),
+            html.Div(id='mnid-executive-content', className='mnid-executive-content', children=_initial_ec),
         ]),
     ])
 
@@ -2692,16 +2710,28 @@ def _render_deferred_geo_sections(store_data):
 
     all_inds = store_data.get('all_inds') or []
     facility_code = store_data.get('facility_code', '')
+    scope_meta = store_data.get('scope_meta') or {}
+    _, selected_facility_codes, selected_districts = _resolve_scope_filters(network_df, scope_meta)
     tracked = [i for i in all_inds if i.get('status') == 'tracked']
     cache_key = (
         store_data.get('data_key'),
         facility_code,
         tuple(i.get('id') for i in tracked),
+        tuple(sorted(selected_facility_codes)),
+        tuple(sorted(selected_districts)),
     )
 
     if cache_key not in _heatmap_store_cache:
         agg_for_heatmap = _get_aggregate()
         if agg_for_heatmap is not None and not agg_for_heatmap.empty:
+            if selected_facility_codes:
+                agg_for_heatmap = agg_for_heatmap[
+                    agg_for_heatmap['facility_code'].isin([str(f) for f in selected_facility_codes])
+                ]
+            elif selected_districts:
+                agg_for_heatmap = agg_for_heatmap[
+                    agg_for_heatmap['district'].isin([str(d) for d in selected_districts])
+                ]
             _heatmap_store_cache[cache_key] = _compute_heatmap_store_from_agg(
                 agg_for_heatmap, tracked, facility_code
             )
@@ -2709,6 +2739,8 @@ def _render_deferred_geo_sections(store_data):
             _heatmap_store_cache[cache_key] = _compute_heatmap_store(
                 network_df, tracked, facility_code
             )
+        if selected_districts:
+            _heatmap_store_cache[cache_key]['current_district'] = selected_districts[0]
         _trim_cache(_heatmap_store_cache, _HEATMAP_CACHE_MAX)
 
     performance_div, heatmap_div = _coverage_heatmap_section(
