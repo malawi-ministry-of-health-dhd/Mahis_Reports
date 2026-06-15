@@ -48,6 +48,7 @@ pd.options.mode.chained_assignment = None
 
 path = os.getcwd()
 json_path = os.path.join(path, 'data', 'visualizations', 'validated_dashboard.json')
+dashboard_tabs_config_path = os.path.join(path, 'data', 'visualizations', 'dashboard_tabs_config.json')
 
 _mnid_full_data_cache: dict = {}
 _dashboard_data_cache: dict = {}
@@ -57,6 +58,11 @@ _LATEST_DATA_DATE_CACHE: dict[str, pd.Timestamp | None] = {}
 _MNID_FULL_CACHE_MAX = 6
 _DASHBOARD_DATA_CACHE_MAX = 4
 _MNID_PREWARM_STARTED = False
+_DASHBOARD_TAB_CONFIG_DEFAULTS = {
+    "mode": "default",
+    "visible_reports": [],
+    "default_report": None,
+}
 
 
 def _trim_cache(cache: dict, max_entries: int) -> None:
@@ -235,8 +241,52 @@ def load_dashboard_menu():
     except Exception:
         return []
 
+
+def load_dashboard_tab_config():
+    try:
+        with open(dashboard_tabs_config_path, 'r') as f:
+            raw_config = json.load(f) or {}
+    except Exception:
+        raw_config = {}
+
+    config = dict(_DASHBOARD_TAB_CONFIG_DEFAULTS)
+    if isinstance(raw_config, dict):
+        config.update(raw_config)
+
+    mode = str(config.get("mode") or "default").strip().lower()
+    config["mode"] = mode if mode in {"default", "mnh_only"} else "default"
+
+    visible_reports = config.get("visible_reports")
+    if not isinstance(visible_reports, list):
+        visible_reports = []
+    config["visible_reports"] = [str(item).strip() for item in visible_reports if str(item).strip()]
+
+    default_report = config.get("default_report")
+    config["default_report"] = str(default_report).strip() if str(default_report or "").strip() else None
+    return config
+
+
+def get_enabled_dashboard_menu():
+    menu_json = load_dashboard_menu()
+    config = load_dashboard_tab_config()
+
+    if config["mode"] == "mnh_only":
+        allowed_reports = {"Maternal Health"}
+    elif config["visible_reports"]:
+        allowed_reports = set(config["visible_reports"])
+    else:
+        allowed_reports = None
+
+    if allowed_reports is None:
+        filtered_menu = menu_json
+    else:
+        filtered_menu = [item for item in menu_json if item.get("report_name") in allowed_reports]
+
+    return filtered_menu, config
+
 def get_dashboard_names():
-    return [d.get("report_name") for d in load_dashboard_menu() if d.get("report_name")]
+    menu_json, _ = get_enabled_dashboard_menu()
+    return [d.get("report_name") for d in menu_json if d.get("report_name")]
 
 def normalize_report_name(name, menu_json):
     if not name:
@@ -595,13 +645,15 @@ layout = html.Div(
         Input('active-button-store', 'data')])
 
 def update_menu(interval, color):
-    with open(json_path, 'r') as f:
-        menu_json = json.load(f)
+    menu_json, config = get_enabled_dashboard_menu()
+    default_report = config.get("default_report")
+    fallback_active = default_report if any(d.get("report_name") == default_report for d in menu_json) else None
+    active_name = color if any(d.get("report_name") == color for d in menu_json) else fallback_active
 
     return [
         html.Button(
             display_report_name(d["report_name"]),
-            className="menu-btn active" if color == d["report_name"] else "menu-btn",
+            className="menu-btn active" if active_name == d["report_name"] else "menu-btn",
             id={"type": "menu-button", "name": d["report_name"]}
         )
         for d in menu_json
@@ -659,12 +711,32 @@ def update_dashboard(gen, start_date, end_date, level,
             prop_dict = json.loads(triggered_id.split('.')[0])
             clicked_name = prop_dict['name']
 
-        menu_json = load_dashboard_menu()
+        menu_json, dashboard_tab_config = get_enabled_dashboard_menu()
+        if not menu_json:
+            return (
+                html.Div("No dashboards are enabled in the dashboard tabs config."),
+                level,
+                {'display': 'none'} if level in ['National', 'Facility'] else {},
+                [],
+                [],
+                False,
+                "",
+                [],
+                [],
+                current_active or dash.no_update,
+            )
+
+        config_default_report = dashboard_tab_config.get("default_report")
+        if config_default_report and not any(d.get("report_name") == config_default_report for d in menu_json):
+            config_default_report = None
+
         if overview:
             selected_reports = overview
         else:
-            selected_reports = [clicked_name] if clicked_name else [menu_json[0]["report_name"] if menu_json else "Dashboard"]
+            default_report = config_default_report or menu_json[0]["report_name"]
+            selected_reports = [clicked_name] if clicked_name in {d.get("report_name") for d in menu_json} else [default_report]
         selected_reports = list(dict.fromkeys(normalize_report_name(r, menu_json) for r in selected_reports))
+        effective_active_report = selected_reports[0] if selected_reports else None
         selected_dashboards = [d for d in menu_json if d.get('report_name') in selected_reports]
         mnid_only_request = bool(selected_dashboards) and all(d.get('dashboard_type') == 'mnid' for d in selected_dashboards)
 
@@ -694,7 +766,7 @@ def update_dashboard(gen, start_date, end_date, level,
                 "",
                 [],
                 [],
-                clicked_name
+                effective_active_report
             )
 
         user_level = scope['level']
@@ -1085,7 +1157,7 @@ def update_dashboard(gen, start_date, end_date, level,
             district_note,
             [{'label': f, 'value': f} for f in all_facilities],
             facilities,
-            clicked_name
+            effective_active_report
         )
     except PreventUpdate:
         raise
