@@ -539,7 +539,7 @@ html { scroll-behavior: smooth; }
 
 .mnid-heatmap-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.95fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   align-items: stretch;
 }
@@ -551,6 +551,7 @@ html { scroll-behavior: smooth; }
   background: #FFFFFF;
   box-shadow: 0 1px 4px rgba(15,23,42,0.06), inset 0 0 0 1px rgba(255,255,255,0.45);
   overflow: hidden;
+  min-height: 680px;
 }
 
 .mnid-heatmap-map .js-plotly-plot,
@@ -560,13 +561,7 @@ html { scroll-behavior: smooth; }
 }
 
 .mnid-heatmap-panel {
-  min-width: 0;
-  height: 560px;
-  padding: 10px 12px;
-  background: #FAFAF8;
-  border: 1px solid #E2E8F0;
-  border-radius: 12px;
-  overflow-y: auto;
+  display: none;
 }
 
 .mnid-map-controls {

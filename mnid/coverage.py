@@ -192,8 +192,6 @@ def _coverage_heatmap_section(
     district_gauges = _build_district_gauge_row(store)
 
     initial_fig   = _build_heatmap_fig(store, 'by_district', 'All years')
-    initial_panel = _build_malawi_panel(store, 'by_district', 'All years')
-
     dyn_districts = store.get('all_districts', [])
     cur_dist   = store.get('current_district', dyn_districts[0] if dyn_districts else '')
     all_labels = store.get('y_labels', [])
@@ -334,13 +332,13 @@ def _coverage_heatmap_section(
                         'responsive': True,
                         'doubleClick': 'reset'}
                 , figure=initial_fig,
-                style={'height': '560px', 'width': '100%', 'minWidth': '0'},
+                style={'height': '680px', 'width': '100%', 'minWidth': '0'},
                 clear_on_unhover=False,
             ),
             html.Div(
                 id='mnid-heatmap-right',
                 className='mnid-heatmap-panel',
-                children=initial_panel,
+                children=[],
             ),
         ]),
 

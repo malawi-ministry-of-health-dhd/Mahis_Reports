@@ -761,7 +761,7 @@ def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
         fig.add_annotation(text='District GeoJSON not available for MNID map',
                            xref='paper', yref='paper', x=0.5, y=0.5,
                            showarrow=False, font=dict(size=12, color=MUTED))
-        fig.update_layout(paper_bgcolor=BG, plot_bgcolor=BG, height=560)
+        fig.update_layout(paper_bgcolor=BG, plot_bgcolor=BG, height=680)
         return fig
 
     district_rings = geo_ref.get('district_rings', {})
@@ -902,7 +902,7 @@ def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
         'Facility Coverage Map' if view == 'by_facility' else f'{focus_dist} Facility Coverage Map'
     )
     fig.update_layout(
-        paper_bgcolor=BG, plot_bgcolor=BG, height=560, margin=dict(l=10, r=10, t=34, b=10),
+        paper_bgcolor=BG, plot_bgcolor=BG, height=680, margin=dict(l=10, r=10, t=34, b=10),
         font=dict(family=FONT, color=TEXT, size=11), hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
         hovermode='closest', dragmode='pan',
         xaxis=dict(visible=False, range=x_range, fixedrange=False),
