@@ -81,7 +81,7 @@ from mnid.coverage import (
     _build_compare_heatmap, _comparative_analysis_section,
 )
 from mnid.layout import (
-    _TH, _hero_donut_card, _hero_donut_row, _priority_table,
+    _TH, _hero_donut_card, _hero_donut_row,
     _district_gauge_fig, _build_district_gauge_row,
     _pph_cascade, _topbar, _sidebar, _alert_banner,
     _avg_ring, _count_bar, _kpi, _kpi_row, _section_anchor,
@@ -531,7 +531,13 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         ),
         _kpi_row(computed),
         _hero_donut_row(computed, preferred_cat=default_cat, section_title=hero_title),
-        _priority_table(computed),
+        _sec_header(
+            'Coverage & Quality' if dashboard_theme == 'newborn' else 'Coverage Indicators',
+            sum(len(v) for v in by_cat.values()),
+            desc='Coverage against target across the neonatal care pathway, from stabilization to follow-up.' if dashboard_theme == 'newborn' else 'Coverage % vs target - target threshold shown per chart',
+            eyebrow='Indicators' if dashboard_theme == 'newborn' else None,
+        ),
+        coverage_charts,
 
         _section_anchor('mnid-trends'),
         _sec_header(
