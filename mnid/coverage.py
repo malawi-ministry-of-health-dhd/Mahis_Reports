@@ -499,6 +499,7 @@ def _coverage_phase_fig(
     facility_codes=None,
     districts=None,
     grain: str = 'monthly',
+    row_height: int = 38,
 ) -> go.Figure:
     """Horizontal bar chart: one bar per indicator coloured by status vs target."""
     if agg_df is not None:
@@ -538,7 +539,8 @@ def _coverage_phase_fig(
                for r in rows]
     text_vals = [f"{r['pct']:.0f}%" if r['pct'] is not None else 'No data' for r in rows]
 
-    height = max(len(rows) * 38 + 70, CHART_HEIGHT_SM)
+    wide = row_height > 38
+    height = max(len(rows) * row_height + 70, CHART_HEIGHT_SM)
 
     fig = go.Figure()
 
@@ -550,7 +552,7 @@ def _coverage_phase_fig(
                     line=dict(color='rgba(0,0,0,0)')),
         text=text_vals,
         textposition='outside',
-        textfont=dict(size=10, color=TEXT, family=FONT),
+        textfont=dict(size=11 if wide else 10, color=TEXT, family=FONT),
         cliponaxis=False,
         hovertemplate='<b>%{y}</b><br>Coverage: %{x:.1f}%<extra></extra>',
         showlegend=False,
@@ -560,7 +562,7 @@ def _coverage_phase_fig(
     fig.add_trace(go.Scatter(
         x=targets, y=labels,
         mode='markers',
-        marker=dict(symbol='line-ew', size=14, color='#64748B',
+        marker=dict(symbol='line-ew', size=16 if wide else 14, color='#64748B',
                     line=dict(color='#64748B', width=2)),
         name='Target',
         hovertemplate='Target: %{x:.0f}%<extra></extra>',
@@ -570,16 +572,16 @@ def _coverage_phase_fig(
         paper_bgcolor=BG, plot_bgcolor=BG,
         font=dict(family=FONT, color=TEXT, size=11),
         height=height,
-        margin=dict(l=8, r=56, t=8, b=8),
+        margin=dict(l=8, r=60, t=8, b=8),
         xaxis=dict(range=[0, 115], showgrid=True, gridcolor=GRID_C,
                    zeroline=False, showline=False,
-                   ticksuffix='%', tickfont=dict(size=9, color=MUTED)),
+                   ticksuffix='%', tickfont=dict(size=10 if wide else 9, color=MUTED)),
         yaxis=dict(showgrid=False, zeroline=False, showline=False,
-                   tickfont=dict(size=10, color=DIM), automargin=True),
+                   tickfont=dict(size=11 if wide else 10, color=DIM), automargin=True),
         hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
         legend=dict(orientation='h', x=0, y=-0.06, xanchor='left',
                     font=dict(size=9, color=DIM)),
-        bargap=0.28,
+        bargap=0.22 if wide else 0.28,
     )
     return fig
 
@@ -636,6 +638,10 @@ def _coverage_charts_section(
     phases = [(cat, phase_map.get(cat, cat)) for cat in _resolve_category_order(
         [{'category': k} for k in by_cat.keys()], categories
     )]
+    active_phases = [(c, t) for c, t in phases if by_cat.get(c)]
+    single_card = len(active_phases) == 1
+    row_height = 52 if single_card else 38
+
     cards = []
     for cat_key, cat_title in phases:
         inds = by_cat.get(cat_key, [])
@@ -655,15 +661,16 @@ def _coverage_charts_section(
 
         fig = _coverage_phase_fig(cat_title, inds, df,
                                    agg_df=agg_df, start_date=start_date, end_date=end_date,
-                                   facility_codes=facility_codes, districts=districts, grain=grain)
-        inner_height = max(len(inds) * 38 + 70, CHART_HEIGHT_SM)
+                                   facility_codes=facility_codes, districts=districts, grain=grain,
+                                   row_height=row_height)
+        inner_height = max(len(inds) * row_height + 70, CHART_HEIGHT_SM)
         outer_height = _clamp_chart_height(inner_height, CHART_HEIGHT_SM, CHART_HEIGHT_LG)
 
+        title_style = {'fontSize': '13px' if single_card else '12px', 'fontWeight': '600', 'color': TEXT}
         cards.append(html.Div(className='mnid-chart-card', children=[
             html.Div(style={'display': 'flex', 'justifyContent': 'space-between',
-                            'alignItems': 'center', 'marginBottom': '4px'}, children=[
-                html.Div(cat_title,
-                         style={'fontSize': '12px', 'fontWeight': '600', 'color': TEXT}),
+                            'alignItems': 'center', 'marginBottom': '6px' if single_card else '4px'}, children=[
+                html.Div(cat_title, style=title_style),
                 html.Div(className='mnid-pills', children=pills),
             ]),
             _graph_scroll_wrap(
