@@ -166,8 +166,9 @@ def validate_dashboard_json(contents):
                     c["filters"],
                     ["unique", "variable1", "variable2", "variable3", "variable4", "variable5", "variable6", "variable7", "variable8"]
                 )
-                if len(selected_values) > 0:
-                    return False, f"The following filter values in counts are invalid data columns: {', '.join(selected_values)}"
+                # paused for now
+                # if len(selected_values) > 0:
+                #     return False, f"The following filter values in counts are invalid data columns: {', '.join(selected_values)}"
 
             for chart in sections:
                 for ch in chart['items']:
@@ -190,8 +191,9 @@ def validate_dashboard_json(contents):
                             "age_col", "gender_col"
                         ]
                     )
-                    if len(selected_values) > 0:
-                        return False, f"The following filter values in charts are invalid data columns: {', '.join(selected_values)}"
+                    # paused for now
+                    # if len(selected_values) > 0:
+                    #     return False, f"The following filter values in charts are invalid data columns: {', '.join(selected_values)}"
 
             for indicator in priority_indicators:
                 if not isinstance(indicator, dict):
