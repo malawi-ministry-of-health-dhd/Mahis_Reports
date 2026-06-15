@@ -1,5 +1,5 @@
 {
-  "mode": "default",
+  "mode": "mnh_only",
   "visible_reports": [],
-  "default_report": null
+  "default_report": "Maternal Health"
 }
