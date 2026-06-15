@@ -108,7 +108,6 @@ function(_tick) {
         '#mnid-trends',
         '#mnid-performance',
         '#mnid-heatmap',
-        '#mnid-coverage',
         '#mnid-comparative',
         '#mnid-analysis'
     ];
@@ -557,15 +556,6 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
             eyebrow='Map' if dashboard_theme == 'newborn' else None,
         ),
         heatmap_div,
-
-        _section_anchor('mnid-coverage'),
-        _sec_header(
-            'Coverage & Quality' if dashboard_theme == 'newborn' else 'Coverage Indicators',
-            sum(len(v) for v in by_cat.values()),
-            desc='Coverage against target across the neonatal care pathway, from stabilization to follow-up.' if dashboard_theme == 'newborn' else 'Coverage % vs target - target threshold shown per chart',
-            eyebrow='Indicators' if dashboard_theme == 'newborn' else None,
-        ),
-        coverage_charts,
 
         _section_anchor('mnid-comparative'),
         _sec_header(
@@ -2588,4 +2578,3 @@ def _render_mnid_executive_tab(active_tab, executive_token):
             return views[selected]
 
     return views.get('country-profile', html.Div())
-
