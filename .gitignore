@@ -57,6 +57,6 @@ models.py
 # latest_data_opd.parquet.backup
 demo_parquet/
 docs/
-generate_demo_parquet.py
+# generate_demo_parquet.py
 scripts/generate_demo_mnid_data.py
-data/mnid_aggregates/
+# data/mnid_aggregates/
