@@ -202,6 +202,55 @@ def _aggregate_grain_for_window(start_ts, end_ts) -> str:
     return 'monthly'
 
 
+def _build_agg_batch(
+    agg_df: pd.DataFrame,
+    start,
+    end,
+    grain: str,
+    fac_filter=None,
+    dist_filter=None,
+) -> dict:
+    """
+    Pre-aggregate a date window into a {(indicator_id, grain): (num, den, pct)} dict.
+
+    Single groupby over the filtered aggregate replaces N individual query_coverage
+    calls (one per indicator) — typically 40-60x faster.
+    """
+    try:
+        grains = _agg_candidate_grains(grain)
+        floor = min(_agg_floor_period(start, g) for g in grains)
+        sub = agg_df[
+            agg_df['grain'].isin(grains)
+            & (agg_df['period_start'] >= floor)
+            & (agg_df['period_start'] <= pd.Timestamp(end))
+        ]
+        if fac_filter:
+            sub = sub[sub['facility_code'].isin([str(f) for f in fac_filter])]
+        elif dist_filter:
+            sub = sub[sub['district'].isin([str(d) for d in dist_filter])]
+        if sub.empty:
+            return {}
+        grouped = sub.groupby(['indicator_id', 'grain'])[['numerator', 'denominator']].sum()
+        result: dict = {}
+        for (iid, g), row in grouped.iterrows():
+            n, d = int(row['numerator']), int(row['denominator'])
+            pct = round(min(n / d * 100, 100.0), 1) if d > 0 else 0.0
+            result[(str(iid), g)] = (n, d, pct)
+        return result
+    except Exception:
+        return {}
+
+
+def _batch_cov(batch: dict, ind_id: str, grain_fallbacks: list) -> tuple:
+    """Look up (num, den, pct) from a pre-built batch dict with grain fallback."""
+    iid = str(ind_id)
+    for g in grain_fallbacks:
+        v = batch.get((iid, g))
+        if v and v[1] > 0:
+            return v
+    return 0, 0, 0.0
+
+
 def _trim_cache(cache: dict, max_entries: int) -> None:
     while len(cache) > max_entries:
         try:
@@ -424,12 +473,46 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
     _agg = _get_aggregate()
     _fac_filter = selected_facility_codes or None
     _dist_filter = selected_districts or None
-    _kpi_grain = 'daily'
+    _kpi_grain = 'monthly'
     _coverage_grain = _aggregate_grain_for_window(_s, _e)
+    _kpi_fallbacks = list(_agg_candidate_grains(_kpi_grain))
+
+    # Pre-compute previous period boundaries (needed before the KPI loop below)
+    try:
+        window = max((_e - _s).days, 1) if _s and _e else 1
+        prev_end = _s - pd.Timedelta(days=1)
+        prev_start = prev_end - pd.Timedelta(days=window - 1)
+    except Exception:
+        prev_start = prev_end = None
+
+    # Batch aggregate queries: 2 groupbys replace ~84 individual query_coverage calls
+    _cur_batch: dict = {}
+    _prev_batch: dict = {}
+    if _agg is not None and _s is not None:
+        _cur_batch  = _build_agg_batch(_agg, _s, _e, _kpi_grain, _fac_filter, _dist_filter if not _fac_filter else None)
+        if prev_start is not None:
+            _prev_batch = _build_agg_batch(_agg, prev_start, prev_end, _kpi_grain, _fac_filter, _dist_filter if not _fac_filter else None)
+
+    # Pre-slice coverage aggregate once to avoid repeated full-scan per indicator in coverage charts
+    _cov_agg: pd.DataFrame | None = None
+    if _agg is not None and _s is not None:
+        _cov_grains = _agg_candidate_grains(_coverage_grain)
+        _cov_floor = min(_agg_floor_period(_s, g) for g in _cov_grains)
+        _cov_agg = _agg[
+            _agg['grain'].isin(_cov_grains)
+            & (_agg['period_start'] >= _cov_floor)
+            & (_agg['period_start'] <= pd.Timestamp(_e))
+        ]
+        if _fac_filter:
+            _cov_agg = _cov_agg[_cov_agg['facility_code'].isin([str(f) for f in _fac_filter])]
+        elif _dist_filter:
+            _cov_agg = _cov_agg[_cov_agg['district'].isin([str(d) for d in _dist_filter])]
 
     computed = []
     for ind in tracked:
-        if _agg is not None and _s is not None:
+        if _cur_batch:
+            num, den, pct = _batch_cov(_cur_batch, ind['id'], _kpi_fallbacks)
+        elif _agg is not None and _s is not None:
             num, den, pct = _agg_coverage(
                 _agg, ind['id'], _s, _e,
                 facility_codes=_fac_filter,
@@ -447,15 +530,11 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
             'attained_pct': _target_attainment_pct(pct, ind.get('target', 0), ind),
         })
 
-    try:
-        window = max((_e - _s).days, 1) if _s and _e else 1
-        prev_end = _s - pd.Timedelta(days=1)
-        prev_start = prev_end - pd.Timedelta(days=window - 1)
-    except Exception:
-        prev_start = prev_end = None
-
     for c in computed:
-        if _agg is not None and prev_start is not None:
+        if _prev_batch and prev_start is not None:
+            _, _, prev_pct = _batch_cov(_prev_batch, c['id'], _kpi_fallbacks)
+            c['delta_pct'] = round(c['pct'] - prev_pct, 1)
+        elif _agg is not None and prev_start is not None:
             try:
                 _, _, prev_pct = _agg_coverage(
                     _agg, c['id'], prev_start, prev_end,
@@ -492,7 +571,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
 
     coverage_charts = _coverage_charts_section(
         by_cat, facility_df, category_order,
-        agg_df=_agg,
+        agg_df=_cov_agg if _cov_agg is not None else _agg,
         start_date=str(_s.date()) if _s is not None else start_date,
         end_date=str(_e.date()) if _e is not None else end_date,
         facility_codes=list(_fac_filter) if _fac_filter else None,
@@ -2044,11 +2123,10 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
     time_grain = time_grain or 'weekly'
     chart_type = chart_type or 'line'
     ctx = callback_context
-    user_changed_indicators = (
-        ctx and ctx.triggered and
-        ctx.triggered[0]['prop_id'] == 'mnid-compare-indicators.value'
-    )
-    if ctx and ctx.triggered and ctx.triggered[0]['prop_id'] == 'mnid-compare-chart-toggle.n_clicks':
+    ctx_prop = ctx.triggered[0]['prop_id'] if ctx and ctx.triggered else ''
+    user_changed_indicators = ctx_prop == 'mnid-compare-indicators.value'
+    mode_just_changed = ctx_prop == 'mnid-compare-mode.value'
+    if ctx_prop == 'mnid-compare-chart-toggle.n_clicks':
         chart_type = 'line' if chart_type == 'bar' else 'bar'
     store_payload = stored or {}
     tracked = store_payload.get('tracked', [])
@@ -2087,17 +2165,23 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
         ind_value_out = no_update if user_changed_indicators else selected_ind_ids
         return _empty_fig, entity_options, (selected_entities or []), ind_options, ind_value_out, chart_type, toggle_class, toggle_text
 
+    # When mode switches, discard the previous selection (facility codes ≠ district names).
+    # Also guard against 'Unknown' facility_code at national scope — it is never in the options.
+    effective_selection = None if mode_just_changed else selected_entities
+
     if mode == 'facility':
         entity_options = facility_options
-        default_entities = ([current_fac] if current_fac else []) or [opt['value'] for opt in facility_options[:4]]
-        entities = [str(v) for v in (selected_entities or default_entities) if str(v) in {str(opt['value']) for opt in facility_options}]
+        valid_fac_vals = {str(opt['value']) for opt in facility_options}
+        default_entities = ([current_fac] if current_fac and current_fac in valid_fac_vals else []) or [opt['value'] for opt in facility_options[:4]]
+        entities = [str(v) for v in (effective_selection or default_entities) if str(v) in valid_fac_vals]
         entity_labels = {str(opt['value']): str(opt['label']) for opt in facility_options}
         def get_df(entity):
             return mch_full[mch_full['Facility_CODE'] == entity] if 'Facility_CODE' in mch_full.columns else pd.DataFrame()
     else:
         entity_options = district_options
-        default_entities = ([current_dist] if current_dist else []) or [opt['value'] for opt in district_options[:4]]
-        entities = [str(v) for v in (selected_entities or default_entities) if str(v) in {str(opt['value']) for opt in district_options}]
+        valid_dist_vals = {str(opt['value']) for opt in district_options}
+        default_entities = ([current_dist] if current_dist and current_dist in valid_dist_vals else []) or [opt['value'] for opt in district_options[:4]]
+        entities = [str(v) for v in (effective_selection or default_entities) if str(v) in valid_dist_vals]
         entity_labels = {str(opt['value']): str(opt['label']) for opt in district_options}
         def get_df(entity):
             return mch_full[mch_full['District'] == entity] if 'District' in mch_full.columns else pd.DataFrame()
@@ -2406,7 +2490,8 @@ def prewarm_cache(dataset_version: str | None = None) -> bool:
 
 def render_mnid_dashboard(data_opd, config,
                           facility_code, start_date, end_date,
-                          scope_meta: dict | None = None):
+                          scope_meta: dict | None = None,
+                          initial_tab: str | None = None):
     dataset_version = (scope_meta or {}).get('dataset_version')
     selected_programs = tuple(sorted((scope_meta or {}).get('mnid_categories') or []))
     selected_facilities = tuple(sorted((scope_meta or {}).get('selected_facilities') or []))
@@ -2490,16 +2575,25 @@ def render_mnid_dashboard(data_opd, config,
 
     executive_tabs = dcc.Tabs(
         id='mnid-executive-tabs',
-        value='country-profile',
+        value=initial_tab or 'country-profile',
         style={'marginBottom': '18px'},
         children=tab_children,
     )
+
+    # When opening on a non-CP tab, start the content div empty so the callback
+    # fills it without a country-profile flash. dcc.Loading shows a spinner.
+    _target_tab = initial_tab or 'country-profile'
+    _initial_ec = [executive_content['country-profile']] if _target_tab == 'country-profile' else []
 
     return html.Div(className=f'mnid-bg{" mnid-theme-newborn" if dashboard_theme == "newborn" else ""}', children=[
         dcc.Store(id='mnid-executive-view-store', data=executive_token),
         html.Div(className=f'mnid-shell{" mnid-shell-newborn" if dashboard_theme == "newborn" else ""}', children=[
             executive_tabs,
-            html.Div(id='mnid-executive-content', children=[executive_content['country-profile']]),
+            dcc.Loading(
+                html.Div(id='mnid-executive-content', children=_initial_ec),
+                type='circle',
+                color='#15803d',
+            ),
         ]),
     ])
 

@@ -324,7 +324,8 @@ PREMIUM_DASHBOARD_REPORTS = {"Maternal and Child Health"}
 
 
 def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json, filter_summary=None,
-                          start_date=None, end_date=None, facility_code=None, scope_meta=None, url_object=None):
+                          start_date=None, end_date=None, facility_code=None, scope_meta=None, url_object=None,
+                          initial_tab=None):
     config = dashboards_json
     count_items_per_row = config.get("count_items_per_row") or 5
 
@@ -337,6 +338,7 @@ def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json, filt
             start_date=str(start_date)[:10] if start_date else '',
             end_date=str(end_date)[:10] if end_date else '',
             scope_meta=scope_meta,
+            initial_tab=initial_tab,
         )
 
     # Render all non-MNID dashboards with the generic chart builder.
@@ -364,6 +366,7 @@ layout = html.Div(
     children=[
         dcc.Location(id='url', refresh=False),
         dcc.Store(id='active-button-store', data='General Summary'),
+        dcc.Store(id='mnid-active-tab-store', data='country-profile', storage_type='session'),
         
         # Left Sidebar
         html.Div(
@@ -670,6 +673,15 @@ def update_menu(interval, color):
 
 
 @callback(
+    Output('mnid-active-tab-store', 'data'),
+    Input('mnid-executive-tabs', 'value'),
+    prevent_initial_call=True,
+)
+def _save_mnid_active_tab(tab_value):
+    return tab_value or 'country-profile'
+
+
+@callback(
     [Output('dashboard-container', 'children'),
      Output('dashboard-level-filter', 'value'),
      Output('dashboard-district-filter-group', 'style'),
@@ -695,12 +707,13 @@ def update_menu(interval, color):
     [
         State('url-params-store', 'data'),
         State('dashboard-age-filter', 'value'),
-        State('active-button-store', 'data')
+        State('active-button-store', 'data'),
+        State('mnid-active-tab-store', 'data'),
     ],
 )
 def update_dashboard(gen, start_date, end_date, level,
                      districts, facilities, overview, category,
-                     menu_clicks, pathname, urlparams, age, current_active):
+                     menu_clicks, pathname, urlparams, age, current_active, active_mnid_tab):
     try:
         ctx = callback_context
         triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else None
@@ -718,6 +731,13 @@ def update_dashboard(gen, start_date, end_date, level,
         if triggered_id and "menu-button" in triggered_id:
             prop_dict = json.loads(triggered_id.split('.')[0])
             clicked_name = prop_dict['name']
+
+        # Preserve the active MNID tab across filter/date changes; reset when switching reports
+        initial_mnid_tab = (
+            'country-profile'
+            if triggered_id and 'menu-button' in triggered_id
+            else (active_mnid_tab or 'country-profile')
+        )
 
         menu_json, dashboard_tab_config = get_enabled_dashboard_menu()
         if not menu_json:
@@ -1134,7 +1154,8 @@ def update_dashboard(gen, start_date, end_date, level,
                         'data_period_note': data_period_note,
                         'dataset_version': dataset_version,
                     },
-                    url_object=url_object
+                    url_object=url_object,
+                    initial_tab=initial_mnid_tab,
                 )
                 rendered.append(html.Div([
                     html.H2(display_report_name(report_name), style={"marginTop": "10px"}),
