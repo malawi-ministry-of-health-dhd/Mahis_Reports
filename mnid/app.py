@@ -108,8 +108,7 @@ function(_tick) {
         '#mnid-trends',
         '#mnid-performance',
         '#mnid-heatmap',
-        '#mnid-comparative',
-        '#mnid-analysis'
+        '#mnid-comparative'
     ];
 
     let active = '#mnid-summary';
@@ -471,14 +470,6 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         _analysis_charts_cache[_ac_key] = (anc_charts, labour_charts, pnc_charts, nb_charts)
         _trim_cache(_analysis_charts_cache, _ANALYSIS_CACHE_MAX)
 
-    analysis_acc = [
-        _chart_acc_section('ch_anc',    'Antenatal Care',    anc_charts)    if anc_charts and 'ANC' in category_order else None,
-        _chart_acc_section('ch_labour', 'Labour & Delivery', labour_charts) if labour_charts and 'Labour' in category_order else None,
-        _chart_acc_section('ch_pnc',    'Postnatal Care',    pnc_charts)    if pnc_charts and 'PNC' in category_order else None,
-        _chart_acc_section('ch_nb',     'Neonatal Care',     nb_charts)     if nb_charts and 'Newborn' in category_order else None,
-    ]
-    analysis_acc = [a for a in analysis_acc if a]
-
     comparative_div = _comparative_analysis_section(all_inds, facility_code, facility_df, payload_key=payload_key)
     geo_section_store = dcc.Store(
         id='mnid-deferred-geo-store',
@@ -498,15 +489,6 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
             ]),
             html.Span(f'{count} indicators' if count else '', className='mnid-section-header-count'),
         ])
-
-    total_analysis = sum(
-        len(charts) for cat, charts in [
-            ('ANC', anc_charts),
-            ('Labour', labour_charts),
-            ('PNC', pnc_charts),
-            ('Newborn', nb_charts),
-        ] if cat in category_order
-    )
 
     indicator_content = html.Div(className=f'mnid-main{" mnid-main-newborn" if dashboard_theme == "newborn" else ""}', children=[
         _topbar(facility_code, period, len(tracked), len(awaiting), facility_df=facility_df, network_df=network_df, period_note=period_note, title=dashboard_title, subtitle=dashboard_subtitle, theme=dashboard_theme),
@@ -561,25 +543,6 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
             eyebrow='Comparison' if dashboard_theme == 'newborn' else None,
         ),
         comparative_div,
-
-        _section_anchor('mnid-analysis'),
-        _sec_header(
-            'Clinical Interventions' if dashboard_theme == 'newborn' else 'Clinical Analysis',
-            None if dashboard_theme == 'newborn' else total_analysis,
-            desc='Clinical intervention, thermal support, respiratory support, and complication views.' if dashboard_theme == 'newborn' else 'Care-phase deep-dives',
-            eyebrow='Clinical View' if dashboard_theme == 'newborn' else None,
-        ),
-        dmc.Accordion(
-            multiple=True,
-            value=[a.value for a in analysis_acc],
-            variant='separated', radius='md', mb='md',
-            children=analysis_acc,
-            styles={
-                'item': {'backgroundColor': BG, 'border': f'1px solid {BORDER}', 'borderRadius': '12px', 'marginBottom': '8px', 'boxShadow': '0 1px 3px rgba(0,0,0,0.04)'},
-                'control': {'padding': '12px 16px'},
-                'panel': {'padding': '0 16px 2px'},
-            },
-        ),
     ])
 
     return {

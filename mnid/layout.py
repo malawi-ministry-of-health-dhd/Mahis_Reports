@@ -524,7 +524,6 @@ def _sidebar(facility_code: str, theme: str = 'default') -> html.Div:
             ('District Performance', '#mnid-performance'),
             ('Geographic Coverage', '#mnid-heatmap'),
             ('Facility Comparison', '#mnid-comparative'),
-            ('Clinical Interventions', '#mnid-analysis'),
         ]
     else:
         nav_items = [
@@ -533,7 +532,6 @@ def _sidebar(facility_code: str, theme: str = 'default') -> html.Div:
             ('Performance', '#mnid-performance'),
             ('Map View', '#mnid-heatmap'),
             ('Comparison', '#mnid-comparative'),
-            ('Analysis', '#mnid-analysis'),
         ]
     return html.Div(className='mnid-nav', children=[
         html.A(
