@@ -568,6 +568,7 @@ layout = html.Div(
             children=[
                 # Menu Section
                 html.Div(
+                    id="dashboard-menu-section",
                     className="sidebar-menu-section",
                     children=[
                         html.Div(
@@ -644,6 +645,7 @@ layout = html.Div(
 
 @callback(
         Output('scrolling-menu', 'children'),
+        Output('dashboard-menu-section', 'style'),
         [Input('dashboard-interval-update-today', 'n_intervals'),
         Input('active-button-store', 'data')])
 
@@ -652,8 +654,9 @@ def update_menu(interval, color):
     default_report = config.get("default_report")
     fallback_active = default_report if any(d.get("report_name") == default_report for d in menu_json) else None
     active_name = color if any(d.get("report_name") == color for d in menu_json) else fallback_active
+    show_menu = len(menu_json) > 1
 
-    return [
+    buttons = [
         html.Button(
             display_report_name(d["report_name"]),
             className="menu-btn active" if active_name == d["report_name"] else "menu-btn",
@@ -662,6 +665,8 @@ def update_menu(interval, color):
         for d in menu_json
         if d.get("report_name") != "Newborn"
     ]
+
+    return buttons, ({} if show_menu else {"display": "none"})
 
 
 @callback(
