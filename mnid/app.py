@@ -2517,7 +2517,6 @@ def render_mnid_dashboard(data_opd, config,
 
     return html.Div(className=f'mnid-bg{" mnid-theme-newborn" if dashboard_theme == "newborn" else ""}', children=[
         dcc.Store(id='mnid-executive-view-store', data=executive_token),
-        dcc.Interval(id='mnid-executive-preload', interval=150, n_intervals=0, max_intervals=1),
         html.Div(className=f'mnid-shell{" mnid-shell-newborn" if dashboard_theme == "newborn" else ""}', children=[
             executive_tabs,
             html.Div(id='mnid-executive-content', children=[executive_content['country-profile']]),
@@ -2590,60 +2589,3 @@ def _render_mnid_executive_tab(active_tab, executive_token):
 
     return views.get('country-profile', html.Div())
 
-
-@callback(
-    Output('mnid-executive-preload', 'disabled'),
-    Input('mnid-executive-preload', 'n_intervals'),
-    State('mnid-executive-view-store', 'data'),
-    prevent_initial_call=False,
-)
-def _preload_mnid_executive_tabs(_tick, executive_token):
-    state = _MNID_EXECUTIVE_DATA_CACHE.get(executive_token) or {}
-    if not state:
-        return True
-
-    views = _MNID_EXECUTIVE_CONTENT_CACHE.setdefault(executive_token, {})
-
-    facility_df = state.get('facility_df')
-    if facility_df is not None and 'operational-readiness' not in views:
-        views['operational-readiness'] = render_operational_readiness(
-            facility_df,
-            supply_inds=state.get('supply_inds'),
-            wf_inds=state.get('wf_inds'),
-            dq_inds=state.get('dq_inds'),
-        )
-
-    network_df = state.get('network_df')
-    config = state.get('config')
-    facility_code = state.get('facility_code')
-    start_date = state.get('start_date')
-    end_date = state.get('end_date')
-    scope_meta = state.get('scope_meta')
-    if network_df is not None and config is not None and 'maternal-dashboard' not in views:
-        bundle = _build_mnid_indicator_content(
-            network_df=network_df,
-            config=config,
-            facility_code=facility_code,
-            start_date=start_date,
-            end_date=end_date,
-            scope_meta=scope_meta,
-            include_content=True,
-        )
-        views['maternal-dashboard'] = bundle.get('indicator_content', html.Div())
-
-    newborn_config = state.get('newborn_config')
-    newborn_scope_meta = state.get('newborn_scope_meta')
-    if network_df is not None and newborn_config is not None and 'newborn-dashboard' not in views:
-        bundle = _build_mnid_indicator_content(
-            network_df=network_df,
-            config=newborn_config,
-            facility_code=facility_code,
-            start_date=start_date,
-            end_date=end_date,
-            scope_meta=newborn_scope_meta,
-            include_content=True,
-        )
-        views['newborn-dashboard'] = bundle.get('indicator_content', html.Div())
-
-    _trim_cache(_MNID_EXECUTIVE_CONTENT_CACHE, _MNID_UI_CACHE_MAX)
-    return True

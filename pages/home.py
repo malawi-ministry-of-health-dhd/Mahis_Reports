@@ -56,6 +56,7 @@ DEFAULT_RELATIVE_PERIOD = 'This Month'
 _LATEST_DATA_DATE_CACHE: dict[str, pd.Timestamp | None] = {}
 _MNID_FULL_CACHE_MAX = 6
 _DASHBOARD_DATA_CACHE_MAX = 4
+_MNID_PREWARM_STARTED = False
 
 
 def _trim_cache(cache: dict, max_entries: int) -> None:
@@ -70,7 +71,16 @@ def _start_mnid_prewarm(version: str | None = None):
     """Kick off MNID cache pre-warm in a daemon background thread at server startup."""
     import threading
     import logging
+    global _MNID_PREWARM_STARTED
     _log = logging.getLogger(__name__)
+
+    if _MNID_PREWARM_STARTED:
+        return
+
+    # In debug mode Werkzeug imports the app twice. Only start heavy background
+    # warmup work in the serving process to avoid duplicate parquet scans.
+    if os.environ.get('WERKZEUG_RUN_MAIN') not in {None, 'true'}:
+        return
 
     def _run(v):
         try:
@@ -81,6 +91,7 @@ def _start_mnid_prewarm(version: str | None = None):
 
     t = threading.Thread(target=_run, args=(version,), daemon=True, name='mnid-prewarm')
     t.start()
+    _MNID_PREWARM_STARTED = True
     _log.info('MNID pre-warm thread started')
 
 
