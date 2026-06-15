@@ -647,8 +647,8 @@ def _stacked_mortality_chart(df: pd.DataFrame) -> go.Figure:
     fig.add_trace(go.Bar(x=df["District"], y=df["maternal"],  name="Maternal",  marker_color=MORTALITY_ROSE, marker_line_width=0))
     fig.add_trace(go.Bar(x=df["District"], y=df["neonatal"],  name="Neonatal",  marker_color=NEONATAL_ORANGE, marker_line_width=0))
     fig.add_trace(go.Bar(x=df["District"], y=df["stillbirth"], name="Stillbirth", marker_color=STILLBIRTH_BLUE, marker_line_width=0))
+    fig.update_layout(**_EXEC_CHART_LAYOUT)
     fig.update_layout(
-        **_EXEC_CHART_LAYOUT,
         barmode="stack",
         height=CHART_HEIGHT_LG,
         margin=dict(l=32, r=14, t=14, b=72),
@@ -673,8 +673,8 @@ def _mortality_distribution_chart(df: pd.DataFrame, title: str, color: str) -> g
         x=df["District"], y=df["value"],
         marker=dict(color=f"rgba({r},{g_v},{b},0.75)", line=dict(color=color, width=0.5)),
     ))
+    fig.update_layout(**_EXEC_CHART_LAYOUT)
     fig.update_layout(
-        **_EXEC_CHART_LAYOUT,
         height=CHART_HEIGHT_MD,
         margin=dict(l=32, r=14, t=14, b=64),
         xaxis=dict(

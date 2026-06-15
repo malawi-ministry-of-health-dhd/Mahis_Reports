@@ -79,7 +79,7 @@ def _start_mnid_prewarm(version: str | None = None):
 
     # In debug mode Werkzeug imports the app twice. Only start heavy background
     # warmup work in the serving process to avoid duplicate parquet scans.
-    if os.environ.get('WERKZEUG_RUN_MAIN') not in {None, 'true'}:
+    if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
         return
 
     def _run(v):
