@@ -49,6 +49,7 @@ pd.options.mode.chained_assignment = None
 path = os.getcwd()
 json_path = os.path.join(path, 'data', 'visualizations', 'validated_dashboard.json')
 dashboard_tabs_config_path = os.path.join(path, 'data', 'visualizations', 'dashboard_tabs_config.json')
+dashboard_tabs_example_config_path = os.path.join(path, 'data', 'visualizations', 'dashboard_tabs_config.example.json')
 
 _mnid_full_data_cache: dict = {}
 _dashboard_data_cache: dict = {}
@@ -243,8 +244,10 @@ def load_dashboard_menu():
 
 
 def load_dashboard_tab_config():
+    raw_config = {}
+    config_path = dashboard_tabs_config_path if os.path.exists(dashboard_tabs_config_path) else dashboard_tabs_example_config_path
     try:
-        with open(dashboard_tabs_config_path, 'r') as f:
+        with open(config_path, 'r') as f:
             raw_config = json.load(f) or {}
     except Exception:
         raw_config = {}
