@@ -19,6 +19,7 @@ from mnid.constants import (
 from mnid.chart_helpers import (
     _CHART_LAYOUT, _CAT_LABELS,
     _css, _display_pct, _target_attainment_pct, _target_mode, _is_inverse_indicator,
+    CHART_HEIGHT_MD, CHART_HEIGHT_LG, _clamp_chart_height, _graph_style, _graph_scroll_wrap,
 )
 from mnid.heatmap import _cov_color
 
@@ -316,7 +317,8 @@ def _build_district_gauge_row(store, year='All years'):
         dists  = [d for d, _ in sorted_data]
         vals   = [_display_pct(v) for _, v in sorted_data]
         colors = [_cov_color(v) for v in vals]
-        bar_h  = max(260, len(dists) * 24 + 40)
+        inner_bar_h = max(CHART_HEIGHT_MD, len(dists) * 24 + 40)
+        outer_bar_h = _clamp_chart_height(inner_bar_h, CHART_HEIGHT_MD, CHART_HEIGHT_LG)
 
         fig = go.Figure(go.Bar(
             x=vals, y=dists,
@@ -333,7 +335,7 @@ def _build_district_gauge_row(store, year='All years'):
         fig.update_layout(
             paper_bgcolor=BG, plot_bgcolor=BG,
             font=dict(family=FONT, size=10),
-            height=bar_h,
+            height=inner_bar_h,
             margin=dict(l=8, r=60, t=12, b=24),
             xaxis=dict(
                 range=[0, 110], showgrid=True, gridcolor=GRID_C, gridwidth=0.5,
@@ -342,10 +344,13 @@ def _build_district_gauge_row(store, year='All years'):
             ),
             yaxis=dict(showgrid=False, tickfont=dict(size=10)),
         )
-        inner = dcc.Graph(
-            figure=fig,
-            config={'displayModeBar': False},
-            style={'height': f'{bar_h}px'},
+        inner = _graph_scroll_wrap(
+            dcc.Graph(
+                figure=fig,
+                config={'displayModeBar': False},
+                style=_graph_style(inner_bar_h),
+            ),
+            outer_bar_h,
         )
 
     return html.Div(style={'marginBottom': '14px'}, children=[

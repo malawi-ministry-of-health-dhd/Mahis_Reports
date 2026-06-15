@@ -7,6 +7,10 @@ import plotly.graph_objects as go
 from dash import dcc, html
 
 from mnid.chart_helpers import _cov, _moving_average_values
+from mnid.chart_helpers import (
+    CHART_HEIGHT_MD, CHART_HEIGHT_LG,
+    _graph_style, _graph_scroll_wrap, _clamp_chart_height,
+)
 from mnid.coverage import _system_readiness
 from mnid.constants import BG, BORDER, DIM, FONT, GRID_C, MUTED, OK_C, TEXT, WARN_C
 
@@ -646,7 +650,14 @@ def _stacked_mortality_chart(df: pd.DataFrame) -> go.Figure:
     fig.update_layout(
         **_EXEC_CHART_LAYOUT,
         barmode="stack",
-        height=290,
+        height=CHART_HEIGHT_LG,
+        margin=dict(l=32, r=14, t=14, b=72),
+        xaxis=dict(
+            showgrid=False, showline=False, zeroline=False,
+            tickfont=dict(size=10, color="#94a3b8"),
+            tickangle=-18,
+            automargin=True,
+        ),
     )
     return fig
 
@@ -664,7 +675,14 @@ def _mortality_distribution_chart(df: pd.DataFrame, title: str, color: str) -> g
     ))
     fig.update_layout(
         **_EXEC_CHART_LAYOUT,
-        height=250,
+        height=CHART_HEIGHT_MD,
+        margin=dict(l=32, r=14, t=14, b=64),
+        xaxis=dict(
+            showgrid=False, showline=False, zeroline=False,
+            tickfont=dict(size=10, color="#94a3b8"),
+            tickangle=-18,
+            automargin=True,
+        ),
     )
     return fig
 
@@ -747,7 +765,11 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
                 selected_className="mnid-exec-subtab--selected",
                 children=html.Div(style={"paddingTop": "18px"}, children=[
                     dmc.SimpleGrid(cols=2, spacing="lg", children=[
-                        dcc.Graph(figure=_mortality_distribution_chart(dist_df[["District", "value"]] if not dist_df.empty else pd.DataFrame(), f"{label} distribution", color), config={"displayModeBar": False}),
+                        dcc.Graph(
+                            figure=_mortality_distribution_chart(dist_df[["District", "value"]] if not dist_df.empty else pd.DataFrame(), f"{label} distribution", color),
+                            config={"displayModeBar": False},
+                            style=_graph_style(CHART_HEIGHT_MD),
+                        ),
                         dcc.Graph(figure=_moving_average_chart(series_df, f"{label[:-1]} trend", color, None), config={"displayModeBar": False}),
                     ]),
                 ]),
@@ -868,9 +890,13 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
             _section_header("Where is Mortality Happening? · Geographic Breakdown"),
             dmc.SimpleGrid(cols=2, spacing="lg", mb="lg", children=[
                 _ranking_list("Region ranking · maternal deaths", region_rows or [("No data", 0)], [MORTALITY_ROSE, "#FB7185", "#FCA5A5", "#FECACA"]),
-                dmc.Paper(withBorder=True, radius="md", p="md", style={"borderColor": "#e2e8f0"}, children=[
+                dmc.Paper(withBorder=True, radius="md", p="md", style={"borderColor": "#e2e8f0", "overflow": "hidden"}, children=[
                     html.Div("District ranking · all mortality", style={"fontSize": "13px", "fontWeight": "700", "color": "#0f172a", "marginBottom": "10px"}),
-                    dcc.Graph(figure=_stacked_mortality_chart(geography_df), config={"displayModeBar": False}),
+                    dcc.Graph(
+                        figure=_stacked_mortality_chart(geography_df),
+                        config={"displayModeBar": False},
+                        style=_graph_style(CHART_HEIGHT_LG),
+                    ),
                 ]),
             ]),
             dmc.SimpleGrid(cols=2, spacing="lg", mb="lg", children=[
@@ -1003,14 +1029,18 @@ def render_operational_readiness(
 
     # ---------- Charts ----------
     workforce_chart = go.Figure()
+    workforce_chart_inner_height = CHART_HEIGHT_MD
+    workforce_chart_outer_height = CHART_HEIGHT_MD
     if not district_df.empty and workforce_rows:
+        workforce_chart_inner_height = max(CHART_HEIGHT_MD, len(district_df) * 24 + 60)
+        workforce_chart_outer_height = _clamp_chart_height(workforce_chart_inner_height, CHART_HEIGHT_MD, CHART_HEIGHT_LG)
         workforce_chart.add_trace(go.Bar(
             x=district_df["national_score"].round(1),
             y=district_df["District"],
             orientation="h",
             marker=dict(color=PRIMARY_GREEN, line=dict(width=0)),
         ))
-        workforce_chart.update_layout(**_EXEC_CHART_LAYOUT, height=250)
+        workforce_chart.update_layout(**_EXEC_CHART_LAYOUT, height=workforce_chart_inner_height)
         workforce_chart.update_layout(
             xaxis=dict(showgrid=True, gridcolor="#f1f5f9", zeroline=False, showline=False,
                        tickfont=dict(size=10, color="#94a3b8"), ticksuffix="%"),
@@ -1023,10 +1053,14 @@ def render_operational_readiness(
         trend_df = pd.DataFrame(trend_rows)
         assessment_chart.add_trace(go.Bar(x=trend_df["month"], y=trend_df["meeting"], name="Readiness score", marker_color="#22c55e", marker_line_width=0))
         assessment_chart.add_trace(go.Bar(x=trend_df["month"], y=trend_df["support"],  name="Gap to 100%",    marker_color="#fca5a5", marker_line_width=0))
-        assessment_chart.update_layout(**_EXEC_CHART_LAYOUT, barmode="stack", height=260)
+        assessment_chart.update_layout(**_EXEC_CHART_LAYOUT, barmode="stack", height=CHART_HEIGHT_MD)
 
     district_rank_chart = go.Figure()
+    district_rank_inner_height = CHART_HEIGHT_MD
+    district_rank_outer_height = CHART_HEIGHT_MD
     if not district_df.empty:
+        district_rank_inner_height = max(CHART_HEIGHT_MD, len(district_df) * 24 + 60)
+        district_rank_outer_height = _clamp_chart_height(district_rank_inner_height, CHART_HEIGHT_MD, CHART_HEIGHT_LG)
         colors = [PRIMARY_GREEN if v >= 60 else WARNING_AMBER if v >= 45 else MORTALITY_ROSE for v in district_df["national_score"]]
         district_rank_chart.add_trace(go.Bar(
             x=district_df["national_score"].round(1),
@@ -1034,7 +1068,7 @@ def render_operational_readiness(
             orientation="h",
             marker=dict(color=colors, line=dict(width=0)),
         ))
-        district_rank_chart.update_layout(**_EXEC_CHART_LAYOUT, height=250)
+        district_rank_chart.update_layout(**_EXEC_CHART_LAYOUT, height=district_rank_inner_height)
         district_rank_chart.update_layout(
             xaxis=dict(showgrid=True, gridcolor="#f1f5f9", zeroline=False, showline=False,
                        tickfont=dict(size=10, color="#94a3b8"), ticksuffix="%"),
@@ -1187,7 +1221,14 @@ def render_operational_readiness(
                 ]),
                 dmc.Paper(withBorder=True, radius="md", p="md", style={"borderColor": "#e2e8f0"}, children=[
                     html.Div("District readiness by live MNID indicators", style={"fontSize": "13px", "fontWeight": "700", "color": "#0f172a", "marginBottom": "12px"}),
-                    dcc.Graph(figure=workforce_chart, config={"displayModeBar": False}),
+                    _graph_scroll_wrap(
+                        dcc.Graph(
+                            figure=workforce_chart,
+                            config={"displayModeBar": False},
+                            style=_graph_style(workforce_chart_inner_height),
+                        ),
+                        workforce_chart_outer_height,
+                    ),
                 ]),
             ]),
             _section_header("Commodity Availability · Essential Medicines"),
@@ -1210,11 +1251,22 @@ def render_operational_readiness(
                             html.Div("Need support", style={"fontSize": "11px", "color": "#64748b", "textAlign": "center"}),
                         ], style={"padding": "14px", "background": "#fee2e2", "borderRadius": "10px"}),
                     ], style={"display": "grid", "gridTemplateColumns": "repeat(3,1fr)", "gap": "10px", "marginBottom": "16px"}),
-                    dcc.Graph(figure=assessment_chart, config={"displayModeBar": False}),
+                    dcc.Graph(
+                        figure=assessment_chart,
+                        config={"displayModeBar": False},
+                        style=_graph_style(CHART_HEIGHT_MD),
+                    ),
                 ]),
                 dmc.Paper(withBorder=True, radius="md", p="md", style={"borderColor": "#e2e8f0"}, children=[
                     html.Div("District compliance ranking", style={"fontSize": "13px", "fontWeight": "700", "color": "#0f172a", "marginBottom": "12px"}),
-                    dcc.Graph(figure=district_rank_chart, config={"displayModeBar": False}),
+                    _graph_scroll_wrap(
+                        dcc.Graph(
+                            figure=district_rank_chart,
+                            config={"displayModeBar": False},
+                            style=_graph_style(district_rank_inner_height),
+                        ),
+                        district_rank_outer_height,
+                    ),
                 ]),
             ]),
             _section_header("Procurement & Distribution · Supply Chain Status"),

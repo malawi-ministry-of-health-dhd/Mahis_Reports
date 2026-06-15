@@ -24,6 +24,8 @@ from mnid.chart_helpers import (
     _cov, _css, _display_pct, _value_counts, _monthly_visits,
     _chart_card, _donut, _hbar, _line,
     _monthly_concept_rate, _monthly_concept_mix_fig, _concept_rate,
+    CHART_HEIGHT_SM, CHART_HEIGHT_MD, CHART_HEIGHT_LG,
+    _clamp_chart_height, _graph_style, _graph_scroll_wrap,
 )
 from mnid.heatmap import (
     _cov_color,
@@ -538,7 +540,7 @@ def _coverage_phase_fig(
                for r in rows]
     text_vals = [f"{r['pct']:.0f}%" if r['pct'] is not None else 'No data' for r in rows]
 
-    height = max(len(rows) * 38 + 70, 180)
+    height = max(len(rows) * 38 + 70, CHART_HEIGHT_SM)
 
     fig = go.Figure()
 
@@ -656,7 +658,8 @@ def _coverage_charts_section(
         fig = _coverage_phase_fig(cat_title, inds, df,
                                    agg_df=agg_df, start_date=start_date, end_date=end_date,
                                    facility_codes=facility_codes, districts=districts, grain=grain)
-        h   = max(len(inds) * 38 + 70, 180)
+        inner_height = max(len(inds) * 38 + 70, CHART_HEIGHT_SM)
+        outer_height = _clamp_chart_height(inner_height, CHART_HEIGHT_SM, CHART_HEIGHT_LG)
 
         cards.append(html.Div(className='mnid-chart-card', children=[
             html.Div(style={'display': 'flex', 'justifyContent': 'space-between',
@@ -665,8 +668,14 @@ def _coverage_charts_section(
                          style={'fontSize': '12px', 'fontWeight': '600', 'color': TEXT}),
                 html.Div(className='mnid-pills', children=pills),
             ]),
-            dcc.Graph(figure=fig, config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
-                      style={'height': f'{h}px'}),
+            _graph_scroll_wrap(
+                dcc.Graph(
+                    figure=fig,
+                    config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
+                    style=_graph_style(inner_height),
+                ),
+                outer_height,
+            ),
             html.P('|= target', style={'fontSize': '9px', 'color': MUTED,
                                         'margin': '2px 0 0', 'textAlign': 'right'}),
         ]))
@@ -1198,7 +1207,7 @@ def _build_compare_heatmap(title: str, df: 'pd.DataFrame', tracked: list) -> go.
 
     if not names:
         fig = go.Figure()
-        fig.update_layout(**_CHART_LAYOUT, height=260)
+        fig.update_layout(**_CHART_LAYOUT, height=CHART_HEIGHT_MD)
         return fig
 
     fig = go.Figure(go.Bar(
@@ -1215,7 +1224,7 @@ def _build_compare_heatmap(title: str, df: 'pd.DataFrame', tracked: list) -> go.
         title=dict(text=title,
                    font=dict(size=12, color='#444441', family=FONT),
                    x=0, xanchor='left', y=0.98),
-        height=max(260, len(names) * 24 + 60),
+        height=_clamp_chart_height(max(CHART_HEIGHT_MD, len(names) * 24 + 60), CHART_HEIGHT_MD, CHART_HEIGHT_LG),
         margin=dict(l=10, r=20, t=36, b=10),
         xaxis=dict(title='Coverage %', range=[0, 100], showgrid=True, gridcolor=GRID_C),
         yaxis=dict(showgrid=False, autorange='reversed'),

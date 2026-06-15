@@ -44,6 +44,40 @@ _ANALYSIS_PALETTE = ['#2563EB', '#0F766E', '#7C3AED', '#C2410C', '#DB2777', '#08
 _CAT_LABELS = {'ANC': 'ANC', 'Labour': 'Labour & Delivery', 'Newborn': 'Newborn', 'PNC': 'PNC'}
 _CAT_ORDER  = ['ANC', 'Labour', 'Newborn', 'PNC']
 
+CHART_HEIGHT_SM = 220
+CHART_HEIGHT_MD = 320
+CHART_HEIGHT_LG = 420
+CHART_HEIGHT_XL = 520
+
+
+def _clamp_chart_height(value: int, min_height: int = CHART_HEIGHT_SM, max_height: int = CHART_HEIGHT_LG) -> int:
+    return max(min_height, min(int(value), max_height))
+
+
+def _graph_style(height: int) -> dict:
+    fixed_height = int(height)
+    return {
+        'height': f'{fixed_height}px',
+        'width': '100%',
+        'minHeight': f'{fixed_height}px',
+        'maxHeight': f'{fixed_height}px',
+    }
+
+
+def _graph_scroll_wrap(child, outer_height: int):
+    fixed_height = int(outer_height)
+    return html.Div(
+        style={
+            'height': f'{fixed_height}px',
+            'width': '100%',
+            'minHeight': f'{fixed_height}px',
+            'maxHeight': f'{fixed_height}px',
+            'overflowY': 'auto',
+            'overflowX': 'hidden',
+        },
+        children=[child],
+    )
+
 
 def _warn_once(message: str) -> None:
     if message in _MNID_WARNED_MESSAGES:
