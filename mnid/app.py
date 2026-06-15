@@ -479,25 +479,15 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
     ]
     analysis_acc = [a for a in analysis_acc if a]
 
-    # Heatmap store: keyed by data identity + facility + indicators.
-    # Use aggregate fast path when available — avoids expensive raw groupby scans.
-    _heatmap_cache_key = (id(network_df), facility_code, tuple(i['id'] for i in tracked))
-    if _heatmap_cache_key not in _heatmap_store_cache:
-        _agg_for_heatmap = _get_aggregate()
-        if _agg_for_heatmap is not None and not _agg_for_heatmap.empty:
-            _heatmap_store_cache[_heatmap_cache_key] = _compute_heatmap_store_from_agg(
-                _agg_for_heatmap, tracked, facility_code
-            )
-        else:
-            _heatmap_store_cache[_heatmap_cache_key] = _compute_heatmap_store(
-                network_df, tracked, facility_code
-            )
-        _trim_cache(_heatmap_store_cache, _HEATMAP_CACHE_MAX)
-    performance_div, heatmap_div = _coverage_heatmap_section(
-        all_inds, facility_code, network_df,
-        precomputed_store=_heatmap_store_cache[_heatmap_cache_key],
-    )
     comparative_div = _comparative_analysis_section(all_inds, facility_code, facility_df, payload_key=payload_key)
+    geo_section_store = dcc.Store(
+        id='mnid-deferred-geo-store',
+        data={
+            'data_key': _remember_ui_payload('mnid-geo', network_df, stable_key=f'geo:{payload_key}'),
+            'all_inds': all_inds,
+            'facility_code': facility_code,
+        },
+    )
 
     def _sec_header(title, count=None, desc=None, eyebrow=None):
         return html.Div(className=f'mnid-section-header{" mnid-section-header-newborn" if dashboard_theme == "newborn" else ""}', children=[
@@ -553,7 +543,8 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
             desc='How this newborn service compares across district and facility peers.' if dashboard_theme == 'newborn' else 'District comparison heatmap for key performance indicators',
             eyebrow='Performance' if dashboard_theme == 'newborn' else None,
         ),
-        performance_div,
+        geo_section_store,
+        dcc.Loading(html.Div(id='mnid-deferred-performance')),
 
         _section_anchor('mnid-heatmap'),
         _sec_header(
@@ -561,7 +552,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
             desc='Geographic context for neonatal service delivery and district-level performance.' if dashboard_theme == 'newborn' else 'Geographic coverage map and district/facility context',
             eyebrow='Map' if dashboard_theme == 'newborn' else None,
         ),
-        heatmap_div,
+        dcc.Loading(html.Div(id='mnid-deferred-heatmap')),
 
         _section_anchor('mnid-comparative'),
         _sec_header(
@@ -2583,3 +2574,47 @@ def _render_mnid_executive_tab(active_tab, executive_token):
             return views[selected]
 
     return views.get('country-profile', html.Div())
+
+
+@callback(
+    Output('mnid-deferred-performance', 'children'),
+    Output('mnid-deferred-heatmap', 'children'),
+    Input('mnid-deferred-geo-store', 'data'),
+    prevent_initial_call=False,
+)
+def _render_deferred_geo_sections(store_data):
+    if not store_data:
+        return html.Div(), html.Div()
+
+    network_df = _restore_ui_dataframe(store_data.get('data_key'))
+    if network_df is None or network_df.empty:
+        return html.Div(), html.Div()
+
+    all_inds = store_data.get('all_inds') or []
+    facility_code = store_data.get('facility_code', '')
+    tracked = [i for i in all_inds if i.get('status') == 'tracked']
+    cache_key = (
+        store_data.get('data_key'),
+        facility_code,
+        tuple(i.get('id') for i in tracked),
+    )
+
+    if cache_key not in _heatmap_store_cache:
+        agg_for_heatmap = _get_aggregate()
+        if agg_for_heatmap is not None and not agg_for_heatmap.empty:
+            _heatmap_store_cache[cache_key] = _compute_heatmap_store_from_agg(
+                agg_for_heatmap, tracked, facility_code
+            )
+        else:
+            _heatmap_store_cache[cache_key] = _compute_heatmap_store(
+                network_df, tracked, facility_code
+            )
+        _trim_cache(_heatmap_store_cache, _HEATMAP_CACHE_MAX)
+
+    performance_div, heatmap_div = _coverage_heatmap_section(
+        all_inds,
+        facility_code,
+        network_df,
+        precomputed_store=_heatmap_store_cache[cache_key],
+    )
+    return performance_div, heatmap_div
