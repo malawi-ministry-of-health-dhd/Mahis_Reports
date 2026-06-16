@@ -741,7 +741,6 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         'dashboard_theme': dashboard_theme,
     }
 
-
 def clear_runtime_caches() -> None:
     _network_df_cache.clear()
     _heatmap_store_cache.clear()
@@ -2354,6 +2353,20 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
             series_idx += 1
             series_name = f'{entity_labels.get(entity, entity)} | {ind["label"]}'
             if chart_type == 'line':
+                valid_ys = [y for y in ys if y is not None]
+                avg = sum(valid_ys) / len(valid_ys) if valid_ys else None
+
+                # Mean reference line (dashed, same colour, lighter)
+                if avg is not None:
+                    fig.add_trace(go.Scatter(
+                        x=xs, y=[avg] * len(xs),
+                        mode='lines',
+                        line=dict(color=color, width=1.2, dash='dash'),
+                        showlegend=False,
+                        hovertemplate=f'Mean {entity_labels.get(entity, entity)}: {avg:.0f}%<extra></extra>',
+                        opacity=0.55,
+                    ))
+
                 fig.add_trace(go.Scatter(
                     name=series_name,
                     x=xs,
