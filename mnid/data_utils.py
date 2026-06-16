@@ -10,7 +10,7 @@ pd.options.mode.chained_assignment = None
 
 # Lightweight in-memory store for the two active DataFrames the trend and
 # compare callbacks need (fallback when aggregate is not yet built).
-# At most 2 entries at any time — no disk files, no eviction complexity.
+# Only ever holds 2 entries, so we skip disk files and eviction logic.
 _MNID_UI_CACHE: dict = {}
 
 
@@ -183,8 +183,11 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
 
     def _cat_str(col: str, transform=None) -> pd.Series:
         """Build a categorical string series from out[col].
-        Categorical means str.contains/str.lower etc. operate on unique values only (~50×
-        speedup when there are few unique concept/obs values vs many rows)."""
+
+        Categorical means str.contains/str.lower etc. only run on the unique values,
+        not every row - about 50x faster when there are far fewer distinct concept/obs
+        values than rows.
+        """
         if col not in out.columns:
             return pd.Series('', index=out.index)
         s = out[col].fillna('').astype('category')
@@ -231,9 +234,8 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
         | program.isin(['LABOUR AND DELIVERY PROGRAM'])
     )
 
-    # Pre-compute all str.contains/regex patterns once — each is expensive (~215-340ms on
-    # 100k rows) so materializing them before the _assign_flag calls eliminates repeated
-    # pandas string engine overhead when they are used in chained boolean expressions.
+    # Each str.contains/regex check costs ~215-340ms on 100k rows, so we compute them
+    # all once up front rather than re-running them inside every _assign_flag call.
     _cp_hiv = (concept.isin(['HIV Test', 'HIV status', 'HIV Positive', 'Mother HIV Status', 'New HIV status'])
                | concept_lower.str.contains('hiv', na=False))
     _cp_hb = (concept.isin(['Hb(g/dL)', 'Last HB result', 'Hemoglobin', 'Haemoglobin', 'Anemia screening'])
@@ -539,8 +541,8 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
         & _ctx_series('mnid_newborn_parenteral_antibiotics').eq('Yes')
     ).map({True: 'Yes', False: ''})
 
-    # Vectorized birth weight extraction — avoids a Python-level loop that created a
-    # pd.Series object per row (very slow at scale).
+    # Pulls birth weight in one vectorized pass instead of looping row by row and
+    # building a pd.Series per row, which got slow once there were a lot of rows.
     birth_weight_rows = out.loc[concept.eq('Birth weight'), ['person_id']].copy()
     if not birth_weight_rows.empty:
         value_numeric = out['ValueN'] if 'ValueN' in out.columns else pd.Series([None] * len(out), index=out.index)
@@ -787,10 +789,10 @@ def prepare_mnid_dataframe(df: pd.DataFrame | None) -> pd.DataFrame:
     if keep:
         df = df[keep]
 
-    # Pre-filter to MCH rows *before* running the expensive normalization so
-    # _derive_person_level_context works on ~7k rows instead of 248k.
-    # Use exact program names (from raw parquet) not a text pattern — the pattern
-    # 'Maternal|Child|Neonatal|Newborn' misses 'ANC PROGRAM', 'LABOUR AND DELIVERY PROGRAM' etc.
+    # Filter down to MCH rows before normalizing, so _derive_person_level_context
+    # runs on ~7k rows instead of 248k. Match on the exact program names rather than
+    # a text pattern - 'Maternal|Child|Neonatal|Newborn' misses 'ANC PROGRAM',
+    # 'LABOUR AND DELIVERY PROGRAM', etc.
     _pc = 'Program' if 'Program' in df.columns else ('Reporting_Program' if 'Reporting_Program' in df.columns else None)
     if _pc:
         _mch_mask = df[_pc].fillna('').str.upper().isin(_MCH_PROGRAMS)

@@ -40,7 +40,7 @@ _TH = {
 
 def _hero_donut_card(label, pct, target, color, mode='max', delta_pct=None,
                      numerator=None, denominator=None):
-    """Large CSS conic-gradient donut card — period delta + num/den counts."""
+    """Large CSS conic-gradient donut card with period delta and num/den counts."""
     p = max(0.0, min(float(pct), 100.0))
     r_v = int(color[1:3], 16)
     g_v = int(color[3:5], 16)

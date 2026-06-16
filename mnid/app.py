@@ -95,7 +95,7 @@ _MNID_WARNED_MESSAGES = set()
 _LOGGER = logging.getLogger(__name__)
 _NETWORK_DF_CACHE_MAX = 6
 _HEATMAP_CACHE_MAX = 6
-# Country profile is independent of category — cache by (opd_key, start, end, report_name)
+# Country profile doesn't depend on category, so cache by (opd_key, start, end, report_name)
 _country_profile_cache: dict = {}
 _COUNTRY_PROFILE_CACHE_MAX = 12
 
@@ -117,9 +117,8 @@ def _mnid_loading_placeholder() -> html.Div:
         ],
     )
 
-# ── Startup aggregation ────────────────────────────────────────────────────────
-# Build the indicator aggregate parquet in a background thread at startup when
-# it doesn't yet exist or is stale (dev mode: scheduler not running, first deployment, etc.)
+# Builds the indicator aggregate parquet in a background thread at startup when it
+# doesn't exist yet (dev mode with no scheduler running, first deployment, etc.)
 def _maybe_build_aggregate_on_startup() -> None:
     import threading
     from pathlib import Path as _Path
@@ -146,12 +145,12 @@ def _maybe_build_aggregate_on_startup() -> None:
             pass
         try:
             from mnid.aggregation.scheduler import run_aggregation_job
-            _LOGGER.info('Aggregate parquet not found — building monthly grain in background...')
+            _LOGGER.info('Aggregate parquet not found, building monthly grain in background...')
             ok = run_aggregation_job(grains=['monthly'])
             if ok:
                 _LOGGER.info('Startup aggregation complete (monthly grain).')
             else:
-                _LOGGER.warning('Startup aggregation returned False — check data source and indicators.')
+                _LOGGER.warning('Startup aggregation returned False, check data source and indicators.')
         except Exception as _exc:
             _LOGGER.warning('Startup aggregation failed: %s', _exc)
 
@@ -232,7 +231,7 @@ def _build_agg_batch(
     Pre-aggregate a date window into a {(indicator_id, grain): (num, den, pct)} dict.
 
     Single groupby over the filtered aggregate replaces N individual query_coverage
-    calls (one per indicator) — typically 40-60x faster.
+    calls (one per indicator), typically 40-60x faster.
     """
     try:
         grains = _agg_candidate_grains(grain)
@@ -248,13 +247,15 @@ def _build_agg_batch(
             sub = sub[sub['district'].isin([str(d) for d in dist_filter])]
         if sub.empty:
             return {}
-        grouped = sub.groupby(['indicator_id', 'grain'])[['numerator', 'denominator']].sum()
-        result: dict = {}
-        for (iid, g), row in grouped.iterrows():
-            n, d = int(row['numerator']), int(row['denominator'])
-            pct = round(min(n / d * 100, 100.0), 1) if d > 0 else 0.0
-            result[(str(iid), g)] = (n, d, pct)
-        return result
+        grouped = sub.groupby(['indicator_id', 'grain'], as_index=False)[['numerator', 'denominator']].sum()
+        num = grouped['numerator'].astype(int)
+        den = grouped['denominator'].astype(int)
+        den_safe = den.where(den > 0, 1)
+        pct = (num / den_safe * 100).clip(upper=100.0).round(1).where(den > 0, 0.0)
+        return {
+            (str(iid), g): (int(n), int(d), float(p))
+            for iid, g, n, d, p in zip(grouped['indicator_id'], grouped['grain'], num, den, pct)
+        }
     except Exception:
         return {}
 
@@ -350,7 +351,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
                                   facility_code, start_date, end_date,
                                   scope_meta: dict | None = None,
                                   include_content: bool = True) -> dict:
-    # Compute normalised period bounds once — used for both date filtering and aggregate queries.
+    # Compute normalised period bounds once, used for both date filtering and aggregate queries.
     try:
         _s = pd.to_datetime(start_date).normalize() if start_date else None
         _e = (
@@ -835,10 +836,11 @@ def update_trend_chart(n_clicks_list, location, selected_inds, stored_trend, act
     else:
         df = _restore_ui_dataframe(trend_payload.get('data_key'))
 
-    ind_value_out = None if cat_changed else no_update
+    default_ind_values = [o['value'] for o in ind_options[:_DEFAULT_TREND_INDICATOR_LIMIT]]
+    ind_value_out = default_ind_values if cat_changed else no_update
 
     cards = _run_chart_cards(df, tracked, cat, location or 'all',
-                             selected_inds if not cat_changed else None,
+                             default_ind_values if cat_changed else selected_inds,
                              scope_meta, agg_df=_agg_now)
     classes = ['mnid-filter-btn active' if c == cat else 'mnid-filter-btn' for c in categories]
     return cards, cat, classes, loc_options, ind_options, ind_value_out
@@ -1005,10 +1007,10 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
         plot_df['_p'] = dates.dt.floor('D')
     elif span <= 180:
         tickfmt, hfmt, grain = '%d %b', '%d %b %Y', 'weekly'
-        plot_df['_p'] = dates.dt.to_period('W').apply(lambda p: p.start_time)
+        plot_df['_p'] = dates.dt.to_period('W').dt.start_time
     else:
         tickfmt, hfmt, grain = '%b %y', '%b %Y', 'monthly'
-        plot_df['_p'] = dates.dt.to_period('M').apply(lambda p: datetime(p.year, p.month, 1))
+        plot_df['_p'] = dates.dt.to_period('M').dt.start_time
 
     periods = sorted(plot_df['_p'].dropna().unique())
     if not periods:
@@ -1104,6 +1106,9 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
     return cards
 
 
+_DEFAULT_TREND_INDICATOR_LIMIT = 4
+
+
 def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None = None,
                     default_cat: str | None = None,
                     scope_meta: dict | None = None,
@@ -1119,6 +1124,7 @@ def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None 
         for c in cat_order
     }
     default_ind_opts = ind_opts_by_cat.get(default_cat, [])
+    default_ind_values = [o['value'] for o in default_ind_opts[:_DEFAULT_TREND_INDICATOR_LIMIT]]
 
     # Store date range so callbacks can detect grain without restoring the full df.
     # data_key is kept as a lightweight fallback for when the aggregate isn't built yet.
@@ -1157,7 +1163,7 @@ def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None 
                 dcc.Dropdown(
                     id='mnid-trend-ind-filter',
                     options=default_ind_opts,
-                    value=None,
+                    value=default_ind_values,
                     multi=True,
                     clearable=True,
                     placeholder='All indicators',
@@ -2184,8 +2190,9 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
         ind_value_out = no_update if user_changed_indicators else selected_ind_ids
         return _empty_fig, entity_options, (selected_entities or []), ind_options, ind_value_out, chart_type, toggle_class, toggle_text
 
-    # When mode switches, discard the previous selection (facility codes ≠ district names).
-    # Also guard against 'Unknown' facility_code at national scope — it is never in the options.
+    # When mode switches, discard the previous selection since facility codes and district
+    # names aren't interchangeable. Also guard against 'Unknown' facility_code at national
+    # scope, since it's never actually in the options.
     effective_selection = None if mode_just_changed else selected_entities
 
     if mode == 'facility':
@@ -2488,7 +2495,7 @@ def prewarm_cache(dataset_version: str | None = None) -> bool:
             dataset_version,
             len(full),
             tuple(full.columns.tolist()) if not full.empty else (),
-            (),   # selected_facilities — national level, no filter
+            (),   # selected_facilities (national level, no filter)
             (),   # selected_districts
         )
         if opd_key in _network_df_cache:
@@ -2496,7 +2503,7 @@ def prewarm_cache(dataset_version: str | None = None) -> bool:
 
         import logging
         _LOG = logging.getLogger(__name__)
-        _LOG.info('MNID pre-warm: preparing %d rows …', len(full))
+        _LOG.info('MNID pre-warm: preparing %d rows...', len(full))
         net_df = _prep(full)
         _network_df_cache[opd_key] = net_df
         _LOG.info('MNID pre-warm complete: %d rows cached', len(net_df))
@@ -2515,8 +2522,8 @@ def render_mnid_dashboard(data_opd, config,
     selected_programs = tuple(sorted((scope_meta or {}).get('mnid_categories') or []))
     selected_facilities = tuple(sorted((scope_meta or {}).get('selected_facilities') or []))
     selected_districts = tuple(sorted((scope_meta or {}).get('selected_districts') or []))
-    # _prepare_mnid_dataframe doesn't use selected_programs — key on data identity only
-    # so that maternal and newborn dashboards loaded in the same session share the cache.
+    # _prepare_mnid_dataframe doesn't use selected_programs, so key on data identity
+    # only - that way maternal and newborn dashboards loaded in the same session share the cache.
     _opd_key = (
         dataset_version,
         len(data_opd),
@@ -2553,7 +2560,7 @@ def render_mnid_dashboard(data_opd, config,
     else:
         newborn_config = None
 
-    # Country profile doesn't depend on mnid_categories — cache by (opd_key, dates, report).
+    # Country profile doesn't depend on mnid_categories, so cache by (opd_key, dates, report).
     _cp_key = (_opd_key, start_date, end_date, config.get('report_name'))
     if _cp_key not in _country_profile_cache:
         _country_profile_cache[_cp_key] = render_country_profile(

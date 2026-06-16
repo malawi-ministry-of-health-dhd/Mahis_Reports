@@ -345,7 +345,7 @@ def _compute_heatmap_store_from_agg(
     ind_order = [i['id'] for i in sorted_inds]
 
     def _pct_dict(sub, group_col):
-        """Return {ind_id: {group_key: pct|None}} via vectorised pivot — no .loc loops."""
+        """Return {ind_id: {group_key: pct|None}} via vectorised pivot, no .loc loops."""
         if sub.empty:
             return {}
         g = sub.groupby(['indicator_id', group_col])[['numerator', 'denominator']].sum().reset_index()
@@ -371,7 +371,7 @@ def _compute_heatmap_store_from_agg(
             store['district_avgs'][ylbl] = {d: None for d in all_districts}
             continue
 
-        # Monthly view: current facility only — pivot over period_start
+        # monthly view: current facility only, pivot over period_start
         fac_sub = sub[sub['facility_code'] == str(facility_code)]
         if not fac_sub.empty:
             gm = fac_sub.groupby(['indicator_id', 'period_start'])[['numerator', 'denominator']].sum().reset_index()
@@ -385,7 +385,7 @@ def _compute_heatmap_store_from_agg(
             x_m, z_m = [], []
         store['monthly'][ylbl] = {'x': x_m, 'z': z_m, 'tick_angle': 0}
 
-        # By facility — pivot over facility_code
+        # by facility, pivot over facility_code
         fp = _pct_dict(sub, 'facility_code')
         x_f = [f'{f}*' if f == str(facility_code) else f for f in all_facilities]
         z_f = _z_matrix(fp, all_facilities)
@@ -394,7 +394,7 @@ def _compute_heatmap_store_from_agg(
             'districts': [_FACILITY_DISTRICT.get(f, '') for f in all_facilities],
         }
 
-        # By district — pivot over district
+        # by district, pivot over district
         data_dists = sorted(sub['district'].dropna().astype(str).unique().tolist())
         if data_dists:
             dp = _pct_dict(sub, 'district')
@@ -410,14 +410,14 @@ def _compute_heatmap_store_from_agg(
             store['by_district'][ylbl] = {'x': [], 'z': [], 'tick_angle': -20}
             store['district_avgs'][ylbl] = {}
 
-        # Per-district facility breakdowns — reuse already-computed fp
+        # per-district facility breakdowns, reuse fp computed above
         for dist in all_districts:
             dfacs = district_facs_map[dist]
             x_df = [f'{f}*' if f == str(facility_code) else f for f in dfacs]
             z_df = _z_matrix(fp, dfacs)
             store['by_district_facs'][dist][ylbl] = {'x': x_df, 'z': z_df, 'tick_angle': -30}
 
-    # Yearly view: current facility, year-over-year — pivot over _yr
+    # yearly view: current facility, year-over-year, pivot over _yr
     fac_all = base[base['facility_code'] == str(facility_code)]
     if not fac_all.empty and years:
         gy = fac_all.groupby(['indicator_id', '_yr'])[['numerator', 'denominator']].sum().reset_index()
@@ -460,11 +460,8 @@ def _build_facility_performance_heatmap_fig(stored: dict, year: str,
                                             district=None,
                                             sel_inds: list | None = None,
                                             facility_type: str | None = None) -> html.Div:
-    """
-    Facility-first display:
-      • No district selected  → all facilities
-      • District(s) selected  → facilities within the selected district(s)
-    """
+    """Facility-first display: all facilities if no district is selected,
+    otherwise just the facilities within the selected district(s)."""
     all_labels = stored.get('y_labels', [])
     if sel_inds:
         rows_idx = [i for i, lbl in enumerate(all_labels) if lbl in sel_inds]

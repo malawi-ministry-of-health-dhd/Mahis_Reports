@@ -502,8 +502,13 @@ def _coverage_phase_fig(
     districts=None,
     grain: str = 'monthly',
     row_height: int = 38,
+    precomputed: dict | None = None,
 ) -> go.Figure:
-    """Horizontal bar chart: one bar per indicator coloured by status vs target."""
+    """Horizontal bar chart: one bar per indicator coloured by status vs target.
+
+    `precomputed`, if given, maps indicator id -> (num, den, pct) so callers
+    that already computed coverage (e.g. for an average pill) don't pay for it twice.
+    """
     if agg_df is not None:
         from mnid.aggregation.store import query_coverage as _agg_cov
         def _get_cov(ind):
@@ -523,7 +528,10 @@ def _coverage_phase_fig(
                          'target': ind['target'], 'cls': 'await',
                          'sub': 'Awaiting baseline'})
         else:
-            num, den, pct = _get_cov(ind)
+            if precomputed is not None and ind['id'] in precomputed:
+                num, den, pct = precomputed[ind['id']]
+            else:
+                num, den, pct = _get_cov(ind)
             cls = _css(pct, ind['target'])
             rows.append({'label': ind['label'][:36], 'pct': pct,
                          'target': ind['target'], 'cls': cls,
@@ -652,6 +660,7 @@ def _coverage_charts_section(
         tracked  = [i for i in inds if i.get('status') == 'tracked']
         awaiting = [i for i in inds if i.get('status') == 'awaiting_baseline']
         computed = [_compute(i) for i in tracked]
+        cov_by_id = {ind['id']: c for ind, c in zip(tracked, computed)}
         avg_pct  = round(sum(c[2] for c in computed) / len(computed), 0) if computed else None
 
         pills = [html.Span(f'{len(tracked)} available', className='mnid-pill mnid-pill-green')]
@@ -664,7 +673,7 @@ def _coverage_charts_section(
         fig = _coverage_phase_fig(cat_title, inds, df,
                                    agg_df=agg_df, start_date=start_date, end_date=end_date,
                                    facility_codes=facility_codes, districts=districts, grain=grain,
-                                   row_height=row_height)
+                                   row_height=row_height, precomputed=cov_by_id)
         inner_height = max(len(inds) * row_height + 70, CHART_HEIGHT_SM)
         outer_height = _clamp_chart_height(inner_height, CHART_HEIGHT_SM, CHART_HEIGHT_LG)
 

@@ -1,23 +1,15 @@
 """
 Overnight aggregation job.
 
-Triggered two ways:
-  1. Daily at 02:00 via APScheduler in start_scheduler.py
-  2. After data_storage.py refreshes the parquet (call run_aggregation_job directly)
+Runs daily at 02:00 via APScheduler (see start_scheduler.py), or right after
+data_storage.py refreshes the parquet, by calling run_aggregation_job directly.
+Reads from demo_parquet/ or data/parquet/ depending on config.USE_DEMO_DATA.
 
-Data source is always determined by config.py:
-  USE_DEMO_DATA = True  → reads from demo_parquet/
-  USE_DEMO_DATA = False → reads from data/parquet/
-
-The job writes indicator_aggregates.parquet + meta.json and then invalidates
-the in-memory store cache so the next dashboard request picks up fresh data.
-
-Sustainability design:
-  - A lock file (mnid_aggregates/.agg_running) prevents concurrent runs.
-  - meta.json is always written, even on failure, so the dashboard can show
-    last-run status and whether it succeeded.
-  - Log output is written to logs/mnid_aggregation.log when log_to_file() is
-    called from start_scheduler.py.
+Writes indicator_aggregates.parquet + meta.json, then invalidates the in-memory
+store cache so the next dashboard request picks up fresh data. A lock file
+(mnid_aggregates/.agg_running) stops two runs overlapping. meta.json is always
+written, even on failure, so the dashboard can show last-run status. Logs go
+to logs/mnid_aggregation.log once log_to_file() is called from start_scheduler.py.
 """
 import json
 import logging
@@ -65,14 +57,14 @@ def run_aggregation_job(
     output_dir = output_dir or str(root / 'data' / 'mnid_aggregates')
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    # ── Concurrency guard ────────────────────────────────────────────────
+    # don't let two runs overlap
     if _LOCK_FILE.exists():
         age = datetime.utcnow().timestamp() - _LOCK_FILE.stat().st_mtime
-        # Negative age = file mtime is in the future (timezone/clock skew) — treat as stale
+        # negative age means the lock file's mtime is in the future (clock skew) - treat as stale
         if 0 <= age < 3600:
-            _LOG.warning('Aggregation already running (lock age %.0fs) — skipping', age)
+            _LOG.warning('Aggregation already running (lock age %.0fs), skipping', age)
             return False
-        _LOG.warning('Stale lock file found (age %.0fs) — removing and continuing', age)
+        _LOG.warning('Stale lock file found (age %.0fs), removing and continuing', age)
         _LOCK_FILE.unlink(missing_ok=True)
 
     _LOCK_FILE.touch()
@@ -87,7 +79,7 @@ def run_aggregation_job(
 
         if success:
             invalidate_cache()
-            _LOG.info('Aggregation job complete — in-memory cache refreshed')
+            _LOG.info('Aggregation job complete, in-memory cache refreshed')
             return True
         else:
             msg = 'run_aggregation() returned False (no data or no indicators found)'

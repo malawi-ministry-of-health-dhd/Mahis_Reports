@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from dash import dcc, html
 
-from mnid.chart_helpers import _cov, _moving_average_values
+from mnid.chart_helpers import _cov, _moving_average_values, _grouped_filter_counts
 from mnid.chart_helpers import (
     CHART_HEIGHT_MD, CHART_HEIGHT_LG,
     _graph_style, _graph_scroll_wrap, _clamp_chart_height,
@@ -1028,13 +1028,29 @@ def _score_series_by_month(df: pd.DataFrame, indicators: list[dict], months: int
     return rows
 
 
+def _readiness_scores_from_counts(keys: list, group_cols: list[str], indicators: list[dict], df: pd.DataFrame) -> dict:
+    """Average per-indicator coverage % across `indicators` for each group key, skipping
+    indicators with a zero denominator for that group (matches _mean_pct's behaviour)."""
+    pct_by_key: dict = {k: [] for k in keys}
+    for ind in indicators:
+        num_counts = _grouped_filter_counts(df, group_cols, ind.get("numerator_filters", {}))
+        den_counts = _grouped_filter_counts(df, group_cols, ind.get("denominator_filters", {}))
+        for k in keys:
+            lookup_k = k if len(group_cols) > 1 else k[0]
+            den = int(den_counts.get(lookup_k, 0))
+            if den <= 0:
+                continue
+            num = int(num_counts.get(lookup_k, 0))
+            pct_by_key[k].append(round(min(num / den * 100, 100.0), 1))
+    return {k: (round(sum(v) / len(v), 1) if v else 0.0) for k, v in pct_by_key.items()}
+
+
 def _entity_readiness_scores(df: pd.DataFrame, group_col: str, indicators: list[dict]) -> pd.DataFrame:
     if df.empty or group_col not in df.columns or not indicators:
         return pd.DataFrame(columns=[group_col, "national_score"])
-    rows = []
-    for entity, entity_df in df.groupby(group_col):
-        score = _mean_pct(_readiness_indicator_rows(entity_df, indicators))
-        rows.append({group_col: entity, "national_score": score})
+    keys = [(g,) for g in df[group_col].dropna().unique()]
+    scores = _readiness_scores_from_counts(keys, [group_col], indicators, df)
+    rows = [{group_col: k[0], "national_score": scores[k]} for k in keys]
     out = pd.DataFrame(rows)
     if out.empty:
         return out
@@ -1044,19 +1060,15 @@ def _entity_readiness_scores(df: pd.DataFrame, group_col: str, indicators: list[
 def _facility_readiness_scores(df: pd.DataFrame, indicators: list[dict]) -> pd.DataFrame:
     if df.empty or "Facility_CODE" not in df.columns or "Facility" not in df.columns or not indicators:
         return pd.DataFrame(columns=["Facility_CODE", "Facility", "District", "national_score"])
-    rows = []
     group_cols = ["Facility_CODE", "Facility"] + (["District"] if "District" in df.columns else [])
-    for keys, facility_df in df.groupby(group_cols):
-        if not isinstance(keys, tuple):
-            keys = (keys,)
-        score = _mean_pct(_readiness_indicator_rows(facility_df, indicators))
-        row = {
-            "Facility_CODE": keys[0],
-            "Facility": keys[1] if len(keys) > 1 else keys[0],
-            "national_score": score,
-        }
-        if "District" in df.columns:
-            row["District"] = keys[2] if len(keys) > 2 else ""
+    combos = df[group_cols].drop_duplicates()
+    keys = [tuple(row) for row in combos.itertuples(index=False, name=None)]
+    scores = _readiness_scores_from_counts(keys, group_cols, indicators, df)
+    rows = []
+    for k in keys:
+        row = {"Facility_CODE": k[0], "Facility": k[1], "national_score": scores[k]}
+        if "District" in group_cols:
+            row["District"] = k[2]
         rows.append(row)
     out = pd.DataFrame(rows)
     if out.empty:
@@ -1139,7 +1151,7 @@ def render_operational_readiness(
                        tickfont=dict(size=10, color="#94a3b8")),
         )
 
-    # ---------- Hero — National Readiness Command Center ----------
+    # ---------- Hero - National Readiness Command Center ----------
     bar_fill_pct = max(min(national_score, 100), 0)
     target_pct = 85
     hero = dmc.Paper(

@@ -11,6 +11,8 @@ import logging
 from datetime import datetime
 from dash import html, dcc
 from helpers.helpers import create_count_from_config
+from helpers.visualizations import _apply_filter
+from config import DATE_ as _DATE_COL
 from mnid.constants import (
     OK_C, WARN_C, DANGER_C, INFO_C, MUTED, GRID_C, BG, BORDER, TEXT, DIM, FONT,
     CAT_PALETTES, FACILITY_NAMES as _FACILITY_NAMES,
@@ -18,6 +20,31 @@ from mnid.constants import (
 
 _LOGGER = logging.getLogger(__name__)
 _MNID_WARNED_MESSAGES: set = set()
+
+
+def _grouped_filter_counts(df: pd.DataFrame, group_cols: list[str], cfg: dict) -> pd.Series:
+    """Count rows matching a numerator/denominator filter config, grouped by group_cols.
+
+    Same end result as calling create_count_from_config once per group, just done in
+    one pass: filter the whole dataframe (still via _apply_filter, same as the config
+    helper would use), dedupe, then group. group_cols is folded into the dedupe key
+    so someone who shows up in two groups on the same date still counts once per group,
+    same as if each group had been filtered separately.
+    """
+    unique_col = cfg.get('unique') or 'person_id'
+    data = df
+    for i in range(1, 11):
+        var = cfg.get(f'variable{i}')
+        val = cfg.get(f'value{i}')
+        if not var or not val:
+            continue
+        data = _apply_filter(data, var, val)
+        if data.empty:
+            break
+    if data.empty or unique_col not in data.columns or _DATE_COL not in data.columns:
+        return pd.Series(dtype='int64')
+    data = data.drop_duplicates(subset=group_cols + [unique_col, _DATE_COL])
+    return data.groupby(group_cols).size()
 
 _CHART_LAYOUT = dict(
     paper_bgcolor=BG, plot_bgcolor=BG,
@@ -300,10 +327,10 @@ def _monthly_visits(df, encounter_val, unique_col='person_id'):
         sub['month'] = dates.dt.floor('D')
     elif span_days <= 180:
         freq, fmt = 'W', 'week'
-        sub['month'] = dates.dt.to_period('W').apply(lambda p: p.start_time)
+        sub['month'] = dates.dt.to_period('W').dt.start_time
     else:
         freq, fmt = 'M', 'month'
-        sub['month'] = dates.dt.to_period('M').apply(lambda p: datetime(p.year, p.month, 1))
+        sub['month'] = dates.dt.to_period('M').dt.start_time
     out = sub.groupby('month')[unique_col].nunique().reset_index()
     out.columns = ['month', 'n']
     out['freq'] = fmt
@@ -464,12 +491,12 @@ def _monthly_concept_rate(df, concept, positive_values=None, title='', target=No
         hover_fmt = '%{x|%d %b %Y}<br>%{y:.0f}%'
     elif span_days <= 180:
         period_grain = 'weekly'
-        sub['_m'] = dates.dt.to_period('W').apply(lambda p: p.start_time)
+        sub['_m'] = dates.dt.to_period('W').dt.start_time
         tickfmt = '%d %b'
         hover_fmt = '%{x|%d %b %Y}<br>%{y:.0f}%'
     else:
         period_grain = 'monthly'
-        sub['_m'] = dates.dt.to_period('M').apply(lambda p: datetime(p.year, p.month, 1))
+        sub['_m'] = dates.dt.to_period('M').dt.start_time
         tickfmt = '%b %y'
         hover_fmt = '%{x|%b %Y}<br>%{y:.0f}%'
 
