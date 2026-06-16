@@ -270,10 +270,22 @@
                   "x_title": "",
                   "y_title": "",
                   "rename": {
-                    "person_id": "Number of Patients"
+                    "person_id": "Number of Patients",
+                    "OPD Program": "OPD",
+                    "NCD PROGRAM": "NCD",
+                    "HIV PROGRAM": "ART",
+                    "HTS PROGRAM": "HTS",
+                    "AETC PROGRAM": "AETC",
+                    "ANC PROGRAM": "ANC",
+                    "IMMUNIZATION PROGRAM": "EPI",
+                    "LABOUR AND DELIVERY PROGRAM":"LABOUR",
+                    "NEONATAL PROGRAM":"NEONATAL",
+                    "PNC PROGRAM": "PNC"
                   },
-                  "replace":{
-                    "Program": ""
+                  "replace": {
+                    "Program": {
+                      "Program": ""
+                    }
                   }
                 }
               }
@@ -5676,12 +5688,16 @@
                   "top_n": 10,
                   "x_title": "",
                   "y_title": "",
-                  "replace": {"Reactive":"HIV Positive",
-                              "Positive":"HIV Positive",
-                              "Non-reactive": "HIV Negative",
-                              "HIV negative": "HIV Negative",
-                              "HIV unknown": "HIV Unknown",
-                              "Unknown": "HIV Unknown"}
+                  "replace": {
+                    "obs_value_coded": {
+                      "Reactive": "HIV Positive",
+                      "Positive": "HIV Positive",
+                      "Non-reactive": "HIV Negative",
+                      "HIV negative": "HIV Negative",
+                      "HIV unknown": "HIV Unknown",
+                      "Unknown": "HIV Unknown"
+                    }
+                  }
                 }
               },
               {

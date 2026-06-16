@@ -73,6 +73,24 @@ def apply_calculated_fields(df, rules_json):
 
     return df
 
+def _apply_replace(df: pd.DataFrame, replace) -> pd.DataFrame:
+    """Apply value replacements to a DataFrame from a config dict.
+
+    Supports two formats:
+      Column-specific (new): {"column": {"old_value": "new_value", ...}}
+        — replacements are scoped to the named column only.
+      Flat / global (legacy): {"old_value": "new_value", ...}
+        — replacements applied across all columns (pandas default behaviour).
+    """
+    if not replace or not isinstance(replace, dict):
+        return df
+    if all(isinstance(v, dict) for v in replace.values()):
+        for col, mapping in replace.items():
+            if col in df.columns:
+                df[col] = df[col].str.replace(mapping)
+            else: df = df.replace(replace)
+        return df
+    return df.replace(replace)
 
 def _normalize_filter_value(val):
     """Normalize filter_value into a proper list or string."""
@@ -1240,7 +1258,6 @@ def create_new_returning_chart(
 
     return fig
 
-
 def create_pie_chart(query_fiter,data_path, names_col, values_col, title,
                      unique_column=PERSON_ID_, filter_col1=None,
                      filter_value1=None, filter_col2=None,
@@ -1318,7 +1335,7 @@ def create_pie_chart(query_fiter,data_path, names_col, values_col, title,
             height=height
         )
     # apply replace and rename
-    df_summary = df_summary.rename(columns=rename).replace(replace)
+    df_summary = _apply_replace(df_summary.rename(columns=rename), replace)
 
     # Collapse tail slices into "Other"
     if max_slices and len(df_summary) > max_slices:
@@ -1471,7 +1488,7 @@ def create_pivot_table(query_fiter,data_path, index_col, columns_col, values_col
         fill_value=0 if aggfunc != 'concat' else ""
     ).reset_index()
 
-    pivot = pivot.rename(columns=rename).replace(replace)
+    pivot = _apply_replace(pivot.rename(columns=rename), replace)
     pivot.columns = [str(c) for c in pivot.columns]
 
     num_index_cols = len(index_cols)
@@ -1659,7 +1676,7 @@ def create_crosstab_table(
         )
 
     ct = ct.reset_index()
-    ct = ct.rename(columns=rename).replace(replace)
+    ct = _apply_replace(ct.rename(columns=rename), replace)
 
     dash_columns = []
     for col in ct.columns:
