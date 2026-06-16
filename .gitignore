@@ -49,5 +49,5 @@ data/mahisdev
 data/mahisuat
 data/parquet
 # data/visualizations
-data/configurations.json
+configurations.json
 __pycache__/

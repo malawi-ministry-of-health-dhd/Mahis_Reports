@@ -752,7 +752,18 @@
                   "filter_val2": "",
                   "filter_col3": "",
                   "filter_val3": "",
-                  "rename": {},
+                  "rename": {
+                    "OPD Program": "OPD",
+                    "NCD PROGRAM": "NCD",
+                    "HIV PROGRAM": "ART",
+                    "HTS PROGRAM": "HTS",
+                    "AETC PROGRAM": "AETC",
+                    "ANC PROGRAM": "ANC",
+                    "IMMUNIZATION PROGRAM": "EPI",
+                    "LABOUR AND DELIVERY PROGRAM":"LABOUR",
+                    "NEONATAL PROGRAM":"NEONATAL",
+                    "PNC PROGRAM": "PNC"
+                  },
                   "replace": ""
                 }
               }
