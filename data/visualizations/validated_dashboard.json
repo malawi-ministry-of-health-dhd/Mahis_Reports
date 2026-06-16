@@ -271,6 +271,9 @@
                   "y_title": "",
                   "rename": {
                     "person_id": "Number of Patients"
+                  },
+                  "replace":{
+                    "Program": ""
                   }
                 }
               }
