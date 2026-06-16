@@ -13,6 +13,7 @@ pd.options.mode.chained_assignment = None
 import plotly.graph_objects as go
 from datetime import datetime
 from pathlib import Path
+import os
 from dash import html, dcc, callback, callback_context, no_update, Input, Output, State, ALL
 from dash.exceptions import PreventUpdate
 from helpers.helpers import create_count_from_config
@@ -91,6 +92,7 @@ _MNID_UI_CACHE_MAX = 16
 _MNID_UI_CACHE_TTL_SECONDS = 3600
 _MNID_EXECUTIVE_CONTENT_CACHE: dict = {}
 _MNID_EXECUTIVE_DATA_CACHE: dict = {}
+_MNID_EXECUTIVE_TAB_VIEW_CACHE: dict = {}
 _MNID_WARNED_MESSAGES = set()
 _LOGGER = logging.getLogger(__name__)
 _NETWORK_DF_CACHE_MAX = 6
@@ -98,6 +100,45 @@ _HEATMAP_CACHE_MAX = 6
 # Country profile doesn't depend on category, so cache by (opd_key, start, end, report_name)
 _country_profile_cache: dict = {}
 _COUNTRY_PROFILE_CACHE_MAX = 12
+
+
+def _load_dashboard_tab_config() -> dict:
+    root = Path(os.getcwd())
+    config_path = root / 'data' / 'visualizations' / 'dashboard_tabs_config.json'
+    raw = {}
+    try:
+        if config_path.exists():
+            raw = json.loads(config_path.read_text(encoding='utf-8')) or {}
+    except Exception:
+        raw = {}
+
+    hidden = raw.get('hidden_mnid_tabs')
+    if not isinstance(hidden, list):
+        hidden = []
+    return {
+        'hidden_mnid_tabs': {str(item).strip() for item in hidden if str(item).strip()}
+    }
+
+
+def _executive_view_cache_key(selected: str, state: dict,
+                              scope_meta: dict | None = None,
+                              config: dict | None = None) -> tuple:
+    network_df = state.get('network_df')
+    effective_scope = scope_meta or state.get('scope_meta') or {}
+    effective_config = config or state.get('config') or {}
+    return (
+        selected,
+        effective_config.get('report_name'),
+        state.get('facility_code'),
+        state.get('start_date'),
+        state.get('end_date'),
+        len(network_df) if network_df is not None else 0,
+        tuple(network_df.columns.tolist()) if network_df is not None and not network_df.empty else (),
+        tuple(sorted((effective_scope or {}).get('selected_facilities') or [])),
+        tuple(sorted((effective_scope or {}).get('selected_districts') or [])),
+        tuple(sorted((effective_scope or {}).get('mnid_categories') or [])),
+        (effective_scope or {}).get('dataset_version'),
+    )
 
 
 def _mnid_loading_placeholder() -> html.Div:
@@ -589,7 +630,9 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         by_cat.setdefault(ind.get('category', 'Other'), []).append(ind)
 
     coverage_charts = _coverage_charts_section(
-        by_cat, facility_df, category_order,
+        by_cat,
+        facility_df,
+        category_order,
         agg_df=_cov_agg if _cov_agg is not None else _agg,
         start_date=str(_s.date()) if _s is not None else start_date,
         end_date=str(_e.date()) if _e is not None else end_date,
@@ -597,16 +640,29 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         districts=list(_dist_filter) if _dist_filter and not _fac_filter else None,
         grain=_coverage_grain,
     )
-
-    comparative_div = _comparative_analysis_section(all_inds, facility_code, facility_df, payload_key=payload_key)
-    geo_section_store = dcc.Store(
-        id='mnid-deferred-geo-store',
-        data={
-            'data_key': _remember_ui_payload('mnid-geo', facility_df, stable_key=f'geo:{payload_key}'),
-            'all_inds': all_inds,
-            'facility_code': facility_code,
-            'scope_meta': scope_meta or {},
-        },
+    trend_switcher = _trend_switcher(
+        facility_df,
+        all_inds,
+        scope_meta=scope_meta,
+        payload_key=payload_key,
+    )
+    performance_div, heatmap_div = _coverage_heatmap_section(
+        all_inds,
+        facility_code,
+        network_df,
+        precomputed_store=_resolve_heatmap_store(
+            network_df,
+            all_inds,
+            facility_code,
+            scope_meta,
+            payload_key,
+        ),
+    )
+    comparative_div = _comparative_analysis_section(
+        all_inds,
+        facility_code,
+        facility_df,
+        payload_key=payload_key,
     )
 
     def _sec_header(title, count=None, desc=None, eyebrow=None):
@@ -648,7 +704,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
             desc='Monthly trends for neonatal admissions and outcome-related indicators, with target references where applicable.' if dashboard_theme == 'newborn' else '12-month rolling - dotted line = target',
             eyebrow='Trends' if dashboard_theme == 'newborn' else None,
         ),
-        _trend_switcher(facility_df, all_inds, scope_meta=scope_meta, payload_key=payload_key),
+        trend_switcher,
 
         _section_anchor('mnid-performance'),
         _sec_header(
@@ -656,8 +712,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
             desc='How this newborn service compares across district and facility peers.' if dashboard_theme == 'newborn' else 'District comparison heatmap for key performance indicators',
             eyebrow='Performance' if dashboard_theme == 'newborn' else None,
         ),
-        geo_section_store,
-        dcc.Loading(html.Div(id='mnid-deferred-performance')),
+        performance_div,
 
         _section_anchor('mnid-heatmap'),
         _sec_header(
@@ -665,7 +720,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
             desc='Geographic context for neonatal service delivery and district-level performance.' if dashboard_theme == 'newborn' else 'Geographic coverage map and district/facility context',
             eyebrow='Map' if dashboard_theme == 'newborn' else None,
         ),
-        dcc.Loading(html.Div(id='mnid-deferred-heatmap')),
+        heatmap_div,
 
         _section_anchor('mnid-comparative'),
         _sec_header(
@@ -692,6 +747,8 @@ def clear_runtime_caches() -> None:
     _heatmap_store_cache.clear()
     _MNID_UI_CACHE.clear()
     _MNID_EXECUTIVE_CONTENT_CACHE.clear()
+    _MNID_EXECUTIVE_DATA_CACHE.clear()
+    _MNID_EXECUTIVE_TAB_VIEW_CACHE.clear()
     if _MNID_UI_DISK_CACHE is not None:
         try:
             _MNID_UI_DISK_CACHE.clear()
@@ -2468,6 +2525,43 @@ _network_df_cache: dict = {}
 _heatmap_store_cache: dict = {}
 
 
+def _resolve_heatmap_store(network_df: pd.DataFrame, all_inds: list, facility_code: str,
+                           scope_meta: dict | None, store_key: str) -> dict:
+    _, selected_facility_codes, selected_districts = _resolve_scope_filters(network_df, scope_meta or {})
+    tracked = [i for i in all_inds if i.get('status') == 'tracked']
+    cache_key = (
+        store_key,
+        facility_code,
+        tuple(i.get('id') for i in tracked),
+        tuple(sorted(selected_facility_codes)),
+        tuple(sorted(selected_districts)),
+    )
+
+    if cache_key not in _heatmap_store_cache:
+        agg_for_heatmap = _get_aggregate()
+        if agg_for_heatmap is not None and not agg_for_heatmap.empty:
+            if selected_facility_codes:
+                agg_for_heatmap = agg_for_heatmap[
+                    agg_for_heatmap['facility_code'].isin([str(f) for f in selected_facility_codes])
+                ]
+            elif selected_districts:
+                agg_for_heatmap = agg_for_heatmap[
+                    agg_for_heatmap['district'].isin([str(d) for d in selected_districts])
+                ]
+            _heatmap_store_cache[cache_key] = _compute_heatmap_store_from_agg(
+                agg_for_heatmap, tracked, facility_code
+            )
+        else:
+            _heatmap_store_cache[cache_key] = _compute_heatmap_store(
+                network_df, tracked, facility_code
+            )
+        if selected_districts:
+            _heatmap_store_cache[cache_key]['current_district'] = selected_districts[0]
+        _trim_cache(_heatmap_store_cache, _HEATMAP_CACHE_MAX)
+
+    return _heatmap_store_cache[cache_key]
+
+
 def prewarm_cache(dataset_version: str | None = None) -> bool:
     """
     Pre-compute and cache the prepared MNID network DataFrame so the first
@@ -2560,15 +2654,8 @@ def render_mnid_dashboard(data_opd, config,
     else:
         newborn_config = None
 
-    # Country profile doesn't depend on mnid_categories, so cache by (opd_key, dates, report).
-    _cp_key = (_opd_key, start_date, end_date, config.get('report_name'))
-    if _cp_key not in _country_profile_cache:
-        _country_profile_cache[_cp_key] = render_country_profile(
-            facility_df, scope_meta=scope_meta, indicator_label=country_label
-        )
-        _trim_cache(_country_profile_cache, _COUNTRY_PROFILE_CACHE_MAX)
-    executive_content = {'country-profile': _country_profile_cache[_cp_key]}
-    executive_token = f'{hash((_opd_key, start_date, end_date, config.get("report_name"), tuple(sorted(executive_content.keys()))))}'
+    executive_content = {}
+    executive_token = f'{hash((_opd_key, start_date, end_date, config.get("report_name")))}'
     _MNID_EXECUTIVE_CONTENT_CACHE[executive_token] = executive_content
     _MNID_EXECUTIVE_DATA_CACHE[executive_token] = {
         'network_df': network_df,
@@ -2583,6 +2670,7 @@ def render_mnid_dashboard(data_opd, config,
         'dq_inds': primary_bundle['dq_inds'],
         'newborn_config': newborn_config,
         'newborn_scope_meta': newborn_scope_meta,
+        'country_label': country_label,
     }
     _trim_cache(_MNID_EXECUTIVE_CONTENT_CACHE, _MNID_UI_CACHE_MAX)
     _trim_cache(_MNID_EXECUTIVE_DATA_CACHE, _MNID_UI_CACHE_MAX)
@@ -2590,18 +2678,27 @@ def render_mnid_dashboard(data_opd, config,
     _tab_style  = {'padding': '10px 18px', 'borderRadius': '12px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#FFFFFF', 'color': TEXT}
     _tab_active = {'padding': '10px 18px', 'borderRadius': '12px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#F0FDF4', 'color': '#15803D', 'fontWeight': 700}
     _tab_active2 = dict(_tab_active, backgroundColor='#F8FAFC')
+    hidden_mnid_tabs = _load_dashboard_tab_config().get('hidden_mnid_tabs', set())
 
     tab_children = [
-        dcc.Tab(label='Country Profile',        value='country-profile',       style=_tab_style, selected_style=_tab_active),
-        dcc.Tab(label='Operational Readiness',  value='operational-readiness', style=_tab_style, selected_style=_tab_active2),
-        dcc.Tab(label='Maternal',               value='maternal-dashboard',    style=_tab_style, selected_style=_tab_active2),
+        dcc.Tab(label='Country Profile', value='country-profile', style=_tab_style, selected_style=_tab_active),
     ]
+    if 'operational-readiness' not in hidden_mnid_tabs:
+        tab_children.append(
+            dcc.Tab(label='Operational Readiness', value='operational-readiness', style=_tab_style, selected_style=_tab_active2)
+        )
+    tab_children.append(
+        dcc.Tab(label='Maternal', value='maternal-dashboard', style=_tab_style, selected_style=_tab_active2)
+    )
     if newborn_config is not None:
         tab_children.append(dcc.Tab(label='Newborn', value='newborn-dashboard', style=_tab_style, selected_style=_tab_active2))
 
+    visible_tab_values = [getattr(tab, 'value', None) for tab in tab_children]
+    resolved_initial_tab = initial_tab if initial_tab in visible_tab_values else (visible_tab_values[0] if visible_tab_values else 'country-profile')
+
     executive_tabs = dcc.Tabs(
         id='mnid-executive-tabs',
-        value=initial_tab or 'country-profile',
+        value=resolved_initial_tab,
         style={'marginBottom': '18px'},
         children=tab_children,
     )
@@ -2609,19 +2706,134 @@ def render_mnid_dashboard(data_opd, config,
     # Avoid pre-rendering a heavy dashboard section just to show a loading state.
     # Country profile can render immediately; other tabs get a lightweight skeleton
     # behind the fixed loading overlay.
-    _target_tab = initial_tab or 'country-profile'
-    _initial_ec = [executive_content['country-profile']] if _target_tab == 'country-profile' else [
-        _mnid_loading_placeholder()
-    ]
+    _target_tab = resolved_initial_tab
+    if _target_tab == 'country-profile':
+        _cp_key = (_opd_key, start_date, end_date, config.get('report_name'))
+        if _cp_key not in _country_profile_cache:
+            _country_profile_cache[_cp_key] = render_country_profile(
+                facility_df, scope_meta=scope_meta, indicator_label=country_label
+            )
+            _trim_cache(_country_profile_cache, _COUNTRY_PROFILE_CACHE_MAX)
+        executive_content['country-profile'] = _country_profile_cache[_cp_key]
+        _initial_ec = [executive_content['country-profile']]
+    else:
+        _initial_ec = [_mnid_loading_placeholder()]
 
     return html.Div(className=f'mnid-bg{" mnid-theme-newborn" if dashboard_theme == "newborn" else ""}', children=[
         dcc.Store(id='mnid-executive-view-store', data=executive_token),
+        dcc.Store(id='mnid-preload-status'),
         html.Div(className=f'mnid-shell{" mnid-shell-newborn" if dashboard_theme == "newborn" else ""}', children=[
             executive_tabs,
             html.Div(id='mnid-executive-content', className='mnid-executive-content', children=_initial_ec),
         ]),
+        dcc.Interval(id='mnid-background-preload', interval=250, n_intervals=0, max_intervals=1),
     ])
 
+def _build_executive_tab_view(selected: str, views: dict, state: dict,
+                              scope_meta_override: dict | None = None,
+                              config_override: dict | None = None,
+                              store_in_views: bool = True):
+    network_df = state.get('network_df')
+    config = config_override or state.get('config')
+    facility_code = state.get('facility_code')
+    start_date = state.get('start_date')
+    end_date = state.get('end_date')
+    scope_meta = scope_meta_override or state.get('scope_meta')
+    facility_df = state.get('facility_df')
+    supply_inds = state.get('supply_inds')
+    wf_inds = state.get('wf_inds')
+    dq_inds = state.get('dq_inds')
+    country_label = state.get('country_label') or 'Maternal'
+
+    if selected in views:
+        return views.get(selected, views.get('country-profile', html.Div()))
+
+    view_cache_key = _executive_view_cache_key(
+        selected,
+        state,
+        scope_meta=scope_meta,
+        config=config,
+    )
+    if view_cache_key in _MNID_EXECUTIVE_TAB_VIEW_CACHE:
+        cached_view = _MNID_EXECUTIVE_TAB_VIEW_CACHE[view_cache_key]
+        if store_in_views:
+            views[selected] = cached_view
+        return cached_view
+
+    if selected == 'country-profile' and facility_df is not None:
+        cp_key = (
+            (
+                (scope_meta or {}).get('dataset_version'),
+                len(network_df) if network_df is not None else 0,
+                tuple(network_df.columns.tolist()) if network_df is not None and not network_df.empty else (),
+                tuple(sorted((scope_meta or {}).get('selected_facilities') or [])),
+                tuple(sorted((scope_meta or {}).get('selected_districts') or [])),
+            ),
+            start_date,
+            end_date,
+            config.get('report_name') if config else None,
+        )
+        if cp_key not in _country_profile_cache:
+            _country_profile_cache[cp_key] = render_country_profile(
+                facility_df,
+                scope_meta=scope_meta,
+                indicator_label=country_label,
+            )
+            _trim_cache(_country_profile_cache, _COUNTRY_PROFILE_CACHE_MAX)
+        views[selected] = _country_profile_cache[cp_key]
+        return views[selected]
+
+    if selected == 'operational-readiness' and facility_df is not None:
+        rendered_view = render_operational_readiness(
+            facility_df,
+            supply_inds=supply_inds,
+            wf_inds=wf_inds,
+            dq_inds=dq_inds,
+        )
+        if store_in_views:
+            views[selected] = rendered_view
+        _MNID_EXECUTIVE_TAB_VIEW_CACHE[view_cache_key] = rendered_view
+        _trim_cache(_MNID_EXECUTIVE_TAB_VIEW_CACHE, _MNID_UI_CACHE_MAX * 2)
+        return rendered_view
+
+    if selected == 'maternal-dashboard' and network_df is not None and config is not None:
+        bundle = _build_mnid_indicator_content(
+            network_df=network_df,
+            config=config,
+            facility_code=facility_code,
+            start_date=start_date,
+            end_date=end_date,
+            scope_meta=scope_meta,
+            include_content=True,
+        )
+        rendered_view = bundle.get('indicator_content', html.Div())
+        if store_in_views:
+            views[selected] = rendered_view
+        _MNID_EXECUTIVE_TAB_VIEW_CACHE[view_cache_key] = rendered_view
+        _trim_cache(_MNID_EXECUTIVE_TAB_VIEW_CACHE, _MNID_UI_CACHE_MAX * 2)
+        return rendered_view
+
+    if selected == 'newborn-dashboard':
+        newborn_config = state.get('newborn_config')
+        newborn_scope_meta = state.get('newborn_scope_meta')
+        if network_df is not None and newborn_config is not None:
+            bundle = _build_mnid_indicator_content(
+                network_df=network_df,
+                config=newborn_config,
+                facility_code=facility_code,
+                start_date=start_date,
+                end_date=end_date,
+                scope_meta=newborn_scope_meta,
+                include_content=True,
+            )
+            rendered_view = bundle.get('indicator_content', html.Div())
+            if store_in_views:
+                views[selected] = rendered_view
+            _MNID_EXECUTIVE_TAB_VIEW_CACHE[view_cache_key] = rendered_view
+            _trim_cache(_MNID_EXECUTIVE_TAB_VIEW_CACHE, _MNID_UI_CACHE_MAX * 2)
+            return rendered_view
+
+    return views.get('country-profile', html.Div())
 
 
 @callback(
@@ -2633,60 +2845,10 @@ def render_mnid_dashboard(data_opd, config,
 def _render_mnid_executive_tab(active_tab, executive_token):
     views = _MNID_EXECUTIVE_CONTENT_CACHE.get(executive_token) or {}
     selected = active_tab or 'country-profile'
-    if selected in views:
-        return views.get(selected, views.get('country-profile', html.Div()))
-
     state = _MNID_EXECUTIVE_DATA_CACHE.get(executive_token) or {}
-    network_df = state.get('network_df')
-    config = state.get('config')
-    facility_code = state.get('facility_code')
-    start_date = state.get('start_date')
-    end_date = state.get('end_date')
-    scope_meta = state.get('scope_meta')
-    facility_df = state.get('facility_df')
-    supply_inds = state.get('supply_inds')
-    wf_inds = state.get('wf_inds')
-    dq_inds = state.get('dq_inds')
 
     try:
-        if selected == 'operational-readiness' and facility_df is not None:
-            views[selected] = render_operational_readiness(
-                facility_df,
-                supply_inds=supply_inds,
-                wf_inds=wf_inds,
-                dq_inds=dq_inds,
-            )
-            return views[selected]
-
-        if selected == 'maternal-dashboard' and network_df is not None and config is not None:
-            bundle = _build_mnid_indicator_content(
-                network_df=network_df,
-                config=config,
-                facility_code=facility_code,
-                start_date=start_date,
-                end_date=end_date,
-                scope_meta=scope_meta,
-                include_content=True,
-            )
-            views[selected] = bundle.get('indicator_content', html.Div())
-            return views[selected]
-
-        if selected == 'newborn-dashboard':
-            newborn_config = state.get('newborn_config')
-            newborn_scope_meta = state.get('newborn_scope_meta')
-            if network_df is not None and newborn_config is not None:
-                bundle = _build_mnid_indicator_content(
-                    network_df=network_df,
-                    config=newborn_config,
-                    facility_code=facility_code,
-                    start_date=start_date,
-                    end_date=end_date,
-                    scope_meta=newborn_scope_meta,
-                    include_content=True,
-                )
-                views[selected] = bundle.get('indicator_content', html.Div())
-                return views[selected]
-
+        return _build_executive_tab_view(selected, views, state)
     except Exception as _exc:
         _LOGGER.exception('Failed to render executive tab %s: %s', selected, _exc)
         return html.Div(
@@ -2694,66 +2856,64 @@ def _render_mnid_executive_tab(active_tab, executive_token):
             style={'padding': '24px', 'color': '#dc2626', 'fontSize': '13px'},
         )
 
-    if state and selected not in ('country-profile',):
-        _LOGGER.warning('Executive tab %s: no data in cache (token=%s). network_df=%s, config=%s',
-                        selected, executive_token, network_df is not None, config is not None)
-
-    return views.get('country-profile', html.Div())
-
 
 @callback(
-    Output('mnid-deferred-performance', 'children'),
-    Output('mnid-deferred-heatmap', 'children'),
-    Input('mnid-deferred-geo-store', 'data'),
+    Output('mnid-preload-status', 'data'),
+    Input('mnid-background-preload', 'n_intervals'),
+    State('mnid-executive-view-store', 'data'),
+    State('mnid-executive-tabs', 'value'),
     prevent_initial_call=False,
 )
-def _render_deferred_geo_sections(store_data):
-    if not store_data:
-        return html.Div(), html.Div()
+def _preload_mnid_executive_tabs(_tick, executive_token, active_tab):
+    if not executive_token:
+        raise PreventUpdate
 
-    network_df = _restore_ui_dataframe(store_data.get('data_key'))
-    if network_df is None or network_df.empty:
-        return html.Div(), html.Div()
+    views = _MNID_EXECUTIVE_CONTENT_CACHE.get(executive_token)
+    state = _MNID_EXECUTIVE_DATA_CACHE.get(executive_token)
+    if views is None or state is None:
+        raise PreventUpdate
 
-    all_inds = store_data.get('all_inds') or []
-    facility_code = store_data.get('facility_code', '')
-    scope_meta = store_data.get('scope_meta') or {}
-    _, selected_facility_codes, selected_districts = _resolve_scope_filters(network_df, scope_meta)
-    tracked = [i for i in all_inds if i.get('status') == 'tracked']
-    cache_key = (
-        store_data.get('data_key'),
-        facility_code,
-        tuple(i.get('id') for i in tracked),
-        tuple(sorted(selected_facility_codes)),
-        tuple(sorted(selected_districts)),
-    )
+    preload_tabs = ['maternal-dashboard', 'newborn-dashboard']
+    warmed = []
 
-    if cache_key not in _heatmap_store_cache:
-        agg_for_heatmap = _get_aggregate()
-        if agg_for_heatmap is not None and not agg_for_heatmap.empty:
-            if selected_facility_codes:
-                agg_for_heatmap = agg_for_heatmap[
-                    agg_for_heatmap['facility_code'].isin([str(f) for f in selected_facility_codes])
-                ]
-            elif selected_districts:
-                agg_for_heatmap = agg_for_heatmap[
-                    agg_for_heatmap['district'].isin([str(d) for d in selected_districts])
-                ]
-            _heatmap_store_cache[cache_key] = _compute_heatmap_store_from_agg(
-                agg_for_heatmap, tracked, facility_code
-            )
-        else:
-            _heatmap_store_cache[cache_key] = _compute_heatmap_store(
-                network_df, tracked, facility_code
-            )
-        if selected_districts:
-            _heatmap_store_cache[cache_key]['current_district'] = selected_districts[0]
-        _trim_cache(_heatmap_store_cache, _HEATMAP_CACHE_MAX)
+    for tab_value in preload_tabs:
+        if tab_value == active_tab or tab_value in views:
+            continue
+        if tab_value == 'newborn-dashboard' and state.get('newborn_config') is None:
+            continue
+        try:
+            _build_executive_tab_view(tab_value, views, state)
+            warmed.append(tab_value)
+        except Exception as exc:
+            _LOGGER.warning('Background preload failed for executive tab %s: %s', tab_value, exc)
 
-    performance_div, heatmap_div = _coverage_heatmap_section(
-        all_inds,
-        facility_code,
-        network_df,
-        precomputed_store=_heatmap_store_cache[cache_key],
-    )
-    return performance_div, heatmap_div
+    base_scope_meta = state.get('scope_meta') or {}
+    maternal_config = state.get('config') or {}
+    if maternal_config.get('report_name') == 'Maternal Health':
+        maternal_categories = [
+            category for category in (maternal_config.get('mnid_categories') or ['ANC', 'Labour', 'PNC'])
+            if category in {'ANC', 'Labour', 'PNC'}
+        ]
+        current_categories = tuple(sorted(base_scope_meta.get('mnid_categories') or []))
+        for category in maternal_categories:
+            if current_categories == (category,):
+                continue
+            try:
+                warm_scope_meta = dict(base_scope_meta)
+                warm_scope_meta['mnid_categories'] = [category]
+                _build_executive_tab_view(
+                    'maternal-dashboard',
+                    views,
+                    state,
+                    scope_meta_override=warm_scope_meta,
+                    store_in_views=False,
+                )
+                warmed.append(f'maternal-dashboard:{category}')
+            except Exception as exc:
+                _LOGGER.warning('Background preload failed for maternal category %s: %s', category, exc)
+
+    return {
+        'token': executive_token,
+        'active_tab': active_tab or 'country-profile',
+        'warmed_tabs': warmed,
+    }

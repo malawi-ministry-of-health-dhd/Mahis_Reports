@@ -641,15 +641,20 @@
 
 #dashboard-container.app-loading-home {
     position: relative;
+    filter: blur(1.1px) saturate(0.99);
+    opacity: 0.9;
+    transition: filter 100ms ease, opacity 100ms ease;
+}
+
+#dashboard-container.app-loading-home > * {
+    pointer-events: none;
 }
 
 #dashboard-container.app-loading-home::before {
     content: "";
     position: absolute;
     inset: 0;
-    background: rgba(248, 250, 252, 0.025);
-    backdrop-filter: blur(1px) saturate(1);
-    -webkit-backdrop-filter: blur(1px) saturate(1);
+    background: rgba(248, 250, 252, 0.015);
     z-index: 1190;
     pointer-events: none;
     border-radius: 18px;
