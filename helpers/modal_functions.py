@@ -212,8 +212,9 @@ def validate_dashboard_json(contents):
                         filter_value,
                         ["unique", "variable1", "variable2", "variable3", "variable4", "variable5", "variable6", "variable7", "variable8"]
                     )
-                    if invalid_columns:
-                        return False, f"The following MNID filter values are invalid data columns: {', '.join(invalid_columns)}"
+                    # Pause this for now
+                    # if invalid_columns:
+                    #     return False, f"The following MNID filter values are invalid data columns: {', '.join(invalid_columns)}"
         return True, "Dry run successful! JSON structure is valid."
 
     except Exception as e:
