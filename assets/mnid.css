@@ -1,5 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500&display=swap');
+
+:root {
+  /* Brand greens */
+  --g9: #052e16; --g8: #14532d; --g7: #15803d;
+  --g6: #16a34a; --g5: #22c55e; --g4: #4ade80;
+  --g2: #bbf7d0; --g1: #dcfce7; --g0: #f0fdf4;
+
+  /* RAG — Traffic Lights */
+  --rag-g: #16a34a; --rag-g-bg: #dcfce7;
+  --rag-a: #d97706; --rag-a-bg: #fef3c7;
+  --rag-r: #dc2626; --rag-r-bg: #fee2e2;
+
+  /* Mortality colours */
+  --mort-mat: #e11d48;  --mort-mat-bg: #fff1f2;  --mort-mat-bdr: #fecdd3;
+  --mort-neo: #d97706;  --mort-neo-bg: #fffbeb;  --mort-neo-bdr: #fde68a;
+  --mort-still: #7c3aed; --mort-still-bg: #f5f3ff; --mort-still-bdr: #ddd6fe;
+
+  /* Neutrals */
+  --n9: #0f172a; --n8: #1e293b; --n7: #334155;
+  --n6: #475569; --n5: #64748b; --n4: #94a3b8;
+  --n3: #cbd5e1; --n2: #e2e8f0; --n1: #f1f5f9; --n0: #f8fafc;
+
+  /* Semantic */
+  --blue: #2563eb; --blue-bg: #eff6ff;
+  --white: #ffffff;
+
+  /* Spacing & shape */
+  --radius: 10px; --radius-lg: 14px; --radius-xl: 18px;
+  --radius-sm: 7px; --radius-xs: 5px;
+  --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.07);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,.10);
+  --border: 1px solid var(--n2);
+
+  /* Layout */
+  --sidebar-w: 224px;
+  --topbar-h: 52px;
+}
+
+*, *::before, *::after {
+  font-family: 'Geist', system-ui, sans-serif !important;
+  box-sizing: border-box;
+}
+
+html { -webkit-font-smoothing: antialiased; }
+body { background: var(--n0) !important; color: var(--n9); }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-thumb { background: var(--n2); border-radius: 99px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
 /* ===================================================================
-  MNID Dashboard â€” MAHIS green design tokens
+  MNID Dashboard — MAHIS green design tokens
    =================================================================== */
 
 /* Smooth scrolling */
@@ -14,6 +71,63 @@ html { scroll-behavior: smooth; }
 .mnid-kpi       { animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .mnid-chart-card{ animation: fadeInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .mnid-card      { animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.mnid-executive-content { min-height: 520px; position: relative; }
+.mnid-loading-surface {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 520px;
+  padding: 8px 4px 20px;
+}
+.mnid-loading-surface-hero,
+.mnid-loading-surface-card,
+.mnid-loading-surface-wide {
+  background: linear-gradient(
+    90deg,
+    rgba(226,232,240,0.9) 0%,
+    rgba(248,250,252,0.98) 50%,
+    rgba(226,232,240,0.9) 100%
+  );
+  background-size: 220% 100%;
+  animation: dashboardSkeletonShift 1.4s ease-in-out infinite;
+  border: 1px solid rgba(226,232,240,0.85);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.72);
+}
+.mnid-loading-surface-hero {
+  height: 68px;
+  border-radius: 22px;
+}
+.mnid-loading-surface-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.mnid-loading-surface-card {
+  height: 132px;
+  border-radius: 24px;
+}
+.mnid-loading-surface-wide {
+  flex: 1 1 auto;
+  min-height: 280px;
+  border-radius: 28px;
+}
+.mnid-loading-parent { position: relative; }
+.mnid-loading-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(248,250,252,0.18);
+  backdrop-filter: blur(14px) saturate(0.96);
+  -webkit-backdrop-filter: blur(14px) saturate(0.96);
+  border-radius: 0;
+  z-index: 1250;
+}
+.mnid-loading-shell {
+  position: relative;
+  z-index: 1300;
+}
 
 /* Staggered KPI card entrance */
 .mnid-kpi-row > .mnid-kpi:nth-child(1) { animation-delay: 0.05s; }
@@ -482,7 +596,7 @@ html { scroll-behavior: smooth; }
 
 .mnid-heatmap-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.95fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   align-items: stretch;
 }
@@ -494,6 +608,7 @@ html { scroll-behavior: smooth; }
   background: #FFFFFF;
   box-shadow: 0 1px 4px rgba(15,23,42,0.06), inset 0 0 0 1px rgba(255,255,255,0.45);
   overflow: hidden;
+  min-height: 680px;
 }
 
 .mnid-heatmap-map .js-plotly-plot,
@@ -503,13 +618,7 @@ html { scroll-behavior: smooth; }
 }
 
 .mnid-heatmap-panel {
-  min-width: 0;
-  height: 560px;
-  padding: 10px 12px;
-  background: #FAFAF8;
-  border: 1px solid #E2E8F0;
-  border-radius: 12px;
-  overflow-y: auto;
+  display: none;
 }
 
 .mnid-map-controls {
@@ -983,7 +1092,7 @@ html { scroll-behavior: smooth; }
 /* MNID analysis chart grid */
 .mnid-chart-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
   gap: 12px;
   padding: 4px 0;
 }
@@ -1905,6 +2014,55 @@ html { scroll-behavior: smooth; }
 .mnid-card,
 .mnid-chart-card {
   border-radius: 16px;
+}
+
+/* Executive view section headers */
+.mnid-exec-section-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 12px;
+  margin-top: 8px;
+}
+.mnid-exec-section-bar {
+  width: 3px;
+  height: 12px;
+  background: var(--g6);
+  border-radius: 2px;
+  flex-shrink: 0;
+  display: inline-block;
+}
+.mnid-exec-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--n5);
+  text-transform: uppercase;
+  letter-spacing: .09em;
+}
+
+/* Executive view alert banner */
+.mnid-exec-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  color: #78350f;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* Card hover lift */
+.mantine-Paper-root:hover {
+  box-shadow: var(--shadow-md) !important;
+}
+
+/* Executive page layout */
+.mnid-executive-page {
+  padding-bottom: 24px;
 }
 
 /* Responsive */

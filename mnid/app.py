@@ -6,18 +6,15 @@ calculates configured indicator coverage, and renders the main dashboard
 sections such as trends, comparison views, heatmaps, and readiness panels.
 """
 import dash_mantine_components as dmc
-import diskcache
 import json
 import logging
-import os
 import pandas as pd
 pd.options.mode.chained_assignment = None
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import statistics as _stats
-import uuid
 from datetime import datetime
-from dash import html, dcc, clientside_callback, callback, callback_context, no_update, Input, Output, State, ALL
+from pathlib import Path
+import os
+from dash import html, dcc, callback, callback_context, no_update, Input, Output, State, ALL
 from dash.exceptions import PreventUpdate
 from helpers.helpers import create_count_from_config
 from mnid.constants import (
@@ -30,6 +27,16 @@ from mnid.data_utils import (
     prepare_mnid_dataframe as _prepare_mnid_dataframe,
     serialize_store_df as _serialize_store_df,
     deserialize_store_df as _deserialize_store_df,
+    _remember_ui_payload, _restore_ui_dataframe,
+    _MNID_UI_CACHE,
+)
+from mnid.aggregation.store import (
+    get_aggregate as _get_aggregate,
+    query_coverage as _agg_coverage,
+    query_time_series as _agg_time_series,
+    _floor_to_period as _agg_floor_period,
+    _candidate_grains as _agg_candidate_grains,
+    resolve_indicator_id as _agg_resolve_id,
 )
 from mnid.geo_utils import (
     load_malawi_district_geojson as _load_malawi_district_geojson,
@@ -38,1490 +45,716 @@ from mnid.geo_utils import (
 )
 
 
-_CHART_LAYOUT = dict(
-    paper_bgcolor=BG, plot_bgcolor=BG,
-    font=dict(family=FONT, color=TEXT, size=11),
-    margin=dict(l=4, r=4, t=36, b=4),
-    hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
-    legend=dict(font=dict(size=10, color=DIM), bgcolor='rgba(0,0,0,0)',
-                orientation='v', x=1.02, y=0.5, xanchor='left'),
+
+from mnid.chart_helpers import (
+    _CHART_LAYOUT, _TREND_SERIES_PALETTE, _TREND_ACCENT, _ANALYSIS_PALETTE,
+    _CAT_LABELS, _CAT_ORDER,
+    _warn_once, _moving_average_window, _moving_average_values,
+    _filter_columns_missing, _cov, _monthly, _css, _CLR, _target_label,
+    _on_target, _target_attainment_pct, _target_mode, _is_inverse_indicator,
+    _display_pct, _axis_wrap, _infer_facility_type, _contrast_text,
+    _value_counts, _flag_value_counts, _monthly_visits,
+    _empty_card, _chart_card, _donut, _hbar, _line,
+    _monthly_concept_rate, _monthly_concept_mix_fig, _concept_rate,
 )
+from mnid.indicators import (
+    _resolve_category_order, _uses_program_based_mnid_schema,
+    _program_based_priority_indicators, _program_based_overlay_fallbacks,
+    _enrich_program_based_mnid_indicators, _resolve_runtime_mnid_indicators,
+)
+from mnid.heatmap import (
+    _mask, _matrix_by_group, _matrix_monthly, _cov_color,
+    _compute_heatmap_store, _compute_heatmap_store_from_agg,
+    _build_facility_performance_heatmap_fig,
+    _build_performance_attention_table, _build_heatmap_fig,
+    _build_geo_heatmap_fig, _build_district_treemap, _build_malawi_panel,
+)
+from mnid.coverage import (
+    _newborn_summary_card, _newborn_section_card,
+    _first_available_value_counts, _newborn_tab_content,
+    _facilities_requiring_attention, _coverage_heatmap_section,
+    _ind_card, _phase_gauge_fig, _phase_gauge_row,
+    _clinical_donuts_section, _coverage_phase_fig, _no_data_card,
+    _coverage_charts_section, _acc_section, _chart_acc_section,
+    _stat_row, _system_readiness, _compare_status_counts,
+    _validate_indicator_configs, _build_compare_pie, _build_compare_bar,
+    _build_compare_heatmap, _comparative_analysis_section,
+)
+from mnid.layout import (
+    _TH, _hero_donut_card, _hero_donut_row,
+    _district_gauge_fig, _build_district_gauge_row,
+    _pph_cascade, _topbar, _sidebar, _alert_banner,
+    _avg_ring, _count_bar, _kpi, _kpi_row, _section_anchor,
+)
+from mnid.executive_views import render_country_profile, render_operational_readiness
 
-_TREND_SERIES_PALETTE = [
-    '#2563EB', '#0F766E', '#C2410C', '#7C3AED',
-    '#DB2777', '#0891B2', '#4D7C0F', '#B45309',
-    '#1D4ED8', '#BE185D', '#0F766E', '#6D28D9',
-]
-_TREND_ACCENT = {
-    'ANC': '#2563EB',
-    'Labour': '#C2410C',
-    'Newborn': '#0F766E',
-    'PNC': '#7C3AED',
-}
-_ANALYSIS_PALETTE = ['#2563EB', '#0F766E', '#7C3AED', '#C2410C', '#DB2777', '#0891B2', '#64748B']
-
-_MNID_UI_CACHE = {}
 _MNID_UI_CACHE_MAX = 16
 _MNID_UI_CACHE_TTL_SECONDS = 3600
+_MNID_EXECUTIVE_CONTENT_CACHE: dict = {}
+_MNID_EXECUTIVE_DATA_CACHE: dict = {}
+_MNID_EXECUTIVE_TAB_VIEW_CACHE: dict = {}
 _MNID_WARNED_MESSAGES = set()
 _LOGGER = logging.getLogger(__name__)
-try:
-    _MNID_UI_DISK_CACHE = diskcache.Cache(os.path.join('.', 'cache', 'mnid_ui'))
-except Exception:
-    _MNID_UI_DISK_CACHE = None
+_NETWORK_DF_CACHE_MAX = 6
+_HEATMAP_CACHE_MAX = 6
+# Country profile doesn't depend on category, so cache by (opd_key, start, end, report_name)
+_country_profile_cache: dict = {}
+_COUNTRY_PROFILE_CACHE_MAX = 12
 
 
-def _remember_ui_payload(prefix: str, records_or_fn, stable_key: str | None = None) -> str:
-    cache_key = f'{prefix}:{stable_key}' if stable_key else f'{prefix}:{uuid.uuid4().hex}'
-    if cache_key in _MNID_UI_CACHE:
-        return cache_key
-    records = records_or_fn() if callable(records_or_fn) else records_or_fn
-    _MNID_UI_CACHE[cache_key] = records
-    while len(_MNID_UI_CACHE) > _MNID_UI_CACHE_MAX:
-        oldest_key = next(iter(_MNID_UI_CACHE))
-        _MNID_UI_CACHE.pop(oldest_key, None)
-    return cache_key
+def _load_dashboard_tab_config() -> dict:
+    root = Path(os.getcwd())
+    config_path = root / 'data' / 'visualizations' / 'dashboard_tabs_config.json'
+    raw = {}
+    try:
+        if config_path.exists():
+            raw = json.loads(config_path.read_text(encoding='utf-8')) or {}
+    except Exception:
+        raw = {}
+
+    hidden = raw.get('hidden_mnid_tabs')
+    if not isinstance(hidden, list):
+        hidden = []
+    return {
+        'hidden_mnid_tabs': {str(item).strip() for item in hidden if str(item).strip()}
+    }
 
 
-def _restore_ui_dataframe(cache_key: str | None) -> pd.DataFrame:
-    if not cache_key:
-        return pd.DataFrame()
+def _executive_view_cache_key(selected: str, state: dict,
+                              scope_meta: dict | None = None,
+                              config: dict | None = None) -> tuple:
+    network_df = state.get('network_df')
+    effective_scope = scope_meta or state.get('scope_meta') or {}
+    effective_config = config or state.get('config') or {}
+    return (
+        selected,
+        effective_config.get('report_name'),
+        state.get('facility_code'),
+        state.get('start_date'),
+        state.get('end_date'),
+        len(network_df) if network_df is not None else 0,
+        tuple(network_df.columns.tolist()) if network_df is not None and not network_df.empty else (),
+        tuple(sorted((effective_scope or {}).get('selected_facilities') or [])),
+        tuple(sorted((effective_scope or {}).get('selected_districts') or [])),
+        tuple(sorted((effective_scope or {}).get('mnid_categories') or [])),
+        (effective_scope or {}).get('dataset_version'),
+    )
 
-    obj = _MNID_UI_CACHE.get(cache_key)
-    if obj is None and _MNID_UI_DISK_CACHE is not None:
+
+def _mnid_loading_placeholder() -> html.Div:
+    return html.Div(
+        className='mnid-loading-surface',
+        children=[
+            html.Div(className='mnid-loading-surface-hero'),
+            html.Div(
+                className='mnid-loading-surface-grid',
+                children=[
+                    html.Div(className='mnid-loading-surface-card'),
+                    html.Div(className='mnid-loading-surface-card'),
+                    html.Div(className='mnid-loading-surface-card'),
+                ],
+            ),
+            html.Div(className='mnid-loading-surface-wide'),
+        ],
+    )
+
+# Builds the indicator aggregate parquet in a background thread at startup when it
+# doesn't exist yet (dev mode with no scheduler running, first deployment, etc.)
+def _maybe_build_aggregate_on_startup() -> None:
+    import threading
+    from pathlib import Path as _Path
+
+    _agg_path = _Path('data') / 'mnid_aggregates' / 'indicator_aggregates.parquet'
+    _lock_path = _Path('data') / 'mnid_aggregates' / '.agg_running'
+
+    # Skip if aggregate already exists (store.py validates source on load)
+    if _agg_path.exists():
+        return
+
+    def _build():
+        import time as _time
+        _time.sleep(15)  # let the app finish booting before starting the background build
+        # Clear any stale lock left by a crashed previous run before starting
         try:
-            obj = _MNID_UI_DISK_CACHE.get(cache_key)
+            if _lock_path.exists():
+                import datetime as _dt
+                age = _dt.datetime.utcnow().timestamp() - _lock_path.stat().st_mtime
+                if not (0 <= age < 3600):
+                    _lock_path.unlink(missing_ok=True)
+                    _LOGGER.info('Cleared stale aggregation lock before startup build.')
         except Exception:
-            obj = None
-        if obj is not None:
-            _MNID_UI_CACHE[cache_key] = obj
+            pass
+        try:
+            from mnid.aggregation.scheduler import run_aggregation_job
+            _LOGGER.info('Aggregate parquet not found, building monthly grain in background...')
+            ok = run_aggregation_job(grains=['monthly'])
+            if ok:
+                _LOGGER.info('Startup aggregation complete (monthly grain).')
+            else:
+                _LOGGER.warning('Startup aggregation returned False, check data source and indicators.')
+        except Exception as _exc:
+            _LOGGER.warning('Startup aggregation failed: %s', _exc)
 
-    if isinstance(obj, pd.DataFrame):
-        return obj
-    return _deserialize_store_df(obj)
+    t = threading.Thread(target=_build, daemon=True, name='mnid-startup-agg')
+    t.start()
 
+_maybe_build_aggregate_on_startup()
+
+_MNID_SCROLLSPY_CLIENTSIDE = """
+function(_tick) {
+    const sections = [
+        '#mnid-summary',
+        '#mnid-coverage',
+        '#mnid-trends',
+        '#mnid-performance',
+        '#mnid-heatmap',
+        '#mnid-comparative'
+    ];
+
+    let active = '#mnid-summary';
+    const activationLine = 124;
+    let bestPassed = null;
+    let nextUpcoming = null;
+
+    for (const selector of sections) {
+        const el = document.querySelector(selector);
+        if (!el) {
+            continue;
+        }
+
+        const rect = el.getBoundingClientRect();
+        const top = rect.top;
+
+        if (top <= activationLine) {
+            if (bestPassed === null || top > bestPassed.top) {
+                bestPassed = { selector, top };
+            }
+        } else if (nextUpcoming === null || top < nextUpcoming.top) {
+            nextUpcoming = { selector, top };
+        }
+    }
+
+    if (bestPassed !== null) {
+        active = bestPassed.selector;
+    } else if (nextUpcoming !== null) {
+        active = nextUpcoming.selector;
+    }
+
+    return active;
+}
+"""
+
+
+def _aggregate_grain_for_window(start_ts, end_ts) -> str:
+    """Pick the cheapest aggregate grain that still matches the visible window."""
+    try:
+        if start_ts is None or end_ts is None:
+            return 'daily'
+        span_days = max(int((pd.Timestamp(end_ts) - pd.Timestamp(start_ts)).days), 0)
+    except Exception:
+        return 'daily'
+    if span_days <= 45:
+        return 'daily'
+    if span_days <= 180:
+        return 'weekly'
+    return 'monthly'
+
+
+def _build_agg_batch(
+    agg_df: pd.DataFrame,
+    start,
+    end,
+    grain: str,
+    fac_filter=None,
+    dist_filter=None,
+) -> dict:
+    """
+    Pre-aggregate a date window into a {(indicator_id, grain): (num, den, pct)} dict.
+
+    Single groupby over the filtered aggregate replaces N individual query_coverage
+    calls (one per indicator), typically 40-60x faster.
+    """
+    try:
+        grains = _agg_candidate_grains(grain)
+        floor = min(_agg_floor_period(start, g) for g in grains)
+        sub = agg_df[
+            agg_df['grain'].isin(grains)
+            & (agg_df['period_start'] >= floor)
+            & (agg_df['period_start'] <= pd.Timestamp(end))
+        ]
+        if fac_filter:
+            sub = sub[sub['facility_code'].isin([str(f) for f in fac_filter])]
+        elif dist_filter:
+            sub = sub[sub['district'].isin([str(d) for d in dist_filter])]
+        if sub.empty:
+            return {}
+        grouped = sub.groupby(['indicator_id', 'grain'], as_index=False)[['numerator', 'denominator']].sum()
+        num = grouped['numerator'].astype(int)
+        den = grouped['denominator'].astype(int)
+        den_safe = den.where(den > 0, 1)
+        pct = (num / den_safe * 100).clip(upper=100.0).round(1).where(den > 0, 0.0)
+        return {
+            (str(iid), g): (int(n), int(d), float(p))
+            for iid, g, n, d, p in zip(grouped['indicator_id'], grouped['grain'], num, den, pct)
+        }
+    except Exception:
+        return {}
+
+
+def _batch_cov(batch: dict, ind_id: str, grain_fallbacks: list) -> tuple:
+    """Look up (num, den, pct) from a pre-built batch dict with grain fallback."""
+    iid = str(ind_id)
+    for g in grain_fallbacks:
+        v = batch.get((iid, g))
+        if v and v[1] > 0:
+            return v
+    return 0, 0, 0.0
+
+
+def _trim_cache(cache: dict, max_entries: int) -> None:
+    while len(cache) > max_entries:
+        try:
+            cache.pop(next(iter(cache)))
+        except Exception:
+            break
+
+
+def _resolve_scope_filters(df: pd.DataFrame, scope_meta: dict | None = None) -> tuple[list[str], list[str], list[str]]:
+    """
+    Split the current scope into facility names, facility codes, and districts.
+
+    UI scope currently stores facility names, while aggregate parquet queries
+    filter by Facility_CODE. Resolve both once so raw-row and aggregate paths
+    stay aligned.
+    """
+    scope_meta = scope_meta or {}
+    selected_facilities = [
+        str(value).strip() for value in (scope_meta.get('selected_facilities') or [])
+        if str(value).strip()
+    ]
+    selected_districts = [
+        str(value).strip() for value in (scope_meta.get('selected_districts') or [])
+        if str(value).strip()
+    ]
+    selected_facility_codes: list[str] = []
+
+    if df is not None and not df.empty and 'Facility_CODE' in df.columns:
+        code_series = df['Facility_CODE'].dropna().astype(str).str.strip()
+        known_codes = set(code_series[code_series.ne('')].unique().tolist())
+
+        if selected_facilities:
+            direct_codes = [value for value in selected_facilities if value in known_codes]
+            selected_facility_codes.extend(direct_codes)
+
+            if 'Facility' in df.columns:
+                fac_meta = (
+                    df[['Facility', 'Facility_CODE']]
+                    .dropna(subset=['Facility', 'Facility_CODE'])
+                    .assign(
+                        Facility=lambda x: x['Facility'].astype(str).str.strip(),
+                        Facility_CODE=lambda x: x['Facility_CODE'].astype(str).str.strip(),
+                    )
+                )
+                name_to_codes: dict[str, list[str]] = {}
+                for facility_name, facility_code in fac_meta.itertuples(index=False):
+                    if not facility_name or not facility_code:
+                        continue
+                    name_to_codes.setdefault(facility_name, [])
+                    if facility_code not in name_to_codes[facility_name]:
+                        name_to_codes[facility_name].append(facility_code)
+                for facility_name in selected_facilities:
+                    selected_facility_codes.extend(name_to_codes.get(facility_name, []))
+
+        selected_facility_codes = list(dict.fromkeys(selected_facility_codes))
+
+    return selected_facilities, selected_facility_codes, selected_districts
+
+
+def _load_mnid_report_config(report_name: str) -> dict | None:
+    try:
+        config_path = Path(__file__).resolve().parents[1] / 'data' / 'visualizations' / 'validated_dashboard.json'
+        with open(config_path, 'r') as fh:
+            dashboards = json.load(fh)
+    except Exception:
+        return None
+
+    return next(
+        (
+            dashboard for dashboard in dashboards
+            if dashboard.get('dashboard_type') == 'mnid'
+            and dashboard.get('report_name') == report_name
+        ),
+        None,
+    )
+
+
+def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
+                                  facility_code, start_date, end_date,
+                                  scope_meta: dict | None = None,
+                                  include_content: bool = True) -> dict:
+    # Compute normalised period bounds once, used for both date filtering and aggregate queries.
+    try:
+        _s = pd.to_datetime(start_date).normalize() if start_date else None
+        _e = (
+            (pd.to_datetime(end_date).normalize() + pd.Timedelta(days=1) - pd.Timedelta(seconds=1))
+            if end_date else (
+                network_df['Date'].max() if 'Date' in network_df.columns and not network_df.empty
+                else pd.Timestamp.now()
+            )
+        )
+    except Exception:
+        _s = _e = None
+
+    facility_df = network_df
+    if _s is not None and 'Date' in network_df.columns and not network_df.empty:
+        try:
+            date_mask = (network_df['Date'] >= _s) & (network_df['Date'] <= _e)
+            facility_df = network_df[date_mask]
+        except Exception:
+            facility_df = network_df
+
+    selected_facilities, selected_facility_codes, selected_districts = _resolve_scope_filters(
+        network_df,
+        scope_meta,
+    )
+    if selected_facilities and 'Facility' in facility_df.columns:
+        facility_df = facility_df[facility_df['Facility'].isin(selected_facilities)]
+    elif selected_districts and 'District' in facility_df.columns:
+        facility_df = facility_df[facility_df['District'].isin(selected_districts)]
+
+    selected_program = (scope_meta or {}).get('mnid_categories')
+    selected_program = selected_program[0] if selected_program else 'All'
+    facility_df.attrs['mnid_program'] = selected_program
+    network_df.attrs['mnid_program'] = selected_program
+    if network_df.empty:
+        network_df = facility_df
+
+    vt = config.get('visualization_types', {})
+    all_inds = config.get('priority_indicators') or vt.get('priority_indicators', [])
+    supply_inds = config.get('supply_indicators') or vt.get('supply_indicators', [])
+    wf_inds = config.get('workforce_indicators') or vt.get('workforce_indicators', [])
+    dq_inds = config.get('data_quality_indicators') or vt.get('data_quality_indicators', [])
+    period = f'{start_date} to {end_date}'
+    period_note = (scope_meta or {}).get('data_period_note')
+
+    requested_categories = (scope_meta or {}).get('mnid_categories')
+    config_categories = config.get('mnid_categories')
+    if config_categories:
+        effective_categories = [c for c in (requested_categories or []) if c in config_categories] or config_categories
+    else:
+        effective_categories = requested_categories
+    all_inds = _resolve_runtime_mnid_indicators(
+        all_inds,
+        facility_df,
+        effective_categories,
+    )
+    _validate_indicator_configs(all_inds)
+    category_order = _resolve_category_order(all_inds, effective_categories)
+    if category_order:
+        allowed = set(category_order)
+        all_inds = [i for i in all_inds if i.get('category') in allowed]
+
+    payload_key = f'{hash((len(network_df), tuple(network_df.columns.tolist()) if not network_df.empty else (), start_date, end_date, tuple(category_order)))}_{start_date}_{end_date}'
+
+    tracked = [i for i in all_inds if i.get('status') == 'tracked']
+    awaiting = [i for i in all_inds if i.get('status') == 'awaiting_baseline']
+    default_cat = category_order[0] if category_order else 'ANC'
+
+    if category_order == ['Newborn']:
+        dashboard_title = 'Neonatal Care Dashboard'
+        dashboard_subtitle = 'Program monitoring for admissions, outcomes, clinical interventions, coverage, and readiness.'
+        dashboard_theme = 'newborn'
+    elif set(category_order) == {'ANC', 'Labour', 'PNC'}:
+        dashboard_title = 'Maternal Health Dashboard'
+        dashboard_subtitle = 'ANC, labour, and postnatal performance, comparison, coverage, and readiness.'
+        dashboard_theme = 'default'
+    else:
+        dashboard_title = f"{config.get('report_name', 'Maternal and Child Health')} Indicators"
+        dashboard_subtitle = 'Clean view of performance, comparison, coverage, and readiness.'
+        dashboard_theme = 'default'
+
+    if dashboard_theme == 'newborn' and not (supply_inds or wf_inds or dq_inds):
+        _unavail = {'unique': 'person_id', 'variable1': 'concept_name', 'value1': '__mnid_unavailable__'}
+        wf_inds = [
+            {
+                'label': 'SSNC competency assessed',
+                'target_pct': 80,
+                'numerator_filters': dict(_unavail),
+                'denominator_filters': dict(_unavail),
+            },
+        ]
+        supply_inds = [
+            {
+                'label': 'CPAP equipment available',
+                'target_pct': 80,
+                'numerator_filters': dict(_unavail),
+                'denominator_filters': dict(_unavail),
+            },
+            {
+                'label': 'Phototherapy unit available',
+                'target_pct': 80,
+                'numerator_filters': dict(_unavail),
+                'denominator_filters': dict(_unavail),
+            },
+            {
+                'label': 'Neonatal resuscitation equipment available',
+                'target_pct': 80,
+                'numerator_filters': dict(_unavail),
+                'denominator_filters': dict(_unavail),
+            },
+        ]
+        dq_inds = [
+            {
+                'label': 'Record completeness',
+                'target_pct': 95,
+                'numerator_filters': dict(_unavail),
+                'denominator_filters': dict(_unavail),
+            },
+            {
+                'label': 'Data entered within 7 days',
+                'target_pct': 90,
+                'numerator_filters': dict(_unavail),
+                'denominator_filters': dict(_unavail),
+            },
+        ]
+    hero_title = 'KEY NEONATAL INDICATORS' if dashboard_theme == 'newborn' else f'KEY {_CAT_LABELS.get(default_cat, str(default_cat or "Program")).upper()} INDICATORS'
+
+    if not include_content:
+        return {
+            'indicator_content': None,
+            'facility_df': facility_df,
+            'network_df': network_df,
+            'supply_inds': supply_inds,
+            'wf_inds': wf_inds,
+            'dq_inds': dq_inds,
+            'dashboard_theme': dashboard_theme,
+        }
+
+    _agg = _get_aggregate()
+    _fac_filter = selected_facility_codes or None
+    _dist_filter = selected_districts or None
+    _kpi_grain = 'monthly'
+    _coverage_grain = _aggregate_grain_for_window(_s, _e)
+    _kpi_fallbacks = list(_agg_candidate_grains(_kpi_grain))
+
+    # Pre-compute previous period boundaries (needed before the KPI loop below)
+    try:
+        window = max((_e - _s).days, 1) if _s and _e else 1
+        prev_end = _s - pd.Timedelta(days=1)
+        prev_start = prev_end - pd.Timedelta(days=window - 1)
+    except Exception:
+        prev_start = prev_end = None
+
+    # Batch aggregate queries: 2 groupbys replace ~84 individual query_coverage calls
+    _cur_batch: dict = {}
+    _prev_batch: dict = {}
+    if _agg is not None and _s is not None:
+        _cur_batch  = _build_agg_batch(_agg, _s, _e, _kpi_grain, _fac_filter, _dist_filter if not _fac_filter else None)
+        if prev_start is not None:
+            _prev_batch = _build_agg_batch(_agg, prev_start, prev_end, _kpi_grain, _fac_filter, _dist_filter if not _fac_filter else None)
+
+    # Pre-slice coverage aggregate once to avoid repeated full-scan per indicator in coverage charts
+    _cov_agg: pd.DataFrame | None = None
+    if _agg is not None and _s is not None:
+        _cov_grains = _agg_candidate_grains(_coverage_grain)
+        _cov_floor = min(_agg_floor_period(_s, g) for g in _cov_grains)
+        _cov_agg = _agg[
+            _agg['grain'].isin(_cov_grains)
+            & (_agg['period_start'] >= _cov_floor)
+            & (_agg['period_start'] <= pd.Timestamp(_e))
+        ]
+        if _fac_filter:
+            _cov_agg = _cov_agg[_cov_agg['facility_code'].isin([str(f) for f in _fac_filter])]
+        elif _dist_filter:
+            _cov_agg = _cov_agg[_cov_agg['district'].isin([str(d) for d in _dist_filter])]
+
+    computed = []
+    for ind in tracked:
+        if _cur_batch:
+            num, den, pct = _batch_cov(_cur_batch, ind['id'], _kpi_fallbacks)
+        elif _agg is not None and _s is not None:
+            num, den, pct = _agg_coverage(
+                _agg, ind['id'], _s, _e,
+                facility_codes=_fac_filter,
+                districts=_dist_filter if not _fac_filter else None,
+                grain=_kpi_grain,
+                indicator_label=ind.get('label'),
+            )
+        else:
+            num, den, pct = _cov(facility_df, ind['numerator_filters'], ind['denominator_filters'])
+        computed.append({
+            **ind,
+            'pct': pct,
+            'numerator': num,
+            'denominator': den,
+            'attained_pct': _target_attainment_pct(pct, ind.get('target', 0), ind),
+        })
+
+    for c in computed:
+        if _prev_batch and prev_start is not None:
+            _, _, prev_pct = _batch_cov(_prev_batch, c['id'], _kpi_fallbacks)
+            c['delta_pct'] = round(c['pct'] - prev_pct, 1)
+        elif _agg is not None and prev_start is not None:
+            try:
+                _, _, prev_pct = _agg_coverage(
+                    _agg, c['id'], prev_start, prev_end,
+                    facility_codes=_fac_filter,
+                    districts=_dist_filter if not _fac_filter else None,
+                    grain=_kpi_grain,
+                    indicator_label=c.get('label'),
+                )
+                c['delta_pct'] = round(c['pct'] - prev_pct, 1)
+            except Exception:
+                c['delta_pct'] = None
+        elif prev_start is not None:
+            try:
+                prev_df = network_df[
+                    (network_df['Date'] >= prev_start) & (network_df['Date'] <= prev_end)
+                ] if 'Date' in network_df.columns and not network_df.empty else pd.DataFrame()
+                if not prev_df.empty and selected_facilities and 'Facility' in prev_df.columns:
+                    prev_df = prev_df[prev_df['Facility'].isin(selected_facilities)]
+                elif not prev_df.empty and selected_districts and 'District' in prev_df.columns:
+                    prev_df = prev_df[prev_df['District'].isin(selected_districts)]
+                _, _, prev_pct = _cov(prev_df, c['numerator_filters'], c['denominator_filters'])
+                c['delta_pct'] = round(c['pct'] - prev_pct, 1)
+            except Exception:
+                c['delta_pct'] = None
+        else:
+            c['delta_pct'] = None
+
+    below = [(c['label'], c['pct']) for c in computed if not _on_target(c['pct'], c['target'], c)]
+    strong = [c['label'] for c in computed if _on_target(c['pct'], c['target'], c)]
+
+    by_cat = {}
+    for ind in all_inds:
+        by_cat.setdefault(ind.get('category', 'Other'), []).append(ind)
+
+    coverage_charts = _coverage_charts_section(
+        by_cat,
+        facility_df,
+        category_order,
+        agg_df=_cov_agg if _cov_agg is not None else _agg,
+        start_date=str(_s.date()) if _s is not None else start_date,
+        end_date=str(_e.date()) if _e is not None else end_date,
+        facility_codes=list(_fac_filter) if _fac_filter else None,
+        districts=list(_dist_filter) if _dist_filter and not _fac_filter else None,
+        grain=_coverage_grain,
+    )
+    trend_switcher = _trend_switcher(
+        facility_df,
+        all_inds,
+        scope_meta=scope_meta,
+        payload_key=payload_key,
+    )
+    performance_div, heatmap_div = _coverage_heatmap_section(
+        all_inds,
+        facility_code,
+        network_df,
+        precomputed_store=_resolve_heatmap_store(
+            network_df,
+            all_inds,
+            facility_code,
+            scope_meta,
+            payload_key,
+        ),
+    )
+    comparative_div = _comparative_analysis_section(
+        all_inds,
+        facility_code,
+        facility_df,
+        payload_key=payload_key,
+    )
+
+    def _sec_header(title, count=None, desc=None, eyebrow=None):
+        return html.Div(className=f'mnid-section-header{" mnid-section-header-newborn" if dashboard_theme == "newborn" else ""}', children=[
+            html.Div([
+                html.Div(eyebrow, className='mnid-section-header-eyebrow') if eyebrow else None,
+                html.Span(title, className='mnid-section-header-title'),
+                html.Div(desc, className='mnid-section-header-desc') if desc else None,
+            ]),
+            html.Span(f'{count} indicators' if count else '', className='mnid-section-header-count'),
+        ])
+
+    indicator_content = html.Div(className=f'mnid-main{" mnid-main-newborn" if dashboard_theme == "newborn" else ""}', children=[
+        _topbar(facility_code, period, len(tracked), len(awaiting), facility_df=facility_df, network_df=network_df, period_note=period_note, scope_meta=scope_meta, title=dashboard_title, subtitle=dashboard_subtitle, theme=dashboard_theme),
+        _sidebar(facility_code, theme=dashboard_theme),
+        _alert_banner(below, strong),
+
+        _section_anchor('mnid-summary'),
+        _sec_header(
+            'Overview',
+            desc='Neonatal program snapshot, priority indicator posture, and facility context.' if dashboard_theme == 'newborn' else f'{len(tracked)} available - {len(awaiting)} awaiting',
+            eyebrow='Overview' if dashboard_theme == 'newborn' else None,
+        ),
+        _kpi_row(computed),
+        _hero_donut_row(computed, preferred_cat=default_cat, section_title=hero_title),
+
+        _section_anchor('mnid-coverage'),
+        _sec_header(
+            'Coverage & Quality' if dashboard_theme == 'newborn' else 'Coverage Indicators',
+            sum(len(v) for v in by_cat.values()),
+            desc='Coverage against target across the neonatal care pathway, from stabilization to follow-up.' if dashboard_theme == 'newborn' else 'Coverage % vs target - target threshold shown per chart',
+            eyebrow='Indicators' if dashboard_theme == 'newborn' else None,
+        ),
+        coverage_charts,
+
+        _section_anchor('mnid-trends'),
+        _sec_header(
+            'Run Charts',
+            desc='Monthly trends for neonatal admissions and outcome-related indicators, with target references where applicable.' if dashboard_theme == 'newborn' else '12-month rolling - dotted line = target',
+            eyebrow='Trends' if dashboard_theme == 'newborn' else None,
+        ),
+        trend_switcher,
+
+        _section_anchor('mnid-performance'),
+        _sec_header(
+            'District Performance' if dashboard_theme == 'newborn' else 'Facility Performance',
+            desc='How this newborn service compares across district and facility peers.' if dashboard_theme == 'newborn' else 'District comparison heatmap for key performance indicators',
+            eyebrow='Performance' if dashboard_theme == 'newborn' else None,
+        ),
+        performance_div,
+
+        _section_anchor('mnid-heatmap'),
+        _sec_header(
+            'Geographic Coverage' if dashboard_theme == 'newborn' else 'Map View',
+            desc='Geographic context for neonatal service delivery and district-level performance.' if dashboard_theme == 'newborn' else 'Geographic coverage map and district/facility context',
+            eyebrow='Map' if dashboard_theme == 'newborn' else None,
+        ),
+        heatmap_div,
+
+        _section_anchor('mnid-comparative'),
+        _sec_header(
+            'Facility Comparison' if dashboard_theme == 'newborn' else 'Facility & District Comparison',
+            desc='Facility and district comparison for neonatal indicators.' if dashboard_theme == 'newborn' else 'Cross-facility and district indicator benchmarking',
+            eyebrow='Comparison' if dashboard_theme == 'newborn' else None,
+        ),
+        comparative_div,
+    ])
+
+    return {
+        'indicator_content': indicator_content,
+        'facility_df': facility_df,
+        'network_df': network_df,
+        'supply_inds': supply_inds,
+        'wf_inds': wf_inds,
+        'dq_inds': dq_inds,
+        'dashboard_theme': dashboard_theme,
+    }
 
 def clear_runtime_caches() -> None:
     _network_df_cache.clear()
+    _heatmap_store_cache.clear()
     _MNID_UI_CACHE.clear()
+    _MNID_EXECUTIVE_CONTENT_CACHE.clear()
+    _MNID_EXECUTIVE_DATA_CACHE.clear()
+    _MNID_EXECUTIVE_TAB_VIEW_CACHE.clear()
     if _MNID_UI_DISK_CACHE is not None:
         try:
             _MNID_UI_DISK_CACHE.clear()
         except Exception:
             pass
-
-
-def _warn_once(message: str) -> None:
-    if message in _MNID_WARNED_MESSAGES:
-        return
-    _MNID_WARNED_MESSAGES.add(message)
-    _LOGGER.warning(message)
-
-
-def _filter_columns_missing(df: pd.DataFrame, cfg: dict | None) -> list[str]:
-    if not cfg:
-        return []
-    missing = []
-    for i in range(1, 11):
-        var = cfg.get(f'variable{i}')
-        val = cfg.get(f'value{i}')
-        if not var or not val:
-            continue
-        if var not in df.columns:
-            missing.append(str(var))
-    return missing
-
-# MNID data helpers
-
-def _cov(df, n_cfg, d_cfg):
-    num_missing = _filter_columns_missing(df, n_cfg)
-    den_missing = _filter_columns_missing(df, d_cfg)
-    if num_missing:
-        _warn_once(f"MNID numerator filter references missing columns: {', '.join(num_missing)}")
-    if den_missing:
-        _warn_once(f"MNID denominator filter references missing columns: {', '.join(den_missing)}")
-    try:
-        num = int(create_count_from_config(df, n_cfg) or 0)
-    except Exception as exc:
-        _warn_once(f"MNID numerator count failed for config {n_cfg}: {exc}")
-        num = 0
-    try:
-        den = int(create_count_from_config(df, d_cfg) or 0)
-    except Exception as exc:
-        _warn_once(f"MNID denominator count failed for config {d_cfg}: {exc}")
-        den = 0
-    if den:
-        pct = round(min(num / den * 100, 100.0), 1)
-    else:
-        pct = 0.0
-    return num, den, pct
-
-
-def _monthly(df, n_cfg, d_cfg, n=6):
-    if 'Date' not in df.columns or not len(df): return []
-    try:
-        periods = pd.to_datetime(df['Date'], errors='coerce').dt.to_period('M')
-        months = sorted(periods.dropna().unique())[-n:]
-        return [{'x': datetime(m.year, m.month, 1),
-                 'pct': _cov(df[periods == m], n_cfg, d_cfg)[2]}
-                for m in months]
-    except Exception as exc:
-        _warn_once(f"MNID monthly series build failed for numerator {n_cfg} / denominator {d_cfg}: {exc}")
-        return []
-
-
-def _target_mode(ind_or_mode) -> str:
-    if isinstance(ind_or_mode, dict):
-        mode = str(ind_or_mode.get('target_mode') or 'max').strip().lower()
-    else:
-        mode = str(ind_or_mode or 'max').strip().lower()
-    return mode if mode in {'max', 'min'} else 'max'
-
-
-def _is_inverse_indicator(ind: dict) -> bool:
-    return _target_mode(ind) == 'min'
-
-
-def _css(pct, tgt, mode='max'):
-    mode = _target_mode(mode)
-    if mode == 'min':
-        warn_threshold = tgt * 1.15 if tgt else 0
-        return 'ok' if pct <= tgt else ('warn' if pct <= warn_threshold else 'danger')
-    return 'ok' if pct >= tgt else ('warn' if pct >= tgt * 0.85 else 'danger')
-
-
-def _on_target(pct, tgt, mode='max') -> bool:
-    return _css(pct, tgt, mode) == 'ok'
-
-
-def _target_attainment_pct(pct, tgt, mode='max') -> float:
-    mode = _target_mode(mode)
-    pct = float(pct or 0.0)
-    tgt = float(tgt or 0.0)
-    if mode == 'min':
-        if pct <= tgt:
-            return 100.0
-        if pct <= 0:
-            return 100.0
-        return max(0.0, min(100.0, (tgt / pct) * 100.0))
-    if tgt <= 0:
-        return 0.0
-    return max(0.0, min(100.0, (pct / tgt) * 100.0))
-
-
-def _target_label(ind: dict) -> str:
-    prefix = '<=' if _is_inverse_indicator(ind) else ''
-    return f'Target {prefix}{ind["target"]}%'
-_CLR = {'ok': OK_C, 'warn': WARN_C, 'danger': DANGER_C, 'info': INFO_C}
-
-
-def _display_pct(pct):
-    if pct is None:
-        return None
-    return max(0.0, min(float(pct), 100.0))
-
-
-def _axis_wrap(label: str, width: int = 14, max_lines: int = 3) -> str:
-    words = str(label or '').split()
-    if not words:
-        return ''
-    lines = []
-    current = words[0]
-    used = 1
-    for word in words[1:]:
-        if len(current) + len(word) + 1 <= width:
-            current = f'{current} {word}'
-        else:
-            lines.append(current)
-            current = word
-        used += 1
-        if len(lines) >= max_lines - 1:
-            break
-    remaining = words[used:]
-    if remaining:
-        current = f'{current} {" ".join(remaining)}'.strip()
-    lines.append(current)
-    if len(lines[-1]) > width + 4:
-        lines[-1] = f'{lines[-1][:width + 1].rstrip()}...'
-    return '<br>'.join(lines)
-
-
-def _infer_facility_type(facility_key: str) -> str:
-    fac_code = str(facility_key or '').rstrip('*')
-    name = _FACILITY_NAMES.get(fac_code, fac_code).strip()
-    upper = name.upper()
-    if 'CENTRAL' in upper or upper.endswith(' CH'):
-        return 'Central Hospital'
-    if 'HEALTH CENT' in upper or upper.endswith(' HC'):
-        return 'Health Center'
-    if 'DISTRICT' in upper or 'HOSPITAL' in upper:
-        return 'District Hospital'
-    return 'Other'
-
-
-def _contrast_text(hex_color: str, dark: str = TEXT, light: str = '#FFFFFF') -> str:
-    color = (hex_color or '').lstrip('#')
-    if len(color) != 6:
-        return dark
-    r, g, b = int(color[0:2], 16), int(color[2:4], 16), int(color[4:6], 16)
-    luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-    return dark if luminance > 0.62 else light
-
-
-def _value_counts(df, concept, col='obs_value_coded', unique_col='person_id'):
-    sub = df[df['concept_name'] == concept]
-    if not len(sub): return pd.DataFrame(columns=['label','n'])
-    out = sub.groupby(col)[unique_col].nunique().reset_index()
-    out.columns = ['label','n']
-    return out.sort_values('n', ascending=False)
-
-
-def _flag_value_counts(df, flag_col: str, unique_col: str = 'person_id',
-                       yes_label: str = 'Screened', no_label: str = 'Not screened'):
-    if flag_col not in df.columns or unique_col not in df.columns or not len(df):
-        return pd.DataFrame(columns=['label', 'n'])
-    people = (
-        df[[unique_col, flag_col]]
-        .dropna(subset=[unique_col])
-        .assign(**{flag_col: lambda x: x[flag_col].fillna('').astype(str).str.strip()})
-        .drop_duplicates(subset=[unique_col])
-    )
-    if people.empty:
-        return pd.DataFrame(columns=['label', 'n'])
-    labels = people[flag_col].eq('Yes').map({True: yes_label, False: no_label})
-    out = labels.value_counts().rename_axis('label').reset_index(name='n')
-    return out.sort_values('n', ascending=False)
-
-
-def _monthly_visits(df, encounter_val, unique_col='person_id'):
-    sub = pd.DataFrame()
-    if 'Encounter' in df.columns:
-        sub = df[df['Encounter'] == encounter_val]
-    if sub.empty and 'Service_Area' in df.columns:
-        area_map = {
-            'ANC VISIT': 'ANC',
-            'LABOUR AND DELIVERY': 'Labour',
-            'POSTNATAL CARE': 'PNC',
-            'NEONATAL CARE': 'Newborn',
-        }
-        service_area = area_map.get(str(encounter_val or '').strip().upper())
-        if service_area:
-            sub = df[df['Service_Area'].astype(str) == service_area]
-    if not len(sub):
-        return pd.DataFrame(columns=['month', 'n', 'freq'])
-    dates = pd.to_datetime(sub['Date'], errors='coerce').dropna()
-    if dates.empty:
-        return pd.DataFrame(columns=['month', 'n', 'freq'])
-    span_days = max(int((dates.max() - dates.min()).days), 0)
-    if span_days <= 45:
-        freq, fmt = 'D', 'day'
-        sub['month'] = dates.dt.floor('D')
-    elif span_days <= 180:
-        freq, fmt = 'W', 'week'
-        sub['month'] = dates.dt.to_period('W').apply(lambda p: p.start_time)
-    else:
-        freq, fmt = 'M', 'month'
-        sub['month'] = dates.dt.to_period('M').apply(lambda p: datetime(p.year, p.month, 1))
-    out = sub.groupby('month')[unique_col].nunique().reset_index()
-    out.columns = ['month', 'n']
-    out['freq'] = fmt
-    return out.sort_values('month')
-
-
-# MNID chart builders
-
-def _empty_card(title):
-    return html.Div(className='mnid-chart-card', children=[
-        html.Div(title, className='mnid-card-title'),
-        html.Div('No data available', className='mnid-ind-note',
-                 style={'padding': '24px 0', 'textAlign': 'center'}),
-    ])
-
-
-def _chart_card(title, fig):
-    return html.Div(className='mnid-chart-card', children=[
-        dcc.Graph(figure=fig, config={'displayModeBar': True, 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
-                  style={'height': '220px'}),
-    ])
-
-
-def _donut(counts_df, title, color_map=None):
-    if not len(counts_df):
-        return None
-    palette = _ANALYSIS_PALETTE
-    colors = [color_map.get(r, palette[i % len(palette)])
-              if color_map else palette[i % len(palette)]
-              for i, r in enumerate(counts_df['label'])]
-    fig = go.Figure(go.Pie(
-        labels=counts_df['label'], values=counts_df['n'],
-        hole=0.62,
-        marker=dict(colors=colors, line=dict(color='#fff', width=2)),
-        textinfo='none',
-        hovertemplate='%{label}<br>%{value} (%{percent})<extra></extra>',
-    ))
-    fig.update_layout(
-        **_CHART_LAYOUT,
-        title=dict(text=title, font=dict(size=12, color='#444441', family=FONT),
-                   x=0, xanchor='left', y=0.98),
-        height=220,
-    )
-    return fig
-
-
-def _hbar(counts_df, title, color=INFO_C, single_color=False):
-    if not len(counts_df):
-        return None
-    counts_df = counts_df.sort_values('n')
-    palette = _ANALYSIS_PALETTE
-    colors = color if single_color else [palette[i % len(palette)]
-                                         for i in range(len(counts_df))]
-    fig = go.Figure(go.Bar(
-        x=counts_df['n'], y=counts_df['label'],
-        orientation='h',
-        marker=dict(color=colors, line=dict(color='rgba(0,0,0,0)')),
-        text=counts_df['n'], textposition='outside',
-        textfont=dict(size=10, color=DIM),
-        hovertemplate='%{y}: %{x}<extra></extra>',
-    ))
-    fig.update_layout(
-        **_CHART_LAYOUT,
-        title=dict(text=title, font=dict(size=12, color='#444441', family=FONT),
-                   x=0, xanchor='left', y=0.98),
-        height=220,
-        xaxis=dict(showgrid=True, gridcolor=GRID_C, zeroline=False,
-                   showline=False, tickfont=dict(size=10, color=MUTED)),
-        yaxis=dict(showgrid=False, zeroline=False, showline=False,
-                   tickfont=dict(size=10, color=DIM), automargin=True),
-    )
-    return fig
-
-
-def _line(monthly_df, title, color='#2563EB', y_label='Clients'):
-    if not len(monthly_df): return None
-    clean = monthly_df.dropna(subset=['n']).copy()
-    if clean.empty:
-        return None
-
-    freq = clean['freq'].iloc[0] if 'freq' in clean.columns else 'month'
-    if freq == 'day':
-        tickfmt = '%d %b'
-        hover_fmt = '%{x|%d %b %Y}: %{y}'
-    elif freq == 'week':
-        tickfmt = '%d %b'
-        hover_fmt = '%{x|%d %b %Y}: %{y}'
-    else:
-        tickfmt = '%b %y'
-        hover_fmt = '%{x|%b %Y}: %{y}'
-
-    fig = go.Figure(go.Scatter(
-        x=clean['month'], y=clean['n'],
-        mode='lines+markers',
-        line=dict(color=color, width=2.5, shape='linear'),
-        marker=dict(size=6, color=color, line=dict(color='#fff', width=1.35)),
-        hovertemplate=hover_fmt + '<extra></extra>',
-    ))
-
-    avg_val = clean['n'].mean()
-    fig.add_hline(
-        y=avg_val,
-        line_dash='dash',
-        line_color='#DC2626',
-        line_width=1.5,
-        annotation_text=f'Average = {avg_val:.0f}',
-        annotation_position='top right',
-        annotation_font_color='#374151',
-    )
-
-    key_points = []
-    start_point = (clean.iloc[0]['month'], clean.iloc[0]['n'])
-    end_point = (clean.iloc[-1]['month'], clean.iloc[-1]['n'])
-    peak_row = clean.loc[clean['n'].idxmax()]
-    peak_point = (peak_row['month'], peak_row['n'])
-    for point in [start_point, peak_point, end_point]:
-        if point not in key_points:
-            key_points.append(point)
-
-    fig.add_trace(go.Scatter(
-        x=[x for x, _ in key_points],
-        y=[y for _, y in key_points],
-        mode='markers+text',
-        text=[f'{y:.0f}' for _, y in key_points],
-        textposition='top center',
-        textfont=dict(size=9, color='#374151'),
-        marker=dict(size=8, color='#1e293b'),
-        showlegend=False,
-        hovertemplate=hover_fmt + '<extra></extra>',
-    ))
-
-    fig.update_layout(
-        **_CHART_LAYOUT,
-        title=dict(text=title, font=dict(size=12, color='#444441', family=FONT),
-                   x=0, xanchor='left', y=0.98),
-        height=220,
-        xaxis=dict(showgrid=False, zeroline=False, showline=False,
-                   tickformat=tickfmt, tickfont=dict(size=10, color=MUTED)),
-        yaxis=dict(showgrid=True, gridcolor=GRID_C, zeroline=False,
-                   showline=False, tickfont=dict(size=10, color=MUTED),
-                   title=dict(text=y_label, font=dict(size=10, color=MUTED))),
-    )
-    return fig
-
-
-# MNID trend switcher
-
-_CAT_LABELS = {'ANC': 'ANC', 'Labour': 'Labour & Delivery', 'Newborn': 'Newborn', 'PNC': 'PNC'}
-_CAT_ORDER  = ['ANC', 'Labour', 'Newborn', 'PNC']
-
-
-def _resolve_category_order(indicators: list, configured: list | None = None) -> list:
-    present = {str(i.get('category', '')).strip() for i in indicators if i.get('category')}
-    ordered = [c for c in (configured or _CAT_ORDER) if c in present]
-    return ordered or [c for c in _CAT_ORDER if c in present]
-
-
-def _uses_program_based_mnid_schema(df: pd.DataFrame) -> bool:
-    if df is None or df.empty or 'Source_Program' not in df.columns:
-        return False
-    source_programs = set(df['Source_Program'].dropna().astype(str).str.upper().unique().tolist())
-    return bool(source_programs & {
-        'ANC PROGRAM',
-        'LABOUR AND DELIVERY PROGRAM',
-        'PNC PROGRAM',
-        'NEONATAL PROGRAM',
-    })
-
-
-def _program_based_priority_indicators(categories: list[str] | None = None) -> list[dict]:
-    wanted = set(categories or _CAT_ORDER)
-    indicators = []
-
-    if 'ANC' in wanted:
-        indicators.extend([
-            {
-                'id': 'mnid_anc_prog_001',
-                'label': 'ANC visit documented',
-                'category': 'ANC',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Encounter_Source', 'value1': 'ANC VISIT'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
-            },
-            {
-                'id': 'mnid_anc_prog_002',
-                'label': 'Pregnancy planned',
-                'category': 'ANC',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Pregnancy planned', 'variable2': 'obs_value_coded', 'value2': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Pregnancy planned'},
-            },
-            {
-                'id': 'mnid_anc_prog_003',
-                'label': 'Gestational age method recorded',
-                'category': 'ANC',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {
-                    'unique': 'person_id',
-                    'variable1': 'concept_name', 'value1': 'Gestational age recorded',
-                    'variable2': 'obs_value_coded', 'value2': ['GA by LNMP', 'GA by palpation', 'GA by ultrasound'],
-                },
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
-            },
-            {
-                'id': 'mnid_anc_prog_004',
-                'label': 'ANC 2+ tetanus doses',
-                'category': 'ANC',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {
-                    'unique': 'person_id',
-                    'variable1': 'concept_name', 'value1': 'Number of tetanus doses',
-                    'variable2': 'obs_value_coded', 'value2': ['two doses', 'three doses', 'four doses'],
-                },
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
-            },
-            {
-                'id': 'mnid_anc_prog_005',
-                'label': 'Danger signs assessed',
-                'category': 'ANC',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Danger signs present'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
-            },
-            {
-                'id': 'mnid_anc_prog_006',
-                'label': 'ANC clients tested for HIV',
-                'category': 'ANC',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC', 'variable2': 'mnid_anc_hiv_test_done', 'value2': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
-                'note': 'Direct ANC HIV-testing coverage using person-level HIV test completion flags.',
-            },
-            {
-                'id': 'mnid_anc_prog_007',
-                'label': 'ANC clients with blood pressure measured',
-                'category': 'ANC',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC', 'variable2': 'mnid_anc_bp_screened', 'value2': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
-                'note': 'Direct ANC blood-pressure measurement coverage using recorded systolic or diastolic values.',
-            },
-        ])
-
-    if 'Labour' in wanted:
-        indicators.extend([
-            {
-                'id': 'mnid_lab_prog_001',
-                'label': 'Labour assessment documented',
-                'category': 'Labour',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour', 'variable2': 'mnid_labour_assessment_documented', 'value2': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
-                'note': 'Tracked from normalized labour-assessment encounter-source rows in the real parquet.',
-            },
-            {
-                'id': 'mnid_lab_prog_001b',
-                'label': 'Labour visit documented',
-                'category': 'Labour',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour', 'variable2': 'mnid_labour_visit_documented', 'value2': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
-                'note': 'Tracked from normalized labour-and-delivery visit encounter rows in the real parquet.',
-            },
-            {
-                'id': 'mnid_lab_prog_002',
-                'label': 'Delivery details recorded',
-                'category': 'Labour',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour', 'variable2': 'concept_name', 'value2': 'Mode of delivery'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
-                'note': 'Uses presence of a delivery-mode record as the delivery-details documentation marker in the current extract.',
-            },
-            {
-                'id': 'mnid_lab_prog_003',
-                'label': 'Facility deliveries',
-                'category': 'Labour',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Place of delivery', 'variable2': 'obs_value_coded', 'value2': ['This facility', 'this facility']},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
-            },
-            {
-                'id': 'mnid_lab_prog_004',
-                'label': 'Vitamin K given at birth',
-                'category': 'Labour',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour', 'variable2': 'concept_name', 'value2': 'Vitamin K given', 'variable3': 'obs_value_coded', 'value3': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour', 'variable2': 'concept_name', 'value2': 'Vitamin K given'},
-            },
-            {
-                'id': 'mnid_lab_prog_005',
-                'label': 'Breastfeeding in first hour',
-                'category': 'Labour',
-                'target': 80,
-                'status': 'awaiting_baseline',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour', 'variable2': 'concept_name', 'value2': 'Breast feeding', 'variable3': 'obs_value_coded', 'value3': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour', 'variable2': 'concept_name', 'value2': 'Breast feeding'},
-                'note': 'Breastfeeding status is present, but the current extract does not expose the required within-1-hour timing field.',
-            },
-            {
-                'id': 'mnid_lab_prog_006',
-                'label': 'Births delivered by caesarean section',
-                'category': 'Labour',
-                'target': 15,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_csection', 'value1': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
-                'note': 'Direct caesarean-section share among labour and delivery clients. This is a monitoring rate, not a higher-is-better coverage indicator.',
-            },
-            {
-                'id': 'mnid_lab_prog_007',
-                'label': 'Estimated blood loss recorded after delivery',
-                'category': 'Labour',
-                'target': 70,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour', 'variable2': 'mnid_labour_estimated_blood_loss_recorded', 'value2': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
-                'note': 'Operational proxy using the real Estimated blood loss concept where it is recorded in labour and delivery data.',
-            },
-        ])
-
-    if 'PNC' in wanted:
-        indicators.extend([
-            {
-                'id': 'mnid_pnc_prog_001',
-                'label': 'PNC visit documented',
-                'category': 'PNC',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'PNC', 'variable2': 'mnid_pnc_visit_documented', 'value2': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'PNC'},
-                'note': 'Tracked from normalized PNC-visit encounter-source rows in the real parquet.',
-            },
-            {
-                'id': 'mnid_pnc_prog_002',
-                'label': 'PNC mothers within 48 hours',
-                'category': 'PNC',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Postnatal check period', 'variable2': 'obs_value_coded', 'value2': 'Up to 48 hrs or before discharge'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'PNC'},
-            },
-            {
-                'id': 'mnid_pnc_prog_003',
-                'label': 'Mother alive at PNC review',
-                'category': 'PNC',
-                'target': 95,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Status of the mother', 'variable2': 'obs_value_coded', 'value2': ['Alive', 'Discharged alive']},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Status of the mother'},
-            },
-            {
-                'id': 'mnid_pnc_prog_004',
-                'label': 'Baby alive at PNC review',
-                'category': 'PNC',
-                'target': 95,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Status of baby', 'variable2': 'obs_value_coded', 'value2': 'Alive'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Status of baby'},
-            },
-            {
-                'id': 'mnid_pnc_prog_005',
-                'label': 'BCG vaccination coverage',
-                'category': 'PNC',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Immunisation given', 'variable2': 'obs_value_coded', 'value2': 'BCG'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Immunisation given'},
-            },
-            {
-                'id': 'mnid_pnc_prog_006',
-                'label': 'HIV positive mothers identified in PNC',
-                'category': 'PNC',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {
-                    'unique': 'person_id',
-                    'variable1': 'concept_name', 'value1': 'Mother HIV Status',
-                    'variable2': 'obs_value_coded', 'value2': ['Reactive', 'Positive', 'positive', 'reactive'],
-                },
-                'denominator_filters': {
-                    'unique': 'person_id',
-                    'variable1': 'concept_name', 'value1': 'Mother HIV Status',
-                },
-                'note': 'Tracked from maternal HIV status observations currently flowing through the MNH parquet, pending tighter PNC encounter normalization.',
-            },
-        ])
-
-    if 'Newborn' in wanted:
-        indicators.extend([
-            {
-                'id': 'mnid_nb_prog_001',
-                'label': 'Neonatal enrolment documented',
-                'category': 'Newborn',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Encounter_Source', 'value1': 'NEONATAL PROGRAM'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn'},
-            },
-            {
-                'id': 'mnid_nb_prog_002',
-                'label': 'Birth weight recorded',
-                'category': 'Newborn',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Birth weight'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn'},
-            },
-            {
-                'id': 'mnid_nb_prog_003',
-                'label': 'Gestation weeks recorded',
-                'category': 'Newborn',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Gestation in weeks'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn'},
-            },
-            {
-                'id': 'mnid_nb_prog_004',
-                'label': 'Vitamin K given',
-                'category': 'Newborn',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn', 'variable2': 'concept_name', 'value2': 'Vitamin K given', 'variable3': 'obs_value_coded', 'value3': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn', 'variable2': 'concept_name', 'value2': 'Vitamin K given'},
-            },
-            {
-                'id': 'mnid_nb_prog_005',
-                'label': 'Resuscitation intervention recorded',
-                'category': 'Newborn',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Neonatal resuscitation provided', 'variable2': 'obs_value_coded', 'value2': ['Yes', 'Stimulation only', 'Bag and mask']},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Neonatal resuscitation provided'},
-            },
-            {
-                'id': 'mnid_nb_prog_006',
-                'label': 'Thermal care recorded',
-                'category': 'Newborn',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'thermal care'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn'},
-            },
-            {
-                'id': 'mnid_nb_prog_007',
-                'label': 'KMC support recorded',
-                'category': 'Newborn',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_kmc', 'value1': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn'},
-                'note': 'Tracked from newborn KMC support concepts already present in the current parquet.',
-            },
-            {
-                'id': 'mnid_nb_prog_008',
-                'label': 'Low birthweight newborns',
-                'category': 'Newborn',
-                'target': 12,
-                'target_mode': 'min',
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_low_birthweight', 'value1': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Birth weight'},
-                'note': 'Direct low-birthweight rate from recorded birth weight bands. This is a burden rate, not a higher-is-better coverage indicator.',
-            },
-            {
-                'id': 'mnid_nb_prog_009',
-                'label': 'Birth asphyxia among newborn admissions',
-                'category': 'Newborn',
-                'target': 10,
-                'target_mode': 'min',
-                'status': 'awaiting_baseline',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_birth_asphyxia', 'value1': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn'},
-                'note': 'Needs a newborn-admission diagnosis signal for birth asphyxia in the current extract before it can be treated as a core tracked indicator.',
-            },
-            {
-                'id': 'mnid_nb_prog_010',
-                'label': 'Neonatal sepsis among newborn admissions',
-                'category': 'Newborn',
-                'target': 10,
-                'target_mode': 'min',
-                'status': 'awaiting_baseline',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_sepsis', 'value1': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn'},
-                'note': 'Needs a newborn-admission diagnosis signal for sepsis in the current extract before it can be treated as a core tracked indicator.',
-            },
-        ])
-
-    return indicators
-
-
-def _program_based_overlay_fallbacks(categories: list[str] | None = None) -> list[dict]:
-    wanted = set(categories or _CAT_ORDER)
-    indicators = []
-
-    if 'ANC' in wanted:
-        indicators.extend([
-            {
-                'id': 'mnid_anc_pdf_001',
-                'label': 'ANC screened for anaemia',
-                'category': 'ANC',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC', 'variable2': 'mnid_anc_hb_screened', 'value2': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
-                'note': 'Tracked from ANC haemoglobin screening concepts in MAHIS, including Hb(g/dL) and equivalent haemoglobin-result fields.',
-            },
-            {
-                'id': 'mnid_anc_pdf_002',
-                'label': 'ANC screened for syphilis',
-                'category': 'ANC',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC', 'variable2': 'mnid_anc_syphilis_tested', 'value2': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
-                'note': 'Tracked from ANC syphilis-result concepts already present in MAHIS, including VDRL and equivalent syphilis test result fields.',
-            },
-            {
-                'id': 'mnid_anc_pdf_003',
-                'label': 'ANC clients with urinalysis performed',
-                'category': 'ANC',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC', 'variable2': 'mnid_anc_urinalysis_done', 'value2': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
-                'note': 'Tracked from ANC urine-test status, urine-test-conducted, and urinalysis result concepts already present in the parquet.',
-            },
-            {
-                'id': 'mnid_anc_pdf_004',
-                'label': 'ANC screened for infection',
-                'category': 'ANC',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC', 'variable2': 'mnid_anc_infection_screened', 'value2': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
-                'note': 'Tracked with an ANC infection-screening proxy built from HIV, syphilis, and malaria test fields already present in MAHIS.',
-            },
-            {
-                'id': 'mnid_anc_pdf_005',
-                'label': 'ANC screened for high blood pressure',
-                'category': 'ANC',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC', 'variable2': 'mnid_anc_bp_screened', 'value2': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
-                'note': 'Tracked using ANC clients with blood-pressure vitals recorded in the current parquet.',
-            },
-            {
-                'id': 'mnid_anc_pdf_006',
-                'label': 'HIV-tested and screened for anaemia and high blood pressure',
-                'category': 'ANC',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC', 'variable2': 'mnid_anc_hiv_anaemia_bp_screened', 'value2': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
-                'note': 'Tracked as a combined ANC coverage indicator using person-level HIV test, haemoglobin screening, and blood-pressure screening flags.',
-            },
-            {
-                'id': 'mnid_anc_pdf_007',
-                'label': 'POCUS with gestational age',
-                'category': 'ANC',
-                'target': 50,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC', 'variable2': 'mnid_anc_pocus_with_ga', 'value2': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
-                'note': 'Numerator uses gestational-age-by-ultrasound plus ultrasound-status aliases where the real parquet exposes them. Denominator falls back to all ANC clients because first-visit markers are not reliable in the source extract.',
-            },
-        ])
-
-    if 'Labour' in wanted:
-        indicators.extend([
-            {
-                'id': 'mnid_lab_pdf_001',
-                'label': 'Women receiving prophylactic uterotonic immediately after birth',
-                'category': 'Labour',
-                'target': 80,
-                'status': 'awaiting_baseline',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_uterotonic_given', 'value1': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
-                'note': 'Uses oxytocin and misoprostol administration concepts already present in labour records, but timing immediately after birth is not explicit in the source extract.',
-            },
-            {
-                'id': 'mnid_lab_pdf_002',
-                'label': 'Quality intrapartum care and management of complications according to guidelines',
-                'category': 'Labour',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_partograph_used', 'value1': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
-                'note': 'Tracked with a labour-management proxy using documented partograph use until a fuller guideline bundle is exposed in reports data.',
-            },
-            {
-                'id': 'mnid_lab_pdf_003',
-                'label': 'Digital intrapartum monitoring in labour',
-                'category': 'Labour',
-                'target': 80,
-                'status': 'awaiting_baseline',
-                'numerator_filters': {
-                    'unique': 'person_id',
-                    'variable1': 'concept_name', 'value1': 'Digital intrapartum monitoring',
-                    'variable2': 'obs_value_coded', 'value2': 'Used',
-                },
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
-                'note': 'Awaiting a dedicated electronic fetal monitoring concept (CTG / Moyo device) in MAHIS. Partograph use is already tracked under quality intrapartum care.',
-            },
-            {
-                'id': 'mnid_lab_pdf_004',
-                'label': 'Deliveries complicated by maternal sepsis',
-                'category': 'Labour',
-                'target': 10,
-                'target_mode': 'min',
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_maternal_sepsis', 'value1': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
-                'note': 'Tracked directly from labour records with the Maternal sepsis concept. This is a burden indicator, so lower is better.',
-            },
-            {
-                'id': 'mnid_lab_pdf_005',
-                'label': 'Eligible women with pre-term labour who received antenatal corticosteroids',
-                'category': 'Labour',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_preterm_corticosteroids', 'value1': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_preterm', 'value1': 'Yes'},
-                'note': 'Tracked using a person-level proxy for preterm labour plus antenatal corticosteroids already captured in MAHIS labour care.',
-            },
-            {
-                'id': 'mnid_lab_pdf_006',
-                'label': 'Women in labour who received prophylactic azithromycin',
-                'category': 'Labour',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_azithromycin', 'value1': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
-                'note': 'Tracked if azithromycin-specific labour prophylaxis observations are present in the reports extract.',
-            },
-            {
-                'id': 'mnid_lab_pdf_007',
-                'label': 'Women with early-detected PPH who received the WHO treatment bundle',
-                'category': 'Labour',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_pph_bundle_received', 'value1': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_pph', 'value1': 'Yes'},
-                'note': 'Tracked with a treatment-bundle proxy combining documented PPH plus multiple uterotonic/TXA care components already modeled in MAHIS.',
-            },
-        ])
-
-    if 'Newborn' in wanted:
-        indicators.extend([
-            {
-                'id': 'mnid_nb_pdf_001',
-                'label': 'Eligible babies who received neonatal resuscitation',
-                'category': 'Newborn',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {
-                    'unique': 'person_id',
-                    'variable1': 'mnid_newborn_asphyxia_resuscitated', 'value1': 'Yes',
-                },
-                'denominator_filters': {
-                    'unique': 'person_id',
-                    'variable1': 'mnid_newborn_birth_asphyxia', 'value1': 'Yes',
-                },
-                'note': 'Numerator: babies with birth asphyxia who received resuscitation. Denominator: all babies with birth asphyxia diagnosis.',
-            },
-            {
-                'id': 'mnid_nb_pdf_002',
-                'label': 'Eligible preterm and low birth-weight babies who receive iKMC',
-                'category': 'Newborn',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_kmc_eligible', 'value1': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_birth_weight_band', 'value1': ['1000-1499g', '1500-1999g']},
-                'note': 'Tracked as an eligibility proxy using low-birth-weight bands plus KMC-related newborn care concepts already modeled in MAHIS.',
-            },
-            {
-                'id': 'mnid_nb_pdf_003',
-                'label': 'Babies between 1000-1499g who receive prophylactic CPAP',
-                'category': 'Newborn',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_cpap_1000_1499', 'value1': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_birth_weight_band', 'value1': '1000-1499g'},
-                'note': 'Tracked using person-level birth-weight bands and CPAP treatment observations from newborn care.',
-            },
-            {
-                'id': 'mnid_nb_pdf_004',
-                'label': 'Eligible babies between 1500 and 1999g who receive CPAP',
-                'category': 'Newborn',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_cpap_1500_1999', 'value1': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_birth_weight_band', 'value1': '1500-1999g'},
-                'note': 'Tracked using person-level birth-weight bands and CPAP treatment observations from newborn care.',
-            },
-            {
-                'id': 'mnid_nb_pdf_005',
-                'label': 'Babies with clinical jaundice who receive phototherapy',
-                'category': 'Newborn',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_jaundice_phototherapy', 'value1': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_jaundice', 'value1': 'Yes'},
-                'note': 'Tracked using newborn jaundice observations plus phototherapy treatment observations when they land in the reports extract.',
-            },
-            {
-                'id': 'mnid_nb_pdf_006',
-                'label': 'Babies with suspected sepsis who receive parenteral antibiotics',
-                'category': 'Newborn',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_sepsis_antibiotics', 'value1': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_sepsis', 'value1': 'Yes'},
-                'note': 'Tracked using newborn sepsis diagnosis concepts plus parenteral-antibiotic treatment observations.',
-            },
-            {
-                'id': 'mnid_nb_pdf_007',
-                'label': 'Babies not hypothermic on admission to the neonatal unit',
-                'category': 'Newborn',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_not_hypothermic_admission', 'value1': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn'},
-                'note': 'Tracked when the neonatal thermal-status-on-admission concept is available in the reports extract.',
-            },
-            {
-                'id': 'mnid_nb_pdf_008',
-                'label': 'Babies not hypothermic at any time in the neonatal unit',
-                'category': 'Newborn',
-                'target': 80,
-                'status': 'tracked',
-                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_not_hypothermic_anytime', 'value1': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn'},
-                'note': 'Tracked when thermal-status observations in neonatal care are available across the admission period.',
-            },
-        ])
-
-    return indicators
-
-
-def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str] | None = None) -> list[dict]:
-    wanted = set(categories or _CAT_ORDER)
-    overlays = {
-        'ANC screened for anaemia': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'ANC',
-                'variable2': 'mnid_anc_hb_screened', 'value2': 'Yes',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'ANC',
-            },
-            'note': 'Tracked from ANC haemoglobin screening concepts in MAHIS, including Hb(g/dL) and equivalent haemoglobin-result fields.',
-        },
-        'ANC screened for infection': {
-            'status': 'awaiting_baseline',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'ANC',
-                'variable2': 'mnid_anc_infection_screened', 'value2': 'Yes',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'ANC',
-            },
-            'note': 'This is still a composite proxy built from HIV, syphilis, and malaria testing signals. Keep out of the core tracked set until a single agreed infection-screening definition is confirmed.',
-        },
-        'ANC screened for high blood pressure': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'mnid_anc_bp_screened', 'value1': 'Yes',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'ANC',
-            },
-            'note': 'Tracked using ANC clients with blood-pressure vitals recorded in the current parquet.',
-        },
-        'POCUS with gestational age': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'ANC',
-                'variable2': 'mnid_anc_pocus_with_ga', 'value2': 'Yes',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'ANC',
-            },
-            'note': 'Tracked using real-parquet gestational-age-by-ultrasound rows plus ultrasound-status aliases where they are exposed.',
-        },
-        'HIV-tested and screened for anaemia and high blood pressure': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'ANC',
-                'variable2': 'mnid_anc_hiv_anaemia_bp_screened', 'value2': 'Yes',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'ANC',
-            },
-            'note': 'Tracked as a combined ANC coverage indicator using person-level HIV test, haemoglobin screening, and blood-pressure screening flags.',
-        },
-        'Eligible babies who received neonatal resuscitation': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'mnid_newborn_resuscitation_eligible_received', 'value1': 'Yes',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'mnid_newborn_resuscitation_eligible', 'value1': 'Yes',
-            },
-            'note': 'Numerator: eligible newborns with a recorded resuscitation intervention. Denominator: all newborns marked eligible for resuscitation.',
-        },
-        'Breastfeeding in first hour': {
-            'status': 'awaiting_baseline',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'Labour',
-                'variable2': 'concept_name', 'value2': 'Breast feeding',
-                'variable3': 'obs_value_coded', 'value3': 'Yes',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'Labour',
-                'variable2': 'concept_name', 'value2': 'Breast feeding',
-            },
-            'note': 'Breastfeeding status is present, but the required within-1-hour timing field is not exposed in the current extract.',
-        },
-        'ANC 2+ tetanus doses': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Number of tetanus doses',
-                'variable2': 'obs_value_coded', 'value2': ['two doses', 'three doses', 'four doses'],
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'ANC',
-            },
-        },
-        'Pregnancy planned': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Pregnancy planned',
-                'variable2': 'obs_value_coded', 'value2': 'Yes',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Pregnancy planned',
-            },
-        },
-        'Danger signs assessed': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Danger signs present',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'ANC',
-            },
-        },
-        'Facility deliveries': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'mnid_labour_facility_birth', 'value1': 'Yes',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'Labour',
-            },
-        },
-        'Quality intrapartum care and management of complications according to guidelines': {
-            'status': 'awaiting_baseline',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'mnid_labour_partograph_used', 'value1': 'Yes',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'Labour',
-            },
-            'note': 'Partograph use alone is too weak to stand in for the full intrapartum guideline bundle. Keep visible only as a placeholder until the bundle is modeled explicitly.',
-        },
-        'Digital intrapartum monitoring in labour': {
-            'status': 'awaiting_baseline',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Digital intrapartum monitoring',
-                'variable2': 'obs_value_coded', 'value2': 'Used',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'Labour',
-            },
-            'note': 'Awaiting a dedicated electronic fetal monitoring concept (CTG / Moyo device) in MAHIS. Partograph use is already tracked under quality intrapartum care.',
-        },
-        'Eligible women with pre-term labour who received antenatal corticosteroids': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'mnid_labour_preterm_corticosteroids', 'value1': 'Yes',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'mnid_labour_preterm', 'value1': 'Yes',
-            },
-            'note': 'Tracked using a person-level proxy for preterm labour plus antenatal corticosteroids already captured in MAHIS labour care.',
-        },
-        'Women in labour who received prophylactic azithromycin': {
-            'status': 'awaiting_baseline',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'mnid_labour_azithromycin', 'value1': 'Yes',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'Labour',
-            },
-            'note': 'Keep pending until azithromycin prophylaxis is confirmed to land consistently in the reports extract.',
-        },
-        'Women with early-detected PPH who received the WHO treatment bundle': {
-            'status': 'awaiting_baseline',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'mnid_labour_pph_bundle_received', 'value1': 'Yes',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'mnid_labour_pph', 'value1': 'Yes',
-            },
-            'note': 'Current data supports only a treatment-bundle proxy. This needs explicit uterotonic, TXA, and timing fields before it should be treated as a core tracked indicator.',
-        },
-        'Vitamin K given at birth': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'Labour',
-                'variable2': 'concept_name', 'value2': 'Vitamin K given',
-                'variable3': 'obs_value_coded', 'value3': 'Yes',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'Labour',
-                'variable2': 'concept_name', 'value2': 'Vitamin K given',
-            },
-        },
-        'Birth weight recorded': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Birth weight',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'Newborn',
-            },
-        },
-        'Gestation weeks recorded': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'Newborn',
-                'variable2': 'concept_name', 'value2': 'Gestation in weeks',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'Newborn',
-            },
-        },
-        'Vitamin K given': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'Newborn',
-                'variable2': 'concept_name', 'value2': 'Vitamin K given',
-                'variable3': 'obs_value_coded', 'value3': 'Yes',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'Newborn',
-                'variable2': 'concept_name', 'value2': 'Vitamin K given',
-            },
-        },
-        'Thermal care recorded': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'thermal care',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'Newborn',
-            },
-        },
-        'PNC mothers within 48 hours': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Postnatal check period',
-                'variable2': 'obs_value_coded', 'value2': 'Up to 48 hrs or before discharge',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'PNC',
-            },
-        },
-        'Mother alive at PNC review': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Status of the mother',
-                'variable2': 'obs_value_coded', 'value2': 'Alive',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Status of the mother',
-            },
-        },
-        'Baby alive at PNC review': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Status of baby',
-                'variable2': 'obs_value_coded', 'value2': 'Alive',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Status of baby',
-            },
-        },
-        'BCG vaccination coverage': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Immunisation given',
-                'variable2': 'obs_value_coded', 'value2': 'BCG',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Immunisation given',
-            },
-        },
-        'HIV positive mothers identified in PNC': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Mother HIV Status',
-                'variable2': 'obs_value_coded', 'value2': ['Reactive', 'Positive', 'positive', 'reactive'],
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'concept_name', 'value1': 'Mother HIV Status',
-            },
-            'note': 'Tracked from maternal HIV status observations currently flowing through the MNH parquet, pending tighter PNC encounter normalization.',
-        },
-        'Eligible preterm and low birth-weight babies who receive iKMC': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'mnid_newborn_kmc_eligible', 'value1': 'Yes',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'mnid_birth_weight_band', 'value1': ['1000-1499g', '1500-1999g'],
-            },
-            'note': 'Tracked as an eligibility proxy using low-birth-weight bands plus KMC-related newborn care concepts already modeled in MAHIS.',
-        },
-        'Babies between 1000-1499g who receive prophylactic CPAP': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'mnid_newborn_cpap_1000_1499', 'value1': 'Yes',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'mnid_birth_weight_band', 'value1': '1000-1499g',
-            },
-            'note': 'Tracked from birth-weight bands plus newborn CPAP treatment observations already normalized into the parquet.',
-        },
-        'Eligible babies between 1500 and 1999g who receive CPAP': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'mnid_newborn_cpap_1500_1999', 'value1': 'Yes',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'mnid_birth_weight_band', 'value1': '1500-1999g',
-            },
-            'note': 'Tracked from birth-weight bands plus newborn CPAP treatment observations already normalized into the parquet. This remains a weight-band proxy because RDS is not modeled separately.',
-        },
-        'Babies with clinical jaundice who receive phototherapy': {
-            'status': 'awaiting_baseline',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'mnid_newborn_jaundice_phototherapy', 'value1': 'Yes',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'mnid_newborn_jaundice', 'value1': 'Yes',
-            },
-            'note': 'Clinical jaundice is present, but phototherapy treatment is not yet arriving in a reliable report concept in the current parquet.',
-        },
-        'Babies with suspected sepsis who receive parenteral antibiotics': {
-            'status': 'awaiting_baseline',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'mnid_newborn_sepsis_antibiotics', 'value1': 'Yes',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'mnid_newborn_sepsis', 'value1': 'Yes',
-            },
-            'note': 'Needs a linked newborn sepsis diagnosis signal in the current extract before the antibiotic-treatment ratio is dependable.',
-        },
-        'Babies not hypothermic on admission to the neonatal unit': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'mnid_newborn_not_hypothermic_admission', 'value1': 'Yes',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'Newborn',
-            },
-            'note': 'Tracked directly from the neonatal thermal-status-on-admission concept.',
-        },
-        'Babies not hypothermic at any time in the neonatal unit': {
-            'status': 'awaiting_baseline',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'mnid_newborn_not_hypothermic_anytime', 'value1': 'Yes',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'Newborn',
-            },
-            'note': 'This needs longitudinal neonatal thermal-status observations, which are not yet exposed in the current parquet.',
-        },
-    }
-
-    enriched = []
-    seen_labels = set()
-    for indicator in indicators or []:
-        category = str(indicator.get('category', '')).strip()
-        if wanted and category and category not in wanted:
-            continue
-        updated = dict(indicator)
-        overlay = overlays.get(updated.get('label'))
-        if overlay:
-            updated.update(overlay)
-        enriched.append(updated)
-        seen_labels.add(updated.get('label'))
-
-    # Keep source-of-truth indicators from JSON, but append calculable operational priorities if they are missing.
-    for fallback in _program_based_priority_indicators(categories):
-        if fallback.get('label') in seen_labels:
-            continue
-        if wanted and fallback.get('category') not in wanted:
-            continue
-        enriched.append(fallback)
-        seen_labels.add(fallback.get('label'))
-
-    for fallback in _program_based_overlay_fallbacks(categories):
-        if fallback.get('label') in seen_labels:
-            continue
-        if wanted and fallback.get('category') not in wanted:
-            continue
-        enriched.append(fallback)
-        seen_labels.add(fallback.get('label'))
-
-    return enriched
-
-
-def _resolve_runtime_mnid_indicators(indicators: list, df: pd.DataFrame, categories: list[str] | None = None) -> list:
-    if _uses_program_based_mnid_schema(df):
-        return _enrich_program_based_mnid_indicators(indicators, categories)
-    return indicators
+    from mnid.aggregation.store import invalidate_cache as _agg_invalidate
+    _agg_invalidate()
 
 
 def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str, chart_type: str = 'line') -> go.Figure:
@@ -1560,7 +793,9 @@ def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str, chart_type: str =
             xs.append(pd.Period(p, 'M').to_timestamp().to_pydatetime())
             ys.append(round(n / d * 100, 1) if d > 0 else None)
 
-        has_data = any(y is not None for y in ys)
+        moving_average, _ = _moving_average_values(ys, 'monthly')
+
+        has_data = any(y is not None for y in moving_average)
         if not has_data:
             if chart_type == 'bar':
                 fig.add_trace(go.Bar(x=[], y=[], name=ind['label'], marker=dict(color=c), showlegend=True))
@@ -1569,8 +804,8 @@ def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str, chart_type: str =
             continue
 
         if chart_type == 'bar':
-            clean_xs = [x for x, y in zip(xs, ys) if y is not None]
-            clean_ys = [y for y in ys if y is not None]
+            clean_xs = [x for x, y in zip(xs, moving_average) if y is not None]
+            clean_ys = [y for y in moving_average if y is not None]
             fig.add_trace(go.Bar(
                 x=clean_xs, y=clean_ys, name=ind['label'],
                 marker=dict(color=f'rgba({r},{g},{b},0.85)', line=dict(color=c, width=1)),
@@ -1579,12 +814,13 @@ def _cat_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str, chart_type: str =
             ))
         else:
             fig.add_trace(go.Scatter(
-                x=xs, y=ys, name=ind['label'],
+                x=xs, y=moving_average, name=ind['label'],
                 mode='lines+markers',
                 line=dict(color=c, width=2, shape='spline'),
                 marker=dict(size=5, color=c, line=dict(color='#fff', width=1.25)),
                 connectgaps=True,
-                hovertemplate=f'%{{x|%b %Y}}<br>{ind["label"]}: %{{y:.0f}}%<extra></extra>',
+                customdata=[[raw] for raw in ys],
+                hovertemplate=f'%{{x|%b %Y}}<br>{ind["label"]} Moving Avg: %{{y:.1f}}%<br>Raw Coverage: %{{customdata[0]:.1f}}%<extra></extra>',
             ))
     fig.update_layout(
         paper_bgcolor=BG, plot_bgcolor=BG,
@@ -1638,24 +874,35 @@ def update_trend_chart(n_clicks_list, location, selected_inds, stored_trend, act
 
     trend_payload = stored_trend or {}
     tracked = trend_payload.get('tracked', [])
-    df = _restore_ui_dataframe(trend_payload.get('data_key'))
     scope_meta = trend_payload.get('scope_meta') or {}
     loc_options = trend_payload.get('loc_options') or [{'label': 'All locations', 'value': 'all'}]
     ind_opts_by_cat = trend_payload.get('ind_opts_by_cat') or {}
     ind_options = ind_opts_by_cat.get(cat, [])
 
-    # Reset indicator selection when category changes; preserve on other triggers
-    ind_value_out = None if cat_changed else no_update
+    # Use aggregate fast path; only restore the raw df when aggregate is absent (first run).
+    _agg_now = _get_aggregate()
+    if _agg_now is not None:
+        # Build a minimal stub df with the date range so _run_chart_cards can detect grain.
+        _d_min = trend_payload.get('date_min')
+        _d_max = trend_payload.get('date_max')
+        if _d_min and _d_max:
+            df = pd.DataFrame({'Date': pd.to_datetime([_d_min, _d_max])})
+        else:
+            df = _restore_ui_dataframe(trend_payload.get('data_key'))
+    else:
+        df = _restore_ui_dataframe(trend_payload.get('data_key'))
+
+    default_ind_values = [o['value'] for o in ind_options[:_DEFAULT_TREND_INDICATOR_LIMIT]]
+    ind_value_out = default_ind_values if cat_changed else no_update
 
     cards = _run_chart_cards(df, tracked, cat, location or 'all',
-                             selected_inds if not cat_changed else None,
-                             scope_meta)
+                             default_ind_values if cat_changed else selected_inds,
+                             scope_meta, agg_df=_agg_now)
     classes = ['mnid-filter-btn active' if c == cat else 'mnid-filter-btn' for c in categories]
     return cards, cat, classes, loc_options, ind_options, ind_value_out
 
 
 def _location_options_for_df(df: pd.DataFrame, scope_meta: dict) -> list[dict]:
-    """Build location filter options from the available data."""
     level = str((scope_meta or {}).get('level') or '').strip().lower()
     opts = [{'label': 'All locations', 'value': 'all'}]
     if df is None or df.empty:
@@ -1673,128 +920,115 @@ def _location_options_for_df(df: pd.DataFrame, scope_meta: dict) -> list[dict]:
 
 
 def _indicator_run_fig(plot_df: pd.DataFrame, ind: dict, color: str,
-                       periods: list, tickfmt: str, hfmt: str) -> go.Figure:
-    """Single-indicator run chart figure for one card."""
-    nm = _mask(plot_df, ind['numerator_filters'])
-    dm = _mask(plot_df, ind['denominator_filters'])
-    pid = 'person_id'
+                       periods: list, tickfmt: str, hfmt: str,
+                       grain: str = 'monthly',
+                       precomputed: pd.DataFrame | None = None) -> go.Figure:
+    """Single-indicator run chart figure for one card.
 
-    xs, ys = [], []
-    n_vals, d_vals = [], []
-    for p in periods:
-        pm = plot_df['_p'] == p
-        n_val = int(plot_df.loc[pm & nm, pid].dropna().nunique()) if pid in plot_df.columns else int((pm & nm).sum())
-        d_val = int(plot_df.loc[pm & dm, pid].dropna().nunique()) if pid in plot_df.columns else int((pm & dm).sum())
-        xs.append(p)
-        ys.append(round(n_val / d_val * 100, 1) if d_val > 0 else None)
-        n_vals.append(n_val)
-        d_vals.append(d_val)
+    When `precomputed` is provided (a DataFrame with period_start/numerator/
+    denominator/pct from the overnight aggregate) the expensive row-scan loop
+    is skipped entirely, cutting render time from seconds to milliseconds.
+    """
+    if precomputed is not None and not precomputed.empty:
+        xs     = precomputed['period_start'].tolist()
+        ys     = precomputed['pct'].tolist()
+        n_vals = precomputed['numerator'].tolist()
+        d_vals = precomputed['denominator'].tolist()
+        # Mark zero-denominator periods as None so gaps render correctly
+        ys = [y if d > 0 else None for y, d in zip(ys, d_vals)]
+    else:
+        nm = _mask(plot_df, ind['numerator_filters'])
+        dm = _mask(plot_df, ind['denominator_filters'])
+        pid = 'person_id'
 
-    valid_ys = [y for y in ys if y is not None]
-    fig = go.Figure()
+        xs, ys = [], []
+        n_vals, d_vals = [], []
+        for p in periods:
+            pm = plot_df['_p'] == p
+            n_val = int(plot_df.loc[pm & nm, pid].dropna().nunique()) if pid in plot_df.columns else int((pm & nm).sum())
+            d_val = int(plot_df.loc[pm & dm, pid].dropna().nunique()) if pid in plot_df.columns else int((pm & dm).sum())
+            xs.append(p)
+            ys.append(round(n_val / d_val * 100, 1) if d_val > 0 else None)
+            n_vals.append(n_val)
+            d_vals.append(d_val)
+
+    smoothed, _ = _moving_average_values(ys, grain)
+    valid_ys = [y for y in smoothed if y is not None]
     if not valid_ys:
-        fig.update_layout(paper_bgcolor=BG, plot_bgcolor=BG, height=200,
-                          margin=dict(l=8, r=8, t=4, b=4),
-                          annotations=[dict(text='No data for this period',
-                                            xref='paper', yref='paper', x=0.5, y=0.5,
-                                            showarrow=False, font=dict(size=11, color=MUTED))])
-        return fig
+        return go.Figure(layout={
+            'paper_bgcolor': BG, 'plot_bgcolor': BG, 'height': 200,
+            'margin': {'l': 8, 'r': 8, 't': 4, 'b': 4},
+            'annotations': [{'text': 'No data for this period',
+                              'xref': 'paper', 'yref': 'paper', 'x': 0.5, 'y': 0.5,
+                              'showarrow': False, 'font': {'size': 11, 'color': MUTED}}],
+        })
 
-    avg = sum(valid_ys) / len(valid_ys)
-    r_val = int(color[1:3], 16)
-    g_val = int(color[3:5], 16)
-    b_val = int(color[5:7], 16)
-
-    # SD band
-    if len(valid_ys) > 2:
-        sd = _stats.stdev(valid_ys)
-        ub = [min(avg + sd, 100.0)] * len(xs)
-        lb = [max(avg - sd, 0.0)] * len(xs)
-        fig.add_trace(go.Scatter(
-            x=xs + xs[::-1], y=ub + lb[::-1],
-            fill='toself',
-            fillcolor=f'rgba({r_val},{g_val},{b_val},0.08)',
-            line=dict(color='rgba(0,0,0,0)'),
-            showlegend=False, hoverinfo='skip',
-        ))
-
-    # Mean line
-    fig.add_trace(go.Scatter(
-        x=xs, y=[avg] * len(xs), mode='lines',
-        line=dict(color='#EF4444', width=1.5, dash='dash'),
-        showlegend=False,
-        hovertemplate=f'Mean: {avg:.0f}%<extra></extra>',
-    ))
-
-    # Target
     target = ind.get('target')
+    traces = []
     if target is not None:
-        fig.add_trace(go.Scatter(
+        traces.append(go.Scatter(
             x=xs, y=[target] * len(xs), mode='lines',
-            line=dict(color='#94A3B8', width=1.2, dash='dot'),
+            line={'color': '#94A3B8', 'width': 1.5, 'dash': 'dot'},
             showlegend=False,
             hovertemplate=f'Target: {target}%<extra></extra>',
         ))
 
-    # Key-point labels (first, peak, last — deduplicated)
-    valid_pts = [(x, y) for x, y in zip(xs, ys) if y is not None]
+    valid_pts = [(x, y, raw) for x, y, raw in zip(xs, smoothed, ys) if y is not None]
     kp_set, key_pts = set(), []
     for pt in [valid_pts[0], max(valid_pts, key=lambda p: p[1]), valid_pts[-1]]:
         if pt[0] not in kp_set:
             kp_set.add(pt[0])
             key_pts.append(pt)
-    fig.add_trace(go.Scatter(
+    traces.append(go.Scatter(
         x=[p[0] for p in key_pts], y=[p[1] for p in key_pts],
         mode='markers+text',
         text=[f'{p[1]:.0f}%' for p in key_pts],
         textposition='top center',
-        textfont=dict(size=9, color='#374151'),
-        marker=dict(size=7, color='#1e293b'),
+        textfont={'size': 9, 'color': '#374151'},
+        marker={'size': 7, 'color': '#1e293b'},
         showlegend=False,
         hovertemplate=f'%{{x|{hfmt}}}: %{{y:.0f}}%<extra></extra>',
     ))
-
-    # Main data line — customdata carries (n, d) for rich hover
-    fig.add_trace(go.Scatter(
-        x=xs, y=ys, mode='lines+markers',
-        line=dict(color=color, width=2.4, shape='linear'),
-        marker=dict(size=5, color=color, line=dict(color='#fff', width=1.2)),
+    traces.append(go.Scatter(
+        x=xs, y=smoothed, mode='lines+markers',
+        line={'color': color, 'width': 2.4, 'shape': 'linear'},
+        marker={'size': 5, 'color': color, 'line': {'color': '#fff', 'width': 1.2}},
         connectgaps=False, showlegend=False,
         customdata=list(zip(n_vals, d_vals)),
         hovertemplate=(
             f'<b>%{{x|{hfmt}}}</b><br>'
-            'Coverage: <b>%{y:.1f}%</b><br>'
+            'Moving Avg: <b>%{y:.1f}%</b><br>'
             'Clients: %{customdata[0]} / %{customdata[1]}'
             '<extra></extra>'
         ),
     ))
-
-    fig.update_layout(
-        paper_bgcolor=BG, plot_bgcolor=BG,
-        font=dict(family=FONT, color=TEXT, size=10),
-        height=200,
-        margin=dict(l=6, r=80, t=6, b=24),
-        showlegend=False,
-        hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
-        xaxis=dict(showgrid=False, zeroline=False, showline=False,
-                   tickformat=tickfmt, tickfont=dict(size=9, color=MUTED)),
-        yaxis=dict(showgrid=True, gridcolor=GRID_C, zeroline=False, showline=False,
-                   tickfont=dict(size=9, color=MUTED), ticksuffix='%', range=[0, 112]),
-        annotations=[dict(
-            x=1.0, y=avg / 112, xref='paper', yref='paper',
-            text=f'<b>avg {avg:.0f}%</b>',
-            showarrow=False, font=dict(size=9, color='#EF4444'),
-            xanchor='left', yanchor='middle',
-        )],
-    )
-    return fig
+    layout_annotations = []
+    if target is not None:
+        layout_annotations.append({
+            'x': 1.0, 'y': target / 112, 'xref': 'paper', 'yref': 'paper',
+            'text': f'<b>target {target:.0f}%</b>',
+            'showarrow': False, 'font': {'size': 9, 'color': '#64748B'},
+            'xanchor': 'left', 'yanchor': 'middle',
+        })
+    return go.Figure(data=traces, layout={
+        'paper_bgcolor': BG, 'plot_bgcolor': BG,
+        'font': {'family': FONT, 'color': TEXT, 'size': 10},
+        'height': 200, 'margin': {'l': 6, 'r': 80, 't': 6, 'b': 24},
+        'showlegend': False,
+        'hoverlabel': {'bgcolor': '#fff', 'bordercolor': BORDER, 'font_size': 11},
+        'xaxis': {'showgrid': False, 'zeroline': False, 'showline': False,
+                  'tickformat': tickfmt, 'tickfont': {'size': 9, 'color': MUTED}},
+        'yaxis': {'showgrid': True, 'gridcolor': GRID_C, 'zeroline': False, 'showline': False,
+                  'tickfont': {'size': 9, 'color': MUTED}, 'ticksuffix': '%', 'range': [0, 112]},
+        'annotations': layout_annotations,
+    })
 
 
 def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
                      location: str | None = None,
                      selected_ids: list | None = None,
-                     scope_meta: dict | None = None) -> list:
-    """Build a list of card divs — one per tracked indicator in cat."""
+                     scope_meta: dict | None = None,
+                     agg_df: pd.DataFrame | None = None) -> list:
     tracked = [i for i in indicators if i.get('status') == 'tracked' and i.get('category') == cat]
     if selected_ids:
         id_set = set(selected_ids)
@@ -1803,17 +1037,21 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
         return [html.Div('No indicators configured for this category.',
                          style={'color': MUTED, 'fontSize': '13px', 'padding': '24px'})]
 
-    # Apply location filter
     plot_df = df.copy()
+    fac_filter: list[str] | None = None
+    dist_filter: list[str] | None = None
     if location and location != 'all':
-        for col_name in ('Facility_CODE', 'District'):
-            if col_name in df.columns:
-                mask = df[col_name].astype(str) == str(location)
-                if mask.any():
-                    plot_df = df[mask].copy()
-                    break
+        if 'Facility_CODE' in df.columns:
+            mask = df['Facility_CODE'].astype(str) == str(location)
+            if mask.any():
+                plot_df = df[mask].copy()
+                fac_filter = [str(location)]
+        if fac_filter is None and 'District' in df.columns:
+            mask = df['District'].astype(str) == str(location)
+            if mask.any():
+                plot_df = df[mask].copy()
+                dist_filter = [str(location)]
 
-    # Auto-detect time frequency from the filtered data
     dates = pd.to_datetime(plot_df['Date'], errors='coerce').dropna()
     if dates.empty:
         return [html.Div('No data for the selected location.',
@@ -1821,34 +1059,81 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
 
     span = max(int((dates.max() - dates.min()).days), 0)
     if span <= 45:
-        tickfmt, hfmt = '%d %b', '%d %b %Y'
+        tickfmt, hfmt, grain = '%d %b', '%d %b %Y', 'daily'
         plot_df['_p'] = dates.dt.floor('D')
     elif span <= 180:
-        tickfmt, hfmt = '%d %b', '%d %b %Y'
-        plot_df['_p'] = dates.dt.to_period('W').apply(lambda p: p.start_time)
+        tickfmt, hfmt, grain = '%d %b', '%d %b %Y', 'weekly'
+        plot_df['_p'] = dates.dt.to_period('W').dt.start_time
     else:
-        tickfmt, hfmt = '%b %y', '%b %Y'
-        plot_df['_p'] = dates.dt.to_period('M').apply(lambda p: datetime(p.year, p.month, 1))
+        tickfmt, hfmt, grain = '%b %y', '%b %Y', 'monthly'
+        plot_df['_p'] = dates.dt.to_period('M').dt.start_time
 
     periods = sorted(plot_df['_p'].dropna().unique())
     if not periods:
         return [html.Div('No time periods available.',
                          style={'color': MUTED, 'fontSize': '13px', 'padding': '24px'})]
 
+    date_min, date_max = dates.min(), dates.max()
+
+    # Prefer scope_meta facility/district filter when no explicit location given
+    if agg_df is None:
+        agg_df = _get_aggregate()
+    if fac_filter is None and dist_filter is None and scope_meta:
+        _, fac_codes, districts = _resolve_scope_filters(plot_df, scope_meta)
+        fac_filter = fac_codes or None
+        dist_filter = districts or None
+
+    # Pre-slice aggregate once to only the relevant indicators + grains + date window.
+    # This reduces per-card pandas filter work from O(22k rows) to O(~100 rows).
+    _agg_slice = None
+    if agg_df is not None and not agg_df.empty:
+        _ind_ids = {_agg_resolve_id(agg_df, i['id'], i.get('label')) for i in tracked}
+        _grain_set = set(_agg_candidate_grains(grain))
+        # Use the earliest period floor across all candidate grains so fallback grains
+        # (e.g. monthly when primary is weekly) are not cut off by the slice.
+        _pf = min(_agg_floor_period(date_min, g) for g in _grain_set)
+        _smask = (
+            agg_df['grain'].isin(_grain_set)
+            & agg_df['indicator_id'].isin(_ind_ids)
+            & (agg_df['period_start'] >= _pf)
+            & (agg_df['period_start'] <= pd.Timestamp(date_max))
+        )
+        if fac_filter:
+            _smask &= agg_df['facility_code'].isin([str(f) for f in fac_filter])
+        elif dist_filter:
+            _smask &= agg_df['district'].isin([str(d) for d in dist_filter])
+        _agg_slice = agg_df[_smask].reset_index(drop=True)
+
     cat_colors = CAT_PALETTES.get(cat, _TREND_SERIES_PALETTE)
     cards = []
-
     for idx, ind in enumerate(tracked):
         color = cat_colors[idx % len(cat_colors)]
-        fig = _indicator_run_fig(plot_df, ind, color, periods, tickfmt, hfmt)
 
+        # Fast path: use pre-aggregated series when available
+        precomputed = None
+        if _agg_slice is not None:
+            precomputed = _agg_time_series(
+                _agg_slice, ind['id'], grain=grain,
+                facility_codes=fac_filter,
+                districts=dist_filter if not fac_filter else None,
+                start_date=date_min, end_date=date_max,
+                indicator_label=ind.get('label'),
+            )
+
+        fig = _indicator_run_fig(plot_df, ind, color, periods, tickfmt, hfmt, grain, precomputed=precomputed)
         target = ind.get('target')
         target_badge = None
         if target is not None:
-            cls = _css(
-                _cov(plot_df, ind['numerator_filters'], ind['denominator_filters'])[2],
-                target, ind,
-            )
+            # Use pre-sliced aggregate for current-period coverage badge
+            if _agg_slice is not None:
+                cur_pct = _agg_coverage(_agg_slice, ind['id'], date_min, date_max,
+                                        facility_codes=fac_filter,
+                                        districts=dist_filter if not fac_filter else None,
+                                        grain=grain,
+                                        indicator_label=ind.get('label'))[2]
+            else:
+                cur_pct = _cov(plot_df, ind['numerator_filters'], ind['denominator_filters'])[2]
+            cls = _css(cur_pct, target, ind)
             badge_colors = {'ok': ('#D1FAE5', '#065F46'), 'warn': ('#FEF3C7', '#92400E'), 'danger': ('#FEE2E2', '#991B1B')}
             bg, fg = badge_colors.get(cls, ('#F1F5F9', '#475569'))
             target_badge = html.Span(
@@ -1857,13 +1142,11 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
                        'borderRadius': '999px', 'backgroundColor': bg, 'color': fg,
                        'marginLeft': '6px'},
             )
-
         card = html.Div(className='mnid-chart-card', children=[
             html.Div(style={'display': 'flex', 'alignItems': 'center',
                             'justifyContent': 'space-between', 'marginBottom': '2px'}, children=[
                 html.Div(ind['label'], style={
-                    'fontSize': '11px', 'fontWeight': '600', 'color': TEXT,
-                    'lineHeight': '1.3',
+                    'fontSize': '11px', 'fontWeight': '600', 'color': TEXT, 'lineHeight': '1.3',
                 }),
                 target_badge,
             ]),
@@ -1876,8 +1159,10 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
             ),
         ])
         cards.append(card)
-
     return cards
+
+
+_DEFAULT_TREND_INDICATOR_LIMIT = 4
 
 
 def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None = None,
@@ -1889,18 +1174,28 @@ def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None 
     default_cat = default_cat if default_cat in cat_order else (cat_order[0] if cat_order else 'ANC')
     loc_options = _location_options_for_df(df, scope_meta or {})
 
-    # Per-category indicator options stored so callback can swap them on tab change
     ind_opts_by_cat = {
         c: [{'label': i['label'], 'value': i['id']}
             for i in tracked if i.get('category') == c]
         for c in cat_order
     }
     default_ind_opts = ind_opts_by_cat.get(default_cat, [])
+    default_ind_values = [o['value'] for o in default_ind_opts[:_DEFAULT_TREND_INDICATOR_LIMIT]]
 
-    default_cards = _run_chart_cards(df, tracked, default_cat, 'all', None, scope_meta)
+    # Store date range so callbacks can detect grain without restoring the full df.
+    # data_key is kept as a lightweight fallback for when the aggregate isn't built yet.
+    try:
+        _dates = pd.to_datetime(df['Date'], errors='coerce').dropna() if 'Date' in df.columns else pd.Series([], dtype='datetime64[ns]')
+        _date_min = _dates.min().isoformat() if len(_dates) else None
+        _date_max = _dates.max().isoformat() if len(_dates) else None
+    except Exception:
+        _date_min = _date_max = None
+
     trend_store = {
         'tracked': tracked,
         'data_key': _remember_ui_payload('trend', df, stable_key=payload_key),
+        'date_min': _date_min,
+        'date_max': _date_max,
         'scope_meta': scope_meta or {},
         'loc_options': loc_options,
         'ind_opts_by_cat': ind_opts_by_cat,
@@ -1924,7 +1219,7 @@ def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None 
                 dcc.Dropdown(
                     id='mnid-trend-ind-filter',
                     options=default_ind_opts,
-                    value=None,
+                    value=default_ind_values,
                     multi=True,
                     clearable=True,
                     placeholder='All indicators',
@@ -1944,10 +1239,14 @@ def _trend_switcher(df: pd.DataFrame, indicators: list, categories: list | None 
         dcc.Store(id='mnid-trend-store', data=trend_store),
         dcc.Store(id='mnid-trend-active-cat', data=default_cat),
         dcc.Store(id='mnid-trend-cats-store', data=cat_order),
-        html.Div(
-            id='mnid-run-charts-container',
-            className='mnid-chart-grid',
-            children=default_cards,
+        dcc.Loading(
+            html.Div(
+                id='mnid-run-charts-container',
+                className='mnid-chart-grid',
+                children=[],
+            ),
+            type='circle',
+            color='#15803d',
         ),
     ])
 
@@ -2275,246 +1574,6 @@ def _service_table_fig(section: dict) -> go.Figure:
         plot_bgcolor='#FFFFFF',
     )
     return fig
-
-
-def _monthly_concept_rate(df, concept, positive_values=None, title='', target=None,
-                          color='#2563EB', target_col='obs_value_coded'):
-    if df is None or df.empty or 'Date' not in df.columns or 'concept_name' not in df.columns:
-        return None
-    sub = df[df['concept_name'].fillna('').astype(str) == concept]
-    if sub.empty:
-        return None
-    col = target_col if target_col in sub.columns else ('obs_value_coded' if 'obs_value_coded' in sub.columns else None)
-    if not col:
-        return None
-
-    dates = pd.to_datetime(sub['Date'], errors='coerce').dropna()
-    if dates.empty:
-        return None
-    span_days = max(int((dates.max() - dates.min()).days), 0)
-    if span_days <= 45:
-        sub['_m'] = dates.dt.floor('D')
-        tickfmt = '%d %b'
-        hover_fmt = '%{x|%d %b %Y}<br>%{y:.0f}%'
-    elif span_days <= 180:
-        sub['_m'] = dates.dt.to_period('W').apply(lambda p: p.start_time)
-        tickfmt = '%d %b'
-        hover_fmt = '%{x|%d %b %Y}<br>%{y:.0f}%'
-    else:
-        sub['_m'] = dates.dt.to_period('M').apply(lambda p: datetime(p.year, p.month, 1))
-        tickfmt = '%b %y'
-        hover_fmt = '%{x|%b %Y}<br>%{y:.0f}%'
-
-    periods = sorted(sub['_m'].dropna().unique())
-    if not periods:
-        return None
-
-    xs = list(periods)
-    ys = []
-    for p in periods:
-        month_df = sub[sub['_m'] == p]
-        den = month_df['person_id'].dropna().astype(str).nunique() if 'person_id' in month_df.columns else len(month_df)
-        if den <= 0:
-            ys.append(None)
-            continue
-        if positive_values is None:
-            num = den
-        else:
-            wanted = {str(v).strip().lower() for v in positive_values}
-            series = month_df[col].fillna('').astype(str).str.strip().str.lower()
-            num = month_df[series.isin(wanted)]['person_id'].dropna().astype(str).nunique() if 'person_id' in month_df.columns else int(series.isin(wanted).sum())
-        ys.append(round((num / den) * 100, 1) if den else None)
-
-    valid = [(x, y) for x, y in zip(xs, ys) if y is not None]
-    if not valid:
-        return None
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=xs, y=ys,
-        mode='lines+markers',
-        line=dict(color=color, width=2.5, shape='linear'),
-        marker=dict(size=6, color=color, line=dict(color='#fff', width=1.35)),
-        connectgaps=False,
-        hovertemplate=hover_fmt + '<extra></extra>',
-        showlegend=False,
-    ))
-
-    valid_ys = [y for y in ys if y is not None]
-    avg_val = sum(valid_ys) / len(valid_ys)
-    fig.add_hline(
-        y=avg_val,
-        line_dash='dash',
-        line_color='#DC2626',
-        line_width=1.5,
-        annotation_text=f'Avg {avg_val:.0f}%',
-        annotation_position='top right',
-        annotation_font_color='#374151',
-        annotation_font_size=9,
-    )
-
-    if target is not None:
-        fig.add_trace(go.Scatter(
-            x=xs, y=[target] * len(xs),
-            mode='lines',
-            line=dict(color='#A1A1AA', width=1.5, dash='dot'),
-            hovertemplate='Target: %{y:.0f}%<extra></extra>',
-            showlegend=False,
-        ))
-
-    key_pts = []
-    start = valid[0]
-    end = valid[-1]
-    peak = max(valid, key=lambda p: p[1])
-    for pt in [start, peak, end]:
-        if pt not in key_pts:
-            key_pts.append(pt)
-    fig.add_trace(go.Scatter(
-        x=[p[0] for p in key_pts],
-        y=[p[1] for p in key_pts],
-        mode='markers+text',
-        text=[f'{p[1]:.0f}%' for p in key_pts],
-        textposition='top center',
-        textfont=dict(size=9, color='#374151'),
-        marker=dict(size=7, color='#1e293b'),
-        showlegend=False,
-        hovertemplate=hover_fmt + '<extra></extra>',
-    ))
-
-    fig.update_layout(
-        paper_bgcolor='#FFFFFF',
-        plot_bgcolor='#FFFFFF',
-        font=dict(family=FONT, color=TEXT, size=11),
-        margin=dict(l=12, r=8, t=28, b=26),
-        height=210,
-        title=dict(text=title, x=0, xanchor='left', font=dict(size=12, color='#444441', family=FONT)),
-        xaxis=dict(showgrid=False, zeroline=False, showline=False, tickformat=tickfmt,
-                   tickfont=dict(size=9, color=MUTED)),
-        yaxis=dict(range=[0, 115], showgrid=True, gridcolor=GRID_C, zeroline=False, showline=False,
-                   tickfont=dict(size=9, color=MUTED), ticksuffix='%',
-                   title=dict(text='Coverage', font=dict(size=9, color=MUTED))),
-    )
-    return fig
-
-
-def _monthly_concept_mix_fig(df, concept, categories, title, target_col='obs_value_coded'):
-    if df is None or df.empty or 'Date' not in df.columns or 'concept_name' not in df.columns:
-        return None
-    sub = df[df['concept_name'].fillna('').astype(str) == concept]
-    if sub.empty:
-        return None
-    col = target_col if target_col in sub.columns else ('obs_value_coded' if 'obs_value_coded' in sub.columns else None)
-    if not col:
-        return None
-
-    sub['_m'] = pd.to_datetime(sub['Date']).dt.to_period('M')
-    months = sorted(sub['_m'].dropna().unique())[-12:]
-    if not months:
-        return None
-
-    fig = go.Figure()
-    for label, values, color in categories:
-        vals = []
-        wanted = {str(v).strip().lower() for v in values}
-        for m in months:
-            month_df = sub[sub['_m'] == m]
-            den = month_df['person_id'].dropna().astype(str).nunique() if 'person_id' in month_df.columns else len(month_df)
-            if den <= 0:
-                vals.append(0)
-                continue
-            series = month_df[col].fillna('').astype(str).str.strip().str.lower()
-            num = month_df[series.isin(wanted)]['person_id'].dropna().astype(str).nunique() if 'person_id' in month_df.columns else int(series.isin(wanted).sum())
-            vals.append(round((num / den) * 100, 1))
-        fig.add_trace(go.Bar(
-            x=[pd.Period(m, 'M').to_timestamp().to_pydatetime() for m in months],
-            y=vals,
-            name=label,
-            marker=dict(color=color),
-            hovertemplate='%{x|%b %Y}<br>' + label + ': %{y:.0f}%<extra></extra>',
-        ))
-    fig.update_layout(
-        paper_bgcolor='#FFFFFF',
-        plot_bgcolor='#FFFFFF',
-        font=dict(family=FONT, color=TEXT, size=11),
-        margin=dict(l=12, r=8, t=30, b=28),
-        height=240,
-        title=dict(text=title, x=0, xanchor='left', font=dict(size=12, color='#444441', family=FONT)),
-        barmode='stack',
-        legend=dict(orientation='h', x=0, y=1.14, xanchor='left', font=dict(size=9, color=DIM)),
-        xaxis=dict(showgrid=False, zeroline=False, showline=False, tickformat='%b %y',
-                   tickfont=dict(size=9, color=MUTED)),
-        yaxis=dict(range=[0, 100], showgrid=True, gridcolor=GRID_C, zeroline=False, showline=False,
-                   tickfont=dict(size=9, color=MUTED), ticksuffix='%',
-                   title=dict(text='Share of babies', font=dict(size=9, color=MUTED))),
-    )
-    return fig
-
-
-def _concept_rate(df, concept, positive_values=None, target_col='obs_value_coded'):
-    if df is None or df.empty or 'concept_name' not in df.columns:
-        return 0, 0, 0.0
-    sub = df[df['concept_name'].fillna('').astype(str) == concept]
-    if sub.empty:
-        return 0, 0, 0.0
-    den = sub['person_id'].dropna().astype(str).nunique() if 'person_id' in sub.columns else len(sub)
-    if den <= 0:
-        return 0, 0, 0.0
-    if positive_values is None:
-        return den, den, 100.0
-    col = target_col if target_col in sub.columns else ('obs_value_coded' if 'obs_value_coded' in sub.columns else None)
-    if not col:
-        return 0, den, 0.0
-    wanted = {str(v).strip().lower() for v in positive_values}
-    series = sub[col].fillna('').astype(str).str.strip().str.lower()
-    num = sub[series.isin(wanted)]['person_id'].dropna().astype(str).nunique() if 'person_id' in sub.columns else int(series.isin(wanted).sum())
-    pct = round((num / den) * 100, 1) if den else 0.0
-    return num, den, pct
-
-
-def _newborn_summary_card(label, num, den, pct, accent, note):
-    return html.Div(className='mnid-newborn-metric', style={'--nb-accent': accent}, children=[
-        html.Div(label, className='mnid-newborn-metric-label'),
-        html.Div([
-            html.Span(f'{_display_pct(pct):.0f}%', className='mnid-newborn-metric-value'),
-            html.Span(f'{num}/{den}', className='mnid-newborn-metric-meta'),
-        ], className='mnid-newborn-metric-top'),
-        html.Div(note, className='mnid-newborn-metric-note'),
-    ])
-
-
-def _newborn_section_card(title, subtitle, tone, children):
-    return html.Div(className=f'mnid-chart-card mnid-newborn-section mnid-newborn-{tone}',
-                    style={'gridColumn': '1 / -1'},
-                    children=[
-                        html.Div(className='mnid-newborn-section-head', children=[
-                            html.Div([
-                                html.Div(title, className='mnid-card-title'),
-                                html.Div(subtitle, className='mnid-newborn-section-subtitle'),
-                            ]),
-                            html.Span(tone.upper(), className='mnid-newborn-section-tag'),
-                        ]),
-                        children,
-                    ])
-
-
-def _first_available_value_counts(df: pd.DataFrame, concepts: list[str], col: str = 'obs_value_coded'):
-    for concept in concepts:
-        vc = _value_counts(df, concept, col=col)
-        if len(vc):
-            return vc, concept
-    return pd.DataFrame(columns=['label', 'n']), None
-
-
-def _newborn_tab_content(desc: str, children: list):
-    cards = [child for child in children if child is not None]
-    if not cards:
-        cards = [_no_data_card('No data available for this module.')]
-    return html.Div(className='mnid-newborn-tab-panel', children=[
-        html.Div(desc, className='mnid-newborn-tab-desc'),
-        html.Div(className='mnid-newborn-subgrid mnid-newborn-subgrid-3', children=cards),
-    ])
-
-
 def _service_stack_fig(section: dict, chart_id: str | None = None) -> go.Figure:
     rows = section.get('rows', [])
     chart_specs = section.get('chart_specs', []) or []
@@ -2848,15 +1907,17 @@ def _location_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str,
             _, den, pct = _cov(period_df, ind['numerator_filters'], ind['denominator_filters'])
             xs.append(pd.Period(p, freq).to_timestamp().to_pydatetime())
             ys.append(_display_pct(pct) if den > 0 else None)
+        moving_average, ma_window = _moving_average_values(ys, period_label)
 
-        if not any(y is not None for y in ys):
+        if not any(y is not None for y in moving_average):
             continue
 
         color = color_cycle[idx % len(color_cycle)]
         series_name = ind['label']
-        clean_pairs = [(x, y) for x, y in zip(xs, ys) if y is not None]
-        clean_xs = [x for x, _ in clean_pairs]
-        clean_ys = [y for _, y in clean_pairs]
+        clean_pairs = [(x, y, raw) for x, y, raw in zip(xs, moving_average, ys) if y is not None]
+        clean_xs = [x for x, _, _ in clean_pairs]
+        clean_ys = [y for _, y, _ in clean_pairs]
+        clean_raw = [raw for _, _, raw in clean_pairs]
 
         if chart_type == 'bar':
             fig.add_trace(go.Bar(
@@ -2864,7 +1925,8 @@ def _location_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str,
                 y=clean_ys,
                 name=series_name,
                 marker=dict(color=color, line=dict(color=color, width=1)),
-                hovertemplate=f'%{{x|%d %b %Y}}<br>{series_name}: %{{y:.0f}}%<extra></extra>',
+                customdata=[[raw] for raw in clean_raw],
+                hovertemplate=f'%{{x|%d %b %Y}}<br>{series_name} Moving Avg: %{{y:.1f}}%<br>Raw Coverage: %{{customdata[0]:.1f}}%<extra></extra>',
             ))
         else:
             fig.add_trace(go.Scatter(
@@ -2875,39 +1937,41 @@ def _location_trend_fig(df: pd.DataFrame, cat_inds: list, cat: str,
                 line=dict(color=color, width=2.8, shape='linear'),
                 marker=dict(size=6, color=color, line=dict(color='#fff', width=1.4)),
                 connectgaps=False,
-                hovertemplate=f'%{{x|%d %b %Y}}<br>{series_name}: %{{y:.0f}}%<extra></extra>',
+                customdata=[[raw] for raw in clean_raw],
+                hovertemplate=f'%{{x|%d %b %Y}}<br>{series_name} Moving Avg: %{{y:.1f}}%<br>Raw Coverage: %{{customdata[0]:.1f}}%<extra></extra>',
             ))
 
             if idx == 0 and clean_xs:
-                avg_val = sum(clean_ys) / len(clean_ys)
-                fig.add_hline(
-                    y=avg_val,
-                    line_dash='dash',
-                    line_color='#DC2626',
-                    line_width=1.5,
-                    annotation_text=f'Average = {avg_val:.0f}',
-                    annotation_position='top right',
-                    annotation_font_color='#374151',
-                )
+                _tgt = ind.get('target')
+                if _tgt is not None:
+                    fig.add_trace(go.Scatter(
+                        x=clean_xs, y=[_tgt] * len(clean_xs),
+                        mode='lines',
+                        line=dict(color='#A1A1AA', width=1.5, dash='dot'),
+                        name=_target_label(ind),
+                        showlegend=True,
+                        hovertemplate=f'Target: {_tgt:.0f}%<extra></extra>',
+                    ))
 
                 key_points = []
-                key_points.append((clean_xs[0], clean_ys[0]))
+                key_points.append((clean_xs[0], clean_ys[0], clean_raw[0]))
                 if len(clean_xs) > 1:
-                    key_points.append((clean_xs[-1], clean_ys[-1]))
+                    key_points.append((clean_xs[-1], clean_ys[-1], clean_raw[-1]))
                 peak_idx = clean_ys.index(max(clean_ys))
-                peak_point = (clean_xs[peak_idx], clean_ys[peak_idx])
+                peak_point = (clean_xs[peak_idx], clean_ys[peak_idx], clean_raw[peak_idx])
                 if peak_point not in key_points:
                     key_points.append(peak_point)
 
                 fig.add_trace(go.Scatter(
-                    x=[x for x, _ in key_points],
-                    y=[y for _, y in key_points],
+                    x=[x for x, _, _ in key_points],
+                    y=[y for _, y, _ in key_points],
                     mode='markers+text',
-                    text=[f'{y:.0f}' for _, y in key_points],
+                    text=[f'{y:.1f}' for _, y, _ in key_points],
                     textposition='top center',
                     marker=dict(size=8, color='black'),
                     showlegend=False,
-                    hovertemplate=f'%{{x|%d %b %Y}}<br>{series_name}: %{{y:.0f}}%<extra></extra>',
+                    customdata=[[raw] for _, _, raw in key_points],
+                    hovertemplate=f'%{{x|%d %b %Y}}<br>{series_name} Moving Avg: %{{y:.1f}}%<br>Raw Coverage: %{{customdata[0]:.1f}}%<extra></extra>',
                 ))
 
     if not fig.data:
@@ -3026,1012 +2090,6 @@ def _service_table_switcher(df: pd.DataFrame, categories: list | None = None,
     ])
 
 
-# HELPERS (vectorised coverage matrix)
-
-def _mask(df: pd.DataFrame, cfg: dict) -> pd.Series:
-    """Build boolean row mask from a filter config dict without calling create_count."""
-    mask = pd.Series(True, index=df.index)
-    for i in range(1, 11):
-        var = cfg.get(f'variable{i}')
-        val = cfg.get(f'value{i}')
-        if not var or not val:
-            break
-        if var not in df.columns:
-            _warn_once(f"MNID filter mask references missing column '{var}' in config {cfg}")
-            return pd.Series(False, index=df.index)
-        mask &= df[var].isin(val) if isinstance(val, list) else (df[var] == val)
-    return mask
-
-
-def _matrix_by_group(df: pd.DataFrame, inds: list,
-                     group_col: str, groups: list) -> list:
-    """
-    Vectorized: one groupby per indicator (not one filter per group x indicator).
-    Returns z[indicator_idx][group_idx] = coverage % or None.
-    """
-    n_by_grp = {}
-    d_by_grp = {}
-    for ind in inds:
-        nm = _mask(df, ind['numerator_filters'])
-        dm = _mask(df, ind['denominator_filters'])
-        n_by_grp[ind['id']] = df[nm].groupby(group_col)['person_id'].nunique().to_dict()
-        d_by_grp[ind['id']] = df[dm].groupby(group_col)['person_id'].nunique().to_dict()
-
-    z = []
-    for ind in inds:
-        row = []
-        for g in groups:
-            n = n_by_grp[ind['id']].get(g, 0)
-            d = d_by_grp[ind['id']].get(g, 0)
-            row.append(round(n / d * 100, 1) if d > 0 else None)
-        z.append(row)
-    return z
-
-
-def _matrix_monthly(df: pd.DataFrame, inds: list) -> tuple:
-    """Monthly view for a single facility. Returns (x_labels, z)."""
-    d2 = df
-    d2['_m'] = pd.to_datetime(d2['Date']).dt.to_period('M')
-    periods = sorted(d2['_m'].dropna().unique())
-    if not periods:
-        return [], []
-
-    x_labels = [f"{p.strftime('%b')} {str(p.year)[2:]}" for p in periods]
-    n_by_m = {}
-    d_by_m = {}
-    for ind in inds:
-        nm = _mask(d2, ind['numerator_filters'])
-        dm = _mask(d2, ind['denominator_filters'])
-        n_by_m[ind['id']] = d2[nm].groupby('_m')['person_id'].nunique().to_dict()
-        d_by_m[ind['id']] = d2[dm].groupby('_m')['person_id'].nunique().to_dict()
-
-    z = []
-    for ind in inds:
-        row = []
-        for p in periods:
-            n = n_by_m[ind['id']].get(p, 0)
-            d = d_by_m[ind['id']].get(p, 0)
-            row.append(round(n / d * 100, 1) if d > 0 else None)
-        z.append(row)
-    return x_labels, z
-
-
-def _cov_color(pct):
-    if pct is None: return '#E2E8F0'
-    if pct >= 80:   return OK_C
-    if pct >= 65:   return WARN_C
-    return DANGER_C
-
-# # MNID vectorized facility coverage computation
-
-# MNID heatmap pre-computation
-
-def _compute_heatmap_store(mch_full: pd.DataFrame, tracked: list,
-                           facility_code: str) -> dict:
-    """Pre-compute all view x year matrices into a JSON-serialisable store."""
-    current_district = _FACILITY_DISTRICT.get(facility_code, '')
-    if len(mch_full) and 'Facility_CODE' in mch_full.columns:
-        all_facilities = sorted(mch_full['Facility_CODE'].dropna().astype(str).unique().tolist())
-    else:
-        all_facilities = sorted(_ALL_FACILITIES[:])
-
-    geojson = _load_malawi_district_geojson()
-    geo_districts = sorted({
-        f.get('properties', {}).get('shapeName')
-        for f in (geojson or {}).get('features', [])
-        if f.get('properties', {}).get('shapeName')
-    })
-    if len(mch_full) and 'District' in mch_full.columns:
-        data_districts = sorted(mch_full['District'].dropna().astype(str).unique().tolist())
-    else:
-        data_districts = sorted({
-            _FACILITY_DISTRICT.get(f, '')
-            for f in all_facilities
-            if _FACILITY_DISTRICT.get(f)
-        })
-    all_districts = sorted(set(data_districts) | set(geo_districts) | set(_ALL_DISTRICTS))
-
-    if facility_code and facility_code not in all_facilities:
-        all_facilities.insert(0, facility_code)
-    if current_district and current_district not in all_districts:
-        all_districts.insert(0, current_district)
-
-    sorted_inds = []
-    for cat in ['ANC', 'Labour', 'Newborn', 'PNC']:
-        sorted_inds.extend(i for i in tracked if i.get('category') == cat)
-    sorted_inds.extend(i for i in tracked if i not in sorted_inds)
-
-    y_labels  = [i['label'][:32] for i in sorted_inds]
-    y_targets = [i['target']     for i in sorted_inds]
-
-    store = {
-        'y_labels': y_labels, 'y_targets': y_targets,
-        'current_fac': facility_code, 'current_district': current_district,
-        'all_facilities': all_facilities, 'all_districts': all_districts,
-        'monthly': {}, 'by_facility': {}, 'by_district': {},
-        'by_district_facs': {d: {} for d in all_districts},
-        'yearly': {}, 'district_avgs': {},
-    }
-
-    if not len(mch_full) or not sorted_inds:
-        return store
-
-    years = []
-    if 'Date' in mch_full.columns:
-        years = sorted(mch_full['Date'].dt.year.dropna().astype(int).unique().tolist())
-    year_options = {'All years': None, **{str(y): y for y in years}}
-    district_facs_map = {
-        d: [f for f in all_facilities if _FACILITY_DISTRICT.get(f) == d]
-        for d in all_districts
-    }
-    store['facilities_by_district'] = district_facs_map
-
-    for ylbl, yval in year_options.items():
-        df = mch_full[mch_full['Date'].dt.year == yval] if yval else mch_full
-        if not len(df):
-            for key in ['monthly', 'by_facility', 'by_district']:
-                store[key][ylbl] = {'x': [], 'z': [], 'tick_angle': 0}
-            for d in all_districts:
-                store['by_district_facs'][d][ylbl] = {'x': [], 'z': [], 'tick_angle': -30}
-            store['district_avgs'][ylbl] = {d: None for d in all_districts}
-            continue
-
-        # Monthly - current facility only
-        fac_df = df[df['Facility_CODE'] == facility_code]
-        if len(fac_df):
-            x_m, z_m = _matrix_monthly(fac_df, sorted_inds)
-        else:
-            x_m, z_m = [], []
-        store['monthly'][ylbl] = {'x': x_m, 'z': z_m, 'tick_angle': 0}
-
-        # Vectorised groupby for facility and district - one pass per indicator
-        n_by_fac  = {}; d_by_fac  = {}
-        n_by_dist = {}; d_by_dist = {}
-        has_dist  = 'District' in df.columns
-
-        for ind in sorted_inds:
-            nm = _mask(df, ind['numerator_filters'])
-            dm = _mask(df, ind['denominator_filters'])
-            n_by_fac[ind['id']]  = df[nm].groupby('Facility_CODE')['person_id'].nunique().to_dict()
-            d_by_fac[ind['id']]  = df[dm].groupby('Facility_CODE')['person_id'].nunique().to_dict()
-            if has_dist:
-                n_by_dist[ind['id']] = df[nm].groupby('District')['person_id'].nunique().to_dict()
-                d_by_dist[ind['id']] = df[dm].groupby('District')['person_id'].nunique().to_dict()
-
-        def _cell(n_dict, d_dict, ind_id, key):
-            n = n_dict.get(ind_id, {}).get(key, 0)
-            d = d_dict.get(ind_id, {}).get(key, 0)
-            return round(n / d * 100, 1) if d > 0 else None
-
-        # All facilities
-        x_f = [f'{f}*' if f == facility_code else f for f in all_facilities]
-        z_f = [[_cell(n_by_fac, d_by_fac, ind['id'], fac) for fac in all_facilities]
-               for ind in sorted_inds]
-        store['by_facility'][ylbl] = {
-            'x': x_f, 'z': z_f, 'tick_angle': -30,
-            'districts': [_FACILITY_DISTRICT.get(f, '') for f in all_facilities],
-        }
-
-        # All districts
-        if has_dist:
-            data_districts = sorted(df['District'].dropna().unique().tolist())
-            z_d = [[_cell(n_by_dist, d_by_dist, ind['id'], dist) for dist in data_districts]
-                   for ind in sorted_inds]
-            store['by_district'][ylbl] = {'x': data_districts[:], 'z': z_d, 'tick_angle': -20}
-            d_avgs = {}
-            for di, dist in enumerate(data_districts):
-                vals = [z_d[ii][di] for ii in range(len(sorted_inds))
-                        if ii < len(z_d) and di < len(z_d[ii]) and z_d[ii][di] is not None]
-                d_avgs[dist] = round(sum(vals) / len(vals), 1) if vals else None
-            store['district_avgs'][ylbl] = d_avgs
-        else:
-            store['by_district'][ylbl]   = {'x': [], 'z': [], 'tick_angle': -20}
-            store['district_avgs'][ylbl] = {}
-
-        # Per-district facility breakdowns
-        for dist in all_districts:
-            dfacs = district_facs_map[dist]
-            x_df  = [f'{f}*' if f == facility_code else f for f in dfacs]
-            z_df  = [[_cell(n_by_fac, d_by_fac, ind['id'], fac) for fac in dfacs]
-                     for ind in sorted_inds]
-            store['by_district_facs'][dist][ylbl] = {'x': x_df, 'z': z_df, 'tick_angle': -30}
-
-    # Year-over-year for current facility
-    fac_full = mch_full[mch_full['Facility_CODE'] == facility_code]
-    if len(fac_full) and 'Date' in fac_full.columns:
-        years = sorted(fac_full['Date'].dt.year.dropna().astype(int).unique().tolist())
-        n_yr = {}; d_yr = {}
-        for ind in sorted_inds:
-            nm = _mask(fac_full, ind['numerator_filters'])
-            dm = _mask(fac_full, ind['denominator_filters'])
-            yr_col = fac_full['Date'].dt.year.astype(int)
-            n_yr[ind['id']] = fac_full[nm].groupby(yr_col)['person_id'].nunique().to_dict()
-            d_yr[ind['id']] = fac_full[dm].groupby(yr_col)['person_id'].nunique().to_dict()
-        x_yr = [str(y) for y in years]
-        z_yr  = [[round(n_yr[ind['id']].get(yr, 0) / d_yr[ind['id']].get(yr, 0) * 100, 1)
-                  if d_yr[ind['id']].get(yr, 0) > 0 else None
-                  for yr in years] for ind in sorted_inds]
-        store['yearly'] = {'x': x_yr, 'z': z_yr, 'tick_angle': 0}
-
-    # # MNID encounter volume counts for the right panel
-    counts: dict = {}
-    if 'Encounter' in mch_full.columns:
-        enc_col = mch_full['Encounter'].fillna('').str.upper()
-        fac_mask = mch_full['Facility_CODE'] == facility_code
-        for ylbl, yval in {'All years': None, '2025': 2025, '2026': 2026}.items():
-            if yval and 'Date' in mch_full.columns:
-                yr_mask = mch_full['Date'].dt.year == yval
-            else:
-                yr_mask = pd.Series(True, index=mch_full.index)
-            df_yr = mch_full[yr_mask & fac_mask]
-            enc_yr = df_yr['Encounter'].fillna('').str.upper() if len(df_yr) else pd.Series(dtype=str)
-            counts[ylbl] = {
-                'ANC visits':   int(df_yr[enc_yr.str.contains('ANC',      na=False)]['person_id'].nunique()),
-                'Deliveries':   int(df_yr[enc_yr.str.contains('LABOUR|DELIVERY|BIRTH', na=False)]['person_id'].nunique()),
-                'PNC visits':   int(df_yr[enc_yr.str.contains('PNC|POSTNATAL|POST.NATAL', na=False)]['person_id'].nunique()),
-                'All MCH encounters': int(df_yr['person_id'].nunique()),
-            }
-    store['counts'] = counts
-
-    return store
-
-
-
-def _build_facility_performance_heatmap_fig(stored: dict, year: str,
-                                            district: str | None = None,
-                                            sel_inds: list | None = None,
-                                            facility_type: str | None = None) -> html.Div:
-    all_labels = stored.get('y_labels', [])
-    if sel_inds:
-        rows_idx = [i for i, lbl in enumerate(all_labels) if lbl in sel_inds]
-    else:
-        rows_idx = list(range(len(all_labels)))
-
-    focus_district = district or 'All'
-    if focus_district == 'All':
-        data = stored.get('by_facility', {}).get(year, {})
-    else:
-        data = stored.get('by_district_facs', {}).get(focus_district, {}).get(year, {})
-    fac_keys = data.get('x', [])
-    z_raw = data.get('z', [])
-
-    selected_type = facility_type or 'All'
-    facility_rows = []
-    for col_idx, fac_key in enumerate(fac_keys):
-        fac_code = str(fac_key or '').rstrip('*')
-        fac_name = _FACILITY_NAMES.get(fac_code, fac_code)
-        fac_kind = _infer_facility_type(fac_code)
-        if selected_type != 'All' and fac_kind != selected_type:
-            continue
-        row_vals = [
-            _display_pct(z_raw[row_idx][col_idx])
-            if row_idx < len(z_raw) and col_idx < len(z_raw[row_idx]) and z_raw[row_idx][col_idx] is not None
-            else None
-            for row_idx in rows_idx
-        ]
-        vals = [v for v in row_vals if v is not None]
-        avg = round(sum(vals) / len(vals), 1) if vals else None
-        facility_rows.append({
-            'facility': fac_name,
-            'code': fac_code,
-            'type': fac_kind,
-            'avg': avg,
-            'values': row_vals,
-            'is_current': str(fac_code) == str(stored.get('current_fac', '')),
-        })
-
-    facility_rows = [r for r in facility_rows if any(v is not None for v in r['values'])]
-    facility_rows.sort(key=lambda r: (r['avg'] is None, -(r['avg'] or 0), r['facility']))
-
-    if not facility_rows or not rows_idx:
-        return html.Div(
-            'No facility comparison data for this selection',
-            className='mnid-performance-table-empty',
-        )
-
-    def _header_cells(label: str) -> list:
-        words = str(label or '').split()
-        if not words:
-            return ['-']
-        lines = []
-        current = words[0]
-        for word in words[1:]:
-            if len(current) + len(word) + 1 <= 16 and len(lines) < 2:
-                current = f'{current} {word}'
-            else:
-                lines.append(current)
-                current = word
-                if len(lines) >= 2:
-                    break
-        remaining_words = words[len(' '.join(lines + [current]).split()):]
-        if remaining_words:
-            current = f"{current} {' '.join(remaining_words)}".strip()
-        lines.append(current)
-        if len(lines[-1]) > 16:
-            lines[-1] = f"{lines[-1][:15].rstrip()}..."
-        children = []
-        for idx, line in enumerate(lines[:3]):
-            if idx:
-                children.append(html.Br())
-            children.append(line)
-        return children
-
-    header_row = html.Tr([
-        html.Th('Facility Name', className='mnid-performance-th mnid-performance-th-facility')
-    ] + [
-        html.Th(_header_cells(all_labels[i]), className='mnid-performance-th')
-        for i in rows_idx
-    ])
-
-    body_rows = []
-    for row in facility_rows:
-        name = f"{row['facility']} *" if row['is_current'] else row['facility']
-        cells = [html.Td(name, className='mnid-performance-facility-cell')]
-        for val in row['values']:
-            bg = '#E2E8F0' if val is None else _cov_color(val)
-            fg = '#475569' if val is None else _contrast_text(bg)
-            txt = '-' if val is None else f'{val:.0f}%'
-            cells.append(html.Td(txt, className='mnid-performance-value-cell', style={
-                'backgroundColor': bg,
-                'color': fg,
-            }))
-        body_rows.append(html.Tr(cells))
-
-    return html.Div(className='mnid-performance-table-wrap', children=[
-        html.Table(className='mnid-performance-matrix', children=[
-            html.Thead(header_row),
-            html.Tbody(body_rows),
-        ])
-    ])
-
-
-def _build_performance_attention_table(stored: dict, year: str,
-                                       district: str | None = None,
-                                       facility_type: str | None = None,
-                                       sel_inds: list | None = None) -> html.Div:
-    all_labels = stored.get('y_labels', [])
-    all_targets = stored.get('y_targets', [])
-    if sel_inds:
-        rows_idx = [i for i, lbl in enumerate(all_labels) if lbl in sel_inds]
-    else:
-        rows_idx = list(range(len(all_labels)))
-
-    focus_district = district or 'All'
-    if focus_district == 'All':
-        data = stored.get('by_facility', {}).get(year, {})
-    else:
-        data = stored.get('by_district_facs', {}).get(focus_district, {}).get(year, {})
-
-    fac_keys = data.get('x', [])
-    z_raw = data.get('z', [])
-    selected_type = facility_type or 'All'
-
-    rows = []
-    for col_idx, fac_key in enumerate(fac_keys):
-        fac_code = str(fac_key or '').rstrip('*')
-        if str(fac_code) == str(stored.get('current_fac', '')):
-            continue
-        fac_name = _FACILITY_NAMES.get(fac_code, fac_code)
-        fac_kind = _infer_facility_type(fac_code)
-        if selected_type != 'All' and fac_kind != selected_type:
-            continue
-
-        values = []
-        critical = []
-        for row_idx in rows_idx:
-            if row_idx >= len(z_raw) or col_idx >= len(z_raw[row_idx]):
-                continue
-            val = z_raw[row_idx][col_idx]
-            if val is None:
-                continue
-            pct = _display_pct(val)
-            values.append(pct)
-            tgt = all_targets[row_idx] if row_idx < len(all_targets) else 80
-            if pct < tgt:
-                critical.append((all_labels[row_idx], pct, tgt))
-
-        if not values or not critical:
-            continue
-
-        critical.sort(key=lambda item: item[1])
-        worst_pct = critical[0][1]
-        worst_gap = min(item[1] - item[2] for item in critical)
-        avg = round(sum(values) / len(values), 1)
-        rows.append({
-            'facility': fac_name,
-            'district': _FACILITY_DISTRICT.get(fac_code, ''),
-            'facility_type': fac_kind,
-            'avg': avg,
-            'critical': [(label, pct) for label, pct, _ in critical[:2]],
-            'critical_count': len(critical),
-            'worst_pct': worst_pct,
-            'worst_gap': worst_gap,
-        })
-
-    rows.sort(key=lambda row: (row['worst_pct'], row['worst_gap'], -row['critical_count'], row['avg'], row['facility']))
-    rows = rows[:5]
-
-    header = html.Tr([
-        html.Th('#', className='mnid-attention-th mnid-attention-rank'),
-        html.Th('Facility Name', className='mnid-attention-th'),
-        html.Th('District', className='mnid-attention-th'),
-        html.Th('Facility Type', className='mnid-attention-th'),
-        html.Th('Critical Indicator(s)', className='mnid-attention-th'),
-        html.Th('Average Performance', className='mnid-attention-th'),
-    ])
-
-    if not rows:
-        return html.Div(className='mnid-performance-attention-wrap mnid-performance-attention-empty', children=[
-            html.Div('FACILITIES REQUIRING ATTENTION', className='mnid-attention-title'),
-            html.Div(
-                'No facility attention data for this selection.',
-                className='mnid-attention-empty-message',
-            ),
-        ])
-
-    body = []
-    for idx, row in enumerate(rows, start=1):
-        if row['critical']:
-            critical_children = []
-            for pos, (label, pct) in enumerate(row['critical']):
-                if pos:
-                    critical_children.append(html.Br())
-                critical_children.append(f'{label} ({pct:.0f}%)')
-            critical_cell = html.Div(className='mnid-attention-critical', children=critical_children)
-        else:
-            critical_cell = html.Span('Monitoring', className='mnid-attention-monitoring')
-
-        avg_color = _cov_color(row['avg'])
-        body.append(html.Tr([
-            html.Td(str(idx), className='mnid-attention-td mnid-attention-rank'),
-            html.Td(row['facility'], className='mnid-attention-td mnid-attention-facility'),
-            html.Td(row['district'], className='mnid-attention-td'),
-            html.Td(row['facility_type'], className='mnid-attention-td'),
-            html.Td(critical_cell, className='mnid-attention-td mnid-attention-critical-cell'),
-            html.Td(
-                html.Span(f'{row["avg"]:.0f}% (Avg)', style={'color': avg_color}),
-                className='mnid-attention-td mnid-attention-avg',
-                style={'backgroundColor': '#FFF7ED' if row['avg'] < 65 else ('#FFFBEB' if row['avg'] < 80 else '#F0FDF4')},
-            ),
-        ]))
-
-    return html.Div(className='mnid-performance-attention-wrap', children=[
-        html.Div('FACILITIES REQUIRING ATTENTION', className='mnid-attention-title'),
-        html.Table(className='mnid-attention-table', children=[
-            html.Thead(header),
-            html.Tbody(body),
-        ]),
-    ])
-
-
-# MNID heatmap figure builder
-
-def _build_heatmap_fig(stored: dict, view: str, year: str,
-                       district: str | None = None,
-                       sel_inds: list | None = None) -> go.Figure:
-    map_view = view if view in ('by_district', 'district_facs') else 'by_district'
-    return _build_geo_heatmap_fig(stored, map_view, year, district, sel_inds)
-
-
-# # MNID geographic map data for the main heatmap
-
-def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
-                           district: str | None = None,
-                           sel_inds: list | None = None) -> go.Figure:
-    district_avgs = stored.get('district_avgs', {}).get(year, {})
-    current_fac   = stored.get('current_fac', '')
-    current_dist  = stored.get('current_district', '')
-    all_labels    = stored.get('y_labels', [])
-    dyn_districts = stored.get('all_districts', [])
-
-    selected_labels = sel_inds if isinstance(sel_inds, list) else ([sel_inds] if sel_inds else [])
-    if selected_labels:
-        rows_idx = [i for i, lbl in enumerate(all_labels) if lbl in selected_labels]
-    else:
-        rows_idx = list(range(len(all_labels)))
-
-    by_fac_data = stored.get('by_facility', {}).get(year, {})
-    store_fac_x = by_fac_data.get('x', [])
-    store_facs  = [f.rstrip('*') for f in store_fac_x]
-
-    def _fac_avg(fac_code):
-        fac_z = by_fac_data.get('z', [])
-        key = f'{fac_code}*' if fac_code == current_fac else fac_code
-        if key not in store_fac_x:
-            return None
-        ci = store_fac_x.index(key)
-        vals = [fac_z[r][ci] for r in rows_idx
-                if r < len(fac_z) and ci < len(fac_z[r]) and fac_z[r][ci] is not None]
-        return round(sum(vals) / len(vals), 1) if vals else None
-
-    selected_dist = district if district not in (None, '', 'All') else None
-    focus_dist  = selected_dist or current_dist
-    geojson = _load_malawi_district_geojson()
-    geo_ref = _build_geo_reference(geojson)
-    if not geo_ref:
-        fig = go.Figure()
-        fig.add_annotation(text='District GeoJSON not available for MNID map',
-                           xref='paper', yref='paper', x=0.5, y=0.5,
-                           showarrow=False, font=dict(size=12, color=MUTED))
-        fig.update_layout(paper_bgcolor=BG, plot_bgcolor=BG, height=560)
-        return fig
-
-    district_rings = geo_ref.get('district_rings', {})
-    district_centroids = geo_ref.get('district_centroids', {})
-    y_scale = geo_ref.get('y_scale', 1.0)
-    display_districts = sorted(set(dyn_districts) | set(district_rings.keys()) | set(district_avgs.keys()))
-
-    fig = go.Figure()
-    shapes = []
-    hover_x = []
-    hover_y = []
-    hover_cd = []
-    label_x = []
-    label_y = []
-    label_text = []
-
-    for dist in display_districts:
-        rings = district_rings.get(dist, [])
-        if not rings:
-            continue
-        cov = district_avgs.get(dist)
-        fill = _cov_color(cov) if cov is not None else '#E2E8F0'
-        is_focus = (view == 'district_facs' and dist == focus_dist) or (view == 'by_district' and dist == selected_dist)
-        line_color = '#0F172A' if is_focus else '#FFFFFF'
-        line_width = 2.8 if is_focus else 1.4
-        for pts in rings:
-            path_str = 'M ' + ' L '.join(f'{x:.6f},{y:.6f}' for x, y in pts) + ' Z'
-            shapes.append(dict(
-                type='path', path=path_str, xref='x', yref='y',
-                fillcolor=fill, line=dict(color=line_color, width=line_width), layer='below',
-            ))
-        cx, cy = district_centroids.get(dist, (None, None))
-        if cx is not None and cy is not None:
-            hover_x.append(cx)
-            hover_y.append(cy)
-            hover_cd.append([dist, f'{_display_pct(cov):.1f}%' if cov is not None else 'No data'])
-            if view != 'by_facility':
-                label_x.append(cx)
-                label_y.append(cy)
-                label_text.append(f'<b>{dist}</b><br>{_display_pct(cov):.1f}%' if cov is not None else f'<b>{dist}</b><br>No data')
-
-    if shapes:
-        fig.update_layout(shapes=shapes)
-
-    if hover_x:
-        fig.add_trace(go.Scatter(
-            x=hover_x, y=hover_y, mode='markers',
-            marker=dict(size=10, color='rgba(0,0,0,0)'),
-            customdata=hover_cd,
-            hovertemplate='<b>%{customdata[0]}</b><br>Avg coverage: %{customdata[1]}<extra></extra>',
-            showlegend=False,
-        ))
-
-    if label_x:
-        fig.add_trace(go.Scatter(
-            x=label_x, y=label_y, mode='text', text=label_text,
-            textfont=dict(size=10, color='#FFFFFF', family=FONT),
-            hoverinfo='skip', showlegend=False,
-        ))
-
-    if view in ('by_facility', 'district_facs'):
-        if view == 'by_facility':
-            fac_codes = store_facs
-        else:
-            fac_codes = [f for f in store_facs if _FACILITY_DISTRICT.get(f) == focus_dist]
-        facilities_by_district = stored.get('facilities_by_district', {})
-        fac_positions = _derive_facility_positions(facilities_by_district, district_centroids)
-
-        fac_x = []
-        fac_y = []
-        fac_text = []
-        fac_size = []
-        fac_color = []
-        fac_text_pos = []
-        for fac in fac_codes:
-            pos = fac_positions.get(fac)
-            if not pos:
-                continue
-            x, y = pos
-            avg = _fac_avg(fac)
-            name = _FACILITY_NAMES.get(fac, fac)
-            dist = _FACILITY_DISTRICT.get(fac, '')
-            fac_x.append(x)
-            fac_y.append(y)
-            fac_text.append(f'<b>{name}</b><br>{dist}<br>Avg coverage: {f"{_display_pct(avg):.1f}%" if avg is not None else "No data"}')
-            fac_size.append(14 if fac == current_fac else 10)
-            fac_color.append(_cov_color(avg) if avg is not None else '#CBD5E1')
-            fac_text_pos.append('middle left' if x > 0.55 else 'middle right')
-
-        if fac_x:
-            fig.add_trace(go.Scatter(
-                x=fac_x, y=fac_y, mode='markers+text',
-                text=[_FACILITY_NAMES.get(f, f) for f in fac_codes if fac_positions.get(f)],
-                textposition=fac_text_pos,
-                textfont=dict(size=9, color=TEXT, family=FONT),
-                hovertext=fac_text, hovertemplate='%{hovertext}<extra></extra>',
-                marker=dict(size=fac_size, color=fac_color, line=dict(color='#FFFFFF', width=1.2), opacity=0.95),
-                showlegend=False,
-            ))
-
-    x_range = [-0.02, 1.02]
-    y_range = [-0.02, y_scale + 0.02]
-    if view == 'district_facs' or (view == 'by_district' and selected_dist):
-        zoom_dist = focus_dist if view == 'district_facs' else selected_dist
-        focus_points = []
-        for pts in district_rings.get(zoom_dist, []):
-            focus_points.extend(pts)
-        if view == 'district_facs' and 'fac_positions' in locals():
-            for fac in [f for f in store_facs if _FACILITY_DISTRICT.get(f) == focus_dist]:
-                pos = fac_positions.get(fac)
-                if pos:
-                    focus_points.append(pos)
-        if focus_points:
-            xs = [p[0] for p in focus_points]
-            ys = [p[1] for p in focus_points]
-            pad_x = max((max(xs) - min(xs)) * 0.12, 0.03)
-            pad_y = max((max(ys) - min(ys)) * 0.12, 0.03)
-            x_range = [max(-0.02, min(xs) - pad_x), min(1.02, max(xs) + pad_x)]
-            y_range = [max(-0.02, min(ys) - pad_y), min(y_scale + 0.02, max(ys) + pad_y)]
-
-    fig.add_trace(go.Scatter(
-        x=[None], y=[None], mode='markers', showlegend=True,
-        marker=dict(
-            size=10, color=[0], cmin=0, cmax=100, colorscale=HEATMAP_CS,
-            colorbar=dict(
-                thickness=14,
-                title=dict(text='Coverage %', side='right', font=dict(size=9, color=DIM)),
-                tickfont=dict(size=9, color=DIM),
-                tickvals=[0, 65, 80, 100],
-                ticktext=['0%', '65%', '80%', '100%'],
-                len=0.8,
-            ),
-        ),
-        hoverinfo='skip',
-    ))
-
-    title = (f'{selected_dist} District Coverage Map' if view == 'by_district' and selected_dist else 'District Coverage Map') if view == 'by_district' else (
-        'Facility Coverage Map' if view == 'by_facility' else f'{focus_dist} Facility Coverage Map'
-    )
-    fig.update_layout(
-        paper_bgcolor=BG, plot_bgcolor=BG, height=560, margin=dict(l=10, r=10, t=34, b=10),
-        font=dict(family=FONT, color=TEXT, size=11), hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
-        hovermode='closest', dragmode='pan',
-        xaxis=dict(visible=False, range=x_range, fixedrange=False),
-        yaxis=dict(visible=False, range=y_range, fixedrange=False, scaleanchor='x', scaleratio=1),
-        transition=dict(duration=450, easing='cubic-in-out'),
-        annotations=[dict(
-            x=0.01, y=1.03, xref='paper', yref='paper', text=title, showarrow=False, xanchor='left',
-            font=dict(size=15, color=TEXT, family=FONT),
-        )],
-    )
-    return fig
-
-
-# # MNID right panel with Malawi shape and indicator stats
-
-def _build_district_treemap(stored: dict, view: str, year: str,
-                             district: str | None = None,
-                             sel_inds: list | None = None) -> go.Figure:
-    """Treemap of districts/facilities colored by avg indicator coverage - looks like the screenshot."""
-    district_avgs = stored.get('district_avgs', {}).get(year, {})
-    current_fac   = stored.get('current_fac', '')
-    current_dist  = stored.get('current_district', '')
-    all_labels    = stored.get('y_labels', [])
-    all_targets   = stored.get('y_targets', [])
-
-    if sel_inds:
-        rows_idx = [i for i, lbl in enumerate(all_labels) if lbl in sel_inds]
-    else:
-        rows_idx = list(range(len(all_labels)))
-
-    def _fac_avg(fac_code):
-        by_fac = stored.get('by_facility', {}).get(year, {})
-        fac_x  = by_fac.get('x', [])
-        fac_z  = by_fac.get('z', [])
-        key    = f'{fac_code}*' if fac_code == current_fac else fac_code
-        if key not in fac_x:
-            return None
-        ci = fac_x.index(key)
-        vals = [fac_z[r][ci] for r in rows_idx
-                if r < len(fac_z) and ci < len(fac_z[r]) and fac_z[r][ci] is not None]
-        return round(sum(vals) / len(vals), 1) if vals else None
-
-    dyn_districts = stored.get('all_districts', [])
-    # Derive facility list from store
-    by_fac_data  = stored.get('by_facility', {}).get(year, {})
-    store_fac_x  = by_fac_data.get('x', [])
-    dyn_facs     = [f.rstrip('*') for f in store_fac_x]
-
-    if view in ('by_district', 'monthly', 'yearly'):
-        labels  = list(dyn_districts)
-        parents = [''] * len(labels)
-        values  = [1.0] * len(labels)          # equal weight - coverage drives color
-        covs    = [district_avgs.get(d) for d in labels]
-        hl_set  = {current_dist} if view in ('monthly', 'yearly') else set(labels)
-
-    elif view == 'by_facility':
-        fac_labels  = [f'{_FACILITY_NAMES.get(f, f)}*' if f == current_fac else _FACILITY_NAMES.get(f, f) for f in dyn_facs]
-        labels  = list(dyn_districts) + fac_labels
-        parents = ([''] * len(dyn_districts) +
-                   [_FACILITY_DISTRICT.get(f, '') for f in dyn_facs])
-        d_covs  = [district_avgs.get(d) for d in dyn_districts]
-        f_covs  = [_fac_avg(f) for f in dyn_facs]
-        covs    = d_covs + f_covs
-        values  = [1.0] * len(dyn_districts) + [1.0] * len(dyn_facs)
-        hl_set  = set(labels)
-
-    elif view == 'district_facs':
-        dist_filter = district or current_dist
-        facs = [f for f in dyn_facs if _FACILITY_DISTRICT.get(f) == dist_filter]
-        labels  = [f'{_FACILITY_NAMES.get(f, f)}*' if f == current_fac else _FACILITY_NAMES.get(f, f) for f in facs]
-        parents = [''] * len(labels)
-        values  = [1.0] * len(labels)
-        covs    = [_fac_avg(f) for f in facs]
-        hl_set  = set(labels)
-
-    else:
-        labels, parents, values, covs, hl_set = [], [], [], [], set()
-
-    texts  = [f'{_display_pct(c):.0f}%' if c is not None else 'No data' for c in covs]
-    colors = [_cov_color(c) if c is not None else '#C8C5BC' for c in covs]
-    opacities = [1.0 if lbl in hl_set else 0.45 for lbl in labels]
-    final_colors = []
-    for col, op in zip(colors, opacities):
-        final_colors.append('#D6D3CB' if op < 1.0 else col)
-
-    if not labels:
-        fig = go.Figure()
-        fig.update_layout(paper_bgcolor=BG, height=200,
-                          margin=dict(l=0, r=0, t=0, b=0))
-        return fig
-
-    fig = go.Figure(go.Treemap(
-        labels=labels,
-        parents=parents,
-        values=values,
-        marker=dict(
-            colors=final_colors,
-            line=dict(width=2, color='white'),
-            cornerradius=4,
-        ),
-        text=texts,
-        customdata=covs,
-        hovertemplate='<b>%{label}</b><br>Avg coverage: %{text}<extra></extra>',
-        textposition='middle center',
-        textfont=dict(size=11, color=TEXT, family=FONT),
-        texttemplate='<b>%{label}</b><br>%{text}',
-        pathbar=dict(visible=False),
-        tiling=dict(squarifyratio=1.5),
-    ))
-
-    fig.update_layout(
-        paper_bgcolor=BG,
-        margin=dict(l=0, r=0, t=4, b=0),
-        height=200,
-        showlegend=False,
-        font=dict(family=FONT),
-    )
-    return fig
-
-
-def _build_malawi_panel(stored: dict, view: str, year: str,
-                        district: str | None = None,
-                        sel_inds: list | None = None) -> list:
-    district_avgs    = stored.get('district_avgs', {}).get(year, {})
-    current_district = stored.get('current_district', '')
-    all_labels       = stored.get('y_labels', [])
-    all_targets      = stored.get('y_targets', [])
-
-    # Apply indicator selection filter
-    if sel_inds:
-        rows_idx = [i for i, lbl in enumerate(all_labels) if lbl in sel_inds]
-    else:
-        rows_idx = list(range(len(all_labels)))
-    y_labels  = [all_labels[i] for i in rows_idx]
-    y_targets = [all_targets[i] for i in rows_idx]
-
-    # Which district is highlighted
-    if view in ('monthly', 'yearly'):
-        highlight = current_district
-    elif view == 'district_facs':
-        highlight = district or current_district
-    elif view == 'by_district' and district not in (None, '', 'All'):
-        highlight = district
-    else:
-        highlight = None
-
-    treemap_fig  = _build_district_treemap(stored, view, year, district, sel_inds)
-    malawi_panel = dcc.Graph(
-        id='mnid-malawi-treemap',
-        figure=treemap_fig,
-        config={'displayModeBar': True, 'responsive': True, 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
-        style={'marginBottom': '4px', 'height': '170px'},
-    )
-
-    # Stats from selected view data
-    if view == 'monthly':
-        data = stored.get('monthly', {}).get(year, {})
-        view_title = 'This facility - monthly'
-    elif view == 'by_facility':
-        data = stored.get('by_facility', {}).get(year, {})
-        view_title = 'All facilities'
-    elif view == 'by_district':
-        data = stored.get('by_district', {}).get(year, {})
-        view_title = f'{district} district' if district not in (None, '', 'All') else 'All districts'
-    elif view == 'district_facs':
-        dist = district or current_district
-        data = stored.get('by_district_facs', {}).get(dist, {}).get(year, {})
-        view_title = f'{dist} - district facilities'
-    elif view == 'yearly':
-        data = stored.get('yearly') or {}
-        view_title = 'Year-over-year'
-    else:
-        data = {}; view_title = ''
-
-    z_raw = data.get('z', [])
-    z = [z_raw[i] for i in rows_idx if i < len(z_raw)]
-    x = data.get('x', [])
-
-    all_vals    = [v for row in z for v in row if v is not None]
-    overall_avg = round(sum(all_vals) / len(all_vals), 1) if all_vals else None
-
-    ind_stats = []
-    for ii, (lbl, tgt) in enumerate(zip(y_labels, y_targets)):
-        if ii < len(z):
-            vals = [z[ii][jj] for jj in range(len(x))
-                    if jj < len(z[ii]) and z[ii][jj] is not None]
-            if vals:
-                avg = round(sum(vals) / len(vals), 1)
-                ind_stats.append({'label': lbl, 'target': tgt, 'avg': avg,
-                                  'on_target': avg >= tgt})
-
-    on_tgt  = sum(1 for s in ind_stats if s['on_target'])
-    ind_rows = []
-    for s in sorted(ind_stats, key=lambda x: -x['avg'])[:12]:
-        col = _cov_color(s['avg'])
-        ind_rows.append(html.Div(style={
-            'display': 'flex', 'alignItems': 'center', 'gap': '6px',
-            'padding': '3px 0', 'borderBottom': f'0.5px solid {GRID_C}',
-        }, children=[
-            html.Div(style={'flex': '1', 'minWidth': '0'}, children=[
-                html.Div(s['label'], style={
-                    'fontSize': '9px', 'color': DIM,
-                    'overflow': 'hidden', 'textOverflow': 'ellipsis', 'whiteSpace': 'nowrap',
-                }),
-                html.Div(style={'height': '2px', 'background': GRID_C,
-                                'borderRadius': '1px', 'marginTop': '2px'}, children=[
-                    html.Div(style={'width': f'{min(s["avg"], 100):.0f}%', 'height': '100%',
-                                    'background': col, 'borderRadius': '1px', 'width': f'{_display_pct(s["avg"]):.0f}%'}),
-                ]),
-            ]),
-            html.Div(style={'textAlign': 'right', 'flexShrink': '0'}, children=[
-                html.Span(f'{_display_pct(s["avg"]):.0f}%',
-                          style={'fontSize': '10px', 'fontWeight': '600', 'color': col}),
-                html.Span(' OK' if s['on_target'] else '',
-                          style={'fontSize': '9px', 'color': OK_C}),
-            ]),
-        ]))
-
-    # Colour legend
-    legend_items = [
-        (OK_C, '>=80% on target'),
-        (WARN_C, '65-79% watch'),
-        (DANGER_C, '<65% needs action'),
-    ]
-    legend = html.Div(style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '5px',
-                              'marginTop': '8px', 'marginBottom': '6px'}, children=[
-        html.Div(style={'display': 'flex', 'alignItems': 'center', 'gap': '3px'}, children=[
-            html.Div(style={'width': '8px', 'height': '8px', 'borderRadius': '50%',
-                            'backgroundColor': c, 'flexShrink': '0'}),
-            html.Span(l, style={'fontSize': '9px', 'color': DIM}),
-        ])
-        for c, l in legend_items
-    ])
-
-    # Volume counts for this facility
-    counts_for_year = stored.get('counts', {}).get(year, {})
-    count_items = []
-    for label, val in counts_for_year.items():
-        if val > 0:
-            count_items.append(html.Div(style={
-                'display': 'flex', 'justifyContent': 'space-between',
-                'padding': '2px 0', 'borderBottom': f'0.5px solid {GRID_C}',
-            }, children=[
-                html.Span(label, style={'fontSize': '9px', 'color': DIM}),
-                html.Span(f'{val:,}', style={'fontSize': '10px', 'fontWeight': '600',
-                                             'color': INFO_C}),
-            ]))
-    counts_block = html.Div(children=count_items, style={'marginBottom': '8px'}) if count_items else None
-
-    return [
-        html.Div('MALAWI COVERAGE', className='mnid-section-lbl'),
-        malawi_panel,
-        *(([html.Div('ENCOUNTER VOLUMES', className='mnid-section-lbl'), counts_block])
-          if counts_block else []),
-        legend,
-        html.Div(style={'display': 'flex', 'justifyContent': 'space-between',
-                        'alignItems': 'baseline', 'marginBottom': '4px'}, children=[
-            html.Span(view_title, style={'fontSize': '10px', 'color': MUTED}),
-            html.Span(f'{_display_pct(overall_avg):.0f}%' if overall_avg is not None else '-',
-                      style={'fontSize': '18px', 'fontWeight': '700',
-                             'color': _cov_color(overall_avg)}),
-        ]),
-        html.Div(f'{on_tgt}/{len(ind_stats)} indicators on target',
-                 style={'fontSize': '10px', 'color': MUTED, 'marginBottom': '6px'}),
-        html.Div('INDICATOR BREAKDOWN', className='mnid-section-lbl'),
-        html.Div(style={'overflowY': 'auto', 'maxHeight': '290px'}, children=ind_rows),
-    ]
-
-
-_MNID_SCROLLSPY_CLIENTSIDE = """
-function(_tick) {
-    const sections = [
-        '#mnid-summary',
-        '#mnid-data-tables',
-        '#mnid-trends',
-        '#mnid-performance',
-        '#mnid-heatmap',
-        '#mnid-coverage',
-        '#mnid-comparative',
-        '#mnid-analysis',
-        '#mnid-readiness'
-    ];
-
-    let active = '#mnid-summary';
-    const activationLine = 124;
-    let bestPassed = null;
-    let nextUpcoming = null;
-
-    for (const selector of sections) {
-        const el = document.querySelector(selector);
-        if (!el) {
-            continue;
-        }
-
-        const rect = el.getBoundingClientRect();
-        const top = rect.top;
-
-        if (top <= activationLine) {
-            if (bestPassed === null || top > bestPassed.top) {
-                bestPassed = { selector, top };
-            }
-        } else if (nextUpcoming === null || top < nextUpcoming.top) {
-            nextUpcoming = { selector, top };
-        }
-    }
-
-    if (bestPassed !== null) {
-        active = bestPassed.selector;
-    } else if (nextUpcoming !== null) {
-        active = nextUpcoming.selector;
-    }
-
-    return active;
-}
-"""
-
-clientside_callback(
-    _MNID_SCROLLSPY_CLIENTSIDE,
-    Output('mnid-scrollspy-out', 'data'),
-    Input('mnid-scrollspy-tick', 'n_intervals'),
-)
-
-
-@callback(
-    Output({'type': 'mnid-nav-btn', 'index': ALL}, 'className'),
-    Input('mnid-scrollspy-out', 'data'),
-    State({'type': 'mnid-nav-btn', 'index': ALL}, 'id'),
-    prevent_initial_call=False,
-)
-def sync_mnid_nav_active_state(active_hash, nav_ids):
-    active_hash = active_hash or '#mnid-summary'
-    classes = []
-    for item in nav_ids or []:
-        target = (item or {}).get('index')
-        classes.append('mnid-nav-btn active' if target == active_hash else 'mnid-nav-btn')
-    return classes
-
 # # MNID module-level callback
 
 @callback(
@@ -4050,9 +2108,8 @@ def update_heatmap_view(view, district, sel_inds, stored):
     v = view or 'by_district'
     y = 'All years'
     fig   = _build_heatmap_fig(stored, v, y, district, sel_inds)
-    panel = _build_malawi_panel(stored, v, y, district, sel_inds)
     district_style = {'display': 'block'} if v in ('by_district', 'district_facs') else {'display': 'none'}
-    return fig, panel, district_style
+    return fig, html.Div(), district_style
 
 
 @callback(
@@ -4091,22 +2148,27 @@ def sync_district_focus_from_treemap(click_data, stored):
     Output('mnid-performance-aggregate', 'children'),
     Output('mnid-performance-attention', 'children'),
     Input('mnid-performance-indicators', 'value'),
+    Input('mnid-performance-district', 'value'),
+    Input('mnid-performance-year', 'value'),
     State('mnid-heatmap-store', 'data'),
     prevent_initial_call=True,
 )
-def update_performance_heatmap(sel_inds, stored):
+def update_performance_heatmap(sel_inds, sel_districts, sel_year, stored):
     if not stored:
         return html.Div(), html.Div(), html.Div()
+    year = sel_year or 'All years'
+    district = sel_districts or None  # None means all districts
     table = _build_facility_performance_heatmap_fig(
         stored,
-        'All years',
+        year,
+        district,
         sel_inds,
     )
-    gauges = _build_district_gauge_row(stored, 'All years')
+    gauges = _build_district_gauge_row(stored, year)
     attention = _build_performance_attention_table(
         stored,
-        'All years',
-        'All',
+        year,
+        district,
         'All',
         sel_inds,
     )
@@ -4139,25 +2201,28 @@ _COMPARE_COLORS = [
 )
 def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids, toggle_clicks, stored, chart_type):
     mode = mode or 'facility'
-    time_grain = time_grain or 'monthly'
-    chart_type = chart_type or 'bar'
+    time_grain = time_grain or 'weekly'
+    chart_type = chart_type or 'line'
     ctx = callback_context
-    if ctx and ctx.triggered and ctx.triggered[0]['prop_id'] == 'mnid-compare-chart-toggle.n_clicks':
+    ctx_prop = ctx.triggered[0]['prop_id'] if ctx and ctx.triggered else ''
+    user_changed_indicators = ctx_prop == 'mnid-compare-indicators.value'
+    mode_just_changed = ctx_prop == 'mnid-compare-mode.value'
+    if ctx_prop == 'mnid-compare-chart-toggle.n_clicks':
         chart_type = 'line' if chart_type == 'bar' else 'bar'
     store_payload = stored or {}
     tracked = store_payload.get('tracked', [])
-    mch_full = _restore_ui_dataframe(store_payload.get('data_key'))
+    # Restore raw df only when aggregate isn't available (first run before overnight job).
+    _compare_agg_check = _get_aggregate()
+    mch_full = pd.DataFrame() if _compare_agg_check is not None else _restore_ui_dataframe(store_payload.get('data_key'))
     facility_options = store_payload.get('facility_options', [])
     district_options = store_payload.get('district_options', [])
     current_fac = store_payload.get('current_fac', '')
     current_dist = store_payload.get('current_dist', '')
+    compare_date_min = pd.to_datetime(store_payload.get('date_min'), errors='coerce')
+    compare_date_max = pd.to_datetime(store_payload.get('date_max'), errors='coerce')
 
     ind_options = [{'label': i['label'], 'value': i['id']} for i in tracked]
     valid_ind_ids = {opt['value'] for opt in ind_options}
-    user_changed_indicators = (
-        ctx and ctx.triggered and
-        ctx.triggered[0]['prop_id'] == 'mnid-compare-indicators.value'
-    )
     selected_ind_ids = [iid for iid in (selected_ind_ids or []) if iid in valid_ind_ids][:3]
     if not selected_ind_ids:
         selected_ind_ids = [i['id'] for i in tracked[:3]]
@@ -4173,23 +2238,32 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
         yaxis=dict(visible=False),
     )
 
-    if not active_inds or mch_full.empty:
+    # Bail only when both data sources are unavailable
+    if not active_inds or (_compare_agg_check is None and mch_full.empty):
         toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
         toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
         entity_options = facility_options if mode == 'facility' else district_options
-        return _empty_fig, entity_options, (selected_entities or []), ind_options, selected_ind_ids, chart_type, toggle_class, toggle_text
+        ind_value_out = no_update if user_changed_indicators else selected_ind_ids
+        return _empty_fig, entity_options, (selected_entities or []), ind_options, ind_value_out, chart_type, toggle_class, toggle_text
+
+    # When mode switches, discard the previous selection since facility codes and district
+    # names aren't interchangeable. Also guard against 'Unknown' facility_code at national
+    # scope, since it's never actually in the options.
+    effective_selection = None if mode_just_changed else selected_entities
 
     if mode == 'facility':
         entity_options = facility_options
-        default_entities = ([current_fac] if current_fac else []) or [opt['value'] for opt in facility_options[:4]]
-        entities = [str(v) for v in (selected_entities or default_entities) if str(v) in {str(opt['value']) for opt in facility_options}]
+        valid_fac_vals = {str(opt['value']) for opt in facility_options}
+        default_entities = ([current_fac] if current_fac and current_fac in valid_fac_vals else []) or [opt['value'] for opt in facility_options[:4]]
+        entities = [str(v) for v in (effective_selection or default_entities) if str(v) in valid_fac_vals]
         entity_labels = {str(opt['value']): str(opt['label']) for opt in facility_options}
         def get_df(entity):
             return mch_full[mch_full['Facility_CODE'] == entity] if 'Facility_CODE' in mch_full.columns else pd.DataFrame()
     else:
         entity_options = district_options
-        default_entities = ([current_dist] if current_dist else []) or [opt['value'] for opt in district_options[:4]]
-        entities = [str(v) for v in (selected_entities or default_entities) if str(v) in {str(opt['value']) for opt in district_options}]
+        valid_dist_vals = {str(opt['value']) for opt in district_options}
+        default_entities = ([current_dist] if current_dist and current_dist in valid_dist_vals else []) or [opt['value'] for opt in district_options[:4]]
+        entities = [str(v) for v in (effective_selection or default_entities) if str(v) in valid_dist_vals]
         entity_labels = {str(opt['value']): str(opt['label']) for opt in district_options}
         def get_df(entity):
             return mch_full[mch_full['District'] == entity] if 'District' in mch_full.columns else pd.DataFrame()
@@ -4197,43 +2271,83 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
     if not entities:
         toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
         toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
-        return _empty_fig, entity_options, [], ind_options, selected_ind_ids, chart_type, toggle_class, toggle_text
+        ind_value_out = no_update if user_changed_indicators else selected_ind_ids
+        return _empty_fig, entity_options, [], ind_options, ind_value_out, chart_type, toggle_class, toggle_text
 
-    if 'Date' not in mch_full.columns:
+    if _compare_agg_check is None and 'Date' not in mch_full.columns:
         toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
         toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
-        return _empty_fig, entity_options, entities, ind_options, selected_ind_ids, chart_type, toggle_class, toggle_text
+        ind_value_out = no_update if user_changed_indicators else selected_ind_ids
+        return _empty_fig, entity_options, entities, ind_options, ind_value_out, chart_type, toggle_class, toggle_text
 
-    _grain_cfg = {
-        'daily':     ('D',  lambda p: pd.Period(p, 'D').strftime('%d %b %Y'),  30),
-        'weekly':    ('W',  lambda p: pd.Period(p, 'W').strftime('%d %b'),     26),
-        'monthly':   ('M',  lambda p: pd.Period(p, 'M').strftime('%b %Y'),     12),
-        'quarterly': ('Q',  lambda p: f"{p.year} Q{p.quarter}",                8),
-        'yearly':    ('Y',  lambda p: str(p.year),                             5),
-    }
-    period_code, period_fmt, max_periods = _grain_cfg.get(time_grain, _grain_cfg['weekly'])
+    if time_grain == 'daily':
+        period_code = 'D'
+        period_fmt = lambda p: pd.Period(p, 'D').strftime('%d %b %Y')
+        max_periods = 30
+    elif time_grain == 'weekly':
+        period_code = 'W'
+        period_fmt = lambda p: pd.Period(p, 'W').start_time.strftime('%d %b %Y')
+        max_periods = 26
+    elif time_grain == 'quarterly':
+        period_code = 'Q'
+        period_fmt = lambda p: f"{p.year} Q{p.quarter}"
+        max_periods = 8
+    elif time_grain == 'yearly':
+        period_code = 'Y'
+        period_fmt = lambda p: str(p.year)
+        max_periods = 5
+    else:
+        period_code = 'M'
+        period_fmt = lambda p: pd.Period(p, 'M').strftime('%b %Y')
+        max_periods = 12
 
-    d2 = mch_full.copy()
-    d2['_period'] = pd.to_datetime(d2['Date'], errors='coerce').dt.to_period(period_code)
-    periods = sorted(d2['_period'].dropna().unique())[-max_periods:]
+    _compare_agg = _get_aggregate()
+
+    # When aggregate is available, skip raw-row scanning entirely.
+    # Fall back to the raw df loop only if no aggregate exists.
+    if _compare_agg is None:
+        d2 = mch_full
+        d2['_period'] = pd.to_datetime(d2['Date']).dt.to_period(period_code)
+        periods = sorted(d2['_period'].dropna().unique())[-max_periods:]
+    else:
+        periods = []  # not used in aggregate path
 
     fig = go.Figure()
     series_idx = 0
     for entity in entities:
-        entity_df = get_df(entity)
-        if entity_df.empty:
-            continue
         for ind in active_inds:
-            xs, ys, texts = [], [], []
-            for period in periods:
-                period_df = entity_df[
-                    pd.to_datetime(entity_df['Date'], errors='coerce').dt.to_period(period_code) == period
-                ]
-                _, den, pct = _cov(period_df, ind['numerator_filters'], ind['denominator_filters'])
-                xs.append(period_fmt(period))
-                ys.append(_display_pct(pct) if den > 0 else None)
-                texts.append(f'{pct:.0f}%' if den > 0 else 'No data')
-            if not any(y is not None for y in ys):
+            if _compare_agg is not None:
+                fac_arg  = [entity] if mode == 'facility' else None
+                dist_arg = [entity] if mode == 'district' else None
+                series = _agg_time_series(
+                    _compare_agg, ind['id'], grain=time_grain,
+                    facility_codes=fac_arg, districts=dist_arg,
+                    start_date=None if pd.isna(compare_date_min) else compare_date_min,
+                    end_date=None if pd.isna(compare_date_max) else compare_date_max,
+                    indicator_label=ind.get('label'),
+                )
+                series = series.tail(max_periods)
+                if series.empty:
+                    continue
+                xs = [period_fmt(pd.Period(ts, period_code)) for ts in
+                      pd.to_datetime(series['period_start']).dt.to_period(period_code)]
+                ys = series['pct'].tolist()
+                ys = [y if (series['denominator'].iloc[i] > 0) else None
+                      for i, y in enumerate(ys)]
+                texts = [f'{y:.0f}%' if y is not None else 'No data' for y in ys]
+            else:
+                entity_df = get_df(entity)
+                if entity_df.empty:
+                    continue
+                xs, ys, texts = [], [], []
+                for period in periods:
+                    period_df = entity_df[pd.to_datetime(entity_df['Date']).dt.to_period(period_code) == period]
+                    _, den, pct = _cov(period_df, ind['numerator_filters'], ind['denominator_filters'])
+                    xs.append(period_fmt(period))
+                    ys.append(_display_pct(pct) if den > 0 else None)
+                    texts.append(f'{pct:.0f}%' if den > 0 else 'No data')
+            moving_average, _ = _moving_average_values(ys, time_grain)
+            if not any(y is not None for y in moving_average):
                 continue
             color = _COMPARE_COLORS[series_idx % len(_COMPARE_COLORS)]
             series_idx += 1
@@ -4256,48 +2370,74 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
                 fig.add_trace(go.Scatter(
                     name=series_name,
                     x=xs,
-                    y=ys,
+                    y=moving_average,
                     mode='lines+markers',
-                    line=dict(color=color, width=2.4, shape='linear'),
-                    marker=dict(size=5, color=color, line=dict(color='#fff', width=1.0)),
-                    hovertemplate=f'<b>{series_name}</b><br>%{{x}}<br>Coverage: %{{y:.1f}}%<extra></extra>',
+                    line=dict(color=color, width=2.8, shape='linear'),
+                    marker=dict(size=6, color=color, line=dict(color='#fff', width=1.4)),
+                    customdata=[[raw] for raw in ys],
+                    hovertemplate=f'<b>{series_name}</b><br>%{{x}}<br>Moving Avg: %{{y:.1f}}%<br>Raw: %{{customdata[0]:.1f}}%<extra></extra>',
                     connectgaps=False,
                 ))
+                _tgt = ind.get('target')
+                if _tgt is not None:
+                    fig.add_trace(go.Scatter(
+                        name=f'{entity_labels.get(entity, entity)} | {_target_label(ind)}',
+                        x=xs, y=[_tgt] * len(xs),
+                        mode='lines',
+                        line=dict(color=color, width=1.5, dash='dot'),
+                        opacity=0.7, showlegend=False,
+                        hovertemplate=f'Target: {_tgt:.0f}%<extra></extra>',
+                    ))
             else:
                 fig.add_trace(go.Bar(
                     name=series_name,
                     x=xs,
-                    y=ys,
+                    y=moving_average,
                     text=texts,
                     textposition='outside',
                     textfont=dict(size=9, color='#E2E8F0'),
                     marker=dict(color=color, opacity=0.88,
                                 line=dict(color='rgba(255,255,255,0.25)', width=0.8)),
-                    hovertemplate=f'<b>{series_name}</b><br>%{{x}}<br>Coverage: %{{y:.1f}}%<extra></extra>',
+                    customdata=[[raw] for raw in ys],
+                    hovertemplate=f'<b>{series_name}</b><br>%{{x}}<br>Moving Avg: %{{y:.1f}}%<br>Raw: %{{customdata[0]:.1f}}%<extra></extra>',
                 ))
 
     fig.update_layout(
-        height=420,
+        height=360,
         barmode='group' if chart_type == 'bar' else None,
         bargap=0.20,
         bargroupgap=0.06,
-        margin=dict(l=10, r=10, t=30, b=10),
-        paper_bgcolor='#ffffff',
-        plot_bgcolor='#ffffff',
-        font=dict(color=TEXT, family=FONT),
-        xaxis=dict(showgrid=False, tickfont=dict(size=11, color=TEXT), linecolor=BORDER, title=dict(text='Time', font=dict(size=11, color='#94A3B8'))),
+        margin=dict(l=8, r=8, t=12, b=24),
+        paper_bgcolor=BG,
+        plot_bgcolor=BG,
+        font=dict(family=FONT, color=TEXT, size=11),
+        hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
+        xaxis=dict(
+            showgrid=False,
+            zeroline=False,
+            showline=False,
+            tickfont=dict(size=10, color=MUTED),
+            title=dict(text='Date', font=dict(size=10, color=MUTED)),
+        ),
         yaxis=dict(
-            title=dict(text='Coverage %', font=dict(size=11, color='#94A3B8')),
+            title=dict(text='Coverage %', font=dict(size=10, color=MUTED)),
             range=[0, 115],
-            showgrid=True, gridcolor=GRID_C,
-            tickfont=dict(size=10, color=DIM),
+            showgrid=True,
+            gridcolor=GRID_C,
+            zeroline=False,
+            showline=False,
+            tickfont=dict(size=10, color=MUTED),
         ),
         legend=dict(
-            orientation='v', x=1.01, y=1,
-            xanchor='left', yanchor='top',
+            orientation='h',
+            x=0,
+            y=1.05,
+            xanchor='left',
+            yanchor='bottom',
             font=dict(size=10, color=DIM),
-            bgcolor='rgba(0,0,0,0)', bordercolor='rgba(0,0,0,0)',
+            bgcolor='rgba(0,0,0,0)',
         ),
+        hovermode='closest' if chart_type == 'bar' else 'x unified',
     )
     toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
     toggle_text = 'Bar' if chart_type == 'bar' else 'Line'
@@ -4305,15 +2445,10 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
     return fig, entity_options, entities, ind_options, ind_value_out, chart_type, toggle_class, toggle_text
 
 
+
 def register_mnid_callbacks(app) -> None:
     if getattr(app, '_mnid_callbacks_registered', False):
         return
-
-    app.clientside_callback(
-        _MNID_SCROLLSPY_CLIENTSIDE,
-        Output('mnid-scrollspy-out', 'data'),
-        Input('mnid-scrollspy-tick', 'n_intervals'),
-    )
 
     app.callback(
         Output('mnid-run-charts-container', 'children'),
@@ -4348,13 +2483,6 @@ def register_mnid_callbacks(app) -> None:
     )(update_service_table)
 
     app.callback(
-        Output({'type': 'mnid-nav-btn', 'index': ALL}, 'className'),
-        Input('mnid-scrollspy-out', 'data'),
-        State({'type': 'mnid-nav-btn', 'index': ALL}, 'id'),
-        prevent_initial_call=False,
-    )(sync_mnid_nav_active_state)
-
-    app.callback(
         Output('mnid-heatmap-graph', 'figure'),
         Output('mnid-heatmap-right', 'children'),
         Output('mnid-heatmap-district-wrap', 'style'),
@@ -4377,6 +2505,8 @@ def register_mnid_callbacks(app) -> None:
         Output('mnid-performance-aggregate', 'children'),
         Output('mnid-performance-attention', 'children'),
         Input('mnid-performance-indicators', 'value'),
+        Input('mnid-performance-district', 'value'),
+        Input('mnid-performance-year', 'value'),
         State('mnid-heatmap-store', 'data'),
         prevent_initial_call=True,
     )(update_performance_heatmap)
@@ -4402,2194 +2532,401 @@ def register_mnid_callbacks(app) -> None:
     app._mnid_callbacks_registered = True
 
 
-# # MNID main heatmap section layout
-
-def _facilities_requiring_attention(store, year='All years'):
-    """Bottom-5 facilities by average MCH coverage - flags needing follow-up."""
-    by_fac    = store.get('by_facility', {}).get(year, {})
-    fac_x     = by_fac.get('x', [])
-    fac_z     = by_fac.get('z', [])
-    districts = by_fac.get('districts', [])
-    y_targets = store.get('y_targets', [])
-
-    if not fac_x or not fac_z:
-        return html.Div()
-
-    rows = []
-    for ci, fac in enumerate(fac_x):
-        if fac.endswith('*'):   # skip current facility
-            continue
-        vals = [(fac_z[ri][ci], y_targets[ri] if ri < len(y_targets) else 80)
-                for ri in range(len(fac_z))
-                if ci < len(fac_z[ri]) and fac_z[ri][ci] is not None]
-        if not vals:
-            continue
-        avg = round(sum(v for v, _ in vals) / len(vals), 1)
-        n_critical = sum(1 for v, tgt in vals if v < tgt * 0.85)
-        rows.append({
-            'fac': fac,
-            'fac_name': _FACILITY_NAMES.get(fac, fac),
-            'avg': avg,
-            'n_critical': n_critical,
-            'district': districts[ci] if ci < len(districts) else '',
-        })
-
-    if not rows:
-        return html.Div()
-
-    rows_sorted = sorted(rows, key=lambda r: r['avg'])[:5]
-
-    hdr_st = {
-        'fontSize': '9px', 'fontWeight': '700', 'color': MUTED,
-        'padding': '4px 8px', 'borderBottom': f'1.5px solid {BORDER}',
-        'textTransform': 'uppercase', 'letterSpacing': '0.06em',
-    }
-    def _fac_row(r):
-        color = _cov_color(r['avg'])
-        if r['n_critical'] > 0:
-            tag = html.Span(f'{r["n_critical"]} critical', style={
-                'background': '#FEF2F2', 'color': DANGER_C,
-                'border': '1px solid #FECACA',
-                'fontSize': '9px', 'fontWeight': '600',
-                'padding': '1px 7px', 'borderRadius': '8px',
-            })
-        else:
-            tag = html.Span('Monitoring', style={
-                'background': '#FFFBEB', 'color': '#92400E',
-                'border': '1px solid #FDE68A',
-                'fontSize': '9px', 'fontWeight': '600',
-                'padding': '1px 7px', 'borderRadius': '8px',
-            })
-        return html.Tr(children=[
-            html.Td(r['fac_name'], style={
-                'fontSize': '11px', 'fontWeight': '600', 'padding': '7px 8px', 'color': TEXT,
-            }),
-            html.Td(r['district'], style={'fontSize': '10px', 'color': MUTED, 'padding': '7px 8px'}),
-            html.Td(f'{_display_pct(r["avg"]):.0f}%', style={
-                'fontSize': '13px', 'fontWeight': '700', 'color': color, 'padding': '7px 8px',
-                'textAlign': 'center',
-            }),
-            html.Td(tag, style={'padding': '7px 8px', 'textAlign': 'left'}),
-        ])
-
-    return html.Div(className='mnid-card', style={'marginBottom': '12px'}, children=[
-        html.Div('FACILITIES REQUIRING ATTENTION', className='mnid-section-lbl'),
-        html.P(
-            'Bottom 5 facilities by average coverage across all tracked MCH indicators.',
-            style={'fontSize': '10px', 'color': MUTED, 'marginBottom': '8px'},
-        ),
-        html.Table(className='mnid-priority-tbl', children=[
-            html.Thead(html.Tr([
-                html.Th('Facility', style=hdr_st),
-                html.Th('District', style=hdr_st),
-                html.Th('Avg Cov.', style=hdr_st),
-                html.Th('Indicators', style=hdr_st),
-            ])),
-            html.Tbody([_fac_row(r) for r in rows_sorted]),
-        ]),
-    ])
-
-
-def _coverage_heatmap_section(indicators: list, facility_code: str,
-                              mch_full: pd.DataFrame) -> html.Div:
-    """Multi-view indicator heatmap with Malawi district panel and live filters."""
-    tracked = [i for i in indicators if i.get('status') == 'tracked']
-    store   = _compute_heatmap_store(mch_full, tracked, facility_code)
-
-    district_gauges = _build_district_gauge_row(store)
-
-    initial_fig   = _build_heatmap_fig(store, 'by_district', 'All years')
-    initial_panel = _build_malawi_panel(store, 'by_district', 'All years')
-
-    dyn_districts = store.get('all_districts', [])
-    cur_dist   = store.get('current_district', dyn_districts[0] if dyn_districts else '')
-    all_labels = store.get('y_labels', [])
-    years = ['All years']
-    if len(mch_full) and 'Date' in mch_full.columns:
-        years.extend(str(y) for y in sorted(mch_full['Date'].dt.year.dropna().astype(int).unique().tolist()))
-
-    year_opts     = [{'label': y, 'value': y} for y in years]
-    district_opts = [{'label': 'All districts', 'value': 'All'}] + [{'label': d, 'value': d} for d in dyn_districts]
-    ind_opts      = [{'label': lbl, 'value': lbl} for lbl in all_labels]
-    default_perf_inds = all_labels[:8] if len(all_labels) >= 8 else all_labels
-
-    _dd_style = {'fontSize': '12px', 'minWidth': '0'}
-    _lbl_style = {'fontSize': '10px', 'color': MUTED, 'fontWeight': '600',
-                  'marginBottom': '3px'}
-
-    performance_card = html.Div(className='mnid-card mnid-performance-block',
-                    style={'marginBottom': '12px'}, children=[
-        dcc.Store(id='mnid-heatmap-store', data=store),
-        html.Div('FACILITY PERFORMANCE', className='mnid-section-lbl'),
-        html.Div(style={'fontSize': '11px', 'color': DIM, 'marginBottom': '10px'},
-                 children='District comparison heatmap for key performance indicators.'),
-        html.Div(className='mnid-performance-shell', children=[
-            html.Div(id='mnid-performance-aggregate', className='mnid-performance-aggregate',
-                     children=_build_district_gauge_row(store, 'All years')),
-            html.Div(className='mnid-performance-table-card', children=[
-                html.Div(className='mnid-performance-filter', style={'marginBottom': '10px'}, children=[
-                    html.Div('Indicators', style=_lbl_style),
-                    dcc.Dropdown(
-                        id='mnid-performance-indicators',
-                        options=ind_opts,
-                        value=default_perf_inds,
-                        multi=True,
-                        placeholder='Select indicators...',
-                        style=_dd_style,
-                    ),
-                ]),
-                html.Div(
-                    id='mnid-performance-heatmap-table',
-                    className='mnid-performance-heatmap-graph',
-                    children=_build_facility_performance_heatmap_fig(store, 'All years', 'All', default_perf_inds, 'All'),
-                ),
-                html.Div(className='mnid-performance-key', children=[
-                    html.Div('Performance Color Scale', className='mnid-performance-key-title'),
-                    html.Div(className='mnid-performance-key-row', children=[html.Span('Excellent (>90%)'), html.Div(className='mnid-performance-swatch excellent')]),
-                    html.Div(className='mnid-performance-key-row', children=[html.Span('Moderate (60-80%)'), html.Div(className='mnid-performance-swatch moderate')]),
-                    html.Div(className='mnid-performance-key-row', children=[html.Span('Poor (<50%)'), html.Div(className='mnid-performance-swatch poor')]),
-                ]),
-                html.Div(
-                    id='mnid-performance-attention',
-                    className='mnid-performance-attention',
-                    children=_build_performance_attention_table(store, 'All years', 'All', 'All', default_perf_inds),
-                ),
-            ]),
-        ]),
-    ])
-
-    heatmap_card = html.Div(id='mnid-heatmap-inner', className='mnid-card',
-                    style={'marginBottom': '12px'}, children=[
-        html.Div('MAP COVERAGE VIEW', className='mnid-section-lbl'),
-
-        html.Div(className='mnid-map-controls', children=[
-            html.Div(className='mnid-map-scope', children=[
-                html.Div('Scope', style=_lbl_style),
-                dmc.SegmentedControl(
-                    id='mnid-heatmap-view',
-                    value='by_district',
-                    data=[
-                        {'label': 'Districts', 'value': 'by_district'},
-                        {'label': 'Facilities', 'value': 'district_facs'},
-                    ],
-                    size='sm',
-                    radius='xl',
-                    color='green',
-                    fullWidth=True,
-                ),
-            ]),
-            html.Div(className='mnid-map-filter-grid', children=[
-                html.Div(id='mnid-heatmap-district-wrap', style={'display': 'none'}, children=[
-                    html.Div('District Focus', style=_lbl_style),
-                    dcc.Dropdown(
-                        id='mnid-heatmap-district',
-                        options=district_opts,
-                        value='All',
-                        clearable=False,
-                        style=_dd_style,
-                    ),
-                ]),
-                html.Div(children=[
-                    html.Div('Indicators', style=_lbl_style),
-                    dcc.Dropdown(
-                        id='mnid-heatmap-indicators',
-                        options=ind_opts,
-                        value=all_labels[0] if all_labels else None,
-                        clearable=False,
-                        placeholder='Select indicator...',
-                        style=_dd_style,
-                    ),
-                ]),
-            ]),
-        ]),
-
-        html.Div(className='mnid-heatmap-grid', children=[
-            dcc.Graph(
-                id='mnid-heatmap-graph',
-                className='mnid-heatmap-map',
-                animate=True,
-                config={'displayModeBar': True,
-                        'modeBarButtonsToRemove': ['select2d', 'lasso2d'],
-                        'scrollZoom': True,
-                        'responsive': True,
-                        'doubleClick': 'reset'}
-                , figure=initial_fig,
-                style={'height': '560px', 'width': '100%', 'minWidth': '0'},
-                clear_on_unhover=False,
-            ),
-            html.Div(
-                id='mnid-heatmap-right',
-                className='mnid-heatmap-panel',
-                children=initial_panel,
-            ),
-        ]),
-
-        html.P(
-            'Click the scope toggle to switch between district coverage and facility markers. Choose a district when viewing facilities to keep the map readable.',
-            style={'fontSize': '10px', 'color': MUTED, 'marginTop': '8px', 'lineHeight': '1.5'},
-        ),
-    ])
-
-    return performance_card, heatmap_card
-
-# indicator cards
-
-def _ind_card(ind: dict, df: pd.DataFrame) -> html.Div:
-    if ind.get('status') == 'awaiting_baseline':
-        return html.Div(className='mnid-ind-card awaiting', children=[
-            html.Div(ind['label'], className='mnid-ind-label'),
-            html.Div([
-                html.Span('-', className='mnid-ind-pct info'),
-                html.Span('Awaiting baseline', className='mnid-tag mnid-tag-amber'),
-            ], className='mnid-ind-top'),
-            html.Div(_target_label(ind), className='mnid-ind-sub'),
-        ])
-
-    num, den, pct = _cov(df, ind['numerator_filters'], ind['denominator_filters'])
-    target = ind['target']
-    mode = _target_mode(ind)
-    cls = _css(pct, target, mode)
-
-    if _on_target(pct, target, mode):
-        badge = html.Span('On target',    className='mnid-tag mnid-tag-green')
-    elif cls == 'warn':
-        badge = html.Span('Performing',  className='mnid-tag mnid-tag-blue')
-    else:
-        badge = html.Span('Needs review', className='mnid-tag mnid-tag-red')
-
-    return html.Div(className=f'mnid-ind-card {cls}', children=[
-        html.Div(ind['label'], className='mnid-ind-label'),
-        html.Div([
-            html.Span(f'{_display_pct(pct):.0f}%', className=f'mnid-ind-pct {cls}'),
-            badge,
-        ], className='mnid-ind-top'),
-        html.Div(f'{num} / {den}  -  {_target_label(ind)}', className='mnid-ind-sub'),
-    ])
-
-
-# # MNID phase gauge donuts
-
-def _phase_gauge_fig(avg_pct: float, color: str) -> go.Figure:
-    """Mini donut gauge for a single care phase."""
-    rest = max(0.0, 100.0 - avg_pct)
-    fig = go.Figure(go.Pie(
-        values=[avg_pct, rest],
-        hole=0.72,
-        marker=dict(colors=[color, GRID_C], line=dict(color='#fff', width=0)),
-        textinfo='none',
-        hoverinfo='skip',
-        sort=False,
-        direction='clockwise',
-        rotation=90,
-    ))
-    fig.update_layout(
-        paper_bgcolor=BG, plot_bgcolor=BG,
-        margin=dict(l=4, r=4, t=4, b=4),
-        height=100,
-        showlegend=False,
-        annotations=[dict(
-            text=f'<b>{_display_pct(avg_pct):.0f}%</b>',
-            x=0.5, y=0.5, xref='paper', yref='paper', showarrow=False,
-            font=dict(size=20, color=color, family=FONT),
-        )],
-    )
-    return fig
-
-
-def _phase_gauge_row(by_cat: dict, df: pd.DataFrame) -> html.Div:
-    """Row of 4 mini donut gauges - one per care phase."""
-    phases = [
-        ('ANC',     'Antenatal Care',    CAT_PALETTES['ANC'][0],     'anc'),
-        ('Labour',  'Labour & Delivery', CAT_PALETTES['Labour'][0],  'labour'),
-        ('Newborn', 'Newborn Care',       CAT_PALETTES['Newborn'][0], 'newborn'),
-        ('PNC',     'Postnatal Care',    CAT_PALETTES['PNC'][0],     'pnc'),
-    ]
-    cards = []
-    for cat_key, cat_label, cat_color, css_cls in phases:
-        inds = [i for i in by_cat.get(cat_key, []) if i.get('status') == 'tracked']
-        if not inds:
-            continue
-        computed = []
-        for i in inds:
-            num, den, pct = _cov(df, i['numerator_filters'], i['denominator_filters'])
-            attained = _target_attainment_pct(pct, i.get('target', 0), i)
-            computed.append({'num': num, 'den': den, 'pct': pct, 'attained': attained})
-        avg_pct = round(sum(c['attained'] for c in computed) / len(computed), 1) if computed else 0.0
-        on_tgt  = sum(1 for c, i in zip(computed, inds) if _on_target(c['pct'], i['target'], i))
-        color   = _cov_color(avg_pct)
-
-        fig = _phase_gauge_fig(avg_pct, color)
-        cards.append(html.Div(className=f'mnid-phase-gauge {css_cls}', children=[
-            html.Div(cat_label, className='mnid-phase-gauge-title'),
-            dcc.Graph(figure=fig, config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
-                      style={'height': '100px'}),
-            html.Div(className='mnid-phase-gauge-on', children=[
-                html.B(f'{on_tgt}/{len(inds)}'), ' on target',
-            ]),
-        ]))
-    return html.Div(className='mnid-gauge-row', children=cards)
-
-
-# # MNID key clinical outcomes
-
-def _clinical_donuts_section(df: pd.DataFrame) -> html.Div:
-    """Always-visible donut row for key clinical outcomes."""
-    donut_specs = [
-        ('Place of delivery', 'Place of Delivery', {
-            'This facility': OK_C, 'this facility': OK_C,
-            'Referral facility': WARN_C, 'Home': DANGER_C,
-        }),
-        ('Outcome of the delivery', 'Birth Outcome', {
-            'Live births': OK_C,
-            'Fresh stillbirth': DANGER_C,
-            'Macerated stillbirth': '#92400E',
-        }),
-        ('Breast feeding', 'Breastfeeding Mode', {
-            'Exclusive': OK_C, 'Mixed': WARN_C, 'Not breastfeeding': DANGER_C,
-        }),
-        ('Thermal status on admission', 'Newborn Thermal Status', {
-            'Not hypothermic': OK_C,
-            'Mild hypothermia': WARN_C,
-            'Moderate hypothermia': DANGER_C,
-        }),
-    ]
-    cards = []
-    for concept, title, color_map in donut_specs:
-        vc  = _value_counts(df, concept)
-        fig = _donut(vc, title, color_map=color_map)
-        if fig:
-            fig.update_layout(height=200, margin=dict(l=4, r=4, t=32, b=28))
-            cards.append(html.Div(className='mnid-chart-card', children=[
-                dcc.Graph(figure=fig, config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
-                          style={'height': '200px'}),
-            ]))
-
-    if not cards:
-        return html.Div()
-
-    return html.Div([
-        html.Div('KEY CLINICAL OUTCOMES', className='mnid-section-lbl'),
-        html.Div(className='mnid-donut-grid', children=cards),
-    ])
-
-
-# # MNID coverage phase bar chart
-
-def _coverage_phase_fig(title: str, indicators: list, df: pd.DataFrame) -> go.Figure:
-    """Horizontal bar chart: one bar per indicator coloured by status vs target."""
-    rows = []
-    for ind in indicators:
-        if ind.get('status') == 'awaiting_baseline':
-            rows.append({'label': ind['label'][:36], 'pct': None,
-                         'target': ind['target'], 'cls': 'await',
-                         'sub': 'Awaiting baseline'})
-        else:
-            num, den, pct = _cov(df, ind['numerator_filters'], ind['denominator_filters'])
-            cls = _css(pct, ind['target'], ind)
-            rows.append({'label': ind['label'][:36], 'pct': pct,
-                         'target': ind['target'], 'cls': cls,
-                         'sub': f'{num}/{den}'})
-
-    if not rows:
-        return go.Figure()
-
-    # Reversed so first indicator is at the top
-    rows = list(reversed(rows))
-    labels  = [r['label']  for r in rows]
-    values  = [r['pct'] if r['pct'] is not None else 0 for r in rows]
-    targets = [r['target'] for r in rows]
-    colors  = [{'ok': OK_C, 'warn': WARN_C, 'danger': DANGER_C}.get(r['cls'], MUTED)
-               for r in rows]
-    text_vals = [f"{r['pct']:.0f}%" if r['pct'] is not None else 'No data' for r in rows]
-
-    height = max(len(rows) * 38 + 70, 180)
-
-    fig = go.Figure()
-
-    # Bars
-    fig.add_trace(go.Bar(
-        x=values, y=labels,
-        orientation='h',
-        marker=dict(color=colors, opacity=0.88,
-                    line=dict(color='rgba(0,0,0,0)')),
-        text=text_vals,
-        textposition='outside',
-        textfont=dict(size=10, color=TEXT, family=FONT),
-        cliponaxis=False,
-        hovertemplate='<b>%{y}</b><br>Coverage: %{x:.1f}%<extra></extra>',
-        showlegend=False,
-    ))
-
-    # Target markers as a scatter overlay
-    fig.add_trace(go.Scatter(
-        x=targets, y=labels,
-        mode='markers',
-        marker=dict(symbol='line-ew', size=14, color='#64748B',
-                    line=dict(color='#64748B', width=2)),
-        name='Target',
-        hovertemplate='Target: %{x:.0f}%<extra></extra>',
-    ))
-
-    fig.update_layout(
-        paper_bgcolor=BG, plot_bgcolor=BG,
-        font=dict(family=FONT, color=TEXT, size=11),
-        height=height,
-        margin=dict(l=8, r=56, t=8, b=8),
-        xaxis=dict(range=[0, 115], showgrid=True, gridcolor=GRID_C,
-                   zeroline=False, showline=False,
-                   ticksuffix='%', tickfont=dict(size=9, color=MUTED)),
-        yaxis=dict(showgrid=False, zeroline=False, showline=False,
-                   tickfont=dict(size=10, color=DIM), automargin=True),
-        hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
-        legend=dict(orientation='h', x=0, y=-0.06, xanchor='left',
-                    font=dict(size=9, color=DIM)),
-        bargap=0.28,
-    )
-    return fig
-
-
-def _no_data_card(message: str = 'No data available for this period.') -> html.Div:
-    """Inline empty-state card for individual chart sections."""
-    return html.Div(className='mnid-chart-card', style={'gridColumn': '1 / -1'}, children=[
-        html.Div(style={
-            'display': 'flex', 'flexDirection': 'column',
-            'alignItems': 'center', 'justifyContent': 'center',
-            'padding': '40px 24px', 'gap': '10px',
-        }, children=[
-            html.Div('-', style={
-                'fontSize': '32px', 'color': MUTED, 'lineHeight': '1',
-            }),
-            html.Div(message, style={
-                'fontSize': '13px', 'color': DIM, 'fontFamily': FONT,
-                'textAlign': 'center',
-            }),
-        ]),
-    ])
-
-
-def _coverage_charts_section(by_cat: dict, df: pd.DataFrame, categories: list | None = None) -> html.Div:
-    """2-column grid of per-phase coverage bar charts (replaces accordion cards)."""
-    phase_map = {
-        'ANC': 'Antenatal Care (ANC)',
-        'Labour': 'Labour & Delivery',
-        'Newborn': 'Newborn Care',
-        'PNC': 'Postnatal Care (PNC)',
-    }
-    phases = [(cat, phase_map.get(cat, cat)) for cat in _resolve_category_order(
-        [{'category': k} for k in by_cat.keys()], categories
-    )]
-    cards = []
-    for cat_key, cat_title in phases:
-        inds = by_cat.get(cat_key, [])
-        if not inds:
-            continue
-        tracked  = [i for i in inds if i.get('status') == 'tracked']
-        awaiting = [i for i in inds if i.get('status') == 'awaiting_baseline']
-        computed = [_cov(df, i['numerator_filters'], i['denominator_filters'])
-                    for i in tracked]
-        avg_pct  = round(sum(c[2] for c in computed) / len(computed), 0) if computed else None
-
-        pills = [html.Span(f'{len(tracked)} available', className='mnid-pill mnid-pill-green')]
-        if awaiting:
-            pills.append(html.Span(f'{len(awaiting)} awaiting', className='mnid-pill mnid-pill-amber'))
-        if avg_pct is not None:
-            pc = 'mnid-pill-green' if avg_pct >= 80 else ('mnid-pill-amber' if avg_pct >= 65 else 'mnid-pill-red')
-            pills.append(html.Span(f'Avg {_display_pct(avg_pct):.0f}%', className=f'mnid-pill {pc}'))
-
-        fig = _coverage_phase_fig(cat_title, inds, df)
-        h   = max(len(inds) * 38 + 70, 180)
-
-        cards.append(html.Div(className='mnid-chart-card', children=[
-            html.Div(style={'display': 'flex', 'justifyContent': 'space-between',
-                            'alignItems': 'center', 'marginBottom': '4px'}, children=[
-                html.Div(cat_title,
-                         style={'fontSize': '12px', 'fontWeight': '600', 'color': TEXT}),
-                html.Div(className='mnid-pills', children=pills),
-            ]),
-            dcc.Graph(figure=fig, config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
-                      style={'height': f'{h}px'}),
-            html.P('|= target', style={'fontSize': '9px', 'color': MUTED,
-                                        'margin': '2px 0 0', 'textAlign': 'right'}),
-        ]))
-
-    if not cards:
-        return html.Div(className='mnid-chart-grid',
-                        children=[_no_data_card('No indicators configured for this facility.')])
-    return html.Div(className='mnid-chart-grid', children=cards)
-
-
-# accordion helpers (kept for analysis sections)
-
-def _acc_section(sec_id, title, indicators, df, default_open=False):
-    tracked  = [i for i in indicators if i.get('status') == 'tracked']
-    awaiting = [i for i in indicators if i.get('status') == 'awaiting_baseline']
-    computed = [_cov(df, i['numerator_filters'], i['denominator_filters'])
-                for i in tracked]
-    avg_pct  = round(sum(c[2] for c in computed) / len(computed), 0) if computed else None
-
-    pills = [html.Span(f'{len(tracked)} available', className='mnid-pill mnid-pill-green')]
-    if awaiting:
-        pills.append(html.Span(f'{len(awaiting)} awaiting',
-                               className='mnid-pill mnid-pill-amber'))
-    if avg_pct is not None:
-        pc = 'mnid-pill-green' if avg_pct >= 80 else ('mnid-pill-amber' if avg_pct >= 65
-                                                        else 'mnid-pill-red')
-        pills.append(html.Span(f'Avg {_display_pct(avg_pct):.0f}%', className=f'mnid-pill {pc}'))
-
-    return dmc.AccordionItem(value=sec_id, children=[
-        dmc.AccordionControl(html.Div(style={
-            'display':'flex','alignItems':'center',
-            'justifyContent':'space-between','width':'100%','gap':'12px',
-        }, children=[
-            html.Span(title, style={'fontSize':'13px','fontWeight':'500','color':TEXT}),
-            html.Div(className='mnid-pills', children=pills),
-        ])),
-        dmc.AccordionPanel(
-            html.Div(className='mnid-ind-grid',
-                     children=[_ind_card(i, df) for i in indicators]),
-            pt='sm', pb='md',
-        ),
-    ])
-
-
-def _chart_acc_section(sec_id, title, charts):
-    """Accordion panel containing chart cards in a responsive 2-col grid."""
-    return dmc.AccordionItem(value=sec_id, children=[
-        dmc.AccordionControl(
-            html.Span(title, style={'fontSize':'13px','fontWeight':'500','color':TEXT})
-        ),
-        dmc.AccordionPanel(
-            html.Div(className='mnid-chart-grid', children=charts),
-            pt='sm', pb='md',
-        ),
-    ])
-
-
-# themed analysis charts 
-
-def _anc_charts(df):
-    monthly = _monthly_visits(df, 'ANC VISIT')
-    charts = []
-
-    fig = _line(monthly, 'ANC Visits Over Time', color=_TREND_ACCENT['ANC'], y_label='Unique Clients')
-    if fig: charts.append(_chart_card('', fig))
-
-    for concept, title in [
-        ('Anemia screening',            'Anaemia Screening'),
-        ('High blood pressure screening','Blood Pressure Screening'),
-    ]:
-        vc = _value_counts(df, concept)
-        fig = _donut(vc, title, color_map={
-            'Yes': '#2563EB', 'No': '#94A3B8',
-            'Screened': '#2563EB', 'Not screened': '#94A3B8',
-        })
-        if fig: charts.append(_chart_card('', fig))
-
-    vc = _flag_value_counts(df, 'mnid_anc_infection_screened')
-    fig = _donut(vc, 'Infection Screening', color_map={
-        'Screened': '#2563EB', 'Not screened': '#94A3B8',
-    })
-    if fig: charts.append(_chart_card('', fig))
-
-    vc = _value_counts(df, 'POCUS completed')
-    fig = _donut(vc, 'POCUS Completed', color_map={'Yes': '#0F766E', 'No': '#94A3B8'})
-    if fig: charts.append(_chart_card('', fig))
-
-    vc = _value_counts(df, 'HIV Test')
-    fig = _donut(vc, 'HIV Testing Status', color_map={
-        'Negative': '#2563EB', 'Non-reactive': '#2563EB',
-        'Reactive': '#DB2777', 'Positive': '#DB2777',
-        'Not done': '#94A3B8',
-    })
-    if fig: charts.append(_chart_card('', fig))
-
-    vc = _value_counts(df, 'Number of tetanus doses', col='Value')
-    fig = _hbar(vc, 'Tetanus Dose Distribution')
-    if fig: charts.append(_chart_card('', fig))
-
-    return charts
-
-
-def _labour_charts(df):
-    charts = []
-
-    cascade = _pph_cascade(df)
-    if cascade:
-        charts.append(cascade)
-
-    monthly = _monthly_visits(df, 'LABOUR AND DELIVERY')
-    fig = _line(monthly, 'Labour & Delivery Visits', color=_TREND_ACCENT['Labour'], y_label='Clients')
-    if fig: charts.append(_chart_card('', fig))
-
-    vc = _value_counts(df, 'Place of delivery')
-    fig = _donut(vc, 'Place of Delivery', color_map={
-        'This facility': '#2563EB', 'this facility': '#2563EB',
-        'Referral facility': '#0F766E', 'Home': '#C2410C', 'In transit': '#64748B',
-    })
-    if fig: charts.append(_chart_card('', fig))
-
-    vc = _value_counts(df, 'Mode of delivery')
-    fig = _donut(vc, 'Mode of Delivery')
-    if fig: charts.append(_chart_card('', fig))
-
-    vc = _value_counts(df, 'Obstetric complications')
-    fig = _hbar(vc, 'Obstetric Complications')
-    if fig: charts.append(_chart_card('', fig))
-
-    vc = _value_counts(df, 'Outcome of the delivery')
-    fig = _donut(vc, 'Birth Outcome', color_map={
-        'Live birth': '#0F766E',
-        'Live births': '#0F766E',
-        'Fresh still birth': '#DB2777',
-        'Fresh stillbirth': '#DB2777',
-        'Macerated still birth': '#7C3AED',
-        'Macerated stillbirth': '#7C3AED',
-    })
-    if fig: charts.append(_chart_card('', fig))
-
-    for concept, label in [
-        ('Antenatal corticosteroids given', 'Antenatal Corticosteroids'),
-        ('Prophylactic azithromycin given', 'Prophylactic Azithromycin'),
-        ('PPH treatment bundle',            'PPH Treatment Bundle'),
-        ('Digital intrapartum monitoring',  'Digital Monitoring'),
-    ]:
-        vc = _value_counts(df, concept)
-        fig = _donut(vc, label, color_map={
-            'Yes': '#2563EB', 'Used': '#2563EB', 'Completed': '#2563EB',
-            'Partial': '#C2410C',
-            'No': '#94A3B8', 'Not used': '#94A3B8',
-            'Not required': '#CBD5E1', 'Not eligible': '#CBD5E1',
-        })
-        if fig: charts.append(_chart_card('', fig))
-
-    return charts
-
-
-def _pnc_charts(df):
-    charts = []
-    monthly = _monthly_visits(df, 'POSTNATAL CARE')
-    fig = _line(monthly, 'PNC Visits Over Time', color=_TREND_ACCENT['PNC'], y_label='Clients')
-    if fig: charts.append(_chart_card('', fig))
-
-    vc = _value_counts(df, 'Postnatal check period')
-    fig = _hbar(vc, 'PNC Visit Timing')
-    if fig: charts.append(_chart_card('', fig))
-
-    vc = _value_counts(df, 'Breast feeding')
-    fig = _donut(vc, 'Breastfeeding Mode', color_map={
-        'Exclusive': '#2563EB',
-        'exclusive breastfeeding': '#2563EB',
-        'Breastfed exclusively': '#0891B2',
-        'Mixed': '#C2410C',
-        'Yes': '#0F766E',
-        'No': '#DB2777',
-        'Not breastfeeding': '#DB2777',
-    })
-    if fig: charts.append(_chart_card('', fig))
-
-    vc = _value_counts(df, 'Status of the mother')
-    fig = _donut(vc, 'Mother Final Status', color_map={
-        'Alive': '#0F766E',
-        'Discharged alive': '#2563EB',
-        'Stable': '#0891B2',
-        'Admitted': '#C2410C',
-        'Referred': '#7C3AED',
-        'Death': '#DB2777',
-        'Dead': '#DB2777',
-        'Died': '#DB2777',
-    })
-    if fig: charts.append(_chart_card('', fig))
-
-    vc = _value_counts(df, 'Status of baby')
-    fig = _donut(vc, 'Baby Final Status', color_map={
-        'Alive': '#0F766E',
-        'Stable': '#0891B2',
-        'Admitted': '#2563EB',
-        'Discharged': '#7C3AED',
-        'Referred': '#C2410C',
-        'Died': '#DB2777',
-        'Death': '#DB2777',
-        'Dead': '#DB2777',
-    })
-    if fig: charts.append(_chart_card('', fig))
-
-    vc = _value_counts(df, 'Postnatal complications')
-    fig = _hbar(vc, 'Postnatal Complications')
-    if fig: charts.append(_chart_card('', fig))
-
-    return charts
-
-
-def _newborn_charts(df):
-    monthly = _monthly_visits(df, 'NEONATAL CARE')
-    fig = _line(monthly, 'Neonatal Care Admissions', color=_TREND_ACCENT['Newborn'], y_label='Babies')
-    admission_card = _chart_card('', fig) if fig else None
-
-    thermal_num, thermal_den, thermal_pct = _concept_rate(df, 'Thermal status on admission', ['Not hypothermic'])
-    resus_num, resus_den, resus_pct = _concept_rate(df, 'Neonatal resuscitation provided', ['Yes', 'Stimulation only', 'Bag and mask'])
-    kmc_num, kmc_den, kmc_pct = _concept_rate(df, 'iKMC initiated', ['Yes'])
-    support_num, support_den, support_pct = _concept_rate(df, 'CPAP support', ['Bubble CPAP', 'Nasal oxygen'])
-
-    summary_cards = [
-        _newborn_summary_card('Thermal Stability', thermal_num, thermal_den, thermal_pct, '#0F766E',
-                              'Babies arriving normothermic'),
-        _newborn_summary_card('Resuscitation Response', resus_num, resus_den, resus_pct, '#2563EB',
-                              'Babies receiving any resuscitation action'),
-        _newborn_summary_card('iKMC Initiation', kmc_num, kmc_den, kmc_pct, '#7C3AED',
-                              'Eligible babies initiated on KMC'),
-        _newborn_summary_card('Respiratory Support', support_num, support_den, support_pct, '#0891B2',
-                              'Bubble CPAP or nasal oxygen recorded'),
-    ]
-    overview_card = html.Div(className='mnid-chart-card', children=[
-        html.Div(className='mnid-newborn-metric-grid', children=summary_cards)
-    ])
-
-    run_specs = [
-        ('Thermal status on admission', ['Not hypothermic'], 'Thermal Stability', 85, '#0F766E'),
-        ('Neonatal resuscitation provided', ['Yes', 'Stimulation only', 'Bag and mask'], 'Resuscitation Response', 80, '#2563EB'),
-        ('iKMC initiated', ['Yes'], 'iKMC Initiation', 75, '#7C3AED'),
-        ('Phototherapy given', ['Yes'], 'Phototherapy Use', 70, '#C2410C'),
-        ('Parenteral antibiotics given', ['Yes'], 'Antibiotics Given', 85, '#DB2777'),
-        ('CPAP support', ['Bubble CPAP'], 'Bubble CPAP Use', 60, '#0891B2'),
-    ]
-    run_cards = {}
-    for concept, values, title, target, color in run_specs:
-        run_fig = _monthly_concept_rate(df, concept, positive_values=values, title=title, target=target, color=color)
-        if run_fig:
-            run_cards[title] = html.Div(className='mnid-chart-card', children=[
-                dcc.Graph(
-                    figure=run_fig,
-                    config={'displayModeBar': 'hover', 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'], 'toImageButtonOptions': {'format': 'png', 'scale': 2}},
-                    style={'height': '210px'},
-                ),
-            ])
-
-    mix_fig = _monthly_concept_mix_fig(
-        df,
-        'Thermal status on admission',
-        [
-            ('Not hypothermic', ['Not hypothermic'], '#2563EB'),
-            ('Hypothermic', ['Hypothermic', 'Mild hypothermia', 'Moderate hypothermia', 'Severe hypothermia'], '#DB2777'),
-        ],
-        'Thermal Status Mix Over Time',
-    )
-    thermal_mix_card = _chart_card('', mix_fig) if mix_fig else None
-
-    resp_mix_fig = _monthly_concept_mix_fig(
-        df,
-        'CPAP support',
-        [
-            ('Bubble CPAP', ['Bubble CPAP'], '#7C3AED'),
-            ('Nasal oxygen', ['Nasal oxygen'], '#0891B2'),
-            ('No advanced support', ['None', 'No'], '#CBD5E1'),
-        ],
-        'Respiratory Support Mix Over Time',
-    )
-    respiratory_mix_card = _chart_card('', resp_mix_fig) if resp_mix_fig else None
-
-    vc = _value_counts(df, 'Thermal status on admission')
-    fig = _donut(vc, 'Thermal Status on Admission', color_map={
-        'Not hypothermic': '#2563EB',
-        'Hypothermic': '#DB2777',
-        'Mild hypothermia': '#0F766E',
-        'Moderate hypothermia': '#C2410C',
-        'Severe hypothermia': '#DB2777',
-    })
-    thermal_donut = _chart_card('', fig) if fig else None
-
-    vc = _value_counts(df, 'Neonatal resuscitation provided')
-    fig = _donut(vc, 'Neonatal Resuscitation', color_map={
-        'Yes': '#2563EB', 'Stimulation only': '#0F766E',
-        'Bag and mask': '#7C3AED', 'No': '#94A3B8', 'Not required': '#CBD5E1',
-    })
-    resuscitation_donut = _chart_card('', fig) if fig else None
-
-    vc = _value_counts(df, 'iKMC initiated')
-    fig = _donut(vc, 'iKMC Initiated', color_map={
-        'Yes': '#2563EB', 'No': '#94A3B8', 'Not eligible': '#CBD5E1',
-    })
-    kmc_donut = _chart_card('', fig) if fig else None
-
-    vc = _value_counts(df, 'CPAP support')
-    fig = _donut(vc, 'CPAP Support Type', color_map={
-        'Bubble CPAP': '#2563EB', 'Nasal oxygen': '#0F766E', 'No CPAP': '#94A3B8', 'None': '#94A3B8',
-    })
-    cpap_donut = _chart_card('', fig) if fig else None
-
-    vc = _value_counts(df, 'Phototherapy given')
-    fig = _donut(vc, 'Phototherapy Given', color_map={
-        'Yes': '#2563EB', 'No': '#94A3B8',
-    })
-    phototherapy_donut = _chart_card('', fig) if fig else None
-
-    vc = _value_counts(df, 'Parenteral antibiotics given')
-    fig = _donut(vc, 'Parenteral Antibiotics', color_map={
-        'Yes': '#2563EB', 'No': '#94A3B8',
-    })
-    antibiotics_donut = _chart_card('', fig) if fig else None
-
-    vc = _value_counts(df, 'Newborn baby complications')
-    fig = _hbar(vc, 'Newborn Complications')
-    complications_bar = _chart_card('', fig) if fig else None
-
-    birthweight_vc, birthweight_concept = _first_available_value_counts(
-        df,
-        ['Birthweight category', 'Birth weight category', 'Birthweight', 'Birth weight'],
-        col='obs_value_coded',
-    )
-    birthweight_chart = None
-    if len(birthweight_vc):
-        birthweight_fig = _hbar(birthweight_vc, 'Birthweight Distribution', color='#7C3AED')
-        if birthweight_fig:
-            birthweight_chart = _chart_card('', birthweight_fig)
-
-    mortality_vc, mortality_concept = _first_available_value_counts(
-        df,
-        ['Admission outcome', 'Status of baby', 'Baby Final Status', 'Outcome of the delivery'],
-        col='obs_value_coded',
-    )
-    mortality_chart = None
-    if len(mortality_vc):
-        mortality_fig = _donut(mortality_vc, 'Outcome Status', color_map={
-            'Admitted': '#2563EB',
-            'Discharged': '#0F766E',
-            'Stable': '#2563EB', 'Alive': '#0F766E', 'Live birth': '#0F766E', 'Live births': '#0F766E',
-            'Referred': '#C2410C', 'Died': '#DB2777', 'Death': '#DB2777',
-            'Fresh still birth': '#DB2777', 'Fresh stillbirth': '#DB2777',
-            'Macerated still birth': '#7C3AED', 'Macerated stillbirth': '#7C3AED',
-        })
-        if mortality_fig:
-            mortality_chart = _chart_card('', mortality_fig)
-
-    diagnosis_chart = complications_bar
-    quality_cards = [card for card in [phototherapy_donut, antibiotics_donut, thermal_donut] if card is not None]
-
-    tab_specs = [
-        ('Admissions', 'Admissions volume and core neonatal service activity.', [overview_card, admission_card]),
-        ('Mortality', 'Outcome trends and mortality-related newborn status views.', [mortality_chart]),
-        ('Birthweight', 'Birthweight-related distribution views for neonatal review.', [birthweight_chart]),
-        ('Thermal Care', 'Thermal stability monitoring and thermal status composition.', [run_cards.get('Thermal Stability'), thermal_mix_card, thermal_donut]),
-        ('Respiratory Support', 'Respiratory support and resuscitation monitoring.', [run_cards.get('Resuscitation Response'), run_cards.get('Bubble CPAP Use'), respiratory_mix_card, resuscitation_donut, cpap_donut]),
-        ('KMC', 'KMC uptake and related newborn care monitoring.', [run_cards.get('iKMC Initiation'), kmc_donut]),
-        ('Infections', 'Infection-related treatment and complication monitoring.', [run_cards.get('Antibiotics Given'), antibiotics_donut, diagnosis_chart]),
-        ('Quality of Care', 'Selected intervention and support measures used to review care delivery.', quality_cards),
-    ]
-    tabs = []
-    for label, desc, cards in tab_specs:
-        usable_cards = [card for card in cards if card is not None]
-        if usable_cards:
-            tabs.append((label, desc, usable_cards))
-
-    return [html.Div(className='mnid-chart-card mnid-newborn-workspace', style={'gridColumn': '1 / -1'}, children=[
-        html.Div('NEONATAL CLINICAL MODULES', className='mnid-card-title'),
-        html.Div('Select a module to view the relevant neonatal charts and indicators.',
-                 className='mnid-newborn-section-subtitle', style={'marginBottom': '12px'}),
-        dcc.Tabs(
-            value=(tabs[0][0] if tabs else 'Admissions'),
-            className='mnid-newborn-tabs',
-            children=[
-                dcc.Tab(
-                    label=label,
-                    value=label,
-                    className='mnid-newborn-tab',
-                    selected_className='mnid-newborn-tab--selected',
-                    children=_newborn_tab_content(desc, cards),
-                )
-                for label, desc, cards in tabs
-            ],
-        ),
-    ])]
-
-
-# system readiness
-
-def _stat_row(label, num, den, pct, tgt=None):
-    cls = _css(pct, tgt) if tgt else 'info'
-    status_map = {'ok': 'On target', 'warn': 'Watch', 'danger': 'Needs action', 'info': 'Monitor'}
-    return html.Div(className=f'mnid-stat-row {cls}', children=[
-        html.Span(label, className='mnid-stat-lbl'),
-        html.Div(style={'display':'flex','gap':'8px','alignItems':'center', 'flexWrap': 'wrap', 'justifyContent': 'flex-end'}, children=[
-            html.Span(f'{num}/{den}', className=f'mnid-stat-meta {cls}'),
-            html.Span(f'{_display_pct(pct):.0f}%', className=f'mnid-stat-val {cls}'),
-            html.Span(status_map.get(cls, 'Monitor'), className=f'mnid-stat-tag {cls}'),
-        ]),
-    ])
-
-
-def _system_readiness(df, supply_inds, wf_inds, dq_inds):
-    if not (supply_inds or wf_inds or dq_inds):
-        return html.Div()
-
-    def _placeholder_card(title: str):
-        return html.Div(className='mnid-card', children=[
-            html.Div(title, className='mnid-card-title'),
-            html.Div('No configured indicators', className='mnid-ind-note',
-                     style={'padding': '18px 0', 'textAlign': 'center'}),
-        ])
-
-    def _rows(inds):
-        rows = []
-        for ind in inds:
-            if ind.get('status') == 'unavailable':
-                rows.append(html.Div(className='mnid-stat-row info', children=[
-                    html.Span(ind['label'], className='mnid-stat-lbl'),
-                    html.Div(style={'display': 'flex', 'gap': '8px', 'alignItems': 'center',
-                                    'flexWrap': 'wrap', 'justifyContent': 'flex-end'}, children=[
-                        html.Span('Not configured', className='mnid-stat-meta info'),
-                    ]),
-                ]))
-                continue
-            num, den, pct = _cov(df, ind['numerator_filters'], ind['denominator_filters'])
-            rows.append(_stat_row(ind['label'], num, den, pct, ind.get('target', ind.get('target_pct'))))
-        return rows
-
-    return html.Div([
-        html.Div('SYSTEM READINESS', className='mnid-section-lbl'),
-        html.Div(className='mnid-grid3', children=[
-            (html.Div(className='mnid-card', children=[
-                html.Div('Equipment & Supplies', className='mnid-card-title'),
-                *_rows(supply_inds),
-            ]) if supply_inds else _placeholder_card('Equipment & Supplies')),
-            (html.Div(className='mnid-card', children=[
-                html.Div('Workforce Competency', className='mnid-card-title'),
-                *_rows(wf_inds),
-            ]) if wf_inds else _placeholder_card('Workforce Competency')),
-            (html.Div(className='mnid-card', children=[
-                html.Div('Data Quality', className='mnid-card-title'),
-                *_rows(dq_inds),
-            ]) if dq_inds else _placeholder_card('Data Quality')),
-        ]),
-    ])
-
-
-def _compare_status_counts(df: pd.DataFrame, tracked: list) -> dict:
-    """Counts indicators by status for a given filtered dataframe."""
-    on_tgt = 0
-    below  = 0
-    no_dat = 0
-    for ind in tracked:
-        num, den, pct = _cov(df, ind['numerator_filters'], ind['denominator_filters'])
-        if den <= 0:
-            no_dat += 1
-        else:
-            if pct >= ind.get('target', 0):
-                on_tgt += 1
-            else:
-                below += 1
-    return {'On target': on_tgt, 'Below target': below, 'No data': no_dat}
-
-
-def _validate_indicator_configs(df: pd.DataFrame, indicators: list[dict]) -> None:
-    for ind in indicators or []:
-        label = str(ind.get('label') or ind.get('id') or 'Unnamed indicator')
-        num_missing = _filter_columns_missing(df, ind.get('numerator_filters'))
-        den_missing = _filter_columns_missing(df, ind.get('denominator_filters'))
-        if num_missing:
-            _warn_once(f"MNID indicator '{label}' has numerator filters referencing missing columns: {', '.join(num_missing)}")
-        if den_missing:
-            _warn_once(f"MNID indicator '{label}' has denominator filters referencing missing columns: {', '.join(den_missing)}")
-
-
-def _build_compare_pie(title: str, counts: dict) -> go.Figure:
-    labels = list(counts.keys())
-    values = list(counts.values())
-    colors = ['#2563EB', '#0F766E', '#D6D3CB']
-
-    fig = go.Figure(go.Pie(
-        labels=labels,
-        values=values,
-        hole=0.35,
-        marker=dict(colors=colors, line=dict(color='#fff', width=1)),
-        textinfo='percent',
-        hovertemplate='<b>%{label}</b><br>%{value} indicators (%{percent})<extra></extra>',
-    ))
-    fig.update_layout(**_CHART_LAYOUT)
-    fig.update_layout(
-        title=dict(text=title,
-                   font=dict(size=12, color='#444441', family=FONT),
-                   x=0, xanchor='left', y=0.98),
-        height=260,
-        margin=dict(l=10, r=10, t=36, b=10),
-        legend=dict(orientation='h', x=0, y=-0.08, xanchor='left',
-                    font=dict(size=9, color=DIM)),
-    )
-    return fig
-
-
-def _build_compare_bar(title: str, counts: dict) -> go.Figure:
-    labels = list(counts.keys())
-    values = list(counts.values())
-    colors = ['#2563EB', '#0F766E', '#D6D3CB']
-
-    fig = go.Figure(go.Bar(
-        x=values,
-        y=labels,
-        orientation='h',
-        marker=dict(color=colors, line=dict(color='#fff', width=1)),
-        text=[str(v) for v in values],
-        textposition='auto',
-        hovertemplate='<b>%{y}</b>: %{x} indicators<extra></extra>',
-    ))
-    fig.update_layout(**_CHART_LAYOUT)
-    fig.update_layout(
-        title=dict(text=title,
-                   font=dict(size=12, color='#444441', family=FONT),
-                   x=0, xanchor='left', y=0.98),
-        height=260,
-        margin=dict(l=10, r=100, t=36, b=10),
-        xaxis=dict(title='Indicators', showgrid=True, gridcolor=GRID_C),
-        yaxis=dict(showgrid=False),
-    )
-    return fig
-
-
-def _build_compare_heatmap(title: str, df: 'pd.DataFrame', tracked: list) -> go.Figure:
-    """Single-entity heatmap: one row per indicator showing coverage %."""
-    names, pcts, colors_list = [], [], []
-    heat_palette = ['#DBEAFE', '#93C5FD', '#60A5FA', '#2563EB', '#1D4ED8']
-    for ind in tracked:
-        label = ind.get('label', ind.get('id', '-'))
-        if df.empty:
-            pct = 0.0
-        else:
-            _, _, pct = _cov(df, ind['numerator_filters'], ind['denominator_filters'])
-        names.append(label[:38])
-        pcts.append(_display_pct(pct))
-        if pct == 0:
-            colors_list.append('#E5E7EB')
-        else:
-            bucket = min(int((_display_pct(pct) or 0) // 20), len(heat_palette) - 1)
-            colors_list.append(heat_palette[bucket])
-
-    if not names:
-        fig = go.Figure()
-        fig.update_layout(**_CHART_LAYOUT, height=260)
-        return fig
-
-    fig = go.Figure(go.Bar(
-        x=pcts,
-        y=names,
-        orientation='h',
-        marker=dict(color=colors_list, line=dict(color='#fff', width=0.5)),
-        text=[f'{_display_pct(p):.0f}%' for p in pcts],
-        textposition='auto',
-        hovertemplate='<b>%{y}</b><br>Coverage: %{x:.1f}%<extra></extra>',
-    ))
-    fig.update_layout(**_CHART_LAYOUT)
-    fig.update_layout(
-        title=dict(text=title,
-                   font=dict(size=12, color='#444441', family=FONT),
-                   x=0, xanchor='left', y=0.98),
-        height=max(260, len(names) * 24 + 60),
-        margin=dict(l=10, r=20, t=36, b=10),
-        xaxis=dict(title='Coverage %', range=[0, 100], showgrid=True, gridcolor=GRID_C),
-        yaxis=dict(showgrid=False, autorange='reversed'),
-    )
-    return fig
-
-
-# comparative analysis section
-
-def _comparative_analysis_section(indicators: list, facility_code: str,
-                                  mch_full: pd.DataFrame,
-                                  payload_key: str | None = None) -> html.Div:
-    """Time-aware comparison across selected facilities or districts and indicators."""
-    tracked = [i for i in indicators if i.get('status') == 'tracked']
-    all_facs  = sorted(mch_full['Facility_CODE'].dropna().astype(str).unique().tolist()) if len(mch_full) and 'Facility_CODE' in mch_full.columns else sorted(_ALL_FACILITIES[:])
-    all_dists = sorted(mch_full['District'].dropna().astype(str).unique().tolist()) if len(mch_full) and 'District' in mch_full.columns else sorted(_ALL_DISTRICTS[:])
-    current_dist = _FACILITY_DISTRICT.get(facility_code, '')
-    fac_opts = [{'label': _FACILITY_NAMES.get(f, f), 'value': f} for f in all_facs]
-    dist_opts = [{'label': d, 'value': d} for d in all_dists]
-    ind_opts = [{'label': ind['label'], 'value': ind['id']} for ind in tracked]
-    default_facs = ([facility_code] if facility_code in all_facs else all_facs[:4]) or []
-    default_dists = ([current_dist] if current_dist in all_dists else all_dists[:4]) or []
-    default_inds = [ind['id'] for ind in tracked[:3]]
-    _lbl_style = {
-        'fontSize': '11px', 'fontWeight': '600', 'color': '#94A3B8',
-        'textTransform': 'uppercase', 'letterSpacing': '0.05em',
-        'marginBottom': '5px', 'display': 'block',
-    }
-
-    compare_card = html.Div(className='mnid-chart-card mnid-compare-card', children=[
-        # -- Header row -----------------------------------------------------------
-        html.Div(className='mnid-compare-header', style={'display': 'flex', 'alignItems': 'center',
-                        'justifyContent': 'space-between',
-                        'marginBottom': '16px', 'flexWrap': 'wrap', 'gap': '10px'}, children=[
-            html.Div('COMPARISON ANALYSIS', className='mnid-card-title',
-                     style={'marginBottom': '0'}),
-            html.Div(className='mnid-compare-mode', style={'display': 'flex', 'alignItems': 'center', 'gap': '10px', 'flexWrap': 'wrap'}, children=[
-                html.Span('Compare by:', style={'fontSize': '11px', 'color': '#94A3B8',
-                                                'fontWeight': '600', 'letterSpacing': '0.04em'}),
-                dcc.RadioItems(
-                    id='mnid-compare-mode',
-                    options=[
-                        {'label': 'Facility', 'value': 'facility'},
-                        {'label': 'District', 'value': 'district'},
-                    ],
-                    value='facility',
-                    inline=True,
-                    inputStyle={'marginRight': '5px'},
-                    labelStyle={'marginRight': '16px', 'fontSize': '12px',
-                                'color': '#E2E8F0', 'cursor': 'pointer', 'fontWeight': '600'},
-                ),
-                html.Button(
-                    id='mnid-compare-chart-toggle',
-                    className='mnid-trend-toggle is-line',
-                    n_clicks=0,
-                    type='button',
-                    children=[
-                        html.Span('Line', id='mnid-compare-chart-toggle-text', className='mnid-trend-toggle-text'),
-                        html.Span(className='mnid-trend-toggle-thumb'),
-                    ],
-                ),
-            ]),
-        ]),
-        html.Div(className='mnid-compare-filters', style={'display': 'grid', 'gridTemplateColumns': '1.4fr 0.8fr 1.2fr', 'gap': '12px', 'marginBottom': '14px'}, children=[
-            html.Div(children=[
-                html.Label('Locations', style=_lbl_style),
-                dcc.Dropdown(
-                    id='mnid-compare-entities',
-                    options=fac_opts,
-                    value=default_facs,
-                    multi=True,
-                    placeholder='Select locations...',
-                ),
-            ]),
-            html.Div(children=[
-                html.Label('Time Grain', style=_lbl_style),
-                dcc.Dropdown(
-                    id='mnid-compare-time-grain',
-                    options=[
-                        {'label': 'Daily',     'value': 'daily'},
-                        {'label': 'Weekly',    'value': 'weekly'},
-                        {'label': 'Monthly',   'value': 'monthly'},
-                        {'label': 'Quarterly', 'value': 'quarterly'},
-                        {'label': 'Yearly',    'value': 'yearly'},
-                    ],
-                    value='weekly',
-                    clearable=False,
-                ),
-            ]),
-            html.Div(children=[
-                html.Label('Indicators', style=_lbl_style),
-                dcc.Dropdown(
-                    id='mnid-compare-indicators',
-                    options=ind_opts,
-                    value=default_inds,
-                    multi=True,
-                    placeholder='Select up to 3 indicators...',
-                ),
-            ]),
-        ]),
-        # -- Grouped bar chart ----------------------------------------------------
-        dcc.Graph(
-            id='mnid-compare-bar-chart',
-            config={
-                'displayModeBar': 'hover',
-                'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'],
-                'toImageButtonOptions': {'format': 'png', 'scale': 2},
-            },
-            className='mnid-compare-chart',
-            style={'height': '420px'},
-        ),
-    ])
-
-    return html.Div(id='mnid-comparative', children=[
-        dcc.Store(id='mnid-compare-store', data={
-            'tracked':    tracked,
-            'data_key':   _remember_ui_payload('compare', mch_full, stable_key=payload_key),
-            'facility_options': fac_opts,
-            'district_options': dist_opts,
-            'current_fac': facility_code,
-            'current_dist': current_dist,
-        }),
-        dcc.Store(id='mnid-compare-chart-type-store', data='line'),
-        html.Div(className='mnid-chart-grid', children=[compare_card]),
-    ])
-
-
-# # MNID table header style
-_TH = {
-    'fontSize': '10px', 'fontWeight': '700', 'color': MUTED,
-    'textTransform': 'uppercase', 'letterSpacing': '0.06em',
-    'padding': '8px 10px', 'borderBottom': f'2px solid #E2E8F0',
-    'textAlign': 'left', 'whiteSpace': 'nowrap',
-    'background': '#FAFAFA',
-}
-
-
-# # MNID hero indicator donut row
-
-def _hero_donut_card(label, pct, target, color, mode='max', delta_pct=None,
-                     numerator=None, denominator=None):
-    """Large CSS conic-gradient donut card — period delta + num/den counts."""
-    p = max(0.0, min(float(pct), 100.0))
-    r_v = int(color[1:3], 16)
-    g_v = int(color[3:5], 16)
-    b_v = int(color[5:7], 16)
-    cls = _css(p, target, mode)
-    badge_map = {
-        'ok':     ('#F0FDF4', '#14532D', '#BBF7D0', '✓ On target', color),
-        'warn':   ('#FFFBEB', '#92400E', '#FDE68A', '~ Watch',     '#F59E0B'),
-        'danger': ('#FEF2F2', '#7F1D1D', '#FECACA', '✕ Review',   '#EF4444'),
-    }
-    bg, fg, border, txt, stripe_color = badge_map.get(cls, badge_map['danger'])
-
-    # Delta badge
-    if delta_pct is not None:
-        if delta_pct > 0.5:
-            d_cls, d_arrow = 'mnid-hero-delta-up', '▲'
-        elif delta_pct < -0.5:
-            d_cls, d_arrow = 'mnid-hero-delta-down', '▼'
-        else:
-            d_cls, d_arrow = 'mnid-hero-delta-flat', '→'
-        d_sign = '+' if delta_pct > 0 else ''
-        delta_badge = html.Span(
-            f'{d_arrow} {d_sign}{delta_pct:.1f}pp vs prior',
-            className=f'mnid-hero-delta {d_cls}',
-        )
-    else:
-        delta_badge = None
-
-    return html.Div(className='mnid-hero-card', style={'position': 'relative', 'overflow': 'hidden'}, children=[
-        # Top accent stripe
-        html.Div(style={
-            'position': 'absolute', 'top': '0', 'left': '0', 'right': '0',
-            'height': '4px', 'background': stripe_color, 'borderRadius': '16px 16px 0 0',
-        }),
-        # Donut ring — animated fill via CSS @property --mnid-p
-        html.Div(style={
-            '--mnid-p': f'{p:.1f}',
-            'width': '118px', 'height': '118px', 'borderRadius': '50%',
-            'background': f'conic-gradient({color} calc(var(--mnid-p) * 1%), {GRID_C} 0)',
-            'display': 'flex', 'alignItems': 'center', 'justifyContent': 'center',
-            'margin': '14px auto 10px',
-            'animation': 'mnid-donut-in 1.1s cubic-bezier(.34,1.2,.64,1) both',
-            'filter': (
-                'drop-shadow(0 4px 14px rgba(226,232,240,0.5))'
-                if p == 0
-                else f'drop-shadow(0 4px 14px rgba({r_v},{g_v},{b_v},0.25))'
-            ),
-        }, children=[
-            html.Div(style={
-                'width': '82px', 'height': '82px', 'borderRadius': '50%',
-                'background': '#fff',
-                'display': 'flex', 'flexDirection': 'column',
-                'alignItems': 'center', 'justifyContent': 'center', 'gap': '1px',
-            }, children=[
-                html.Span(f'{_display_pct(p):.0f}%', style={
-                    'fontSize': '23px', 'fontWeight': '800',
-                    'color': color, 'lineHeight': '1',
-                }),
-                html.Span(f'Target {target}%', style={
-                    'fontSize': '7.5px', 'color': MUTED,
-                    'lineHeight': '1.2', 'marginTop': '2px',
-                }),
-            ]),
-        ]),
-        html.Div(label, className='mnid-hero-label'),
-        html.Span(txt, style={
-            'background': bg, 'color': fg, 'border': f'1px solid {border}',
-            'fontSize': '9px', 'fontWeight': '600',
-            'padding': '2px 8px', 'borderRadius': '10px',
-            'display': 'inline-block', 'marginTop': '6px',
-        }),
-        delta_badge,
-    ])
-
-
-def _hero_donut_row(computed, preferred_cat: str = 'ANC', section_title: str | None = None):
-    """Row of large hero donut cards favouring the requested category first."""
-    preferred = [c for c in computed if c.get('category') == preferred_cat]
-    heroes = preferred[:5] if preferred else computed[:5]
-    if not heroes:
-        return html.Div()
-
-    if not section_title:
-        label = _CAT_LABELS.get(preferred_cat, str(preferred_cat or 'Program'))
-        section_title = f'KEY {label.upper()} INDICATORS'
-
-    cards = []
-    for ind in heroes:
-        attained = _target_attainment_pct(ind['pct'], ind['target'], ind)
-        color = _cov_color(attained)
-        cards.append(_hero_donut_card(
-            ind['label'], ind['pct'], ind['target'], color, ind,
-            delta_pct=ind.get('delta_pct'),
-            numerator=ind.get('numerator'),
-            denominator=ind.get('denominator'),
-        ))
-
-    return html.Div(style={'marginBottom': '12px'}, children=[
-        html.Div(section_title, className='mnid-section-lbl'),
-        html.Div(className='mnid-hero-row', children=cards),
-    ])
-
-
-# # MNID priority indicators status table
-
-def _priority_table(computed):
-    """Priority Indicators Status table with progress bars and status badges."""
-    if not computed:
-        return html.Div()
-
-    sorted_c = sorted(
-        computed,
-        key=lambda x: (
-            {'danger': 0, 'warn': 1, 'ok': 2}.get(_css(x['pct'], x['target'], x), 0),
-            -x.get('attained_pct', _target_attainment_pct(x['pct'], x['target'], x)),
-        ),
-    )
-
-    def _badge(cls):
-        conf = {
-            'ok':     ('#F0FDF4', '#14532D', '#BBF7D0', 'On target'),
-            'warn':   ('#FFFBEB', '#92400E', '#FDE68A', 'Performing'),
-            'danger': ('#FEF2F2', '#7F1D1D', '#FECACA', 'Needs review'),
-        }.get(cls, ('#FEF2F2', '#7F1D1D', '#FECACA', 'Needs review'))
-        bg, fg, bdr, lbl = conf
-        return html.Span(lbl, style={
-            'background': bg, 'color': fg, 'border': f'1px solid {bdr}',
-            'fontSize': '9px', 'fontWeight': '600',
-            'padding': '2px 8px', 'borderRadius': '10px', 'whiteSpace': 'nowrap',
-        })
-
-    def _prog(pct, target, mode='max'):
-        fill = min(_target_attainment_pct(pct, target, mode), 100)
-        col  = {'ok': OK_C, 'warn': WARN_C, 'danger': DANGER_C}.get(_css(pct, target, mode), MUTED)
-        return html.Div(style={
-            'position': 'relative', 'height': '6px',
-            'background': GRID_C, 'borderRadius': '3px', 'minWidth': '90px',
-        }, children=[
-            html.Div(style={
-                'width': f'{fill:.0f}%', 'height': '100%',
-                'background': col, 'borderRadius': '3px',
-                'transition': 'width 0.4s ease',
-            }),
-            html.Div(style={
-                'position': 'absolute', 'top': '-3px',
-                'left': f'{min(100 if _target_mode(mode) == "min" else target, 100)}%',
-                'height': '12px', 'width': '1.5px',
-                'background': '#94A3B8', 'transform': 'translateX(-50%)',
-                'borderRadius': '1px',
-            }),
-        ])
-
-    cat_dot = {
-        'ANC':     CAT_PALETTES['ANC'][0],
-        'Labour':  CAT_PALETTES['Labour'][0],
-        'Newborn': CAT_PALETTES['Newborn'][0],
-        'PNC':     CAT_PALETTES['PNC'][0],
-    }
-
-    rows = []
-    for ind in sorted_c:
-        cls = _css(ind['pct'], ind['target'], ind)
-        val_col = {'ok': OK_C, 'warn': WARN_C, 'danger': DANGER_C}.get(cls, TEXT)
-        dot_col = cat_dot.get(ind.get('category', ''), MUTED)
-        rows.append(html.Tr(style={'borderBottom': f'1px solid {GRID_C}'}, children=[
-            html.Td(style={'padding': '8px 10px'}, children=[
-                html.Div(style={'display': 'flex', 'alignItems': 'center', 'gap': '8px'},
-                         children=[
-                    html.Div(style={'width': '7px', 'height': '7px', 'borderRadius': '50%',
-                                    'background': dot_col, 'flexShrink': '0'}),
-                    html.Span(ind['label'], style={'fontSize': '11px', 'color': DIM,
-                                                   'lineHeight': '1.3'}),
-                ]),
-            ]),
-            html.Td(f"{ind['pct']:.0f}%", style={
-                'fontSize': '14px', 'fontWeight': '700', 'color': val_col,
-                'padding': '8px 10px', 'textAlign': 'center',
-            }),
-            html.Td(f'{"<=" if _is_inverse_indicator(ind) else ""}{ind["target"]}%', style={
-                'fontSize': '11px', 'color': MUTED,
-                'padding': '8px 10px', 'textAlign': 'center',
-            }),
-            html.Td(_prog(ind['pct'], ind['target'], ind),
-                    style={'padding': '8px 10px', 'minWidth': '100px'}),
-            html.Td(_badge(cls), style={'padding': '8px 10px'}),
-        ]))
-
-    return html.Div(className='mnid-card', style={'marginBottom': '14px'}, children=[
-        html.Div('PRIORITY INDICATORS STATUS', className='mnid-section-lbl'),
-        html.Div(style={'overflowX': 'auto'}, children=[
-            html.Table(className='mnid-priority-tbl', children=[
-                html.Thead(html.Tr([
-                    html.Th('Indicator Name', style=_TH),
-                    html.Th('Coverage',       style={**_TH, 'textAlign': 'center'}),
-                    html.Th('Target',         style={**_TH, 'textAlign': 'center'}),
-                    html.Th('Progress',       style={**_TH, 'minWidth': '100px'}),
-                    html.Th('Status',         style=_TH),
-                ])),
-                html.Tbody(rows),
-            ]),
-        ]),
-    ])
-
-
-# # MNID district speedometer gauges
-
-def _district_gauge_fig(pct, district):
-    """Plotly Indicator speedometer gauge for a single district."""
-    val   = _display_pct(pct) if pct is not None else 0
-    color = _cov_color(pct) if pct is not None else MUTED
-    fig   = go.Figure(go.Indicator(
-        mode  = 'gauge+number',
-        value = val,
-        number = dict(suffix='%', font=dict(size=30, color=color, family=FONT)),
-        title  = dict(text=f'<b>{district}</b>',
-                      font=dict(size=13, color=TEXT, family=FONT)),
-        gauge  = dict(
-            axis=dict(range=[0, 100], tickwidth=1, tickcolor=BORDER,
-                      tickfont=dict(size=9, color=MUTED), dtick=25),
-            bar=dict(color=color, thickness=0.28),
-            bgcolor=GRID_C,
-            borderwidth=0,
-            steps=[
-                dict(range=[0,   40],  color='#FEF2F2'),
-                dict(range=[40,  65],  color='#FFFBEB'),
-                dict(range=[65,  88],  color='#F0FDF4'),
-                dict(range=[88, 100],  color='#DCFCE7'),
-            ],
-            threshold=dict(
-                line=dict(color='#64748B', width=2),
-                thickness=0.75, value=80,
-            ),
-        ),
-    ))
-    fig.update_layout(
-        paper_bgcolor=BG,
-        font=dict(family=FONT),
-        height=200,
-        margin=dict(l=16, r=16, t=52, b=8),
-    )
-    return fig
-
-
-def _build_district_gauge_row(store, year='All years'):
-    """District performance overview: speedometers for <=5 districts, bar chart for >5."""
-    avgs      = store.get('district_avgs', {}).get(year, {})
-    districts = store.get('all_districts', [])
-    data      = [(d, avgs[d]) for d in districts if avgs.get(d) is not None]
-    if not data:
-        return html.Div()
-
-    def _status_text(pct):
-        if pct >= 80:  return 'Strong performance'
-        if pct >= 65:  return 'Moderate coverage'
-        return 'Needs attention'
-
-    if len(data) <= 5:
-        cards = []
-        for dist, pct in data:
-            color = _cov_color(pct)
-            fig   = _district_gauge_fig(pct, dist)
-            cards.append(html.Div(className='mnid-district-gauge-card', children=[
-                dcc.Graph(figure=fig,
-                          config={'displayModeBar': 'hover',
-                                  'modeBarButtonsToRemove': ['select2d', 'lasso2d'],
-                                  'toImageButtonOptions': {'format': 'png', 'scale': 2}},
-                          style={'height': '200px'}),
-                html.Div(_status_text(pct), style={
-                    'fontSize': '10px', 'color': color,
-                    'fontWeight': '600', 'marginTop': '-6px', 'paddingBottom': '4px',
-                }),
-            ]))
-        inner = html.Div(className='mnid-grid3', children=cards)
-    else:
-        # Horizontal bar chart - sorted ascending so worst performer is at top
-        sorted_data = sorted(data, key=lambda x: x[1])
-        dists  = [d for d, _ in sorted_data]
-        vals   = [_display_pct(v) for _, v in sorted_data]
-        colors = [_cov_color(v) for v in vals]
-        bar_h  = max(260, len(dists) * 24 + 40)
-
-        fig = go.Figure(go.Bar(
-            x=vals, y=dists,
-            orientation='h',
-            marker=dict(color=colors, line=dict(color='rgba(0,0,0,0)', width=0)),
-            text=[f'{v:.0f}%' for v in vals],
-            textposition='outside',
-            textfont=dict(size=10, family=FONT),
-            hovertemplate='<b>%{y}</b><br>Avg Coverage: %{x:.1f}%<extra></extra>',
-        ))
-        fig.add_vline(x=80, line_dash='dash', line_color=WARN_C, line_width=1.5,
-                      annotation_text='Target 80%', annotation_font_size=9,
-                      annotation_font_color=WARN_C, annotation_position='top right')
-        fig.update_layout(
-            paper_bgcolor=BG, plot_bgcolor=BG,
-            font=dict(family=FONT, size=10),
-            height=bar_h,
-            margin=dict(l=8, r=60, t=12, b=24),
-            xaxis=dict(
-                range=[0, 110], showgrid=True, gridcolor=GRID_C, gridwidth=0.5,
-                title=dict(text='Avg Coverage %', font=dict(size=9)),
-                tickfont=dict(size=9),
-            ),
-            yaxis=dict(showgrid=False, tickfont=dict(size=10)),
-        )
-        inner = dcc.Graph(
-            figure=fig,
-            config={'displayModeBar': False},
-            style={'height': f'{bar_h}px'},
-        )
-
-    return html.Div(style={'marginBottom': '14px'}, children=[
-        html.Div('DISTRICT PERFORMANCE OVERVIEW', className='mnid-section-lbl'),
-        inner,
-    ])
-
-
-# # MNID PPH management cascade funnel
-
-def _pph_cascade(df):
-    """PPH Management Cascade funnel chart."""
-    try:
-        def _n(col, val, col2=None, val2=None):
-            if col not in df.columns:
-                return 0
-            mask = df[col].fillna('').str.upper().str.contains(val.upper(), na=False)
-            sub  = df[mask]
-            if col2 and val2 and col2 in sub.columns:
-                sub = sub[sub[col2] == val2]
-            return int(sub['person_id'].nunique())
-
-        labor_n = _n('Encounter', 'LABOUR|DELIVERY|BIRTH')
-        if labor_n == 0:
-            return None
-
-        stages = [
-            ('Women in Labor',          labor_n),
-            ('PPH Screening Performed', _n('concept_name', 'PPH screening')),
-            ('PPH Detected',            _n('concept_name', 'PPH screening',
-                                          'obs_value_coded', 'Positive')),
-            ('Treatment Bundle',        _n('concept_name', 'PPH treatment bundle')),
-        ]
-        labels = [s[0] for s in stages]
-        values = [s[1] for s in stages]
-
-        if sum(values[1:]) == 0:
-            return None
-
-        colors = ['#2563EB', '#7C3AED', '#C2410C', '#0F766E']
-
-        fig = go.Figure(go.Funnel(
-            y=labels, x=values,
-            textinfo='value+percent initial',
-            textfont=dict(size=11, family=FONT),
-            marker=dict(color=colors, line=dict(color=['#fff'] * 4, width=2)),
-            connector=dict(line=dict(color=GRID_C, width=2)),
-            hovertemplate='<b>%{y}</b><br>Count: %{x:,}<extra></extra>',
-        ))
-        fig.update_layout(
-            **_CHART_LAYOUT,
-            title=dict(text='PPH Management Cascade',
-                       font=dict(size=12, color='#444441', family=FONT),
-                       x=0, xanchor='left', y=0.98),
-            height=280,
-            margin=dict(l=8, r=8, t=36, b=8),
-            showlegend=False,
-        )
-        return html.Div(className='mnid-chart-card', children=[
-            dcc.Graph(figure=fig,
-                      config={'displayModeBar': 'hover',
-                              'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'],
-                              'toImageButtonOptions': {'format': 'png', 'scale': 2}},
-                      style={'height': '280px'}),
-        ])
-    except Exception as exc:
-        _warn_once(f"MNID PPH cascade rendering failed: {exc}")
-        return None
-
-
-# MNID header, alert, KPI, and section navigation components
-
-def _topbar(facility, period, n_tracked, n_await, facility_df=None, network_df=None,
-            period_note=None,
-            title='Maternal and Child Health Indicators', subtitle='Clean view of performance, comparison, coverage, and readiness.',
-            theme='default'):
-    facility_name = _FACILITY_NAMES.get(facility, facility or 'Network view')
-    district = _FACILITY_DISTRICT.get(facility, 'All districts')
-
-    source_df = facility_df if facility_df is not None and len(facility_df) else network_df
-    if source_df is not None and len(source_df):
-        if facility and 'Facility_CODE' in source_df.columns:
-            fac_rows = source_df[source_df['Facility_CODE'].astype(str) == str(facility)]
-        else:
-            fac_rows = source_df
-            facility_name = 'Network view' if len(source_df) else facility_name
-            district = 'All districts' if len(source_df) else district
-        if len(fac_rows):
-            if 'Facility' in fac_rows.columns:
-                names = fac_rows['Facility'].dropna().astype(str)
-                if not names.empty:
-                    facility_name = names.mode().iloc[0]
-            if 'District' in fac_rows.columns:
-                dists = fac_rows['District'].dropna().astype(str)
-                if not dists.empty:
-                    district = dists.mode().iloc[0]
-
-    selected_program = 'Neonatal Care' if theme == 'newborn' else 'All'
-    if facility_df is not None:
-        requested = getattr(facility_df, 'attrs', {}).get('mnid_program')
-        if requested and theme != 'newborn':
-            selected_program = requested
-
-    topbar_label = 'N-NID Dashboard' if theme == 'newborn' else 'M-NID Dashboard'
-    newborn_focus = None
-    if theme == 'newborn':
-        newborn_focus = html.Div(className='mnid-topbar-highlight', children=[
-            html.Div(className='mnid-topbar-highlight-copy', children=[
-                html.Div('Neonatal service overview', className='mnid-topbar-highlight-title'),
-                html.Div('View stabilization, respiratory support, KMC uptake, and facility performance in one place.',
-                         className='mnid-topbar-highlight-subtitle'),
-            ]),
-            html.Div(className='mnid-topbar-highlight-chips', children=[
-                html.Span('Stabilize', className='mnid-topbar-chip'),
-                html.Span('Support', className='mnid-topbar-chip'),
-                html.Span('Monitor', className='mnid-topbar-chip'),
-                html.Span('Benchmark', className='mnid-topbar-chip'),
-                html.Span(f'{n_tracked} available', className='mnid-topbar-chip strong'),
-                html.Span(f'{n_await} pending', className='mnid-topbar-chip subtle'),
-            ]),
-        ])
-
-    return html.Div(className=f'mnid-topbar{" mnid-topbar-newborn" if theme == "newborn" else ""}', children=[
-        html.Div(className='mnid-topbar-copy', children=[
-            html.Div(topbar_label, className='mnid-topbar-label'),
-            html.H1(title),
-            html.P(subtitle),
-            newborn_focus,
-        ]),
-        html.Div(className='mnid-info-pills', children=[
-            html.Div(className='mnid-info-pill', children=[
-                html.Div('Facility', className='mnid-info-pill-label'),
-                html.Div(facility_name, className='mnid-info-pill-value'),
-            ]),
-            html.Div(className='mnid-info-pill', children=[
-                html.Div('District', className='mnid-info-pill-label'),
-                html.Div(district, className='mnid-info-pill-value'),
-            ]),
-            html.Div(className='mnid-info-pill', children=[
-                html.Div('Period', className='mnid-info-pill-label'),
-                html.Div([
-                    html.Div(period,
-                             style={'fontSize': '11px', 'fontWeight': '700',
-                                    'color': TEXT, 'lineHeight': '1.2'}),
-                    html.Div(period_note,
-                             style={'fontSize': '10px', 'color': MUTED, 'lineHeight': '1.3', 'marginTop': '4px'})
-                    if period_note else None,
-                ]),
-            ]),
-            html.Div(className='mnid-info-pill', children=[
-                html.Div('Program', className='mnid-info-pill-label'),
-                html.Div(
-                    'Labour & Delivery' if selected_program == 'Labour' else selected_program,
-                    className='mnid-info-pill-value mnid-info-pill-value-compact',
-                ),
-            ]),
-            html.Div(className='mnid-info-pill', children=[
-                html.Div('Indicators', className='mnid-info-pill-label'),
-                html.Div(f'{n_tracked} available / {n_await} pending',
-                         style={'fontSize': '11px', 'fontWeight': '700',
-                                'color': TEXT, 'lineHeight': '1.2'}),
-            ]),
-        ]),
-    ])
-
-
-def _sidebar(facility_code: str, theme: str = 'default') -> html.Div:
-    if theme == 'newborn':
-        nav_items = [
-            ('Overview', '#mnid-summary'),
-            ('Service Delivery', '#mnid-data-tables'),
-            ('Run Charts', '#mnid-trends'),
-            ('District Performance', '#mnid-performance'),
-            ('Geographic Coverage', '#mnid-heatmap'),
-            ('Coverage & Quality', '#mnid-coverage'),
-            ('Facility Comparison', '#mnid-comparative'),
-            ('Clinical Interventions', '#mnid-analysis'),
-            ('Operational Readiness', '#mnid-readiness'),
-        ]
-    else:
-        nav_items = [
-            ('Overview', '#mnid-summary'),
-            ('Data Tables', '#mnid-data-tables'),
-            ('Run Charts', '#mnid-trends'),
-            ('Performance', '#mnid-performance'),
-            ('Map View', '#mnid-heatmap'),
-            ('Indicators', '#mnid-coverage'),
-            ('Comparison', '#mnid-comparative'),
-            ('Analysis', '#mnid-analysis'),
-            ('Readiness', '#mnid-readiness'),
-        ]
-    return html.Div(className='mnid-nav', children=[
-        html.A(
-            id={'type': 'mnid-nav-btn', 'index': href},
-            href=href,
-            className='mnid-nav-btn active' if index == 0 else 'mnid-nav-btn',
-            children=label,
-        )
-        for index, (label, href) in enumerate(nav_items)
-    ])
-
-
-def _alert_banner(below, strong):
-    if not below:
-        return html.Div(
-            style={
-                'display': 'flex', 'alignItems': 'center', 'gap': '10px',
-                'background': '#F0FDF4', 'border': '1px solid #BBF7D0',
-                'borderRadius': '10px', 'padding': '10px 14px',
-                'marginBottom': '10px',
-                'animation': 'mnid-ok-pop 0.5s cubic-bezier(.22,.68,0,1.2) both',
-            },
-            children=[
-                html.Div('✓', style={
-                    'width': '28px', 'height': '28px', 'borderRadius': '50%',
-                    'background': '#16A34A', 'color': '#fff',
-                    'display': 'flex', 'alignItems': 'center', 'justifyContent': 'center',
-                    'fontSize': '14px', 'fontWeight': '800', 'flexShrink': '0',
-                }),
-                html.Div([
-                    html.Span('All indicators on target. ', style={
-                        'fontWeight': '700', 'fontSize': '12px', 'color': '#14532D',
-                    }),
-                    html.Span(
-                        f'{len(strong)} strong area{"s" if len(strong) != 1 else ""}: '
-                        + (', '.join(strong[:5]) + ('…' if len(strong) > 5 else '')),
-                        style={'fontSize': '11px', 'color': '#166534'},
-                    ),
-                ]),
-            ]
-        )
-
-    n_below = len(below)
-    n_strong = len(strong)
-    slot = 3.5          # seconds each item is on screen
-    total = n_below * slot
-    # Use the pre-defined keyframe for this N (capped at 15)
-    kf_name = f'mnid-alert-rotate-{min(n_below, 15)}'
-
-    def _item(name, pct, i):
-        is_bad = pct < 50
-        bg   = '#FEE2E2' if is_bad else '#FEF3C7'
-        fg   = '#991B1B' if is_bad else '#92400E'
-        icon = '▼' if is_bad else '↘'
-        return html.Div(
-            style={
-                'position': 'absolute', 'top': '0', 'left': '0',
-                'display': 'flex', 'alignItems': 'center', 'gap': '6px',
-                'opacity': 0,
-                'animation': f'{kf_name} {total:.1f}s {i * slot:.1f}s ease-in-out infinite',
-                'animationFillMode': 'both',
-            },
-            children=[
-                html.Span(f'{icon} {name[:36]}', style={
-                    'fontSize': '12px', 'fontWeight': '600', 'color': fg,
-                    'background': bg, 'padding': '3px 10px', 'borderRadius': '999px',
-                    'whiteSpace': 'nowrap',
-                }),
-                html.Span(f'{pct:.0f}%', style={
-                    'fontSize': '13px', 'fontWeight': '800', 'color': fg,
-                }),
-            ]
-        )
-
-    items = [_item(n, p, i) for i, (n, p) in enumerate(below)]
-
-    return html.Div(
-        style={
-            'display': 'flex', 'alignItems': 'center', 'gap': '12px',
-            'background': '#FFF7ED', 'border': '1px solid #FED7AA',
-            'borderRadius': '10px', 'padding': '10px 14px',
-            'marginBottom': '10px',
-        },
-        children=[
-            # Pulsing dot + count
-            html.Div(style={
-                'display': 'flex', 'flexDirection': 'column',
-                'alignItems': 'center', 'gap': '3px', 'flexShrink': '0',
-            }, children=[
-                html.Div(style={
-                    'width': '10px', 'height': '10px', 'borderRadius': '50%',
-                    'background': '#EF4444',
-                    'animation': 'mnid-dot-blink 1.3s ease-in-out infinite',
-                }),
-                html.Span(f'{n_below}', style={
-                    'fontSize': '15px', 'fontWeight': '800', 'color': '#DC2626', 'lineHeight': '1',
-                }),
-                html.Span('below', style={'fontSize': '8px', 'color': '#9A3412', 'lineHeight': '1'}),
-            ]),
-            # Divider
-            html.Div(style={'width': '1px', 'height': '38px', 'background': '#FED7AA', 'flexShrink': '0'}),
-            # One-at-a-time rotating items
-            html.Div(style={'position': 'relative', 'height': '28px', 'flex': '1', 'minWidth': '0'}, children=items),
-            # Strong count (right side)
-            html.Div(style={'flexShrink': '0', 'textAlign': 'center'}, children=[
-                html.Span(f'{n_strong}', style={
-                    'fontSize': '15px', 'fontWeight': '800', 'color': '#16A34A', 'lineHeight': '1',
-                }),
-                html.Div('on target', style={'fontSize': '8px', 'color': '#166534'}),
-            ]) if n_strong else None,
-        ]
-    )
-
-
-def _avg_ring(pct: float, color: str) -> html.Div:
-    """Prominent donut ring - the ring IS the value display for avg coverage card."""
-    p = max(0.0, min(pct, 100.0))
-    # Choose font size based on length
-    font_size = '11px' if p < 100 else '9px'
-    return html.Div(style={
-        'width': '62px', 'height': '62px', 'borderRadius': '50%',
-        'background': f'conic-gradient({color} {p:.1f}%, {GRID_C} 0)',
-        'display': 'flex', 'alignItems': 'center', 'justifyContent': 'center',
-        'flexShrink': '0',
-        'filter': 'drop-shadow(0 2px 6px rgba(0,0,0,0.10))',
-    }, children=[
-        html.Div(style={
-            'width': '44px', 'height': '44px', 'borderRadius': '50%',
-            'background': BG,
-            'display': 'flex', 'flexDirection': 'column',
-            'alignItems': 'center', 'justifyContent': 'center',
-            'gap': '1px',
-        }, children=[
-            html.Span(f'{_display_pct(p):.0f}%', style={
-                'fontSize': font_size, 'fontWeight': '700',
-                'color': color, 'lineHeight': '1',
-            }),
-            html.Span('avg', style={
-                'fontSize': '7px', 'color': MUTED, 'lineHeight': '1',
-            }),
-        ]),
-    ])
-
-
-def _count_bar(count: int, total: int, color: str) -> html.Div:
-    """Thin coloured bottom stripe showing proportion of total."""
-    fill = round(count / total * 100) if total else 0
-    return html.Div(style={
-        'position': 'absolute', 'bottom': '0', 'left': '0', 'right': '0',
-        'height': '3px', 'background': GRID_C, 'borderRadius': '0 0 10px 10px',
-    }, children=[
-        html.Div(style={
-            'width': f'{fill}%', 'height': '100%',
-            'background': color, 'borderRadius': '0 0 0 10px',
-            'transition': 'width 0.5s ease',
-        }),
-    ])
-
-
-def _kpi(label, value, sub, cls, bottom_bar=None, ring=None):
-    return html.Div(className=f'mnid-kpi {cls}', children=[
-        html.Div(style={'display': 'flex', 'justifyContent': 'space-between',
-                        'alignItems': 'flex-start', 'gap': '6px'}, children=[
-            html.Div([
-                html.Div(label, className='kpi-lbl'),
-                html.Div(value, className='kpi-val'),
-                html.Div(sub,   className='kpi-sub'),
-            ]),
-            ring or html.Div(),
-        ]),
-        bottom_bar or html.Div(),
-    ])
-
-
-def _kpi_row(computed):
-    n    = len(computed)
-    on   = [c for c in computed if _css(c['pct'], c['target'], c) == 'ok']
-    mon  = [c for c in computed if _css(c['pct'], c['target'], c) == 'warn']
-    crit = [c for c in computed if _css(c['pct'], c['target'], c) == 'danger']
-    avg  = round(sum(c.get('attained_pct', _target_attainment_pct(c['pct'], c['target'], c)) for c in computed) / n, 1) if n else 0.0
-    avg_color = _cov_color(avg)
-    return html.Div(className='mnid-kpi-row', children=[
-        _kpi('Available Indicators', str(n), 'live indicators', 'info',
-             bottom_bar=_count_bar(n, n, INFO_C)),
-        _kpi('On Target', str(len(on)), 'meeting benchmark', 'ok',
-             bottom_bar=_count_bar(len(on), n, OK_C)),
-        _kpi('Watch', str(len(mon)), 'near target', 'warn',
-             bottom_bar=_count_bar(len(mon), n, WARN_C)),
-        _kpi('Needs Review', str(len(crit)), 'below target', 'danger',
-             bottom_bar=_count_bar(len(crit), n, DANGER_C)),
-        _kpi('Average Coverage', '', 'across available indicators', 'info',
-             ring=_avg_ring(avg, avg_color)),
-    ])
-
-
-
-# MNID section anchor helper
-
-def _section_anchor(anchor_id):
-    """Invisible offset anchor for sticky-nav scrolling."""
-    return html.Div(id=anchor_id, className='mnid-section-anchor')
-
-
 # MNID dashboard entry point
 
 _network_df_cache: dict = {}
+_heatmap_store_cache: dict = {}
+
+
+def _resolve_heatmap_store(network_df: pd.DataFrame, all_inds: list, facility_code: str,
+                           scope_meta: dict | None, store_key: str) -> dict:
+    _, selected_facility_codes, selected_districts = _resolve_scope_filters(network_df, scope_meta or {})
+    tracked = [i for i in all_inds if i.get('status') == 'tracked']
+    cache_key = (
+        store_key,
+        facility_code,
+        tuple(i.get('id') for i in tracked),
+        tuple(sorted(selected_facility_codes)),
+        tuple(sorted(selected_districts)),
+    )
+
+    if cache_key not in _heatmap_store_cache:
+        agg_for_heatmap = _get_aggregate()
+        if agg_for_heatmap is not None and not agg_for_heatmap.empty:
+            if selected_facility_codes:
+                agg_for_heatmap = agg_for_heatmap[
+                    agg_for_heatmap['facility_code'].isin([str(f) for f in selected_facility_codes])
+                ]
+            elif selected_districts:
+                agg_for_heatmap = agg_for_heatmap[
+                    agg_for_heatmap['district'].isin([str(d) for d in selected_districts])
+                ]
+            _heatmap_store_cache[cache_key] = _compute_heatmap_store_from_agg(
+                agg_for_heatmap, tracked, facility_code
+            )
+        else:
+            _heatmap_store_cache[cache_key] = _compute_heatmap_store(
+                network_df, tracked, facility_code
+            )
+        if selected_districts:
+            _heatmap_store_cache[cache_key]['current_district'] = selected_districts[0]
+        _trim_cache(_heatmap_store_cache, _HEATMAP_CACHE_MAX)
+
+    return _heatmap_store_cache[cache_key]
+
+
+def prewarm_cache(dataset_version: str | None = None) -> bool:
+    """
+    Pre-compute and cache the prepared MNID network DataFrame so the first
+    user request hits a warm cache instead of running the 8-9s prepare step.
+
+    Safe to call from a background thread at server startup.
+    Returns True if the cache was populated, False if already warm or failed.
+    """
+    try:
+        from config import DATA_FILE_NAME_
+        from data_storage import DataStorage
+        from mnid.data_utils import prepare_mnid_dataframe as _prep
+
+        _mnid_cols = ', '.join([
+            'person_id', 'encounter_id', 'Date', 'Program', 'Reporting_Program',
+            'Service_Area', 'Facility', 'Facility_CODE', 'District', 'Encounter',
+            'obs_value_coded', 'concept_name', 'Value', 'ValueN', 'new_revisit',
+            'Home_district', 'TA', 'Village', 'Age', 'Age_Group', 'Gender',
+            'Source_Program',
+        ])
+        full = DataStorage.query_duckdb(f"SELECT {_mnid_cols} FROM '{DATA_FILE_NAME_}'")
+        full['Date'] = pd.to_datetime(full['Date'], errors='coerce')
+
+        opd_key = (
+            dataset_version,
+            len(full),
+            tuple(full.columns.tolist()) if not full.empty else (),
+            (),   # selected_facilities (national level, no filter)
+            (),   # selected_districts
+        )
+        if opd_key in _network_df_cache:
+            return False  # already warm
+
+        import logging
+        _LOG = logging.getLogger(__name__)
+        _LOG.info('MNID pre-warm: preparing %d rows...', len(full))
+        net_df = _prep(full)
+        _network_df_cache[opd_key] = net_df
+        _LOG.info('MNID pre-warm complete: %d rows cached', len(net_df))
+        return True
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning('MNID pre-warm failed: %s', exc)
+        return False
 
 
 def render_mnid_dashboard(data_opd, config,
                           facility_code, start_date, end_date,
-                          scope_meta: dict | None = None):
+                          scope_meta: dict | None = None,
+                          initial_tab: str | None = None):
     dataset_version = (scope_meta or {}).get('dataset_version')
     selected_programs = tuple(sorted((scope_meta or {}).get('mnid_categories') or []))
     selected_facilities = tuple(sorted((scope_meta or {}).get('selected_facilities') or []))
     selected_districts = tuple(sorted((scope_meta or {}).get('selected_districts') or []))
+    # _prepare_mnid_dataframe doesn't use selected_programs, so key on data identity
+    # only - that way maternal and newborn dashboards loaded in the same session share the cache.
     _opd_key = (
         dataset_version,
         len(data_opd),
         tuple(data_opd.columns.tolist()) if not data_opd.empty else (),
-        selected_programs,
         selected_facilities,
         selected_districts,
     )
     if _opd_key not in _network_df_cache:
-        _network_df_cache.clear()
         _network_df_cache[_opd_key] = _prepare_mnid_dataframe(data_opd)
+        _trim_cache(_network_df_cache, _NETWORK_DF_CACHE_MAX)
     network_df = _network_df_cache[_opd_key]
 
-    # Derive facility_df by filtering the already-prepared network_df instead of re-running
-    # the expensive _prepare_mnid_dataframe on every date change.
-    facility_df = network_df
-    if start_date and 'Date' in network_df.columns and not network_df.empty:
-        try:
-            s = pd.to_datetime(start_date)
-            e = pd.to_datetime(end_date) if end_date else network_df['Date'].max()
-            date_mask = (network_df['Date'] >= s) & (network_df['Date'] <= e)
-            facility_df = network_df[date_mask]
-        except Exception:
-            facility_df = network_df
-    selected_facilities = list(selected_facilities)
-    selected_districts = list(selected_districts)
-    if selected_facilities and 'Facility' in facility_df.columns:
-        facility_df = facility_df[facility_df['Facility'].isin(selected_facilities)]
-    elif selected_districts and 'District' in facility_df.columns:
-        facility_df = facility_df[facility_df['District'].isin(selected_districts)]
-
-    selected_program = (scope_meta or {}).get('mnid_categories')
-    selected_program = selected_program[0] if selected_program else 'All'
-    facility_df.attrs['mnid_program'] = selected_program
-    network_df.attrs['mnid_program'] = selected_program
-    if network_df.empty:
-        network_df = facility_df
-
-    vt          = config.get('visualization_types', {})
-    all_inds    = config.get('priority_indicators') or vt.get('priority_indicators', [])
-    supply_inds = config.get('supply_indicators') or vt.get('supply_indicators', [])
-    wf_inds     = config.get('workforce_indicators') or vt.get('workforce_indicators', [])
-    dq_inds     = config.get('data_quality_indicators') or vt.get('data_quality_indicators', [])
-    period      = f'{start_date} to {end_date}'
-    period_note = (scope_meta or {}).get('data_period_note')
-
-    requested_categories = (scope_meta or {}).get('mnid_categories')
-    config_categories = config.get('mnid_categories')
-    if config_categories:
-        effective_categories = [c for c in (requested_categories or []) if c in config_categories] or config_categories
-    else:
-        effective_categories = requested_categories
-    all_inds = _resolve_runtime_mnid_indicators(
-        all_inds,
-        facility_df,
-        effective_categories,
+    primary_bundle = _build_mnid_indicator_content(
+        network_df=network_df,
+        config=config,
+        facility_code=facility_code,
+        start_date=start_date,
+        end_date=end_date,
+        scope_meta=scope_meta,
+        include_content=False,
     )
-    _validate_indicator_configs(facility_df, all_inds)
-    category_order = _resolve_category_order(all_inds, effective_categories)
-    if category_order:
-        allowed = set(category_order)
-        all_inds = [i for i in all_inds if i.get('category') in allowed]
+    facility_df    = primary_bundle['facility_df']
+    dashboard_theme = primary_bundle['dashboard_theme']
 
-    tracked  = [i for i in all_inds if i.get('status') == 'tracked']
-    awaiting = [i for i in all_inds if i.get('status') == 'awaiting_baseline']
-    default_cat = category_order[0] if category_order else 'ANC'
+    country_label    = 'Maternal'
+    newborn_scope_meta = None
 
-    if category_order == ['Newborn']:
-        dashboard_title = 'Neonatal Care Dashboard'
-        dashboard_subtitle = 'Program monitoring for admissions, outcomes, clinical interventions, coverage, and readiness.'
-        dashboard_theme = 'newborn'
-    elif set(category_order) == {'ANC', 'Labour', 'PNC'}:
-        dashboard_title = 'Maternal Health Indicators'
-        dashboard_subtitle = 'ANC, labour, and postnatal performance, comparison, coverage, and readiness.'
-        dashboard_theme = 'default'
+    if config.get('report_name') == 'Maternal Health':
+        newborn_config = _load_mnid_report_config('Newborn')
+        if newborn_config:
+            newborn_scope_meta = dict(scope_meta or {})
+            newborn_scope_meta['mnid_categories'] = newborn_config.get('mnid_categories') or ['Newborn']
+            country_label   = 'Maternal & Newborn'
     else:
-        dashboard_title = f"{config.get('report_name', 'Maternal and Child Health')} Indicators"
-        dashboard_subtitle = 'Clean view of performance, comparison, coverage, and readiness.'
-        dashboard_theme = 'default'
+        newborn_config = None
 
-    hero_title = 'KEY NEONATAL INDICATORS' if dashboard_theme == 'newborn' else f'KEY {_CAT_LABELS.get(default_cat, str(default_cat or "Program")).upper()} INDICATORS'
+    executive_content = {}
+    executive_token = f'{hash((_opd_key, start_date, end_date, config.get("report_name")))}'
+    _MNID_EXECUTIVE_CONTENT_CACHE[executive_token] = executive_content
+    _MNID_EXECUTIVE_DATA_CACHE[executive_token] = {
+        'network_df': network_df,
+        'config': config,
+        'facility_code': facility_code,
+        'start_date': start_date,
+        'end_date': end_date,
+        'scope_meta': scope_meta,
+        'facility_df': facility_df,
+        'supply_inds': primary_bundle['supply_inds'],
+        'wf_inds': primary_bundle['wf_inds'],
+        'dq_inds': primary_bundle['dq_inds'],
+        'newborn_config': newborn_config,
+        'newborn_scope_meta': newborn_scope_meta,
+        'country_label': country_label,
+    }
+    _trim_cache(_MNID_EXECUTIVE_CONTENT_CACHE, _MNID_UI_CACHE_MAX)
+    _trim_cache(_MNID_EXECUTIVE_DATA_CACHE, _MNID_UI_CACHE_MAX)
 
-    computed = []
-    for ind in tracked:
-        num, den, pct = _cov(facility_df, ind['numerator_filters'],
-                              ind['denominator_filters'])
-        computed.append({
-            **ind,
-            'pct': pct,
-            'numerator': num,
-            'denominator': den,
-            'attained_pct': _target_attainment_pct(pct, ind.get('target', 0), ind),
-        })
+    _tab_style  = {'padding': '10px 18px', 'borderRadius': '12px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#FFFFFF', 'color': TEXT}
+    _tab_active = {'padding': '10px 18px', 'borderRadius': '12px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#F0FDF4', 'color': '#15803D', 'fontWeight': 700}
+    _tab_active2 = dict(_tab_active, backgroundColor='#F8FAFC')
+    hidden_mnid_tabs = _load_dashboard_tab_config().get('hidden_mnid_tabs', set())
 
-    # Compute previous-period delta — same window duration shifted back
-    try:
-        s = pd.to_datetime(start_date)
-        e = pd.to_datetime(end_date) if end_date else network_df['Date'].max()
-        window = max((e - s).days, 1)
-        prev_end = s - pd.Timedelta(days=1)
-        prev_start = prev_end - pd.Timedelta(days=window - 1)
-        prev_df = network_df[
-            (network_df['Date'] >= prev_start) & (network_df['Date'] <= prev_end)
-        ] if 'Date' in network_df.columns and not network_df.empty else pd.DataFrame()
-        if not prev_df.empty and selected_facilities and 'Facility' in prev_df.columns:
-            prev_df = prev_df[prev_df['Facility'].isin(selected_facilities)]
-        elif not prev_df.empty and selected_districts and 'District' in prev_df.columns:
-            prev_df = prev_df[prev_df['District'].isin(selected_districts)]
-    except Exception:
-        prev_df = pd.DataFrame()
-
-    for c in computed:
-        if not prev_df.empty:
-            try:
-                _, _, prev_pct = _cov(prev_df, c['numerator_filters'], c['denominator_filters'])
-                c['delta_pct'] = round(c['pct'] - prev_pct, 1)
-            except Exception:
-                c['delta_pct'] = None
-        else:
-            c['delta_pct'] = None
-
-    below  = [(c['label'], c['pct']) for c in computed if not _on_target(c['pct'], c['target'], c)]
-    strong = [c['label'] for c in computed if _on_target(c['pct'], c['target'], c)]
-
-    by_cat = {}
-    for ind in all_inds:
-        by_cat.setdefault(ind.get('category','Other'), []).append(ind)
-
-    coverage_charts  = _coverage_charts_section(by_cat, facility_df, category_order)
-
-    # Pre-build analysis charts
-    anc_charts    = _anc_charts(facility_df)
-    labour_charts = _labour_charts(facility_df)
-    pnc_charts    = _pnc_charts(facility_df)
-    nb_charts     = _newborn_charts(facility_df)
-
-    # All accordion sections open by default
-    analysis_acc = [
-        _chart_acc_section('ch_anc',    'Antenatal Care',    anc_charts)    if anc_charts and 'ANC' in category_order else None,
-        _chart_acc_section('ch_labour', 'Labour & Delivery', labour_charts) if labour_charts and 'Labour' in category_order else None,
-        _chart_acc_section('ch_pnc',    'Postnatal Care',    pnc_charts)    if pnc_charts and 'PNC' in category_order else None,
-        _chart_acc_section('ch_nb',     'Neonatal Care',     nb_charts)     if nb_charts and 'Newborn' in category_order else None,
+    tab_children = [
+        dcc.Tab(label='Country Profile', value='country-profile', style=_tab_style, selected_style=_tab_active),
     ]
-    analysis_acc = [a for a in analysis_acc if a]
+    if 'operational-readiness' not in hidden_mnid_tabs:
+        tab_children.append(
+            dcc.Tab(label='Operational Readiness', value='operational-readiness', style=_tab_style, selected_style=_tab_active2)
+        )
+    tab_children.append(
+        dcc.Tab(label='Maternal', value='maternal-dashboard', style=_tab_style, selected_style=_tab_active2)
+    )
+    if newborn_config is not None:
+        tab_children.append(dcc.Tab(label='Newborn', value='newborn-dashboard', style=_tab_style, selected_style=_tab_active2))
 
-    _payload_key = f'{hash(_opd_key)}_{start_date}_{end_date}'
+    visible_tab_values = [getattr(tab, 'value', None) for tab in tab_children]
+    resolved_initial_tab = initial_tab if initial_tab in visible_tab_values else (visible_tab_values[0] if visible_tab_values else 'country-profile')
 
-    performance_div, heatmap_div = _coverage_heatmap_section(all_inds, facility_code, facility_df)
-    service_table_div = _service_table_switcher(facility_df, category_order, default_cat, scope_meta)
-    comparative_div  = _comparative_analysis_section(all_inds, facility_code, facility_df, payload_key=_payload_key)
-
-    def _sec_header(title, count=None, desc=None, eyebrow=None):
-        return html.Div(className=f'mnid-section-header{" mnid-section-header-newborn" if dashboard_theme == "newborn" else ""}', children=[
-            html.Div([
-                html.Div(eyebrow, className='mnid-section-header-eyebrow') if eyebrow else None,
-                html.Span(title, className='mnid-section-header-title'),
-                html.Div(desc, className='mnid-section-header-desc') if desc else None,
-            ]),
-            html.Span(f'{count} indicators' if count else '',
-                      className='mnid-section-header-count'),
-        ])
-
-    total_analysis = sum(
-        len(charts) for cat, charts in [
-            ('ANC', anc_charts),
-            ('Labour', labour_charts),
-            ('PNC', pnc_charts),
-            ('Newborn', nb_charts),
-        ] if cat in category_order
+    executive_tabs = dcc.Tabs(
+        id='mnid-executive-tabs',
+        value=resolved_initial_tab,
+        style={'marginBottom': '18px'},
+        children=tab_children,
     )
 
-    main_content = html.Div(className=f'mnid-main{" mnid-main-newborn" if dashboard_theme == "newborn" else ""}', children=[
-
-        _topbar(facility_code, period, len(tracked), len(awaiting), facility_df=facility_df, network_df=network_df, period_note=period_note, title=dashboard_title, subtitle=dashboard_subtitle, theme=dashboard_theme),
-        _sidebar(facility_code, theme=dashboard_theme),
-        _alert_banner(below, strong),
-
-        _section_anchor('mnid-summary'),
-        _sec_header('Overview',
-                    desc='Neonatal program snapshot, priority indicator posture, and facility context.' if dashboard_theme == 'newborn' else f'{len(tracked)} available - {len(awaiting)} awaiting',
-                    eyebrow='Overview' if dashboard_theme == 'newborn' else None),
-        _kpi_row(computed),
-        _hero_donut_row(computed, preferred_cat=default_cat, section_title=hero_title),
-        _priority_table(computed),
-
-        _section_anchor('mnid-data-tables'),
-        _sec_header('Service Delivery' if dashboard_theme == 'newborn' else 'Data Tables',
-                    desc='Structured service counts for admissions, thermal care, respiratory support, KMC, and newborn outcomes.' if dashboard_theme == 'newborn' else 'Key service counts and outcomes',
-                    eyebrow='Service Summary' if dashboard_theme == 'newborn' else None),
-        service_table_div,
-
-        _section_anchor('mnid-trends'),
-        _sec_header('Run Charts',
-                    desc='Focused indicator run charts for the current filtered scope.' if dashboard_theme == 'newborn' else 'Focused indicator run charts for the current filtered scope.',
-                    eyebrow='Run Charts' if dashboard_theme == 'newborn' else None),
-        _trend_switcher(facility_df, all_inds, scope_meta=scope_meta, payload_key=_payload_key),
-
-        _section_anchor('mnid-performance'),
-        _sec_header('District Performance' if dashboard_theme == 'newborn' else 'Facility Performance',
-                    desc='How this newborn service compares across district and facility peers.' if dashboard_theme == 'newborn' else 'District comparison heatmap for key performance indicators',
-                    eyebrow='Performance' if dashboard_theme == 'newborn' else None),
-        performance_div,
-
-        _section_anchor('mnid-heatmap'),
-        _sec_header('Geographic Coverage' if dashboard_theme == 'newborn' else 'Map View',
-                    desc='Geographic context for neonatal service delivery and district-level performance.' if dashboard_theme == 'newborn' else 'Geographic coverage map and district/facility context',
-                    eyebrow='Map' if dashboard_theme == 'newborn' else None),
-        heatmap_div,
-
-        _section_anchor('mnid-coverage'),
-        _sec_header('Coverage & Quality' if dashboard_theme == 'newborn' else 'Coverage Indicators', sum(len(v) for v in by_cat.values()),
-                    desc='Coverage against target across the neonatal care pathway, from stabilization to follow-up.' if dashboard_theme == 'newborn' else 'Coverage % vs target - target threshold shown per chart',
-                    eyebrow='Indicators' if dashboard_theme == 'newborn' else None),
-        coverage_charts,
-
-        _section_anchor('mnid-comparative'),
-        _sec_header('Facility Comparison' if dashboard_theme == 'newborn' else 'Facility & District Comparison',
-                    desc='Facility and district comparison for neonatal indicators.' if dashboard_theme == 'newborn' else 'Cross-facility and district indicator benchmarking',
-                    eyebrow='Comparison' if dashboard_theme == 'newborn' else None),
-        comparative_div,
-
-        _section_anchor('mnid-analysis'),
-        _sec_header('Clinical Interventions' if dashboard_theme == 'newborn' else 'Clinical Analysis',
-                    None if dashboard_theme == 'newborn' else total_analysis,
-                    desc='Clinical intervention, thermal support, respiratory support, and complication views.' if dashboard_theme == 'newborn' else 'Care-phase deep-dives',
-                    eyebrow='Clinical View' if dashboard_theme == 'newborn' else None),
-        dmc.Accordion(
-            multiple=True,
-            value=[a.value for a in analysis_acc],
-            variant='separated', radius='md', mb='md',
-            children=analysis_acc,
-            styles={
-                'item': {'backgroundColor': BG, 'border': f'1px solid {BORDER}',
-                         'borderRadius': '12px', 'marginBottom': '8px',
-                         'boxShadow': '0 1px 3px rgba(0,0,0,0.04)'},
-                'control': {'padding': '12px 16px'},
-                'panel': {'padding': '0 16px 2px'},
-            },
-        ),
-
-    ])
-
-    main_content.children.extend([
-        _section_anchor('mnid-readiness'),
-        _sec_header('Operational Readiness',
-                    desc='Devices, staffing, and data quality conditions that support neonatal care delivery.' if dashboard_theme == 'newborn' else 'Equipment - workforce competency - data quality',
-                    eyebrow='Readiness' if dashboard_theme == 'newborn' else None),
-        _system_readiness(facility_df, supply_inds, wf_inds, dq_inds),
-    ])
+    # Avoid pre-rendering a heavy dashboard section just to show a loading state.
+    # Country profile can render immediately; other tabs get a lightweight skeleton
+    # behind the fixed loading overlay.
+    _target_tab = resolved_initial_tab
+    if _target_tab == 'country-profile':
+        _cp_key = (_opd_key, start_date, end_date, config.get('report_name'))
+        if _cp_key not in _country_profile_cache:
+            _country_profile_cache[_cp_key] = render_country_profile(
+                facility_df, scope_meta=scope_meta, indicator_label=country_label
+            )
+            _trim_cache(_country_profile_cache, _COUNTRY_PROFILE_CACHE_MAX)
+        executive_content['country-profile'] = _country_profile_cache[_cp_key]
+        _initial_ec = [executive_content['country-profile']]
+    else:
+        _initial_ec = [_mnid_loading_placeholder()]
 
     return html.Div(className=f'mnid-bg{" mnid-theme-newborn" if dashboard_theme == "newborn" else ""}', children=[
-        # Hidden components used by the MNID scroll spy callback
-        dcc.Interval(id='mnid-scrollspy-tick', interval=250, max_intervals=-1),
-        dcc.Store(id='mnid-scrollspy-out'),
-        html.Div(className=f'mnid-shell{" mnid-shell-newborn" if dashboard_theme == "newborn" else ""}', children=[main_content]),
+        dcc.Store(id='mnid-executive-view-store', data=executive_token),
+        dcc.Store(id='mnid-preload-status'),
+        html.Div(className=f'mnid-shell{" mnid-shell-newborn" if dashboard_theme == "newborn" else ""}', children=[
+            executive_tabs,
+            html.Div(id='mnid-executive-content', className='mnid-executive-content', children=_initial_ec),
+        ]),
+        dcc.Interval(id='mnid-background-preload', interval=250, n_intervals=0, max_intervals=1),
     ])
+
+def _build_executive_tab_view(selected: str, views: dict, state: dict,
+                              scope_meta_override: dict | None = None,
+                              config_override: dict | None = None,
+                              store_in_views: bool = True):
+    network_df = state.get('network_df')
+    config = config_override or state.get('config')
+    facility_code = state.get('facility_code')
+    start_date = state.get('start_date')
+    end_date = state.get('end_date')
+    scope_meta = scope_meta_override or state.get('scope_meta')
+    facility_df = state.get('facility_df')
+    supply_inds = state.get('supply_inds')
+    wf_inds = state.get('wf_inds')
+    dq_inds = state.get('dq_inds')
+    country_label = state.get('country_label') or 'Maternal'
+
+    if selected in views:
+        return views.get(selected, views.get('country-profile', html.Div()))
+
+    view_cache_key = _executive_view_cache_key(
+        selected,
+        state,
+        scope_meta=scope_meta,
+        config=config,
+    )
+    if view_cache_key in _MNID_EXECUTIVE_TAB_VIEW_CACHE:
+        cached_view = _MNID_EXECUTIVE_TAB_VIEW_CACHE[view_cache_key]
+        if store_in_views:
+            views[selected] = cached_view
+        return cached_view
+
+    if selected == 'country-profile' and facility_df is not None:
+        cp_key = (
+            (
+                (scope_meta or {}).get('dataset_version'),
+                len(network_df) if network_df is not None else 0,
+                tuple(network_df.columns.tolist()) if network_df is not None and not network_df.empty else (),
+                tuple(sorted((scope_meta or {}).get('selected_facilities') or [])),
+                tuple(sorted((scope_meta or {}).get('selected_districts') or [])),
+            ),
+            start_date,
+            end_date,
+            config.get('report_name') if config else None,
+        )
+        if cp_key not in _country_profile_cache:
+            _country_profile_cache[cp_key] = render_country_profile(
+                facility_df,
+                scope_meta=scope_meta,
+                indicator_label=country_label,
+            )
+            _trim_cache(_country_profile_cache, _COUNTRY_PROFILE_CACHE_MAX)
+        views[selected] = _country_profile_cache[cp_key]
+        return views[selected]
+
+    if selected == 'operational-readiness' and facility_df is not None:
+        rendered_view = render_operational_readiness(
+            facility_df,
+            supply_inds=supply_inds,
+            wf_inds=wf_inds,
+            dq_inds=dq_inds,
+        )
+        if store_in_views:
+            views[selected] = rendered_view
+        _MNID_EXECUTIVE_TAB_VIEW_CACHE[view_cache_key] = rendered_view
+        _trim_cache(_MNID_EXECUTIVE_TAB_VIEW_CACHE, _MNID_UI_CACHE_MAX * 2)
+        return rendered_view
+
+    if selected == 'maternal-dashboard' and network_df is not None and config is not None:
+        bundle = _build_mnid_indicator_content(
+            network_df=network_df,
+            config=config,
+            facility_code=facility_code,
+            start_date=start_date,
+            end_date=end_date,
+            scope_meta=scope_meta,
+            include_content=True,
+        )
+        rendered_view = bundle.get('indicator_content', html.Div())
+        if store_in_views:
+            views[selected] = rendered_view
+        _MNID_EXECUTIVE_TAB_VIEW_CACHE[view_cache_key] = rendered_view
+        _trim_cache(_MNID_EXECUTIVE_TAB_VIEW_CACHE, _MNID_UI_CACHE_MAX * 2)
+        return rendered_view
+
+    if selected == 'newborn-dashboard':
+        newborn_config = state.get('newborn_config')
+        newborn_scope_meta = state.get('newborn_scope_meta')
+        if network_df is not None and newborn_config is not None:
+            bundle = _build_mnid_indicator_content(
+                network_df=network_df,
+                config=newborn_config,
+                facility_code=facility_code,
+                start_date=start_date,
+                end_date=end_date,
+                scope_meta=newborn_scope_meta,
+                include_content=True,
+            )
+            rendered_view = bundle.get('indicator_content', html.Div())
+            if store_in_views:
+                views[selected] = rendered_view
+            _MNID_EXECUTIVE_TAB_VIEW_CACHE[view_cache_key] = rendered_view
+            _trim_cache(_MNID_EXECUTIVE_TAB_VIEW_CACHE, _MNID_UI_CACHE_MAX * 2)
+            return rendered_view
+
+    return views.get('country-profile', html.Div())
+
+
+@callback(
+    Output('mnid-executive-content', 'children'),
+    Input('mnid-executive-tabs', 'value'),
+    State('mnid-executive-view-store', 'data'),
+    prevent_initial_call=False,
+)
+def _render_mnid_executive_tab(active_tab, executive_token):
+    views = _MNID_EXECUTIVE_CONTENT_CACHE.get(executive_token) or {}
+    selected = active_tab or 'country-profile'
+    state = _MNID_EXECUTIVE_DATA_CACHE.get(executive_token) or {}
+
+    try:
+        return _build_executive_tab_view(selected, views, state)
+    except Exception as _exc:
+        _LOGGER.exception('Failed to render executive tab %s: %s', selected, _exc)
+        return html.Div(
+            f'Tab failed to load ({selected}): {_exc}',
+            style={'padding': '24px', 'color': '#dc2626', 'fontSize': '13px'},
+        )
+
+
+@callback(
+    Output('mnid-preload-status', 'data'),
+    Input('mnid-background-preload', 'n_intervals'),
+    State('mnid-executive-view-store', 'data'),
+    State('mnid-executive-tabs', 'value'),
+    prevent_initial_call=False,
+)
+def _preload_mnid_executive_tabs(_tick, executive_token, active_tab):
+    if not executive_token:
+        raise PreventUpdate
+
+    views = _MNID_EXECUTIVE_CONTENT_CACHE.get(executive_token)
+    state = _MNID_EXECUTIVE_DATA_CACHE.get(executive_token)
+    if views is None or state is None:
+        raise PreventUpdate
+
+    preload_tabs = ['maternal-dashboard', 'newborn-dashboard']
+    warmed = []
+
+    for tab_value in preload_tabs:
+        if tab_value == active_tab or tab_value in views:
+            continue
+        if tab_value == 'newborn-dashboard' and state.get('newborn_config') is None:
+            continue
+        try:
+            _build_executive_tab_view(tab_value, views, state)
+            warmed.append(tab_value)
+        except Exception as exc:
+            _LOGGER.warning('Background preload failed for executive tab %s: %s', tab_value, exc)
+
+    base_scope_meta = state.get('scope_meta') or {}
+    maternal_config = state.get('config') or {}
+    if maternal_config.get('report_name') == 'Maternal Health':
+        maternal_categories = [
+            category for category in (maternal_config.get('mnid_categories') or ['ANC', 'Labour', 'PNC'])
+            if category in {'ANC', 'Labour', 'PNC'}
+        ]
+        current_categories = tuple(sorted(base_scope_meta.get('mnid_categories') or []))
+        for category in maternal_categories:
+            if current_categories == (category,):
+                continue
+            try:
+                warm_scope_meta = dict(base_scope_meta)
+                warm_scope_meta['mnid_categories'] = [category]
+                _build_executive_tab_view(
+                    'maternal-dashboard',
+                    views,
+                    state,
+                    scope_meta_override=warm_scope_meta,
+                    store_in_views=False,
+                )
+                warmed.append(f'maternal-dashboard:{category}')
+            except Exception as exc:
+                _LOGGER.warning('Background preload failed for maternal category %s: %s', category, exc)
+
+    return {
+        'token': executive_token,
+        'active_tab': active_tab or 'country-profile',
+        'warmed_tabs': warmed,
+    }

@@ -1,10 +1,35 @@
 """MNID dataframe preparation and serialization helpers."""
 
 import json
+import os
 import re
+import uuid
 import numpy as np
 import pandas as pd
 pd.options.mode.chained_assignment = None
+
+# Lightweight in-memory store for the two active DataFrames the trend and
+# compare callbacks need (fallback when aggregate is not yet built).
+# Only ever holds 2 entries, so we skip disk files and eviction logic.
+_MNID_UI_CACHE: dict = {}
+
+
+def _remember_ui_payload(prefix: str, records_or_fn, stable_key: str | None = None) -> str:
+    cache_key = f'{prefix}:{stable_key}' if stable_key else f'{prefix}:{uuid.uuid4().hex}'
+    if cache_key in _MNID_UI_CACHE:
+        return cache_key
+    records = records_or_fn() if callable(records_or_fn) else records_or_fn
+    _MNID_UI_CACHE[cache_key] = records
+    return cache_key
+
+
+def _restore_ui_dataframe(cache_key: str | None) -> pd.DataFrame:
+    if not cache_key:
+        return pd.DataFrame()
+    obj = _MNID_UI_CACHE.get(cache_key)
+    if isinstance(obj, pd.DataFrame):
+        return obj
+    return deserialize_store_df(obj)
 
 from .constants import (
     ALL_DISTRICTS,
@@ -76,9 +101,16 @@ def _derive_contextual_concepts(out: pd.DataFrame) -> pd.DataFrame:
     if out.empty or 'concept_name' not in out.columns:
         return out
 
-    concept_series = out['concept_name'].fillna('').astype(str).str.strip()
-    obs_series = out['obs_value_coded'].fillna('').astype(str).str.strip() if 'obs_value_coded' in out.columns else pd.Series('', index=out.index)
-    val_series = out['Value'].fillna('').astype(str).str.strip() if 'Value' in out.columns else pd.Series('', index=out.index)
+    def _cstr(col: str) -> pd.Series:
+        if col not in out.columns:
+            return pd.Series('', index=out.index)
+        s = out[col].fillna('').astype('category')
+        s = s.cat.rename_categories(dict(zip(s.cat.categories, s.cat.categories.astype(str).str.strip())))
+        return s.astype(str)
+
+    concept_series = _cstr('concept_name')
+    obs_series     = _cstr('obs_value_coded')
+    val_series     = _cstr('Value')
     combined_value = obs_series.where(obs_series.ne(''), val_series)
 
     treatment_thermal = concept_series.eq('Treatment') & combined_value.str.fullmatch('Thermal Care', case=False, na=False)
@@ -149,18 +181,34 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
     if out.empty or 'person_id' not in out.columns:
         return out
 
-    concept = out['concept_name'].fillna('').astype(str).str.strip() if 'concept_name' in out.columns else pd.Series('', index=out.index)
-    obs = out['obs_value_coded'].fillna('').astype(str).str.strip() if 'obs_value_coded' in out.columns else pd.Series('', index=out.index)
-    value = out['Value'].fillna('').astype(str).str.strip() if 'Value' in out.columns else pd.Series('', index=out.index)
-    value_n = pd.to_numeric(out['ValueN'], errors='coerce') if 'ValueN' in out.columns else pd.Series(np.nan, index=out.index)
-    service = out['Service_Area'].fillna('').astype(str).str.strip() if 'Service_Area' in out.columns else pd.Series('', index=out.index)
-    encounter = out['Encounter'].fillna('').astype(str).str.strip() if 'Encounter' in out.columns else pd.Series('', index=out.index)
-    program = out['Program'].fillna('').astype(str).str.strip().str.upper() if 'Program' in out.columns else pd.Series('', index=out.index)
+    def _cat_str(col: str, transform=None) -> pd.Series:
+        """Build a categorical string series from out[col].
+
+        Categorical means str.contains/str.lower etc. only run on the unique values,
+        not every row - about 50x faster when there are far fewer distinct concept/obs
+        values than rows.
+        """
+        if col not in out.columns:
+            return pd.Series('', index=out.index)
+        s = out[col].fillna('').astype('category')
+        cats = s.cat.categories.astype(str).str.strip()
+        if transform:
+            cats = transform(cats)
+        s = s.cat.rename_categories(dict(zip(s.cat.categories, cats)))
+        return s.astype(str)
+
+    concept  = _cat_str('concept_name')
+    obs      = _cat_str('obs_value_coded')
+    value    = _cat_str('Value')
+    value_n  = pd.to_numeric(out['ValueN'], errors='coerce') if 'ValueN' in out.columns else pd.Series(np.nan, index=out.index)
+    service  = _cat_str('Service_Area')
+    encounter = _cat_str('Encounter')
+    program  = _cat_str('Program', transform=lambda s: s.str.upper())
     combined = obs.where(obs.ne(''), value)
-    concept_lower = concept.str.lower()
-    combined_lower = combined.str.lower()
+    concept_lower   = concept.str.lower()
+    combined_lower  = combined.str.lower()
     encounter_upper = encounter.str.upper()
-    encounter_source = out['Encounter_Source'].fillna('').astype(str).str.strip() if 'Encounter_Source' in out.columns else encounter
+    encounter_source = _cat_str('Encounter_Source') if 'Encounter_Source' in out.columns else encounter
     encounter_source_lower = encounter_source.str.lower()
 
     person_ctx = pd.DataFrame({'person_id': out['person_id'].dropna().astype(str).unique()})
@@ -186,9 +234,8 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
         | program.isin(['LABOUR AND DELIVERY PROGRAM'])
     )
 
-    # Pre-compute all str.contains/regex patterns once — each is expensive (~215-340ms on
-    # 100k rows) so materializing them before the _assign_flag calls eliminates repeated
-    # pandas string engine overhead when they are used in chained boolean expressions.
+    # Each str.contains/regex check costs ~215-340ms on 100k rows, so we compute them
+    # all once up front rather than re-running them inside every _assign_flag call.
     _cp_hiv = (concept.isin(['HIV Test', 'HIV status', 'HIV Positive', 'Mother HIV Status', 'New HIV status'])
                | concept_lower.str.contains('hiv', na=False))
     _cp_hb = (concept.isin(['Hb(g/dL)', 'Last HB result', 'Hemoglobin', 'Haemoglobin', 'Anemia screening'])
@@ -367,7 +414,7 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
     )
     _assign_flag(
         'mnid_pnc_maternal_death',
-        pnc_mask & concept.eq('Status of the mother') & combined_lower.isin(['death', 'died', 'dead']),
+        pnc_mask & concept.eq('Status of the mother') & combined_lower.isin(['death', 'died', 'dead', 'deceased']),
     )
 
     _assign_flag(
@@ -494,8 +541,8 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
         & _ctx_series('mnid_newborn_parenteral_antibiotics').eq('Yes')
     ).map({True: 'Yes', False: ''})
 
-    # Vectorized birth weight extraction — avoids a Python-level loop that created a
-    # pd.Series object per row (very slow at scale).
+    # Pulls birth weight in one vectorized pass instead of looping row by row and
+    # building a pd.Series per row, which got slow once there were a lot of rows.
     birth_weight_rows = out.loc[concept.eq('Birth weight'), ['person_id']].copy()
     if not birth_weight_rows.empty:
         value_numeric = out['ValueN'] if 'ValueN' in out.columns else pd.Series([None] * len(out), index=out.index)
@@ -742,10 +789,10 @@ def prepare_mnid_dataframe(df: pd.DataFrame | None) -> pd.DataFrame:
     if keep:
         df = df[keep]
 
-    # Pre-filter to MCH rows *before* running the expensive normalization so
-    # _derive_person_level_context works on ~7k rows instead of 248k.
-    # Use exact program names (from raw parquet) not a text pattern — the pattern
-    # 'Maternal|Child|Neonatal|Newborn' misses 'ANC PROGRAM', 'LABOUR AND DELIVERY PROGRAM' etc.
+    # Filter down to MCH rows before normalizing, so _derive_person_level_context
+    # runs on ~7k rows instead of 248k. Match on the exact program names rather than
+    # a text pattern - 'Maternal|Child|Neonatal|Newborn' misses 'ANC PROGRAM',
+    # 'LABOUR AND DELIVERY PROGRAM', etc.
     _pc = 'Program' if 'Program' in df.columns else ('Reporting_Program' if 'Reporting_Program' in df.columns else None)
     if _pc:
         _mch_mask = df[_pc].fillna('').str.upper().isin(_MCH_PROGRAMS)

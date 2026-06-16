@@ -113,6 +113,108 @@ End
     ```bash
     deactivate
     ```
+---
+
+## MNID Dashboard
+
+The MNID (Maternal and Neonatal Indicator Dashboard) is a modular Dash dashboard for monitoring maternal and child health indicators across facilities and districts in Malawi.
+
+### Module structure
+
+```
+mnid/
+  app.py              — main renderer, callbacks, layout assembly
+  layout.py           — hero cards, alert banner, KPI row, sidebar
+  chart_helpers.py    — shared chart/figure helpers, moving averages
+  coverage.py         — coverage charts, comparative analysis section
+  indicators.py       — indicator config resolution, category ordering
+  heatmap.py          — facility/district performance heatmaps
+  data_utils.py       — dataframe prep, serialization, lightweight session store
+  constants.py        — colours, facility maps, palette constants
+  aggregation/
+    engine.py         — overnight pre-aggregation pipeline
+    store.py          — aggregate loader and query helpers
+    scheduler.py      — job wrapper called by start_scheduler.py
+```
+
+### Pre-aggregation service
+
+The dashboard pre-computes indicator coverage (`numerator`, `denominator`, `pct`) for every combination of **facility × indicator × period** (daily / weekly / monthly) and writes the result to `data/mnid_aggregates/indicator_aggregates.parquet`.
+
+Dashboard callbacks query this parquet instead of scanning 1.7M+ raw rows on every period change — making period selection near-instant.
+
+**How it runs**
+
+| Trigger | When | How |
+|---|---|---|
+| App startup (dev & prod) | Once, if parquet is missing | Background thread auto-fires inside `mnid/app.py` on first import |
+| After every `data_storage.py` run | Every data refresh cycle | Background thread called from `start_scheduler.py` → `_run_mnid_aggregation()` |
+| Overnight schedule | Daily at **02:00** | APScheduler job in `start_scheduler.py` |
+| Manual / one-off | On demand | See command below |
+
+**In production**, the scheduler handles everything: `start_scheduler.py` runs `data_storage.py` on its interval, then fires the aggregation in a background thread after each successful data pull. The 02:00 daily job is a safety net in case the data refresh cycle was skipped.
+
+**In development** (running `python app.py` directly without the scheduler), the aggregation fires automatically in a background thread the first time `mnid/app.py` is imported — i.e. on app startup. You will see the following in your terminal when it completes:
+
+```
+INFO mnid.app Aggregate parquet not found — building in background...
+INFO mnid.app Startup aggregation complete.
+```
+
+The first page load after a fresh install may still feel slow while the background job runs (30 seconds to a few minutes depending on data volume). Once the parquet is written, all subsequent loads use the fast path.
+
+**Manual trigger**
+
+Run this any time you want to force a rebuild — after changing indicator configs, after a large data import, or to verify the pipeline works:
+
+```bash
+python -c "from mnid.aggregation.scheduler import run_aggregation_job; run_aggregation_job()"
+```
+
+This runs synchronously in your terminal, prints progress to the log, and writes two files on success:
+
+```
+data/mnid_aggregates/
+  indicator_aggregates.parquet   — pre-computed coverage per facility × indicator × period
+  meta.json                      — build timestamp, row count, elapsed time, status
+```
+
+Check `meta.json` to confirm the last run succeeded:
+
+```bash
+cat data/mnid_aggregates/meta.json
+```
+
+A successful run looks like:
+```json
+{
+  "generated_at": "2025-01-15T02:00:43",
+  "elapsed_sec": 87.4,
+  "rows": 482310,
+  "indicators": 24,
+  "data_source": "data/parquet",
+  "last_run_status": "ok"
+}
+```
+
+**When to trigger manually**
+
+- After adding or changing indicator configs in `data/visualizations/*.json`
+- After a bulk data import that bypassed the scheduler
+- After deleting `data/mnid_aggregates/` to force a clean rebuild
+- When `meta.json` shows `"last_run_status": "error"` and you've fixed the underlying cause
+
+**What it replaces**
+
+Before this service, every period-change triggered:
+- N × `_cov()` calls on 1.7M raw rows for the KPI/hero section
+- A triple-nested entity × indicator × period loop for the comparison charts
+- Per-indicator period-by-period row masking for every run chart card
+
+After: all three paths do a single filtered read of the ~500K-row aggregate. The dashboard always falls back to live row-scan computation if the parquet is absent, so no manual step is required before first use.
+
+---
+
 ### Modifying data in the pages
 To modify data, go to /pages/, select the file to modify and change the filters.
 
