@@ -1,9 +1,12 @@
 """
 Generate synthetic MNID demo data for demo_parquet/.
-Covers 8 Malawi districts, Jan–Jun 2026, ~31% average indicator coverage.
-Run once: python generate_demo_parquet.py
+Covers 8 Malawi districts, last year through today, ~31% average indicator coverage.
+Run: python generate_demo_parquet.py
 """
+import calendar
 import random
+from datetime import date
+
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -52,15 +55,23 @@ DISTRICTS = {
     ],
 }
 
-# month tag → (year, month, days_in_month)
-MONTHS = [
-    ("202601", 2026, 1, 31),
-    ("202602", 2026, 2, 28),
-    ("202603", 2026, 3, 31),
-    ("202604", 2026, 4, 30),
-    ("202605", 2026, 5, 31),
-    ("202606", 2026, 6, 11),  # partial month up to today
-]
+# Month tag -> (year, month, days to generate). Spans from January of last year
+# through today's month, so the data never goes stale relative to whenever this
+# script gets run again - the current month is partial, up to today's day.
+def _build_months(today: date) -> list[tuple[str, int, int, int]]:
+    months = []
+    year, month = today.year - 1, 1
+    while (year, month) <= (today.year, today.month):
+        days_in_month = calendar.monthrange(year, month)[1]
+        last_day = today.day if (year, month) == (today.year, today.month) else days_in_month
+        months.append((f"{year}{month:02d}", year, month, last_day))
+        month += 1
+        if month > 12:
+            month, year = 1, year + 1
+    return months
+
+
+MONTHS = _build_months(date.today())
 
 # Average coverage target ± per-facility jitter
 BASE_RATE = 0.31

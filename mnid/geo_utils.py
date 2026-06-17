@@ -7,13 +7,26 @@ import os
 
 MALAWI_DISTRICTS_GEOJSON = os.path.join('data', 'geo', 'malawi_districts.geojson')
 
+_GEOJSON_CACHE: dict = {}  # {path: geojson_dict}
+_GEO_REF_CACHE: dict = {}  # {id(geojson): geo_ref}
+
 def load_malawi_district_geojson():
-    """Load Malawi district boundaries if a local GeoJSON file is available."""
+    """Load Malawi district boundaries if a local GeoJSON file is available.
+
+    Cached in-process — the file never changes during runtime, so reading
+    and parsing the 800KB JSON only happens once per worker process.
+    """
+    cached = _GEOJSON_CACHE.get(MALAWI_DISTRICTS_GEOJSON)
+    if cached is not None:
+        return cached
     if not os.path.exists(MALAWI_DISTRICTS_GEOJSON):
+        _GEOJSON_CACHE[MALAWI_DISTRICTS_GEOJSON] = None
         return None
     try:
         with open(MALAWI_DISTRICTS_GEOJSON, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            data = json.load(f)
+        _GEOJSON_CACHE[MALAWI_DISTRICTS_GEOJSON] = data
+        return data
     except Exception:
         return None
 
@@ -41,9 +54,17 @@ def _iter_polygon_rings(geojson):
 
 
 def build_geo_reference(geojson):
-    """Return normalized district rings, centroids, and map bounds for MNID plotting."""
+    """Return normalized district rings, centroids, and map bounds for MNID plotting.
+
+    Cached by object identity — the loaded GeoJSON dict is the same object
+    every call (because load_malawi_district_geojson is also cached), so
+    id(geojson) is a stable key and the expensive polygon math runs once.
+    """
     if not geojson:
         return None
+    cached = _GEO_REF_CACHE.get(id(geojson))
+    if cached is not None:
+        return cached
 
     bounds_lon = []
     bounds_lat = []
@@ -81,7 +102,7 @@ def build_geo_reference(geojson):
     for district, ring in raw_rings:
         district_rings.setdefault(district, []).append([norm(lon, lat) for lon, lat in ring])
 
-    return {
+    result = {
         'min_lon': min_lon,
         'max_lon': max_lon,
         'min_lat': min_lat,
@@ -90,6 +111,8 @@ def build_geo_reference(geojson):
         'district_rings': district_rings,
         'district_centroids': district_centroids,
     }
+    _GEO_REF_CACHE[id(geojson)] = result
+    return result
 
 
 def derive_facility_positions(facilities_by_district, district_centroids):

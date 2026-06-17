@@ -6,9 +6,13 @@ calculates configured indicator coverage, and renders the main dashboard
 sections such as trends, comparison views, heatmaps, and readiness panels.
 """
 import dash_mantine_components as dmc
+import diskcache
+import hashlib
 import json
 import logging
 import pandas as pd
+import pickle
+import threading
 pd.options.mode.chained_assignment = None
 import plotly.graph_objects as go
 from datetime import datetime
@@ -90,16 +94,27 @@ from mnid.executive_views import render_country_profile, render_operational_read
 
 _MNID_UI_CACHE_MAX = 16
 _MNID_UI_CACHE_TTL_SECONDS = 3600
-_MNID_EXECUTIVE_CONTENT_CACHE: dict = {}
-_MNID_EXECUTIVE_DATA_CACHE: dict = {}
-_MNID_EXECUTIVE_TAB_VIEW_CACHE: dict = {}
+
+_EXECUTIVE_CACHE_DIR = os.environ.get('MNID_EXEC_CACHE_DIR') or os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), '..', '.mnid_exec_cache'
+)
+_MNID_EXECUTIVE_DISK_CACHE = diskcache.Cache(_EXECUTIVE_CACHE_DIR, size_limit=512 * 1024 * 1024)
 _MNID_WARNED_MESSAGES = set()
 _LOGGER = logging.getLogger(__name__)
+
+
+def _dk(prefix: str, key_data) -> str:
+    """Stable cross-process diskcache key (hash() is randomised per-process)."""
+    return f'{prefix}:{hashlib.md5(pickle.dumps(key_data, protocol=4)).hexdigest()}'
+
+
+_network_df_cache: dict = {}
 _NETWORK_DF_CACHE_MAX = 6
-_HEATMAP_CACHE_MAX = 6
-# Country profile doesn't depend on category, so cache by (opd_key, start, end, report_name)
-_country_profile_cache: dict = {}
-_COUNTRY_PROFILE_CACHE_MAX = 12
+
+# Per-worker in-memory cache for rendered tab views.
+# Avoids diskcache reads on repeat renders within the same worker.
+_worker_view_cache: dict = {}
+_WORKER_VIEW_CACHE_MAX = 32
 
 
 def _load_dashboard_tab_config() -> dict:
@@ -123,7 +138,6 @@ def _load_dashboard_tab_config() -> dict:
 def _executive_view_cache_key(selected: str, state: dict,
                               scope_meta: dict | None = None,
                               config: dict | None = None) -> tuple:
-    network_df = state.get('network_df')
     effective_scope = scope_meta or state.get('scope_meta') or {}
     effective_config = config or state.get('config') or {}
     return (
@@ -132,13 +146,65 @@ def _executive_view_cache_key(selected: str, state: dict,
         state.get('facility_code'),
         state.get('start_date'),
         state.get('end_date'),
-        len(network_df) if network_df is not None else 0,
-        tuple(network_df.columns.tolist()) if network_df is not None and not network_df.empty else (),
+        state.get('opd_key'),
         tuple(sorted((effective_scope or {}).get('selected_facilities') or [])),
         tuple(sorted((effective_scope or {}).get('selected_districts') or [])),
         tuple(sorted((effective_scope or {}).get('mnid_categories') or [])),
         (effective_scope or {}).get('dataset_version'),
+        _agg_version_stamp(),
     )
+
+
+def _agg_version_stamp() -> str:
+    """Return a string that changes whenever the aggregate parquet is rebuilt.
+    Used as part of view cache keys so that rebuilding the aggregate
+    automatically invalidates all stale rendered views in diskcache.
+    """
+    try:
+        import json as _json
+        meta_path = Path(os.getcwd()) / 'data' / 'mnid_aggregates' / 'meta.json'
+        if meta_path.exists():
+            meta = _json.loads(meta_path.read_text(encoding='utf-8'))
+            return str(meta.get('generated_at', ''))
+    except Exception:
+        pass
+    return ''
+
+
+def _get_network_df_from_state(state: dict):
+    """Return network_df: check per-worker cache first, then shared diskcache."""
+    opd_key = state.get('opd_key')
+    if opd_key is None:
+        return None
+    if opd_key in _network_df_cache:
+        return _network_df_cache[opd_key]
+    ndf = _MNID_EXECUTIVE_DISK_CACHE.get(_dk('ndf', opd_key))
+    if ndf is not None:
+        _network_df_cache[opd_key] = ndf
+        _trim_cache(_network_df_cache, _NETWORK_DF_CACHE_MAX)
+    return ndf
+
+
+def _get_facility_df_from_state(state: dict, network_df=None):
+    """Return facility_df by recomputing from network_df (date+facility filter only).
+
+    Reading a large DataFrame from diskcache (SQLite deserialisation) is slower
+    than recomputing the date/facility filter, so we skip the diskcache round-trip.
+    """
+    if network_df is None:
+        network_df = _get_network_df_from_state(state)
+    if network_df is None:
+        return None
+    bundle = _build_mnid_indicator_content(
+        network_df=network_df,
+        config=state.get('config'),
+        facility_code=state.get('facility_code'),
+        start_date=state.get('start_date'),
+        end_date=state.get('end_date'),
+        scope_meta=state.get('scope_meta'),
+        include_content=False,
+    )
+    return bundle.get('facility_df')
 
 
 def _mnid_loading_placeholder() -> html.Div:
@@ -199,6 +265,63 @@ def _maybe_build_aggregate_on_startup() -> None:
     t.start()
 
 _maybe_build_aggregate_on_startup()
+
+
+def _warm_worker_ndf_from_diskcache() -> None:
+    """Load the most-recently-written network_df into this worker's in-memory cache.
+
+    Runs in a daemon thread at module import time (i.e. in every Gunicorn worker).
+    By the time the first user request arrives, network_df is already in
+    _network_df_cache so _get_network_df_from_state never has to pay the
+    diskcache deserialization cost.
+    """
+    def _load():
+        try:
+            ndf_key = _MNID_EXECUTIVE_DISK_CACHE.get('ndf:latest_key')
+            if ndf_key is None:
+                return
+            ndf = _MNID_EXECUTIVE_DISK_CACHE.get(ndf_key)
+            if ndf is None:
+                return
+            # The opd_key is the argument to _dk('ndf', opd_key) which produced ndf_key.
+            # We can't reverse the hash, so store under ndf_key itself as the lookup key.
+            # _get_network_df_from_state uses _dk('ndf', opd_key) which equals ndf_key —
+            # but the lookup is on the tuple opd_key via _network_df_cache[opd_key].
+            # Store in a special slot so _get_network_df_from_state can find it.
+            # Simpler: iterate _network_df_cache won't work cross-process, so instead
+            # we store the ndf under a sentinel in _network_df_cache and check in
+            # _get_network_df_from_state. But the cleanest path is to write the opd_key
+            # alongside the ndf in the diskcache (done in _async_write_ndf below).
+            _LOGGER.info('Worker ndf warm: network_df loaded from diskcache (%d rows)', len(ndf))
+        except Exception as exc:
+            _LOGGER.debug('Worker ndf warm failed (non-fatal): %s', exc)
+    threading.Thread(target=_load, daemon=True, name='mnid-worker-ndf-warm').start()
+
+
+# Also store the opd_key in diskcache so workers can reconstruct the cache entry.
+# This is done in _async_write_ndf via 'ndf:latest_opd_key'.
+def _warm_worker_ndf_from_diskcache_v2() -> None:
+    """Full version: loads ndf AND registers it under the correct opd_key."""
+    def _load():
+        try:
+            ndf_key = _MNID_EXECUTIVE_DISK_CACHE.get('ndf:latest_key')
+            opd_key = _MNID_EXECUTIVE_DISK_CACHE.get('ndf:latest_opd_key')
+            if ndf_key is None or opd_key is None:
+                return
+            if opd_key in _network_df_cache:
+                return  # already warm
+            ndf = _MNID_EXECUTIVE_DISK_CACHE.get(ndf_key)
+            if ndf is None:
+                return
+            _network_df_cache[opd_key] = ndf
+            _trim_cache(_network_df_cache, _NETWORK_DF_CACHE_MAX)
+            _LOGGER.info('Worker ndf warm: %d rows loaded from diskcache', len(ndf))
+        except Exception as exc:
+            _LOGGER.debug('Worker ndf warm failed (non-fatal): %s', exc)
+    threading.Thread(target=_load, daemon=True, name='mnid-worker-ndf-warm').start()
+
+
+_warm_worker_ndf_from_diskcache_v2()
 
 _MNID_SCROLLSPY_CLIENTSIDE = """
 function(_tick) {
@@ -454,7 +577,10 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         allowed = set(category_order)
         all_inds = [i for i in all_inds if i.get('category') in allowed]
 
-    payload_key = f'{hash((len(network_df), tuple(network_df.columns.tolist()) if not network_df.empty else (), start_date, end_date, tuple(category_order)))}_{start_date}_{end_date}'
+    payload_key = hashlib.md5(pickle.dumps(
+        (len(network_df), tuple(network_df.columns.tolist()) if not network_df.empty else (), start_date, end_date, tuple(category_order)),
+        protocol=4,
+    )).hexdigest()[:16] + f'_{start_date}_{end_date}'
 
     tracked = [i for i in all_inds if i.get('status') == 'tracked']
     awaiting = [i for i in all_inds if i.get('status') == 'awaiting_baseline']
@@ -530,6 +656,9 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
             'dashboard_theme': dashboard_theme,
         }
 
+    import time as _time
+    _t0 = _time.monotonic()
+
     _agg = _get_aggregate()
     _fac_filter = selected_facility_codes or None
     _dist_filter = selected_districts or None
@@ -549,9 +678,16 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
     _cur_batch: dict = {}
     _prev_batch: dict = {}
     if _agg is not None and _s is not None:
+        _LOGGER.info(
+            'MNID KPI source: aggregate parquet (%d rows), %d indicators, fac_filter=%s, dist_filter=%s',
+            len(_agg), len(tracked), bool(_fac_filter), bool(_dist_filter),
+        )
         _cur_batch  = _build_agg_batch(_agg, _s, _e, _kpi_grain, _fac_filter, _dist_filter if not _fac_filter else None)
         if prev_start is not None:
             _prev_batch = _build_agg_batch(_agg, prev_start, prev_end, _kpi_grain, _fac_filter, _dist_filter if not _fac_filter else None)
+    else:
+        _LOGGER.warning('MNID KPI source: raw rows (agg=%s, start=%s)', _agg is not None, _s)
+    _LOGGER.info('MNID timing: KPI batch %.2fs', _time.monotonic() - _t0)
 
     # Pre-slice coverage aggregate once to avoid repeated full-scan per indicator in coverage charts
     _cov_agg: pd.DataFrame | None = None
@@ -572,6 +708,10 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
     for ind in tracked:
         if _cur_batch:
             num, den, pct = _batch_cov(_cur_batch, ind['id'], _kpi_fallbacks)
+            if den == 0:
+                # Indicator not in aggregate (e.g. program-based indicators not yet
+                # rebuilt into the parquet) — fall back to raw row computation.
+                num, den, pct = _cov(facility_df, ind['numerator_filters'], ind['denominator_filters'])
         elif _agg is not None and _s is not None:
             num, den, pct = _agg_coverage(
                 _agg, ind['id'], _s, _e,
@@ -592,7 +732,16 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
 
     for c in computed:
         if _prev_batch and prev_start is not None:
-            _, _, prev_pct = _batch_cov(_prev_batch, c['id'], _kpi_fallbacks)
+            _, prev_den, prev_pct = _batch_cov(_prev_batch, c['id'], _kpi_fallbacks)
+            if prev_den == 0:
+                # Indicator not in aggregate — fall back to raw prev-period scan.
+                try:
+                    prev_df_slice = network_df[
+                        (network_df['Date'] >= prev_start) & (network_df['Date'] <= prev_end)
+                    ] if 'Date' in network_df.columns and not network_df.empty else pd.DataFrame()
+                    _, _, prev_pct = _cov(prev_df_slice, c['numerator_filters'], c['denominator_filters'])
+                except Exception:
+                    prev_pct = c['pct']
             c['delta_pct'] = round(c['pct'] - prev_pct, 1)
         elif _agg is not None and prev_start is not None:
             try:
@@ -629,6 +778,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
     for ind in all_inds:
         by_cat.setdefault(ind.get('category', 'Other'), []).append(ind)
 
+    _t1 = _time.monotonic()
     coverage_charts = _coverage_charts_section(
         by_cat,
         facility_df,
@@ -640,12 +790,18 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         districts=list(_dist_filter) if _dist_filter and not _fac_filter else None,
         grain=_coverage_grain,
     )
+    _LOGGER.info('MNID timing: coverage_charts %.2fs', _time.monotonic() - _t1)
+
+    _t2 = _time.monotonic()
     trend_switcher = _trend_switcher(
         facility_df,
         all_inds,
         scope_meta=scope_meta,
         payload_key=payload_key,
     )
+    _LOGGER.info('MNID timing: trend_switcher %.2fs', _time.monotonic() - _t2)
+
+    _t3 = _time.monotonic()
     performance_div, heatmap_div = _coverage_heatmap_section(
         all_inds,
         facility_code,
@@ -658,12 +814,16 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
             payload_key,
         ),
     )
+    _LOGGER.info('MNID timing: heatmap_section %.2fs', _time.monotonic() - _t3)
+
+    _t4 = _time.monotonic()
     comparative_div = _comparative_analysis_section(
         all_inds,
         facility_code,
         facility_df,
         payload_key=payload_key,
     )
+    _LOGGER.info('MNID timing: comparative %.2fs', _time.monotonic() - _t4)
 
     def _sec_header(title, count=None, desc=None, eyebrow=None):
         return html.Div(className=f'mnid-section-header{" mnid-section-header-newborn" if dashboard_theme == "newborn" else ""}', children=[
@@ -743,16 +903,12 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
 
 def clear_runtime_caches() -> None:
     _network_df_cache.clear()
-    _heatmap_store_cache.clear()
+    _worker_view_cache.clear()
     _MNID_UI_CACHE.clear()
-    _MNID_EXECUTIVE_CONTENT_CACHE.clear()
-    _MNID_EXECUTIVE_DATA_CACHE.clear()
-    _MNID_EXECUTIVE_TAB_VIEW_CACHE.clear()
-    if _MNID_UI_DISK_CACHE is not None:
-        try:
-            _MNID_UI_DISK_CACHE.clear()
-        except Exception:
-            pass
+    try:
+        _MNID_EXECUTIVE_DISK_CACHE.clear()
+    except Exception:
+        pass
     from mnid.aggregation.store import invalidate_cache as _agg_invalidate
     _agg_invalidate()
 
@@ -880,7 +1036,10 @@ def update_trend_chart(n_clicks_list, location, selected_inds, stored_trend, act
     ind_options = ind_opts_by_cat.get(cat, [])
 
     # Use aggregate fast path; only restore the raw df when aggregate is absent (first run).
+    # Always keep a reference to the full df — used as fallback when the aggregate parquet
+    # doesn't yet contain a freshly-configured indicator.
     _agg_now = _get_aggregate()
+    _df_full = _restore_ui_dataframe(trend_payload.get('data_key'))
     if _agg_now is not None:
         # Build a minimal stub df with the date range so _run_chart_cards can detect grain.
         _d_min = trend_payload.get('date_min')
@@ -888,16 +1047,16 @@ def update_trend_chart(n_clicks_list, location, selected_inds, stored_trend, act
         if _d_min and _d_max:
             df = pd.DataFrame({'Date': pd.to_datetime([_d_min, _d_max])})
         else:
-            df = _restore_ui_dataframe(trend_payload.get('data_key'))
+            df = _df_full if _df_full is not None else pd.DataFrame()
     else:
-        df = _restore_ui_dataframe(trend_payload.get('data_key'))
+        df = _df_full if _df_full is not None else pd.DataFrame()
 
     default_ind_values = [o['value'] for o in ind_options[:_DEFAULT_TREND_INDICATOR_LIMIT]]
     ind_value_out = default_ind_values if cat_changed else no_update
 
     cards = _run_chart_cards(df, tracked, cat, location or 'all',
                              default_ind_values if cat_changed else selected_inds,
-                             scope_meta, agg_df=_agg_now)
+                             scope_meta, agg_df=_agg_now, fallback_df=_df_full)
     classes = ['mnid-filter-btn active' if c == cat else 'mnid-filter-btn' for c in categories]
     return cards, cat, classes, loc_options, ind_options, ind_value_out
 
@@ -1028,7 +1187,8 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
                      location: str | None = None,
                      selected_ids: list | None = None,
                      scope_meta: dict | None = None,
-                     agg_df: pd.DataFrame | None = None) -> list:
+                     agg_df: pd.DataFrame | None = None,
+                     fallback_df: pd.DataFrame | None = None) -> list:
     tracked = [i for i in indicators if i.get('status') == 'tracked' and i.get('category') == cat]
     if selected_ids:
         id_set = set(selected_ids)
@@ -1120,7 +1280,34 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
                 indicator_label=ind.get('label'),
             )
 
-        fig = _indicator_run_fig(plot_df, ind, color, periods, tickfmt, hfmt, grain, precomputed=precomputed)
+        # When aggregate has no data for this indicator, fall back to the full raw df
+        # so newly-configured or rebuilt indicators still render correct percentages.
+        if (precomputed is None or precomputed.empty) and fallback_df is not None and not fallback_df.empty:
+            _fb = fallback_df.copy()
+            if location and location != 'all':
+                if 'Facility_CODE' in _fb.columns:
+                    _lm = _fb['Facility_CODE'].astype(str) == str(location)
+                    if _lm.any():
+                        _fb = _fb[_lm]
+                elif 'District' in _fb.columns:
+                    _lm = _fb['District'].astype(str) == str(location)
+                    if _lm.any():
+                        _fb = _fb[_lm]
+            _fb_dates = pd.to_datetime(_fb['Date'], errors='coerce').dropna() if 'Date' in _fb.columns else pd.Series([], dtype='datetime64[ns]')
+            if not _fb_dates.empty:
+                if grain == 'monthly':
+                    _fb['_p'] = _fb_dates.dt.to_period('M').dt.start_time
+                elif grain == 'weekly':
+                    _fb['_p'] = _fb_dates.dt.to_period('W').dt.start_time
+                else:
+                    _fb['_p'] = _fb_dates.dt.floor('D')
+                _fb_periods = sorted(_fb['_p'].dropna().unique())
+                fig = _indicator_run_fig(_fb, ind, color, _fb_periods, tickfmt, hfmt, grain, precomputed=None)
+            else:
+                fig = _indicator_run_fig(plot_df, ind, color, periods, tickfmt, hfmt, grain, precomputed=None)
+        else:
+            fig = _indicator_run_fig(plot_df, ind, color, periods, tickfmt, hfmt, grain, precomputed=precomputed)
+
         target = ind.get('target')
         target_badge = None
         if target is not None:
@@ -2206,14 +2393,17 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
     ctx = callback_context
     ctx_prop = ctx.triggered[0]['prop_id'] if ctx and ctx.triggered else ''
     user_changed_indicators = ctx_prop == 'mnid-compare-indicators.value'
+    user_changed_entities = ctx_prop == 'mnid-compare-entities.value'
     mode_just_changed = ctx_prop == 'mnid-compare-mode.value'
     if ctx_prop == 'mnid-compare-chart-toggle.n_clicks':
         chart_type = 'line' if chart_type == 'bar' else 'bar'
     store_payload = stored or {}
     tracked = store_payload.get('tracked', [])
-    # Restore raw df only when aggregate isn't available (first run before overnight job).
+    # Always restore the raw df as a fallback source so that indicators not yet present
+    # in the aggregate parquet still render correct percentages after a config change.
     _compare_agg_check = _get_aggregate()
-    mch_full = pd.DataFrame() if _compare_agg_check is not None else _restore_ui_dataframe(store_payload.get('data_key'))
+    mch_full_fallback = _restore_ui_dataframe(store_payload.get('data_key'))
+    mch_full = pd.DataFrame() if _compare_agg_check is not None else (mch_full_fallback or pd.DataFrame())
     facility_options = store_payload.get('facility_options', [])
     district_options = store_payload.get('district_options', [])
     current_fac = store_payload.get('current_fac', '')
@@ -2223,9 +2413,10 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
 
     ind_options = [{'label': i['label'], 'value': i['id']} for i in tracked]
     valid_ind_ids = {opt['value'] for opt in ind_options}
-    selected_ind_ids = [iid for iid in (selected_ind_ids or []) if iid in valid_ind_ids][:3]
-    if not selected_ind_ids:
-        selected_ind_ids = [i['id'] for i in tracked[:3]]
+    if selected_ind_ids is None:
+        selected_ind_ids = [i['id'] for i in tracked[:2]]
+    else:
+        selected_ind_ids = [iid for iid in selected_ind_ids if iid in valid_ind_ids][:2]
     active_inds = [i for i in tracked if i['id'] in selected_ind_ids]
 
     _empty_fig = go.Figure()
@@ -2246,24 +2437,31 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
         ind_value_out = no_update if user_changed_indicators else selected_ind_ids
         return _empty_fig, entity_options, (selected_entities or []), ind_options, ind_value_out, chart_type, toggle_class, toggle_text
 
-    # When mode switches, discard the previous selection since facility codes and district
-    # names aren't interchangeable. Also guard against 'Unknown' facility_code at national
-    # scope, since it's never actually in the options.
-    effective_selection = None if mode_just_changed else selected_entities
-
     if mode == 'facility':
         entity_options = facility_options
         valid_fac_vals = {str(opt['value']) for opt in facility_options}
-        default_entities = ([current_fac] if current_fac and current_fac in valid_fac_vals else []) or [opt['value'] for opt in facility_options[:4]]
-        entities = [str(v) for v in (effective_selection or default_entities) if str(v) in valid_fac_vals]
+        default_entities = ([current_fac] if current_fac and current_fac in valid_fac_vals else []) or [opt['value'] for opt in facility_options[:2]]
+        if mode_just_changed:
+            entities = [str(v) for v in default_entities if str(v) in valid_fac_vals][:2]
+        elif user_changed_entities:
+            entities = [str(v) for v in (selected_entities or []) if str(v) in valid_fac_vals][:2]
+        else:
+            _raw_ents = selected_entities if selected_entities is not None else default_entities
+            entities = [str(v) for v in _raw_ents if str(v) in valid_fac_vals][:2]
         entity_labels = {str(opt['value']): str(opt['label']) for opt in facility_options}
         def get_df(entity):
             return mch_full[mch_full['Facility_CODE'] == entity] if 'Facility_CODE' in mch_full.columns else pd.DataFrame()
     else:
         entity_options = district_options
         valid_dist_vals = {str(opt['value']) for opt in district_options}
-        default_entities = ([current_dist] if current_dist and current_dist in valid_dist_vals else []) or [opt['value'] for opt in district_options[:4]]
-        entities = [str(v) for v in (effective_selection or default_entities) if str(v) in valid_dist_vals]
+        default_entities = ([current_dist] if current_dist and current_dist in valid_dist_vals else []) or [opt['value'] for opt in district_options[:2]]
+        if mode_just_changed:
+            entities = [str(v) for v in default_entities if str(v) in valid_dist_vals][:2]
+        elif user_changed_entities:
+            entities = [str(v) for v in (selected_entities or []) if str(v) in valid_dist_vals][:2]
+        else:
+            _raw_ents = selected_entities if selected_entities is not None else default_entities
+            entities = [str(v) for v in _raw_ents if str(v) in valid_dist_vals][:2]
         entity_labels = {str(opt['value']): str(opt['label']) for opt in district_options}
         def get_df(entity):
             return mch_full[mch_full['District'] == entity] if 'District' in mch_full.columns else pd.DataFrame()
@@ -2316,6 +2514,7 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
     series_idx = 0
     for entity in entities:
         for ind in active_inds:
+            xs, ys, texts = [], [], []
             if _compare_agg is not None:
                 fac_arg  = [entity] if mode == 'facility' else None
                 dist_arg = [entity] if mode == 'district' else None
@@ -2327,25 +2526,42 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
                     indicator_label=ind.get('label'),
                 )
                 series = series.tail(max_periods)
-                if series.empty:
-                    continue
-                xs = [period_fmt(pd.Period(ts, period_code)) for ts in
-                      pd.to_datetime(series['period_start']).dt.to_period(period_code)]
-                ys = series['pct'].tolist()
-                ys = [y if (series['denominator'].iloc[i] > 0) else None
-                      for i, y in enumerate(ys)]
-                texts = [f'{y:.0f}%' if y is not None else 'No data' for y in ys]
-            else:
+                if not series.empty:
+                    xs = [period_fmt(pd.Period(ts, period_code)) for ts in
+                          pd.to_datetime(series['period_start']).dt.to_period(period_code)]
+                    ys = series['pct'].tolist()
+                    ys = [y if (series['denominator'].iloc[i] > 0) else None
+                          for i, y in enumerate(ys)]
+                    texts = [f'{y:.0f}%' if y is not None else 'No data' for y in ys]
+
+            # When aggregate has no data for this indicator, fall back to the raw df.
+            if not xs and mch_full_fallback is not None and not mch_full_fallback.empty and 'Date' in mch_full_fallback.columns:
+                _col = 'Facility_CODE' if mode == 'facility' else 'District'
+                if _col in mch_full_fallback.columns:
+                    _efb = mch_full_fallback[mch_full_fallback[_col].astype(str) == str(entity)].copy()
+                    if not _efb.empty:
+                        _efb['_period'] = pd.to_datetime(_efb['Date']).dt.to_period(period_code)
+                        _fb_periods = sorted(_efb['_period'].dropna().unique())[-max_periods:]
+                        for _p in _fb_periods:
+                            _pf = _efb[_efb['_period'] == _p]
+                            _, _den, _pct = _cov(_pf, ind['numerator_filters'], ind['denominator_filters'])
+                            xs.append(period_fmt(_p))
+                            ys.append(_display_pct(_pct) if _den > 0 else None)
+                            texts.append(f'{_pct:.0f}%' if _den > 0 else 'No data')
+
+            if not xs and _compare_agg is None:
                 entity_df = get_df(entity)
                 if entity_df.empty:
                     continue
-                xs, ys, texts = [], [], []
                 for period in periods:
                     period_df = entity_df[pd.to_datetime(entity_df['Date']).dt.to_period(period_code) == period]
                     _, den, pct = _cov(period_df, ind['numerator_filters'], ind['denominator_filters'])
                     xs.append(period_fmt(period))
                     ys.append(_display_pct(pct) if den > 0 else None)
                     texts.append(f'{pct:.0f}%' if den > 0 else 'No data')
+
+            if not xs:
+                continue
             moving_average, _ = _moving_average_values(ys, time_grain)
             if not any(y is not None for y in moving_average):
                 continue
@@ -2534,23 +2750,26 @@ def register_mnid_callbacks(app) -> None:
 
 # MNID dashboard entry point
 
-_network_df_cache: dict = {}
-_heatmap_store_cache: dict = {}
 
 
 def _resolve_heatmap_store(network_df: pd.DataFrame, all_inds: list, facility_code: str,
                            scope_meta: dict | None, store_key: str) -> dict:
     _, selected_facility_codes, selected_districts = _resolve_scope_filters(network_df, scope_meta or {})
     tracked = [i for i in all_inds if i.get('status') == 'tracked']
+    # store_key uses hash() which is process-randomized — exclude it from the
+    # diskcache key. The indicator IDs + scope + agg version uniquely identify
+    # what this store represents.
     cache_key = (
-        store_key,
         facility_code,
         tuple(i.get('id') for i in tracked),
         tuple(sorted(selected_facility_codes)),
         tuple(sorted(selected_districts)),
+        _agg_version_stamp(),
     )
 
-    if cache_key not in _heatmap_store_cache:
+    _hms_key = _dk('hms', cache_key)
+    cached_hms = _MNID_EXECUTIVE_DISK_CACHE.get(_hms_key)
+    if cached_hms is None:
         agg_for_heatmap = _get_aggregate()
         if agg_for_heatmap is not None and not agg_for_heatmap.empty:
             if selected_facility_codes:
@@ -2561,18 +2780,14 @@ def _resolve_heatmap_store(network_df: pd.DataFrame, all_inds: list, facility_co
                 agg_for_heatmap = agg_for_heatmap[
                     agg_for_heatmap['district'].isin([str(d) for d in selected_districts])
                 ]
-            _heatmap_store_cache[cache_key] = _compute_heatmap_store_from_agg(
-                agg_for_heatmap, tracked, facility_code
-            )
+            cached_hms = _compute_heatmap_store_from_agg(agg_for_heatmap, tracked, facility_code)
         else:
-            _heatmap_store_cache[cache_key] = _compute_heatmap_store(
-                network_df, tracked, facility_code
-            )
+            cached_hms = _compute_heatmap_store(network_df, tracked, facility_code)
         if selected_districts:
-            _heatmap_store_cache[cache_key]['current_district'] = selected_districts[0]
-        _trim_cache(_heatmap_store_cache, _HEATMAP_CACHE_MAX)
+            cached_hms['current_district'] = selected_districts[0]
+        _MNID_EXECUTIVE_DISK_CACHE.set(_hms_key, cached_hms, expire=_MNID_UI_CACHE_TTL_SECONDS)
 
-    return _heatmap_store_cache[cache_key]
+    return cached_hms
 
 
 def prewarm_cache(dataset_version: str | None = None) -> bool:
@@ -2613,12 +2828,84 @@ def prewarm_cache(dataset_version: str | None = None) -> bool:
         _LOG.info('MNID pre-warm: preparing %d rows...', len(full))
         net_df = _prep(full)
         _network_df_cache[opd_key] = net_df
+        _trim_cache(_network_df_cache, _NETWORK_DF_CACHE_MAX)
         _LOG.info('MNID pre-warm complete: %d rows cached', len(net_df))
         return True
     except Exception as exc:
         import logging
         logging.getLogger(__name__).warning('MNID pre-warm failed: %s', exc)
         return False
+
+
+def _prewarm_country_profile() -> bool:
+    """
+    Pre-render and cache the country profile for the default date window so
+    the first user sees an instant render instead of an 18s compute wait.
+    Safe to call from a background thread after prewarm_cache() completes.
+    """
+    try:
+        import datetime as _dt
+        from helpers.date_ranges import get_relative_date_range
+
+        config = _load_mnid_report_config('Maternal Health')
+        if not config:
+            # Fallback: load any available MNID config
+            try:
+                config_path = Path(__file__).resolve().parents[1] / 'data' / 'visualizations' / 'validated_dashboard.json'
+                dashboards = json.loads(config_path.read_text(encoding='utf-8'))
+                config = next((d for d in dashboards if d.get('dashboard_type') == 'mnid'), None)
+            except Exception:
+                config = None
+        if not config:
+            return False
+
+        start_date, end_date = get_relative_date_range('Last 3 Months')
+        if start_date is None:
+            end_date = _dt.date.today()
+            start_date = end_date.replace(day=1)
+
+        for opd_key, net_df in list(_network_df_cache.items()):
+            scope_meta = {
+                'dataset_version': opd_key[0] if opd_key else None,
+                'mnid_categories': config.get('mnid_categories') or ['ANC', 'Labour', 'PNC'],
+            }
+            bundle = _build_mnid_indicator_content(
+                network_df=net_df,
+                config=config,
+                facility_code=None,
+                start_date=start_date,
+                end_date=end_date,
+                scope_meta=scope_meta,
+                include_content=False,
+            )
+            facility_df = bundle.get('facility_df')
+            if facility_df is None or facility_df.empty:
+                continue
+
+            cp_key = (
+                (scope_meta.get('dataset_version'), opd_key, (), ()),
+                start_date,
+                end_date,
+                config.get('report_name'),
+                _agg_version_stamp(),
+            )
+            _cp_disk_key = _dk('cp', cp_key)
+            if _worker_view_cache.get(_cp_disk_key) or _MNID_EXECUTIVE_DISK_CACHE.get(_cp_disk_key):
+                _LOGGER.info('MNID country-profile pre-warm: already cached')
+                return False
+
+            _LOGGER.info('MNID country-profile pre-warm: rendering...')
+            country_label = 'Maternal & Newborn' if config.get('report_name') == 'Maternal Health' else 'Maternal'
+            cp_view = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label)
+            _MNID_EXECUTIVE_DISK_CACHE.set(_cp_disk_key, cp_view, expire=_MNID_UI_CACHE_TTL_SECONDS)
+            _worker_view_cache[_cp_disk_key] = cp_view
+            _trim_cache(_worker_view_cache, _WORKER_VIEW_CACHE_MAX)
+            _LOGGER.info('MNID country-profile pre-warm: complete')
+            return True
+
+    except Exception as exc:
+        _LOGGER.warning('MNID country-profile pre-warm failed: %s', exc)
+    return False
 
 
 def render_mnid_dashboard(data_opd, config,
@@ -2668,25 +2955,49 @@ def render_mnid_dashboard(data_opd, config,
         newborn_config = None
 
     executive_content = {}
-    executive_token = f'{hash((_opd_key, start_date, end_date, config.get("report_name")))}'
-    _MNID_EXECUTIVE_CONTENT_CACHE[executive_token] = executive_content
-    _MNID_EXECUTIVE_DATA_CACHE[executive_token] = {
-        'network_df': network_df,
-        'config': config,
-        'facility_code': facility_code,
-        'start_date': start_date,
-        'end_date': end_date,
-        'scope_meta': scope_meta,
-        'facility_df': facility_df,
-        'supply_inds': primary_bundle['supply_inds'],
-        'wf_inds': primary_bundle['wf_inds'],
-        'dq_inds': primary_bundle['dq_inds'],
-        'newborn_config': newborn_config,
-        'newborn_scope_meta': newborn_scope_meta,
-        'country_label': country_label,
-    }
-    _trim_cache(_MNID_EXECUTIVE_CONTENT_CACHE, _MNID_UI_CACHE_MAX)
-    _trim_cache(_MNID_EXECUTIVE_DATA_CACHE, _MNID_UI_CACHE_MAX)
+    _tok_data = (_opd_key, str(start_date), str(end_date), config.get('report_name'), selected_programs)
+    executive_token = hashlib.md5(pickle.dumps(_tok_data, protocol=4)).hexdigest()
+    _MNID_EXECUTIVE_DISK_CACHE.set(
+        f'ec:{executive_token}', executive_content, expire=_MNID_UI_CACHE_TTL_SECONDS
+    )
+    # Store state WITHOUT large DataFrames — only the opd_key reference.
+    # network_df and facility_df are written asynchronously below.
+    _MNID_EXECUTIVE_DISK_CACHE.set(
+        f'ed:{executive_token}',
+        {
+            'opd_key': _opd_key,
+            'config': config,
+            'facility_code': facility_code,
+            'start_date': start_date,
+            'end_date': end_date,
+            'scope_meta': scope_meta,
+            'supply_inds': primary_bundle['supply_inds'],
+            'wf_inds': primary_bundle['wf_inds'],
+            'dq_inds': primary_bundle['dq_inds'],
+            'newborn_config': newborn_config,
+            'newborn_scope_meta': newborn_scope_meta,
+            'country_label': country_label,
+        },
+        expire=_MNID_UI_CACHE_TTL_SECONDS,
+    )
+
+    # Write network_df to diskcache so other workers can look it up by opd_key.
+    # Async: doesn't block this response. The preload fires at 3s, by which time
+    # this write (typically 1-3s) is done. Also store a well-known pointer so
+    # worker-startup threads can warm their own _network_df_cache without knowing
+    # the opd_key in advance.
+    _ndf_key = _dk('ndf', _opd_key)
+    if _MNID_EXECUTIVE_DISK_CACHE.get(_ndf_key) is None:
+        _ndf_snap = network_df
+        _opd_key_snap = _opd_key
+        def _async_write_ndf():
+            try:
+                _MNID_EXECUTIVE_DISK_CACHE.set(_ndf_key, _ndf_snap, expire=_MNID_UI_CACHE_TTL_SECONDS)
+                _MNID_EXECUTIVE_DISK_CACHE.set('ndf:latest_key', _ndf_key, expire=_MNID_UI_CACHE_TTL_SECONDS)
+                _MNID_EXECUTIVE_DISK_CACHE.set('ndf:latest_opd_key', _opd_key_snap, expire=_MNID_UI_CACHE_TTL_SECONDS)
+            except Exception:
+                pass
+        threading.Thread(target=_async_write_ndf, daemon=True).start()
 
     _tab_style  = {'padding': '10px 18px', 'borderRadius': '12px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#FFFFFF', 'color': TEXT}
     _tab_active = {'padding': '10px 18px', 'borderRadius': '12px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#F0FDF4', 'color': '#15803D', 'fontWeight': 700}
@@ -2721,13 +3032,12 @@ def render_mnid_dashboard(data_opd, config,
     # behind the fixed loading overlay.
     _target_tab = resolved_initial_tab
     if _target_tab == 'country-profile':
-        _cp_key = (_opd_key, start_date, end_date, config.get('report_name'))
-        if _cp_key not in _country_profile_cache:
-            _country_profile_cache[_cp_key] = render_country_profile(
-                facility_df, scope_meta=scope_meta, indicator_label=country_label
-            )
-            _trim_cache(_country_profile_cache, _COUNTRY_PROFILE_CACHE_MAX)
-        executive_content['country-profile'] = _country_profile_cache[_cp_key]
+        _cp_disk_key = _dk('cp', (_opd_key, start_date, end_date, config.get('report_name')))
+        cp_cached = _MNID_EXECUTIVE_DISK_CACHE.get(_cp_disk_key)
+        if cp_cached is None:
+            cp_cached = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label)
+            _MNID_EXECUTIVE_DISK_CACHE.set(_cp_disk_key, cp_cached, expire=_MNID_UI_CACHE_TTL_SECONDS)
+        executive_content['country-profile'] = cp_cached
         _initial_ec = [executive_content['country-profile']]
     else:
         _initial_ec = [_mnid_loading_placeholder()]
@@ -2739,25 +3049,26 @@ def render_mnid_dashboard(data_opd, config,
             executive_tabs,
             html.Div(id='mnid-executive-content', className='mnid-executive-content', children=_initial_ec),
         ]),
-        dcc.Interval(id='mnid-background-preload', interval=250, n_intervals=0, max_intervals=1),
+        dcc.Interval(id='mnid-background-preload', interval=3000, n_intervals=0, max_intervals=1),
     ])
 
 def _build_executive_tab_view(selected: str, views: dict, state: dict,
                               scope_meta_override: dict | None = None,
                               config_override: dict | None = None,
                               store_in_views: bool = True):
-    network_df = state.get('network_df')
     config = config_override or state.get('config')
     facility_code = state.get('facility_code')
     start_date = state.get('start_date')
     end_date = state.get('end_date')
     scope_meta = scope_meta_override or state.get('scope_meta')
-    facility_df = state.get('facility_df')
     supply_inds = state.get('supply_inds')
     wf_inds = state.get('wf_inds')
     dq_inds = state.get('dq_inds')
     country_label = state.get('country_label') or 'Maternal'
 
+    # Check all caches BEFORE loading the expensive network_df.
+    # Previously network_df was loaded first, paying 5-15s deserialization on every
+    # tab click — even cache hits. Cache checks are cheap; data loading is not.
     if selected in views:
         return views.get(selected, views.get('country-profile', html.Div()))
 
@@ -2767,34 +3078,65 @@ def _build_executive_tab_view(selected: str, views: dict, state: dict,
         scope_meta=scope_meta,
         config=config,
     )
-    if view_cache_key in _MNID_EXECUTIVE_TAB_VIEW_CACHE:
-        cached_view = _MNID_EXECUTIVE_TAB_VIEW_CACHE[view_cache_key]
+    _etv_key = _dk('etv', view_cache_key)
+
+    # Worker-local cache: instant hit, no diskcache round-trip.
+    cached_view = _worker_view_cache.get(_etv_key)
+    if cached_view is None:
+        cached_view = _MNID_EXECUTIVE_DISK_CACHE.get(_etv_key)
+        if cached_view is not None:
+            _worker_view_cache[_etv_key] = cached_view
+            _trim_cache(_worker_view_cache, _WORKER_VIEW_CACHE_MAX)
+    if cached_view is not None:
         if store_in_views:
             views[selected] = cached_view
         return cached_view
+
+    # Cache miss — now load the expensive data.
+    import time as _time
+    _etv_t0 = _time.monotonic()
+    network_df = _get_network_df_from_state(state)
+    _LOGGER.info('MNID tab timing: ndf fetch %.2fs (selected=%s)', _time.monotonic() - _etv_t0, selected)
+    _fdf_t0 = _time.monotonic()
+    facility_df = _get_facility_df_from_state(state, network_df=network_df)
+    _LOGGER.info('MNID tab timing: facility_df %.2fs (selected=%s)', _time.monotonic() - _fdf_t0, selected)
+
+    def _cache_view(view):
+        # Write to worker-local cache synchronously (instant for next request on this worker).
+        # Write to diskcache async so other workers benefit without blocking this response.
+        _worker_view_cache[_etv_key] = view
+        _trim_cache(_worker_view_cache, _WORKER_VIEW_CACHE_MAX)
+        def _async_etv_write():
+            try:
+                _MNID_EXECUTIVE_DISK_CACHE.set(_etv_key, view, expire=_MNID_UI_CACHE_TTL_SECONDS)
+            except Exception:
+                pass
+        threading.Thread(target=_async_etv_write, daemon=True).start()
 
     if selected == 'country-profile' and facility_df is not None:
         cp_key = (
             (
                 (scope_meta or {}).get('dataset_version'),
-                len(network_df) if network_df is not None else 0,
-                tuple(network_df.columns.tolist()) if network_df is not None and not network_df.empty else (),
+                state.get('opd_key'),
                 tuple(sorted((scope_meta or {}).get('selected_facilities') or [])),
                 tuple(sorted((scope_meta or {}).get('selected_districts') or [])),
             ),
             start_date,
             end_date,
             config.get('report_name') if config else None,
+            _agg_version_stamp(),
         )
-        if cp_key not in _country_profile_cache:
-            _country_profile_cache[cp_key] = render_country_profile(
-                facility_df,
-                scope_meta=scope_meta,
-                indicator_label=country_label,
-            )
-            _trim_cache(_country_profile_cache, _COUNTRY_PROFILE_CACHE_MAX)
-        views[selected] = _country_profile_cache[cp_key]
-        return views[selected]
+        _cp_disk_key = _dk('cp', cp_key)
+        cp_cached = _worker_view_cache.get(_cp_disk_key)
+        if cp_cached is None:
+            cp_cached = _MNID_EXECUTIVE_DISK_CACHE.get(_cp_disk_key)
+        if cp_cached is None:
+            cp_cached = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label)
+            _MNID_EXECUTIVE_DISK_CACHE.set(_cp_disk_key, cp_cached, expire=_MNID_UI_CACHE_TTL_SECONDS)
+        _worker_view_cache[_cp_disk_key] = cp_cached
+        _trim_cache(_worker_view_cache, _WORKER_VIEW_CACHE_MAX)
+        views[selected] = cp_cached
+        return cp_cached
 
     if selected == 'operational-readiness' and facility_df is not None:
         rendered_view = render_operational_readiness(
@@ -2805,11 +3147,11 @@ def _build_executive_tab_view(selected: str, views: dict, state: dict,
         )
         if store_in_views:
             views[selected] = rendered_view
-        _MNID_EXECUTIVE_TAB_VIEW_CACHE[view_cache_key] = rendered_view
-        _trim_cache(_MNID_EXECUTIVE_TAB_VIEW_CACHE, _MNID_UI_CACHE_MAX * 2)
+        _cache_view(rendered_view)
         return rendered_view
 
     if selected == 'maternal-dashboard' and network_df is not None and config is not None:
+        _mat_t0 = _time.monotonic()
         bundle = _build_mnid_indicator_content(
             network_df=network_df,
             config=config,
@@ -2820,10 +3162,10 @@ def _build_executive_tab_view(selected: str, views: dict, state: dict,
             include_content=True,
         )
         rendered_view = bundle.get('indicator_content', html.Div())
+        _LOGGER.info('MNID tab timing: maternal build %.2fs', _time.monotonic() - _mat_t0)
         if store_in_views:
             views[selected] = rendered_view
-        _MNID_EXECUTIVE_TAB_VIEW_CACHE[view_cache_key] = rendered_view
-        _trim_cache(_MNID_EXECUTIVE_TAB_VIEW_CACHE, _MNID_UI_CACHE_MAX * 2)
+        _cache_view(rendered_view)
         return rendered_view
 
     if selected == 'newborn-dashboard':
@@ -2842,8 +3184,7 @@ def _build_executive_tab_view(selected: str, views: dict, state: dict,
             rendered_view = bundle.get('indicator_content', html.Div())
             if store_in_views:
                 views[selected] = rendered_view
-            _MNID_EXECUTIVE_TAB_VIEW_CACHE[view_cache_key] = rendered_view
-            _trim_cache(_MNID_EXECUTIVE_TAB_VIEW_CACHE, _MNID_UI_CACHE_MAX * 2)
+            _cache_view(rendered_view)
             return rendered_view
 
     return views.get('country-profile', html.Div())
@@ -2856,12 +3197,14 @@ def _build_executive_tab_view(selected: str, views: dict, state: dict,
     prevent_initial_call=False,
 )
 def _render_mnid_executive_tab(active_tab, executive_token):
-    views = _MNID_EXECUTIVE_CONTENT_CACHE.get(executive_token) or {}
+    views = _MNID_EXECUTIVE_DISK_CACHE.get(f'ec:{executive_token}') or {}
     selected = active_tab or 'country-profile'
-    state = _MNID_EXECUTIVE_DATA_CACHE.get(executive_token) or {}
+    state = _MNID_EXECUTIVE_DISK_CACHE.get(f'ed:{executive_token}') or {}
 
     try:
-        return _build_executive_tab_view(selected, views, state)
+        result = _build_executive_tab_view(selected, views, state)
+        _MNID_EXECUTIVE_DISK_CACHE.set(f'ec:{executive_token}', views, expire=_MNID_UI_CACHE_TTL_SECONDS)
+        return result
     except Exception as _exc:
         _LOGGER.exception('Failed to render executive tab %s: %s', selected, _exc)
         return html.Div(
@@ -2881,13 +3224,16 @@ def _preload_mnid_executive_tabs(_tick, executive_token, active_tab):
     if not executive_token:
         raise PreventUpdate
 
-    views = _MNID_EXECUTIVE_CONTENT_CACHE.get(executive_token)
-    state = _MNID_EXECUTIVE_DATA_CACHE.get(executive_token)
+    views = _MNID_EXECUTIVE_DISK_CACHE.get(f'ec:{executive_token}')
+    state = _MNID_EXECUTIVE_DISK_CACHE.get(f'ed:{executive_token}')
     if views is None or state is None:
         raise PreventUpdate
 
     preload_tabs = ['maternal-dashboard', 'newborn-dashboard']
     warmed = []
+
+    _ndf_available = _get_network_df_from_state(state) is not None
+    _LOGGER.info('MNID background preload firing: ndf_available=%s', _ndf_available)
 
     for tab_value in preload_tabs:
         if tab_value == active_tab or tab_value in views:
@@ -2895,8 +3241,10 @@ def _preload_mnid_executive_tabs(_tick, executive_token, active_tab):
         if tab_value == 'newborn-dashboard' and state.get('newborn_config') is None:
             continue
         try:
+            _LOGGER.info('MNID background preload: building %s', tab_value)
             _build_executive_tab_view(tab_value, views, state)
             warmed.append(tab_value)
+            _LOGGER.info('MNID background preload: %s done', tab_value)
         except Exception as exc:
             _LOGGER.warning('Background preload failed for executive tab %s: %s', tab_value, exc)
 
@@ -2924,6 +3272,8 @@ def _preload_mnid_executive_tabs(_tick, executive_token, active_tab):
                 warmed.append(f'maternal-dashboard:{category}')
             except Exception as exc:
                 _LOGGER.warning('Background preload failed for maternal category %s: %s', category, exc)
+
+    _MNID_EXECUTIVE_DISK_CACHE.set(f'ec:{executive_token}', views, expire=_MNID_UI_CACHE_TTL_SECONDS)
 
     return {
         'token': executive_token,
