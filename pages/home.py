@@ -97,6 +97,7 @@ def _trim_cache(cache: dict, max_entries: int) -> None:
 
 def _start_mnid_prewarm(version: str | None = None):
     """Kick off MNID cache pre-warm in a daemon background thread at server startup."""
+    import sys
     import threading
     import logging
     global _MNID_PREWARM_STARTED
@@ -105,9 +106,16 @@ def _start_mnid_prewarm(version: str | None = None):
     if _MNID_PREWARM_STARTED:
         return
 
-    # In debug mode Werkzeug imports the app twice. Only start heavy background
-    # warmup work in the serving process to avoid duplicate parquet scans.
-    if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+    # In Werkzeug debug mode the app is imported TWICE — once in the reloader
+    # parent process and once in the serving child.  Skip the parent to avoid
+    # duplicate heavy work.  Gunicorn workers don't set WERKZEUG_RUN_MAIN at
+    # all, so we use the gunicorn module presence to tell them apart.
+    is_gunicorn = 'gunicorn' in sys.modules
+    werkzeug_run_main = os.environ.get('WERKZEUG_RUN_MAIN')
+    if not is_gunicorn and werkzeug_run_main is None:
+        # Werkzeug reloader parent — skip; the child process will pre-warm.
+        return
+    if werkzeug_run_main == 'false':
         return
 
     def _run(v):
@@ -116,6 +124,27 @@ def _start_mnid_prewarm(version: str | None = None):
             prewarm_cache(dataset_version=v)
         except Exception as exc:
             _log.warning('MNID startup pre-warm thread failed: %s', exc)
+            return
+
+        # After network_df is warm, pre-render the country profile using the
+        # default date window so the first user request hits a warm view cache.
+        try:
+            from mnid.app import _prewarm_country_profile
+            _prewarm_country_profile()
+        except Exception as exc:
+            _log.warning('MNID country-profile pre-warm failed: %s', exc)
+
+        # Build the aggregate parquet if it doesn't exist yet.
+        # The lock file in run_aggregation_job prevents duplicate runs across workers.
+        try:
+            from pathlib import Path
+            agg_parquet = Path(os.getcwd()) / 'data' / 'mnid_aggregates' / 'indicator_aggregates.parquet'
+            if not agg_parquet.exists():
+                from mnid.aggregation.scheduler import run_aggregation_job
+                _log.info('No aggregate parquet found — building now (first-time startup)')
+                run_aggregation_job()
+        except Exception as exc:
+            _log.warning('MNID startup aggregation failed: %s', exc)
 
     t = threading.Thread(target=_run, args=(version,), daemon=True, name='mnid-prewarm')
     t.start()
@@ -821,6 +850,11 @@ layout = html.Div(
         Input('active-button-store', 'data')])
 
 def update_menu(interval, color):
+    ctx = callback_context
+    triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else ""
+    if 'dashboard-interval-update-today' in triggered_id:
+        raise PreventUpdate
+
     menu_json, config = get_enabled_dashboard_menu()
     default_report = config.get("default_report")
     fallback_active = default_report if any(d.get("report_name") == default_report for d in menu_json) else None
@@ -1160,411 +1194,6 @@ def update_dashboard(gen, start_date, end_date, level,
                 'initial_mnid_tab': initial_mnid_tab,
                 'mnid_only_request': mnid_only_request,
             },
-        )
-
-
-        dataset_version = _dataset_version_token()
-        data = None
-        mnid_full_scope_data = None
-        if mnid_only_request:
-            district_col_for_scope = "District"
-            _mnid_scope_key = (
-                dataset_version,
-                effective_level,
-                tuple(sorted(districts or [])),
-                tuple(sorted(facilities or [])),
-            )
-            if _mnid_scope_key in _mnid_full_data_cache:
-                data = _mnid_full_data_cache[_mnid_scope_key].copy()
-            else:
-                _mnid_cols = ', '.join([
-                    'person_id', 'encounter_id', 'Date', 'Program', 'Reporting_Program',
-                    'Service_Area', 'Facility', 'Facility_CODE', 'District', 'Encounter',
-                    'obs_value_coded', 'concept_name', 'Value', 'ValueN', 'new_revisit',
-                    'Home_district', 'TA', 'Village', 'Age', 'Age_Group', 'Gender',
-                    'Source_Program',
-                ])
-                _sql_full = f"SELECT {_mnid_cols} FROM '{DATA_FILE_NAME_}'"
-                _full = DataStorage.query_duckdb(_sql_full)
-                _full[DATE_] = pd.to_datetime(_full[DATE_], errors='coerce')
-                _full = _apply_scope_to_data(_full, scope, district_col_for_scope)
-                if district_col_for_scope in _full.columns and districts:
-                    _full = _full[_full[district_col_for_scope].isin(districts)]
-                if facilities:
-                    _full = _full[_full[FACILITY_].isin(facilities)]
-                _mnid_full_data_cache[_mnid_scope_key] = _full.copy()
-                _trim_cache(_mnid_full_data_cache, _MNID_FULL_CACHE_MAX)
-                data = _full
-            mnid_full_scope_data = data
-
-        sql_comment = f"-- version:{dataset_version} scope:{user_level} level:{effective_level}"
-        if data is None:
-            # SQL has no date filter — date is applied in Python so the cache key stays
-            # stable as the user changes the relative period (no repeated DuckDB scans).
-            if user_level == 'facility':
-                SQL = f"{sql_comment}\nSELECT * FROM '{DATA_FILE_NAME_}' WHERE {FACILITY_CODE_} = '{location}'"
-            else:
-                SQL = f"{sql_comment}\nSELECT * FROM '{DATA_FILE_NAME_}'"
-            data_cache_key = (dataset_version, user_level, effective_level, location)
-        try:
-            if data is None:
-                if data_cache_key in _dashboard_data_cache:
-                    _data_full = _dashboard_data_cache[data_cache_key]
-                else:
-                    _data_full = DataStorage.query_duckdb(SQL)
-                    # Pre-process once and store — subsequent date changes hit cache and skip this
-                    _data_full[DATE_] = pd.to_datetime(_data_full[DATE_], format='mixed').dt.normalize()
-                    _data_full[GENDER_] = _data_full[GENDER_].replace(CUSTOM_GENDER_MAP)
-                    _dashboard_data_cache[data_cache_key] = _data_full
-                    _trim_cache(_dashboard_data_cache, _DASHBOARD_DATA_CACHE_MAX)
-                # Date filter applied in pandas — instant from the in-memory cache
-                data = _data_full[
-                    (_data_full[DATE_] >= default_start_date) &
-                    (_data_full[DATE_] <= end_dt)
-                ].copy()
-            # data.to_excel("data/archive/hmis.xlsx")
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            return (
-                dash.no_update,
-                level or dash.no_update,
-                dash.no_update,
-                [],
-                [],
-                True,
-                "",
-                [],
-                [],
-                current_active or dash.no_update,
-                {'status': 'error', 'message': 'Missing Data. Ensure that the config file has correct database credentials'},
-            )
-        # data[DATE_] and data[GENDER_] are pre-processed when stored in _dashboard_data_cache.
-        # data.to_excel("data/archive/hmis.xlsx", index=False)
-
-        def num_days_patient_seen(data):
-            try:
-                visit_counts = data.groupby(PERSON_ID_)[DATE_].nunique()
-                data['visit_days'] = data[PERSON_ID_].map(visit_counts)
-                data['new_revisit'] = np.where(
-                    data['visit_days'] == 1,
-                    'New',
-                    'Revisit'
-                )
-            except Exception:
-                data['new_revisit'] = 'Unknown'
-            return data
-        
-        if 'new_revisit' not in data.columns or data['new_revisit'].isna().all():
-            data = num_days_patient_seen(data)
-        today = dt.today().date()
-        # data["months"] = ((pd.Timestamp(today) - pd.to_datetime(data["DateValue"])).dt.days // 30).clip(lower=0)
-
-        district_col = "District" if "District" in data.columns else (HOME_DISTRICT_ if HOME_DISTRICT_ in data.columns else None)
-        
-        data = _apply_scope_to_data(data, scope, district_col)
-
-        # Base filters (age + MNID program category)
-        base_mask = pd.Series(True, index=data.index)
-        if age:
-            base_mask &= (data[AGE_GROUP_] == age)
-        category = category or "All"
-        # MNID dashboards derive Service_Area internally and handle program scoping via scope_meta.
-        # We keep the Encounter-based pre-filter only for non-MNID use (dropdowns, non-MNID charts).
-        # base_data_mnid skips the Encounter filter so all relevant observations reach the MNID renderer.
-        base_data_mnid = data[base_mask]
-        encounter_mask = pd.Series(True, index=data.index)
-        if category != "All" and "Encounter" in data.columns:
-            if category == "ANC":
-                encounter_mask = data["Encounter"].fillna('').astype(str).str.contains('ANC', case=False, na=False)
-            elif category == "Labour":
-                encounter_mask = data["Encounter"].fillna('').astype(str).str.contains('LABOUR|DELIVERY|BIRTH', case=False, na=False)
-            elif category == "PNC":
-                encounter_mask = data["Encounter"].fillna('').astype(str).str.contains('PNC|POSTNATAL|POST.NATAL', case=False, na=False)
-        base_data = data[base_mask & encounter_mask]
-
-
-        district_col = "District" if "District" in base_data.columns else (HOME_DISTRICT_ if HOME_DISTRICT_ in base_data.columns else None)
-        all_districts = (
-            base_data[district_col].dropna().sort_values().unique().tolist()
-            if district_col else []
-        )
-
-        requested_level_value = effective_level
-        districts = districts or []
-        facilities = facilities or []
-        overview = overview or []
-        if effective_level == 'national':
-            districts = [d for d in districts if d in all_districts]
-        elif effective_level == 'district':
-            scope_district = scope.get('district')
-            if scope_district:
-                districts = [scope_district]
-            elif districts:
-                districts = [d for d in districts if d in all_districts]
-            if facilities and district_col:
-                allowed_facilities = set(
-                    base_data[base_data[district_col].isin(districts)][FACILITY_]
-                    .dropna()
-                    .unique()
-                    .tolist()
-                ) if districts else set()
-                facilities = [f for f in facilities if f in allowed_facilities]
-        else:
-            districts = [scope.get('district')] if scope.get('district') else []
-            if FACILITY_ in base_data.columns:
-                assigned_facilities = []
-                if scope.get('facility_name'):
-                    assigned_facilities = (
-                        base_data[base_data[FACILITY_].astype(str) == str(scope['facility_name'])][FACILITY_]
-                        .dropna()
-                        .astype(str)
-                        .unique()
-                        .tolist()
-                    )
-                elif scope.get('facility_code') and FACILITY_CODE_ in base_data.columns:
-                    assigned_facilities = (
-                        base_data[base_data[FACILITY_CODE_].astype(str) == str(scope['facility_code'])][FACILITY_]
-                        .dropna()
-                        .astype(str)
-                        .unique()
-                        .tolist()
-                    )
-                facilities = assigned_facilities[:1]
-
-        inferred_districts = _districts_for_facilities(base_data, facilities, district_col)
-        if facilities and inferred_districts:
-            districts = inferred_districts
-
-        if facilities and district_col and districts:
-            allowed_facilities = set(
-                base_data[base_data[district_col].isin(districts)][FACILITY_]
-                .dropna()
-                .unique()
-                .tolist()
-            ) if districts else set()
-            facilities = [f for f in facilities if f in allowed_facilities]
-
-        # Facility options based on selected districts
-        if district_col and districts:
-            facilities_pool = base_data[base_data[district_col].isin(districts)]
-        elif effective_level == "district" and district_col and not districts:
-            facilities_pool = base_data.iloc[0:0]
-        else:
-            facilities_pool = base_data
-        all_facilities = (
-            facilities_pool[FACILITY_].dropna().sort_values().unique().tolist()
-            if FACILITY_ in facilities_pool.columns else []
-        )
-
-        if facilities:
-            effective_level = 'facility'
-        elif districts:
-            effective_level = 'district'
-        else:
-            effective_level = requested_level_value
-        level = _title_level(effective_level)
-
-        show_district_filter = effective_level in {"national", "district"}
-        district_group_style = {} if show_district_filter else {"display": "none"}
-        district_disabled = effective_level == "facility"
-        district_note = ""
-        if effective_level == "district":
-            district_note = "Facility selections are constrained to the selected district(s)."
-        elif effective_level == "facility" and districts:
-            district_note = f"Facility selection resolved to: {', '.join(districts)}"
-
-        # Keep selected facilities consistent with selected districts
-        if district_col and districts:
-            allowed_facilities = set(
-                base_data[base_data[district_col].isin(districts)][FACILITY_]
-                .dropna()
-                .unique()
-                .tolist()
-            )
-            facilities = [f for f in facilities if f in allowed_facilities]
-            all_facilities = sorted(allowed_facilities)
-        elif effective_level == "facility":
-            all_facilities = facilities
-
-        return (
-            dash.no_update,
-            level,
-            district_group_style,
-            [{'label': d, 'value': d} for d in all_districts],
-            districts,
-            district_disabled,
-            district_note,
-            [{'label': f, 'value': f} for f in all_facilities],
-            facilities,
-            effective_active_report,
-            {
-                'status': 'ok',
-                'selected_reports': selected_reports,
-                'effective_level': effective_level,
-                'districts': districts,
-                'facilities': facilities,
-                'category': category,
-                'age': age,
-                'dataset_version': dataset_version,
-                'user_level': user_level,
-                'scope': scope,
-                'location': location,
-                'mnid_location': mnid_location,
-                'url_object': url_object,
-                'start_dt': start_dt.isoformat(),
-                'end_dt': end_dt.isoformat(),
-                'initial_mnid_tab': initial_mnid_tab,
-                'mnid_only_request': mnid_only_request,
-            },
-        )
-
-        # Filter network and facility data
-        network_data = base_data
-        if district_col and districts:
-            network_data = network_data[network_data[district_col].isin(districts)]
-        filtered_data = network_data
-        if facilities:
-            filtered_data = filtered_data[filtered_data[FACILITY_].isin(facilities)]
-        
-        # MNID-specific data paths: no Encounter pre-filter so all program observations are present.
-        # The MNID renderer uses Service_Area (derived from Program/Encounter) for internal scoping.
-        network_data_mnid = base_data_mnid
-        if district_col and districts:
-            network_data_mnid = network_data_mnid[network_data_mnid[district_col].isin(districts)]
-        filtered_data_mnid = network_data_mnid
-        if facilities:
-            filtered_data_mnid = filtered_data_mnid[filtered_data_mnid[FACILITY_].isin(facilities)]
-
-        # Determine report selection
-    
-        rendered = []
-        for report_name in selected_reports:
-            try:
-                dashboard_json = next((d for d in menu_json if d['report_name'] == report_name), None)
-                if not dashboard_json:
-                    continue
-                is_mnid = dashboard_json.get('dashboard_type') == 'mnid'
-                mnid_categories = None
-                if category and category != "All":
-                    mnid_categories = [category]
-
-                # MNID uses unfiltered data paths; non-MNID uses Encounter-pre-filtered paths.
-                _fdata = filtered_data_mnid if is_mnid else filtered_data
-                if is_mnid:
-                    if mnid_full_scope_data is None:
-                        _mnid_scope_key = (
-                            dataset_version,
-                            effective_level,
-                            tuple(sorted(districts or [])),
-                            tuple(sorted(facilities or [])),
-                        )
-                        if _mnid_scope_key in _mnid_full_data_cache:
-                            mnid_full_scope_data = _mnid_full_data_cache[_mnid_scope_key]
-                        else:
-                            _mnid_cols = ', '.join([
-                                'person_id', 'encounter_id', 'Date', 'Program', 'Reporting_Program',
-                                'Service_Area', 'Facility', 'Facility_CODE', 'District', 'Encounter',
-                                'obs_value_coded', 'concept_name', 'Value', 'ValueN', 'new_revisit',
-                                'Home_district', 'TA', 'Village', 'Age', 'Age_Group', 'Gender',
-                                'Source_Program',
-                            ])
-                            _sql_full = f"SELECT {_mnid_cols} FROM '{DATA_FILE_NAME_}'"
-                            _full = DataStorage.query_duckdb(_sql_full)
-                            _full[DATE_] = pd.to_datetime(_full[DATE_], errors='coerce')
-                            _full = _apply_scope_to_data(_full, scope, district_col)
-                            if district_col and districts:
-                                _full = _full[_full[district_col].isin(districts)]
-                            if facilities:
-                                _full = _full[_full[FACILITY_].isin(facilities)]
-                            mnid_full_scope_data = _full
-                            _mnid_full_data_cache[_mnid_scope_key] = _full
-                            _trim_cache(_mnid_full_data_cache, _MNID_FULL_CACHE_MAX)
-                    _ndata = mnid_full_scope_data
-                else:
-                    _ndata = network_data
-
-                filtered_data_date = _fdata[
-                    (_fdata[DATE_] >= start_dt) &
-                    (_fdata[DATE_] <= end_dt)
-                ]
-
-                adj_start_dt, adj_end_dt = start_dt, end_dt
-                delta_days = max((adj_end_dt - adj_start_dt).days, 1)
-                facility_code_display = location
-                if is_mnid:
-                    if len(facilities) == 1 and FACILITY_ in base_data_mnid.columns and FACILITY_CODE_ in base_data_mnid.columns:
-                        fac_match = base_data_mnid[base_data_mnid[FACILITY_].astype(str) == str(facilities[0])]
-                        if len(fac_match):
-                            facility_code_display = str(fac_match[FACILITY_CODE_].dropna().astype(str).iloc[0])
-                        else:
-                            facility_code_display = ''
-                    elif len(facilities) > 1 or effective_level in ['national', 'district']:
-                        facility_code_display = ''
-                    else:
-                        facility_code_display = mnid_location or location
-
-                if facilities:
-                    scope_label = 'Facility' if len(facilities) == 1 else 'Facilities'
-                    scope_value = facilities[0] if len(facilities) == 1 else f'{len(facilities)} selected facilities'
-                elif districts:
-                    scope_label = 'District' if len(districts) == 1 else 'Districts'
-                    scope_value = ', '.join(districts)
-                else:
-                    scope_label = 'Districts'
-                    scope_value = 'All districts'
-                data_period_note = None
-                if filtered_data_date.empty:
-                    data_period_note = 'No data is available for the selected date range.'
-
-                section = build_charts_from_json(
-                    filtered_data_date, _ndata, delta_days, dashboard_json,
-                    start_date=adj_start_dt,
-                    end_date=adj_end_dt,
-                    facility_code=facility_code_display,
-                    scope_meta={
-                        'label': scope_label,
-                        'value': scope_value,
-                        'mnid_categories': mnid_categories,
-                        'level': effective_level,
-                        'selected_facilities': facilities,
-                        'selected_districts': districts,
-                        'data_period_note': data_period_note,
-                        'dataset_version': dataset_version,
-                    },
-                    url_object=url_object,
-                    initial_tab=initial_mnid_tab,
-                )
-                rendered.append(html.Div([
-                    html.H2(display_report_name(report_name), style={"marginTop": "10px"}),
-                    section
-                ]))
-            except Exception as report_exc:
-                import traceback
-                traceback.print_exc()
-                rendered.append(html.Div([
-                    html.H2(display_report_name(report_name), style={"marginTop": "10px"}),
-                    html.Div([
-                        html.P("Report section failed.", style={"color": "#475569", "fontWeight": "600"}),
-                        html.P(f"{type(report_exc).__name__}", style={"color": "#64748b", "fontSize": "12px", "fontWeight": "600"}),
-                        html.P(str(report_exc), style={"color": "#94A3B8", "fontSize": "12px"}),
-                    ], style={"padding": "12px", "border": "1px solid #e2e8f0", "borderRadius": "8px", "backgroundColor": "#fff"}),
-                ]))
-
-        dashboard_content = html.Div(rendered) if len(rendered) > 1 else (rendered[0] if rendered else html.Div("No dashboard selected."))
-
-        
-        return (
-            dashboard_content,
-            level,
-            district_group_style,
-            [{'label': d, 'value': d} for d in all_districts],
-            districts,
-            district_disabled,
-            district_note,
-            [{'label': f, 'value': f} for f in all_facilities],
-            facilities,
-            effective_active_report
         )
     except PreventUpdate:
         raise

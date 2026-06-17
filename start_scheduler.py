@@ -71,6 +71,7 @@ def run_scheduler():
     if os.getenv('INITIAL_DATA_LOAD', 'true').lower() == 'true':
         print("Running initial data load...")
         run_data_storage()
+        _run_mnid_aggregation()
 
     while True:
         schedule.run_pending()

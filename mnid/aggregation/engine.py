@@ -27,7 +27,12 @@ _GRAIN_CODES = {'daily': 'D', 'weekly': 'W', 'monthly': 'M'}
 
 
 def _load_all_indicators(viz_dir: str) -> list[dict]:
-    """Extract all unique indicator configs from every dashboard JSON."""
+    """Extract all unique indicator configs from every dashboard JSON plus
+    the hardcoded program-based indicators defined in mnid/indicators.py.
+
+    The program-based indicators are never in any JSON file, so they must
+    be added explicitly here to be covered by the pre-aggregation pass.
+    """
     seen: set[str] = set()
     indicators: list[dict] = []
     for path in glob.glob(os.path.join(viz_dir, '*.json')):
@@ -54,6 +59,24 @@ def _load_all_indicators(viz_dir: str) -> list[dict]:
                     ):
                         seen.add(iid)
                         indicators.append(ind)
+
+    # Add program-based indicators (ANC, Labour, PNC, Newborn) defined in
+    # mnid/indicators.py — these are Python-only and have no JSON counterpart.
+    try:
+        from mnid.indicators import _program_based_priority_indicators
+        for ind in _program_based_priority_indicators():
+            iid = ind.get('id')
+            if (
+                iid and iid not in seen
+                and ind.get('numerator_filters')
+                and ind.get('denominator_filters')
+            ):
+                seen.add(iid)
+                indicators.append(ind)
+        _LOG.info('Loaded %d program-based indicators', sum(1 for i in indicators if str(i.get('id', '')).startswith('mnid_')))
+    except Exception as exc:
+        _LOG.warning('Could not load program-based indicators: %s', exc)
+
     return indicators
 
 

@@ -147,7 +147,8 @@ def get_relative_date_range(option, current_date=None):
         first_day_last_month = last_day_last_month.replace(day=1)
         last_day_two_months_ago = first_day_last_month - timedelta(days=1)
         first_day_two_months_ago = last_day_two_months_ago.replace(day=1)
-        start_date = first_day_two_months_ago
+        last_day_three_months_ago = first_day_two_months_ago - timedelta(days=1)
+        start_date = last_day_three_months_ago.replace(day=1)
         end_date = last_day_last_month
         return start_date, end_date
     # option This Year

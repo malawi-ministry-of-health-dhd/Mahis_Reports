@@ -41,3 +41,4 @@ docs/
 # scripts/generate_demo_mnid_data.py
 data/mnid_aggregates/
 # data/visualizations/dashboard_tabs_config.json
+.mnid_exec_cache/

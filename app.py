@@ -1,7 +1,14 @@
+import logging
 import dash
 import dash_mantine_components as dmc
 from dash import dcc, html, page_container
 from config import PREFIX_NAME
+
+logging.basicConfig(
+    level=logging.WARNING,
+    format='%(asctime)s %(levelname)s %(name)s %(message)s',
+)
+logging.getLogger('mnid').setLevel(logging.INFO)
 from helpers.api_routes import register_api_routes
 from helpers.navigation_callbacks import register_navigation_callbacks
 from mnid.app import register_mnid_callbacks
