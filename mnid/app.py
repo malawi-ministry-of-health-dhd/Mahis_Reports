@@ -2419,6 +2419,11 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
         selected_ind_ids = [iid for iid in selected_ind_ids if iid in valid_ind_ids][:2]
     active_inds = [i for i in tracked if i['id'] in selected_ind_ids]
 
+    # Disable unselected indicator options once the 2-item limit is reached
+    if len(selected_ind_ids) >= 2:
+        _sel_ind_set = set(selected_ind_ids)
+        ind_options = [{**opt, 'disabled': opt['value'] not in _sel_ind_set} for opt in ind_options]
+
     _empty_fig = go.Figure()
     _empty_fig.update_layout(
         height=420,
@@ -2465,6 +2470,11 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
         entity_labels = {str(opt['value']): str(opt['label']) for opt in district_options}
         def get_df(entity):
             return mch_full[mch_full['District'] == entity] if 'District' in mch_full.columns else pd.DataFrame()
+
+    # Disable unselected location options once the 2-item limit is reached
+    if len(entities) >= 2:
+        _ent_set = set(entities)
+        entity_options = [{**opt, 'disabled': opt['value'] not in _ent_set} for opt in entity_options]
 
     if not entities:
         toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
