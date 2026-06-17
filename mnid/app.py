@@ -31,6 +31,7 @@ from mnid.data_utils import (
     prepare_mnid_dataframe as _prepare_mnid_dataframe,
     serialize_store_df as _serialize_store_df,
     deserialize_store_df as _deserialize_store_df,
+    register_facility_metadata as _register_facility_metadata,
     _remember_ui_payload, _restore_ui_dataframe,
     _MNID_UI_CACHE,
 )
@@ -315,6 +316,7 @@ def _warm_worker_ndf_from_diskcache_v2() -> None:
                 return
             _network_df_cache[opd_key] = ndf
             _trim_cache(_network_df_cache, _NETWORK_DF_CACHE_MAX)
+            _register_facility_metadata(ndf)
             _LOGGER.info('Worker ndf warm: %d rows loaded from diskcache', len(ndf))
         except Exception as exc:
             _LOGGER.debug('Worker ndf warm failed (non-fatal): %s', exc)
