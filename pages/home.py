@@ -121,7 +121,7 @@ def _dataset_version_token() -> str:
     return '|'.join(parts)
 
 
-_start_mnid_prewarm(_dataset_version_token())
+# _start_mnid_prewarm(_dataset_version_token())
 
 
 def clear_dashboard_state_cache() -> None:
