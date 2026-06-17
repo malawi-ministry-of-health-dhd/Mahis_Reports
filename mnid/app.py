@@ -3239,54 +3239,53 @@ def _preload_mnid_executive_tabs(_tick, executive_token, active_tab):
     if views is None or state is None:
         raise PreventUpdate
 
-    preload_tabs = ['maternal-dashboard', 'newborn-dashboard']
-    warmed = []
-
     _ndf_available = _get_network_df_from_state(state) is not None
     _LOGGER.info('MNID background preload firing: ndf_available=%s', _ndf_available)
 
-    for tab_value in preload_tabs:
-        if tab_value == active_tab or tab_value in views:
-            continue
-        if tab_value == 'newborn-dashboard' and state.get('newborn_config') is None:
-            continue
-        try:
-            _LOGGER.info('MNID background preload: building %s', tab_value)
-            _build_executive_tab_view(tab_value, views, state)
-            warmed.append(tab_value)
-            _LOGGER.info('MNID background preload: %s done', tab_value)
-        except Exception as exc:
-            _LOGGER.warning('Background preload failed for executive tab %s: %s', tab_value, exc)
-
-    base_scope_meta = state.get('scope_meta') or {}
-    maternal_config = state.get('config') or {}
-    if maternal_config.get('report_name') == 'Maternal Health':
-        maternal_categories = [
-            category for category in (maternal_config.get('mnid_categories') or ['ANC', 'Labour', 'PNC'])
-            if category in {'ANC', 'Labour', 'PNC'}
-        ]
-        current_categories = tuple(sorted(base_scope_meta.get('mnid_categories') or []))
-        for category in maternal_categories:
-            if current_categories == (category,):
+    def _do_preload():
+        preload_tabs = ['maternal-dashboard', 'newborn-dashboard']
+        for tab_value in preload_tabs:
+            if tab_value == active_tab or tab_value in views:
+                continue
+            if tab_value == 'newborn-dashboard' and state.get('newborn_config') is None:
                 continue
             try:
-                warm_scope_meta = dict(base_scope_meta)
-                warm_scope_meta['mnid_categories'] = [category]
-                _build_executive_tab_view(
-                    'maternal-dashboard',
-                    views,
-                    state,
-                    scope_meta_override=warm_scope_meta,
-                    store_in_views=False,
-                )
-                warmed.append(f'maternal-dashboard:{category}')
+                _LOGGER.info('MNID background preload: building %s', tab_value)
+                _build_executive_tab_view(tab_value, views, state)
+                _LOGGER.info('MNID background preload: %s done', tab_value)
             except Exception as exc:
-                _LOGGER.warning('Background preload failed for maternal category %s: %s', category, exc)
+                _LOGGER.warning('Background preload failed for executive tab %s: %s', tab_value, exc)
 
-    _MNID_EXECUTIVE_DISK_CACHE.set(f'ec:{executive_token}', views, expire=_MNID_UI_CACHE_TTL_SECONDS)
+        base_scope_meta = state.get('scope_meta') or {}
+        maternal_config = state.get('config') or {}
+        if maternal_config.get('report_name') == 'Maternal Health':
+            maternal_categories = [
+                category for category in (maternal_config.get('mnid_categories') or ['ANC', 'Labour', 'PNC'])
+                if category in {'ANC', 'Labour', 'PNC'}
+            ]
+            current_categories = tuple(sorted(base_scope_meta.get('mnid_categories') or []))
+            for category in maternal_categories:
+                if current_categories == (category,):
+                    continue
+                try:
+                    warm_scope_meta = dict(base_scope_meta)
+                    warm_scope_meta['mnid_categories'] = [category]
+                    _build_executive_tab_view(
+                        'maternal-dashboard',
+                        views,
+                        state,
+                        scope_meta_override=warm_scope_meta,
+                        store_in_views=False,
+                    )
+                except Exception as exc:
+                    _LOGGER.warning('Background preload failed for maternal category %s: %s', category, exc)
 
-    return {
-        'token': executive_token,
-        'active_tab': active_tab or 'country-profile',
-        'warmed_tabs': warmed,
-    }
+        _MNID_EXECUTIVE_DISK_CACHE.set(f'ec:{executive_token}', views, expire=_MNID_UI_CACHE_TTL_SECONDS)
+
+    # Fire preload in a background thread so the Dash callback returns immediately.
+    # The heavy builds write to _worker_view_cache and diskcache — the next tab
+    # click will find them cached. Holding the callback thread for 30-60s would
+    # cause the Dash client to drop the connection, reconnect, and re-trigger the
+    # interval (resetting max_intervals=1), creating an infinite preload loop.
+    threading.Thread(target=_do_preload, daemon=True, name='mnid-preload').start()
+    raise PreventUpdate

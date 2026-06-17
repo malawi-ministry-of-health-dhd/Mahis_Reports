@@ -105,13 +105,16 @@ def _derive_contextual_concepts(out: pd.DataFrame) -> pd.DataFrame:
         if col not in out.columns:
             return pd.Series('', index=out.index)
         s = out[col].fillna('').astype('category')
-        s = s.cat.rename_categories(dict(zip(s.cat.categories, s.cat.categories.astype(str).str.strip())))
-        return s.astype(str)
+        return s.cat.rename_categories(dict(zip(s.cat.categories, s.cat.categories.astype(str).str.strip())))
 
     concept_series = _cstr('concept_name')
     obs_series     = _cstr('obs_value_coded')
     val_series     = _cstr('Value')
-    combined_value = obs_series.where(obs_series.ne(''), val_series)
+    # Build combined as a new categorical so str.fullmatch/contains run on unique values.
+    combined_value = pd.Series(
+        pd.Categorical(np.where(obs_series != '', obs_series.astype(object), val_series.astype(object))),
+        index=out.index,
+    )
 
     treatment_thermal = concept_series.eq('Treatment') & combined_value.str.fullmatch('Thermal Care', case=False, na=False)
     out.loc[treatment_thermal, 'concept_name'] = 'thermal care'
@@ -182,20 +185,16 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
         return out
 
     def _cat_str(col: str, transform=None) -> pd.Series:
-        """Build a categorical string series from out[col].
-
-        Categorical means str.contains/str.lower etc. only run on the unique values,
-        not every row - about 50x faster when there are far fewer distinct concept/obs
-        values than rows.
-        """
+        """Build a categorical series from out[col] — kept as categorical so that
+        str.contains/str.lower/str.upper etc. run on unique category values only
+        (~100-200 values) instead of all 143k rows, giving an 8x+ speedup."""
         if col not in out.columns:
             return pd.Series('', index=out.index)
         s = out[col].fillna('').astype('category')
         cats = s.cat.categories.astype(str).str.strip()
         if transform:
             cats = transform(cats)
-        s = s.cat.rename_categories(dict(zip(s.cat.categories, cats)))
-        return s.astype(str)
+        return s.cat.rename_categories(dict(zip(s.cat.categories, cats)))
 
     concept  = _cat_str('concept_name')
     obs      = _cat_str('obs_value_coded')
@@ -204,12 +203,48 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
     service  = _cat_str('Service_Area')
     encounter = _cat_str('Encounter')
     program  = _cat_str('Program', transform=lambda s: s.str.upper())
-    combined = obs.where(obs.ne(''), value)
-    concept_lower   = concept.str.lower()
-    combined_lower  = combined.str.lower()
-    encounter_upper = encounter.str.upper()
+    # Build combined as a new categorical so combined_lower.str.contains() is also fast.
+    combined = pd.Series(
+        pd.Categorical(np.where(obs != '', obs.astype(object), value.astype(object))),
+        index=out.index,
+    )
+
+    def _lower_cat(series: pd.Series) -> pd.Series:
+        """Lowercase a categorical series while preserving categorical dtype.
+
+        pandas .str.lower() on categorical decompresses to object dtype in
+        pandas 2.x, making subsequent str.contains() run on all n rows.
+        This bypasses that: lowercase the category labels (O(n_unique)),
+        remap codes via numpy integer indexing (fast O(n)), return categorical.
+        """
+        if not isinstance(series.dtype, pd.CategoricalDtype):
+            return series.str.lower()
+        lower_cats = series.cat.categories.str.lower()
+        unique_lower, inverse = np.unique(lower_cats, return_inverse=True)
+        codes = series.cat.codes.values
+        new_codes = np.where(codes >= 0, inverse[codes], -1)
+        return pd.Series(
+            pd.Categorical.from_codes(new_codes, categories=unique_lower, ordered=False),
+            index=series.index,
+        )
+
+    def _upper_cat(series: pd.Series) -> pd.Series:
+        if not isinstance(series.dtype, pd.CategoricalDtype):
+            return series.str.upper()
+        upper_cats = series.cat.categories.str.upper()
+        unique_upper, inverse = np.unique(upper_cats, return_inverse=True)
+        codes = series.cat.codes.values
+        new_codes = np.where(codes >= 0, inverse[codes], -1)
+        return pd.Series(
+            pd.Categorical.from_codes(new_codes, categories=unique_upper, ordered=False),
+            index=series.index,
+        )
+
+    concept_lower   = _lower_cat(concept)
+    combined_lower  = _lower_cat(combined)
+    encounter_upper = _upper_cat(encounter)
     encounter_source = _cat_str('Encounter_Source') if 'Encounter_Source' in out.columns else encounter
-    encounter_source_lower = encounter_source.str.lower()
+    encounter_source_lower = _lower_cat(encounter_source)
 
     person_ctx = pd.DataFrame({'person_id': out['person_id'].dropna().astype(str).unique()})
 
@@ -595,10 +630,19 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
 
 
 def _derive_service_area_vectorized(df: pd.DataFrame) -> pd.Series:
-    program = df['Program'].fillna('').astype(str).str.strip().str.upper() if 'Program' in df.columns else pd.Series('', index=df.index)
-    encounter = df['Encounter'].fillna('').astype(str).str.strip().str.upper() if 'Encounter' in df.columns else pd.Series('', index=df.index)
+    def _cat_upper(col):
+        if col not in df.columns:
+            return pd.Series('', index=df.index)
+        s = df[col].fillna('').astype('category')
+        return s.cat.rename_categories(s.cat.categories.astype(str).str.strip().str.upper())
 
-    from_program = program.map(_PROGRAM_SERVICE_AREA_MAP).fillna('')
+    program = _cat_upper('Program')
+    encounter = _cat_upper('Encounter')
+
+    # Map program categories to service areas — runs on unique category values only.
+    from_program = program.cat.rename_categories(
+        {c: _PROGRAM_SERVICE_AREA_MAP.get(c, '') for c in program.cat.categories}
+    )
     enc_newborn = encounter.str.contains('NEONATAL', na=False)
     enc_pnc     = encounter.str.contains('PNC|POSTNATAL', na=False)
     enc_labour  = encounter.str.contains('LABOUR|DELIVERY|BIRTH', na=False)
@@ -607,7 +651,7 @@ def _derive_service_area_vectorized(df: pd.DataFrame) -> pd.Series:
     return pd.Series(
         np.select(
             [from_program.ne(''), enc_newborn, enc_pnc, enc_labour, enc_anc],
-            [from_program,        'Newborn',   'PNC',   'Labour',   'ANC'],
+            [from_program.astype(object), 'Newborn', 'PNC', 'Labour', 'ANC'],
             default='',
         ),
         index=df.index,
@@ -677,25 +721,27 @@ def _normalize_mnid_semantics(df: pd.DataFrame) -> pd.DataFrame:
     if 'Program' in out.columns and 'Source_Program' not in out.columns:
         out['Source_Program'] = out['Program']
 
-    if 'concept_name' in out.columns:
-        concept_series = out['concept_name'].fillna('').astype(str).str.strip()
-        out['concept_name'] = concept_series.replace(_CONCEPT_ALIASES)
+    def _apply_alias_cat(col: str, alias_map: dict) -> None:
+        """Strip and alias-map a column using categorical operations on unique values."""
+        if col not in out.columns:
+            return
+        cat = out[col].fillna('').astype('category')
+        old = cat.cat.categories
+        new = old.astype(str).str.strip().map(lambda c: alias_map.get(c, c))
+        out[col] = cat.cat.rename_categories(dict(zip(old, new))).astype(str)
 
-    if 'obs_value_coded' in out.columns:
-        obs_series = out['obs_value_coded'].fillna('').astype(str).str.strip()
-        out['obs_value_coded'] = obs_series.replace(_OBS_VALUE_ALIASES)
+    _apply_alias_cat('concept_name', _CONCEPT_ALIASES)
+    _apply_alias_cat('obs_value_coded', _OBS_VALUE_ALIASES)
 
     # The new parquet stores several clinically relevant coded answers in `Value`.
     if {'obs_value_coded', 'Value'}.issubset(out.columns):
-        obs_blank = out['obs_value_coded'].fillna('').astype(str).str.strip().eq('')
-        val_present = out['Value'].fillna('').astype(str).str.strip().ne('')
-        out.loc[obs_blank & val_present, 'obs_value_coded'] = (
-            out.loc[obs_blank & val_present, 'Value']
-            .fillna('')
-            .astype(str)
-            .str.strip()
-            .replace(_OBS_VALUE_ALIASES)
-        )
+        obs_blank = out['obs_value_coded'].eq('')
+        _v_cat = out['Value'].fillna('').astype('category')
+        _v_old = _v_cat.cat.categories
+        _v_new = _v_old.astype(str).str.strip().map(lambda c: _OBS_VALUE_ALIASES.get(c, c))
+        val_aliased = _v_cat.cat.rename_categories(dict(zip(_v_old, _v_new))).astype(str)
+        val_present = val_aliased.ne('')
+        out.loc[obs_blank & val_present, 'obs_value_coded'] = val_aliased.loc[obs_blank & val_present]
 
     out = _derive_contextual_concepts(out)
 
