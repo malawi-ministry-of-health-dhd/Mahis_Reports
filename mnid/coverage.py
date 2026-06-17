@@ -315,7 +315,7 @@ def _coverage_heatmap_section(
                         id='mnid-heatmap-indicators',
                         options=ind_opts,
                         value=all_labels[0] if all_labels else None,
-                        clearable=False,
+                        clearable=True,
                         placeholder='Select indicator...',
                         style=_dd_style,
                     ),
@@ -1261,9 +1261,9 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
     fac_opts = [{'label': _FACILITY_NAMES.get(f, f), 'value': f} for f in all_facs]
     dist_opts = [{'label': d, 'value': d} for d in all_dists]
     ind_opts = [{'label': ind['label'], 'value': ind['id']} for ind in tracked]
-    default_facs = ([facility_code] if facility_code in all_facs else all_facs[:4]) or []
-    default_dists = ([current_dist] if current_dist in all_dists else all_dists[:4]) or []
-    default_inds = [ind['id'] for ind in tracked[:3]]
+    default_facs = ([facility_code] if facility_code in all_facs else all_facs[:2]) or []
+    default_dists = ([current_dist] if current_dist in all_dists else all_dists[:2]) or []
+    default_inds = [ind['id'] for ind in tracked[:2]]
     try:
         compare_dates = pd.to_datetime(mch_full['Date'], errors='coerce').dropna() if 'Date' in mch_full.columns else pd.Series([], dtype='datetime64[ns]')
         compare_date_min = compare_dates.min().isoformat() if len(compare_dates) else None
@@ -1318,7 +1318,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                     options=fac_opts,
                     value=default_facs,
                     multi=True,
-                    placeholder='Select locations...',
+                    placeholder='Select up to 2 locations...',
                 ),
             ]),
             html.Div(children=[
@@ -1343,7 +1343,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                     options=ind_opts,
                     value=default_inds,
                     multi=True,
-                    placeholder='Select up to 3 indicators...',
+                    placeholder='Select up to 2 indicators...',
                 ),
             ]),
         ]),
