@@ -1360,7 +1360,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
         ),
     ])
 
-    return html.Div(id='mnid-comparative', children=[
+    return html.Div(children=[
         dcc.Store(id='mnid-compare-store', data={
             'tracked':    tracked,
             'data_key':   _remember_ui_payload('compare', mch_full, stable_key=payload_key),
