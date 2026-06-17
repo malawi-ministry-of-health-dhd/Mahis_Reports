@@ -266,6 +266,63 @@ def _maybe_build_aggregate_on_startup() -> None:
 
 _maybe_build_aggregate_on_startup()
 
+
+def _warm_worker_ndf_from_diskcache() -> None:
+    """Load the most-recently-written network_df into this worker's in-memory cache.
+
+    Runs in a daemon thread at module import time (i.e. in every Gunicorn worker).
+    By the time the first user request arrives, network_df is already in
+    _network_df_cache so _get_network_df_from_state never has to pay the
+    diskcache deserialization cost.
+    """
+    def _load():
+        try:
+            ndf_key = _MNID_EXECUTIVE_DISK_CACHE.get('ndf:latest_key')
+            if ndf_key is None:
+                return
+            ndf = _MNID_EXECUTIVE_DISK_CACHE.get(ndf_key)
+            if ndf is None:
+                return
+            # The opd_key is the argument to _dk('ndf', opd_key) which produced ndf_key.
+            # We can't reverse the hash, so store under ndf_key itself as the lookup key.
+            # _get_network_df_from_state uses _dk('ndf', opd_key) which equals ndf_key —
+            # but the lookup is on the tuple opd_key via _network_df_cache[opd_key].
+            # Store in a special slot so _get_network_df_from_state can find it.
+            # Simpler: iterate _network_df_cache won't work cross-process, so instead
+            # we store the ndf under a sentinel in _network_df_cache and check in
+            # _get_network_df_from_state. But the cleanest path is to write the opd_key
+            # alongside the ndf in the diskcache (done in _async_write_ndf below).
+            _LOGGER.info('Worker ndf warm: network_df loaded from diskcache (%d rows)', len(ndf))
+        except Exception as exc:
+            _LOGGER.debug('Worker ndf warm failed (non-fatal): %s', exc)
+    threading.Thread(target=_load, daemon=True, name='mnid-worker-ndf-warm').start()
+
+
+# Also store the opd_key in diskcache so workers can reconstruct the cache entry.
+# This is done in _async_write_ndf via 'ndf:latest_opd_key'.
+def _warm_worker_ndf_from_diskcache_v2() -> None:
+    """Full version: loads ndf AND registers it under the correct opd_key."""
+    def _load():
+        try:
+            ndf_key = _MNID_EXECUTIVE_DISK_CACHE.get('ndf:latest_key')
+            opd_key = _MNID_EXECUTIVE_DISK_CACHE.get('ndf:latest_opd_key')
+            if ndf_key is None or opd_key is None:
+                return
+            if opd_key in _network_df_cache:
+                return  # already warm
+            ndf = _MNID_EXECUTIVE_DISK_CACHE.get(ndf_key)
+            if ndf is None:
+                return
+            _network_df_cache[opd_key] = ndf
+            _trim_cache(_network_df_cache, _NETWORK_DF_CACHE_MAX)
+            _LOGGER.info('Worker ndf warm: %d rows loaded from diskcache', len(ndf))
+        except Exception as exc:
+            _LOGGER.debug('Worker ndf warm failed (non-fatal): %s', exc)
+    threading.Thread(target=_load, daemon=True, name='mnid-worker-ndf-warm').start()
+
+
+_warm_worker_ndf_from_diskcache_v2()
+
 _MNID_SCROLLSPY_CLIENTSIDE = """
 function(_tick) {
     const sections = [
@@ -599,6 +656,9 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
             'dashboard_theme': dashboard_theme,
         }
 
+    import time as _time
+    _t0 = _time.monotonic()
+
     _agg = _get_aggregate()
     _fac_filter = selected_facility_codes or None
     _dist_filter = selected_districts or None
@@ -627,6 +687,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
             _prev_batch = _build_agg_batch(_agg, prev_start, prev_end, _kpi_grain, _fac_filter, _dist_filter if not _fac_filter else None)
     else:
         _LOGGER.warning('MNID KPI source: raw rows (agg=%s, start=%s)', _agg is not None, _s)
+    _LOGGER.info('MNID timing: KPI batch %.2fs', _time.monotonic() - _t0)
 
     # Pre-slice coverage aggregate once to avoid repeated full-scan per indicator in coverage charts
     _cov_agg: pd.DataFrame | None = None
@@ -717,6 +778,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
     for ind in all_inds:
         by_cat.setdefault(ind.get('category', 'Other'), []).append(ind)
 
+    _t1 = _time.monotonic()
     coverage_charts = _coverage_charts_section(
         by_cat,
         facility_df,
@@ -728,12 +790,18 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         districts=list(_dist_filter) if _dist_filter and not _fac_filter else None,
         grain=_coverage_grain,
     )
+    _LOGGER.info('MNID timing: coverage_charts %.2fs', _time.monotonic() - _t1)
+
+    _t2 = _time.monotonic()
     trend_switcher = _trend_switcher(
         facility_df,
         all_inds,
         scope_meta=scope_meta,
         payload_key=payload_key,
     )
+    _LOGGER.info('MNID timing: trend_switcher %.2fs', _time.monotonic() - _t2)
+
+    _t3 = _time.monotonic()
     performance_div, heatmap_div = _coverage_heatmap_section(
         all_inds,
         facility_code,
@@ -746,12 +814,16 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
             payload_key,
         ),
     )
+    _LOGGER.info('MNID timing: heatmap_section %.2fs', _time.monotonic() - _t3)
+
+    _t4 = _time.monotonic()
     comparative_div = _comparative_analysis_section(
         all_inds,
         facility_code,
         facility_df,
         payload_key=payload_key,
     )
+    _LOGGER.info('MNID timing: comparative %.2fs', _time.monotonic() - _t4)
 
     def _sec_header(title, count=None, desc=None, eyebrow=None):
         return html.Div(className=f'mnid-section-header{" mnid-section-header-newborn" if dashboard_theme == "newborn" else ""}', children=[
@@ -2849,18 +2921,23 @@ def render_mnid_dashboard(data_opd, config,
         expire=_MNID_UI_CACHE_TTL_SECONDS,
     )
 
-    # Write network_df to diskcache so other workers can look it up by opd_key
-    # without re-running _prepare_mnid_dataframe.
-    # This write is synchronous (not async) so the ndf is available before the
-    # browser sends the background-preload request (~250ms later).
-    # facility_df is intentionally NOT stored — recomputing from network_df is
-    # faster than deserialising a large DataFrame from SQLite.
+    # Write network_df to diskcache so other workers can look it up by opd_key.
+    # Async: doesn't block this response. The preload fires at 3s, by which time
+    # this write (typically 1-3s) is done. Also store a well-known pointer so
+    # worker-startup threads can warm their own _network_df_cache without knowing
+    # the opd_key in advance.
     _ndf_key = _dk('ndf', _opd_key)
     if _MNID_EXECUTIVE_DISK_CACHE.get(_ndf_key) is None:
-        try:
-            _MNID_EXECUTIVE_DISK_CACHE.set(_ndf_key, network_df, expire=_MNID_UI_CACHE_TTL_SECONDS)
-        except Exception:
-            pass
+        _ndf_snap = network_df
+        _opd_key_snap = _opd_key
+        def _async_write_ndf():
+            try:
+                _MNID_EXECUTIVE_DISK_CACHE.set(_ndf_key, _ndf_snap, expire=_MNID_UI_CACHE_TTL_SECONDS)
+                _MNID_EXECUTIVE_DISK_CACHE.set('ndf:latest_key', _ndf_key, expire=_MNID_UI_CACHE_TTL_SECONDS)
+                _MNID_EXECUTIVE_DISK_CACHE.set('ndf:latest_opd_key', _opd_key_snap, expire=_MNID_UI_CACHE_TTL_SECONDS)
+            except Exception:
+                pass
+        threading.Thread(target=_async_write_ndf, daemon=True).start()
 
     _tab_style  = {'padding': '10px 18px', 'borderRadius': '12px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#FFFFFF', 'color': TEXT}
     _tab_active = {'padding': '10px 18px', 'borderRadius': '12px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#F0FDF4', 'color': '#15803D', 'fontWeight': 700}
@@ -2919,18 +2996,19 @@ def _build_executive_tab_view(selected: str, views: dict, state: dict,
                               scope_meta_override: dict | None = None,
                               config_override: dict | None = None,
                               store_in_views: bool = True):
-    network_df = _get_network_df_from_state(state)
     config = config_override or state.get('config')
     facility_code = state.get('facility_code')
     start_date = state.get('start_date')
     end_date = state.get('end_date')
     scope_meta = scope_meta_override or state.get('scope_meta')
-    facility_df = _get_facility_df_from_state(state, network_df=network_df)
     supply_inds = state.get('supply_inds')
     wf_inds = state.get('wf_inds')
     dq_inds = state.get('dq_inds')
     country_label = state.get('country_label') or 'Maternal'
 
+    # Check all caches BEFORE loading the expensive network_df.
+    # Previously network_df was loaded first, paying 5-15s deserialization on every
+    # tab click — even cache hits. Cache checks are cheap; data loading is not.
     if selected in views:
         return views.get(selected, views.get('country-profile', html.Div()))
 
@@ -2954,10 +3032,26 @@ def _build_executive_tab_view(selected: str, views: dict, state: dict,
             views[selected] = cached_view
         return cached_view
 
+    # Cache miss — now load the expensive data.
+    import time as _time
+    _etv_t0 = _time.monotonic()
+    network_df = _get_network_df_from_state(state)
+    _LOGGER.info('MNID tab timing: ndf fetch %.2fs (selected=%s)', _time.monotonic() - _etv_t0, selected)
+    _fdf_t0 = _time.monotonic()
+    facility_df = _get_facility_df_from_state(state, network_df=network_df)
+    _LOGGER.info('MNID tab timing: facility_df %.2fs (selected=%s)', _time.monotonic() - _fdf_t0, selected)
+
     def _cache_view(view):
-        _MNID_EXECUTIVE_DISK_CACHE.set(_etv_key, view, expire=_MNID_UI_CACHE_TTL_SECONDS)
+        # Write to worker-local cache synchronously (instant for next request on this worker).
+        # Write to diskcache async so other workers benefit without blocking this response.
         _worker_view_cache[_etv_key] = view
         _trim_cache(_worker_view_cache, _WORKER_VIEW_CACHE_MAX)
+        def _async_etv_write():
+            try:
+                _MNID_EXECUTIVE_DISK_CACHE.set(_etv_key, view, expire=_MNID_UI_CACHE_TTL_SECONDS)
+            except Exception:
+                pass
+        threading.Thread(target=_async_etv_write, daemon=True).start()
 
     if selected == 'country-profile' and facility_df is not None:
         cp_key = (
@@ -2997,6 +3091,7 @@ def _build_executive_tab_view(selected: str, views: dict, state: dict,
         return rendered_view
 
     if selected == 'maternal-dashboard' and network_df is not None and config is not None:
+        _mat_t0 = _time.monotonic()
         bundle = _build_mnid_indicator_content(
             network_df=network_df,
             config=config,
@@ -3007,6 +3102,7 @@ def _build_executive_tab_view(selected: str, views: dict, state: dict,
             include_content=True,
         )
         rendered_view = bundle.get('indicator_content', html.Div())
+        _LOGGER.info('MNID tab timing: maternal build %.2fs', _time.monotonic() - _mat_t0)
         if store_in_views:
             views[selected] = rendered_view
         _cache_view(rendered_view)
