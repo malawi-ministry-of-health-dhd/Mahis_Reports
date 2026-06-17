@@ -36,22 +36,22 @@ register_navigation_callbacks(app, pathname_prefix)
 register_api_routes(server)
 
 
-def _prewarm_mnid_cache():
-    time.sleep(10)  # let the server finish startup before heavy work
-    try:
-        import pandas as pd
-        from data_storage import DataStorage
-        from mnid.app import _network_df_cache, _prepare_mnid_dataframe
-        sql = f"SELECT * FROM '{DATA_PATH_}/parquet'"
-        df = DataStorage.query_duckdb(sql)
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        key = (len(df), tuple(df.columns.tolist()))
-        if key not in _network_df_cache:
-            _network_df_cache[key] = _prepare_mnid_dataframe(df)
-    except Exception:
-        pass
+# def _prewarm_mnid_cache():
+#     time.sleep(10)  # let the server finish startup before heavy work
+#     try:
+#         import pandas as pd
+#         from data_storage import DataStorage
+#         from mnid.app import _network_df_cache, _prepare_mnid_dataframe
+#         sql = f"SELECT * FROM '{DATA_PATH_}/parquet'"
+#         df = DataStorage.query_duckdb(sql)
+#         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+#         key = (len(df), tuple(df.columns.tolist()))
+#         if key not in _network_df_cache:
+#             _network_df_cache[key] = _prepare_mnid_dataframe(df)
+#     except Exception:
+#         pass
 
-threading.Thread(target=_prewarm_mnid_cache, daemon=True).start()
+# threading.Thread(target=_prewarm_mnid_cache, daemon=True).start()
 
 if __name__ == "__main__":
     print(f"Start your app on: http://localhost:8050/home?route=default&Location=1833&uuid={DEMO_UUID}&user_level=national")
