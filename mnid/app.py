@@ -1036,7 +1036,10 @@ def update_trend_chart(n_clicks_list, location, selected_inds, stored_trend, act
     ind_options = ind_opts_by_cat.get(cat, [])
 
     # Use aggregate fast path; only restore the raw df when aggregate is absent (first run).
+    # Always keep a reference to the full df — used as fallback when the aggregate parquet
+    # doesn't yet contain a freshly-configured indicator.
     _agg_now = _get_aggregate()
+    _df_full = _restore_ui_dataframe(trend_payload.get('data_key'))
     if _agg_now is not None:
         # Build a minimal stub df with the date range so _run_chart_cards can detect grain.
         _d_min = trend_payload.get('date_min')
@@ -1044,16 +1047,16 @@ def update_trend_chart(n_clicks_list, location, selected_inds, stored_trend, act
         if _d_min and _d_max:
             df = pd.DataFrame({'Date': pd.to_datetime([_d_min, _d_max])})
         else:
-            df = _restore_ui_dataframe(trend_payload.get('data_key'))
+            df = _df_full if _df_full is not None else pd.DataFrame()
     else:
-        df = _restore_ui_dataframe(trend_payload.get('data_key'))
+        df = _df_full if _df_full is not None else pd.DataFrame()
 
     default_ind_values = [o['value'] for o in ind_options[:_DEFAULT_TREND_INDICATOR_LIMIT]]
     ind_value_out = default_ind_values if cat_changed else no_update
 
     cards = _run_chart_cards(df, tracked, cat, location or 'all',
                              default_ind_values if cat_changed else selected_inds,
-                             scope_meta, agg_df=_agg_now)
+                             scope_meta, agg_df=_agg_now, fallback_df=_df_full)
     classes = ['mnid-filter-btn active' if c == cat else 'mnid-filter-btn' for c in categories]
     return cards, cat, classes, loc_options, ind_options, ind_value_out
 
@@ -1184,7 +1187,8 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
                      location: str | None = None,
                      selected_ids: list | None = None,
                      scope_meta: dict | None = None,
-                     agg_df: pd.DataFrame | None = None) -> list:
+                     agg_df: pd.DataFrame | None = None,
+                     fallback_df: pd.DataFrame | None = None) -> list:
     tracked = [i for i in indicators if i.get('status') == 'tracked' and i.get('category') == cat]
     if selected_ids:
         id_set = set(selected_ids)
@@ -1276,7 +1280,34 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
                 indicator_label=ind.get('label'),
             )
 
-        fig = _indicator_run_fig(plot_df, ind, color, periods, tickfmt, hfmt, grain, precomputed=precomputed)
+        # When aggregate has no data for this indicator, fall back to the full raw df
+        # so newly-configured or rebuilt indicators still render correct percentages.
+        if (precomputed is None or precomputed.empty) and fallback_df is not None and not fallback_df.empty:
+            _fb = fallback_df.copy()
+            if location and location != 'all':
+                if 'Facility_CODE' in _fb.columns:
+                    _lm = _fb['Facility_CODE'].astype(str) == str(location)
+                    if _lm.any():
+                        _fb = _fb[_lm]
+                elif 'District' in _fb.columns:
+                    _lm = _fb['District'].astype(str) == str(location)
+                    if _lm.any():
+                        _fb = _fb[_lm]
+            _fb_dates = pd.to_datetime(_fb['Date'], errors='coerce').dropna() if 'Date' in _fb.columns else pd.Series([], dtype='datetime64[ns]')
+            if not _fb_dates.empty:
+                if grain == 'monthly':
+                    _fb['_p'] = _fb_dates.dt.to_period('M').dt.start_time
+                elif grain == 'weekly':
+                    _fb['_p'] = _fb_dates.dt.to_period('W').dt.start_time
+                else:
+                    _fb['_p'] = _fb_dates.dt.floor('D')
+                _fb_periods = sorted(_fb['_p'].dropna().unique())
+                fig = _indicator_run_fig(_fb, ind, color, _fb_periods, tickfmt, hfmt, grain, precomputed=None)
+            else:
+                fig = _indicator_run_fig(plot_df, ind, color, periods, tickfmt, hfmt, grain, precomputed=None)
+        else:
+            fig = _indicator_run_fig(plot_df, ind, color, periods, tickfmt, hfmt, grain, precomputed=precomputed)
+
         target = ind.get('target')
         target_badge = None
         if target is not None:
@@ -2362,14 +2393,17 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
     ctx = callback_context
     ctx_prop = ctx.triggered[0]['prop_id'] if ctx and ctx.triggered else ''
     user_changed_indicators = ctx_prop == 'mnid-compare-indicators.value'
+    user_changed_entities = ctx_prop == 'mnid-compare-entities.value'
     mode_just_changed = ctx_prop == 'mnid-compare-mode.value'
     if ctx_prop == 'mnid-compare-chart-toggle.n_clicks':
         chart_type = 'line' if chart_type == 'bar' else 'bar'
     store_payload = stored or {}
     tracked = store_payload.get('tracked', [])
-    # Restore raw df only when aggregate isn't available (first run before overnight job).
+    # Always restore the raw df as a fallback source so that indicators not yet present
+    # in the aggregate parquet still render correct percentages after a config change.
     _compare_agg_check = _get_aggregate()
-    mch_full = pd.DataFrame() if _compare_agg_check is not None else _restore_ui_dataframe(store_payload.get('data_key'))
+    mch_full_fallback = _restore_ui_dataframe(store_payload.get('data_key'))
+    mch_full = pd.DataFrame() if _compare_agg_check is not None else (mch_full_fallback or pd.DataFrame())
     facility_options = store_payload.get('facility_options', [])
     district_options = store_payload.get('district_options', [])
     current_fac = store_payload.get('current_fac', '')
@@ -2379,10 +2413,16 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
 
     ind_options = [{'label': i['label'], 'value': i['id']} for i in tracked]
     valid_ind_ids = {opt['value'] for opt in ind_options}
-    selected_ind_ids = [iid for iid in (selected_ind_ids or []) if iid in valid_ind_ids][:3]
-    if not selected_ind_ids:
-        selected_ind_ids = [i['id'] for i in tracked[:3]]
+    if selected_ind_ids is None:
+        selected_ind_ids = [i['id'] for i in tracked[:2]]
+    else:
+        selected_ind_ids = [iid for iid in selected_ind_ids if iid in valid_ind_ids][:2]
     active_inds = [i for i in tracked if i['id'] in selected_ind_ids]
+
+    # Disable unselected indicator options once the 2-item limit is reached
+    if len(selected_ind_ids) >= 2:
+        _sel_ind_set = set(selected_ind_ids)
+        ind_options = [{**opt, 'disabled': opt['value'] not in _sel_ind_set} for opt in ind_options]
 
     _empty_fig = go.Figure()
     _empty_fig.update_layout(
@@ -2402,27 +2442,39 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
         ind_value_out = no_update if user_changed_indicators else selected_ind_ids
         return _empty_fig, entity_options, (selected_entities or []), ind_options, ind_value_out, chart_type, toggle_class, toggle_text
 
-    # When mode switches, discard the previous selection since facility codes and district
-    # names aren't interchangeable. Also guard against 'Unknown' facility_code at national
-    # scope, since it's never actually in the options.
-    effective_selection = None if mode_just_changed else selected_entities
-
     if mode == 'facility':
         entity_options = facility_options
         valid_fac_vals = {str(opt['value']) for opt in facility_options}
-        default_entities = ([current_fac] if current_fac and current_fac in valid_fac_vals else []) or [opt['value'] for opt in facility_options[:4]]
-        entities = [str(v) for v in (effective_selection or default_entities) if str(v) in valid_fac_vals]
+        default_entities = ([current_fac] if current_fac and current_fac in valid_fac_vals else []) or [opt['value'] for opt in facility_options[:2]]
+        if mode_just_changed:
+            entities = [str(v) for v in default_entities if str(v) in valid_fac_vals][:2]
+        elif user_changed_entities:
+            entities = [str(v) for v in (selected_entities or []) if str(v) in valid_fac_vals][:2]
+        else:
+            _raw_ents = selected_entities if selected_entities is not None else default_entities
+            entities = [str(v) for v in _raw_ents if str(v) in valid_fac_vals][:2]
         entity_labels = {str(opt['value']): str(opt['label']) for opt in facility_options}
         def get_df(entity):
             return mch_full[mch_full['Facility_CODE'] == entity] if 'Facility_CODE' in mch_full.columns else pd.DataFrame()
     else:
         entity_options = district_options
         valid_dist_vals = {str(opt['value']) for opt in district_options}
-        default_entities = ([current_dist] if current_dist and current_dist in valid_dist_vals else []) or [opt['value'] for opt in district_options[:4]]
-        entities = [str(v) for v in (effective_selection or default_entities) if str(v) in valid_dist_vals]
+        default_entities = ([current_dist] if current_dist and current_dist in valid_dist_vals else []) or [opt['value'] for opt in district_options[:2]]
+        if mode_just_changed:
+            entities = [str(v) for v in default_entities if str(v) in valid_dist_vals][:2]
+        elif user_changed_entities:
+            entities = [str(v) for v in (selected_entities or []) if str(v) in valid_dist_vals][:2]
+        else:
+            _raw_ents = selected_entities if selected_entities is not None else default_entities
+            entities = [str(v) for v in _raw_ents if str(v) in valid_dist_vals][:2]
         entity_labels = {str(opt['value']): str(opt['label']) for opt in district_options}
         def get_df(entity):
             return mch_full[mch_full['District'] == entity] if 'District' in mch_full.columns else pd.DataFrame()
+
+    # Disable unselected location options once the 2-item limit is reached
+    if len(entities) >= 2:
+        _ent_set = set(entities)
+        entity_options = [{**opt, 'disabled': opt['value'] not in _ent_set} for opt in entity_options]
 
     if not entities:
         toggle_class = 'mnid-trend-toggle is-bar' if chart_type == 'bar' else 'mnid-trend-toggle is-line'
@@ -2472,6 +2524,7 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
     series_idx = 0
     for entity in entities:
         for ind in active_inds:
+            xs, ys, texts = [], [], []
             if _compare_agg is not None:
                 fac_arg  = [entity] if mode == 'facility' else None
                 dist_arg = [entity] if mode == 'district' else None
@@ -2483,25 +2536,42 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
                     indicator_label=ind.get('label'),
                 )
                 series = series.tail(max_periods)
-                if series.empty:
-                    continue
-                xs = [period_fmt(pd.Period(ts, period_code)) for ts in
-                      pd.to_datetime(series['period_start']).dt.to_period(period_code)]
-                ys = series['pct'].tolist()
-                ys = [y if (series['denominator'].iloc[i] > 0) else None
-                      for i, y in enumerate(ys)]
-                texts = [f'{y:.0f}%' if y is not None else 'No data' for y in ys]
-            else:
+                if not series.empty:
+                    xs = [period_fmt(pd.Period(ts, period_code)) for ts in
+                          pd.to_datetime(series['period_start']).dt.to_period(period_code)]
+                    ys = series['pct'].tolist()
+                    ys = [y if (series['denominator'].iloc[i] > 0) else None
+                          for i, y in enumerate(ys)]
+                    texts = [f'{y:.0f}%' if y is not None else 'No data' for y in ys]
+
+            # When aggregate has no data for this indicator, fall back to the raw df.
+            if not xs and mch_full_fallback is not None and not mch_full_fallback.empty and 'Date' in mch_full_fallback.columns:
+                _col = 'Facility_CODE' if mode == 'facility' else 'District'
+                if _col in mch_full_fallback.columns:
+                    _efb = mch_full_fallback[mch_full_fallback[_col].astype(str) == str(entity)].copy()
+                    if not _efb.empty:
+                        _efb['_period'] = pd.to_datetime(_efb['Date']).dt.to_period(period_code)
+                        _fb_periods = sorted(_efb['_period'].dropna().unique())[-max_periods:]
+                        for _p in _fb_periods:
+                            _pf = _efb[_efb['_period'] == _p]
+                            _, _den, _pct = _cov(_pf, ind['numerator_filters'], ind['denominator_filters'])
+                            xs.append(period_fmt(_p))
+                            ys.append(_display_pct(_pct) if _den > 0 else None)
+                            texts.append(f'{_pct:.0f}%' if _den > 0 else 'No data')
+
+            if not xs and _compare_agg is None:
                 entity_df = get_df(entity)
                 if entity_df.empty:
                     continue
-                xs, ys, texts = [], [], []
                 for period in periods:
                     period_df = entity_df[pd.to_datetime(entity_df['Date']).dt.to_period(period_code) == period]
                     _, den, pct = _cov(period_df, ind['numerator_filters'], ind['denominator_filters'])
                     xs.append(period_fmt(period))
                     ys.append(_display_pct(pct) if den > 0 else None)
                     texts.append(f'{pct:.0f}%' if den > 0 else 'No data')
+
+            if not xs:
+                continue
             moving_average, _ = _moving_average_values(ys, time_grain)
             if not any(y is not None for y in moving_average):
                 continue
