@@ -668,6 +668,51 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
         _ctx_series('mnid_labour_vit_k').eq('Yes')
         | _ctx_series('mnid_newborn_vit_k').eq('Yes')
     ).map({True: 'Yes', False: ''})
+    _assign_flag(
+        'mnid_anc_complication',
+        anc_mask & _cp_obs_complications & ~combined_lower.isin(['', 'no', 'none', 'negative', 'unknown']),
+    )
+    _assign_flag(
+        'mnid_pnc_mother_complication',
+        pnc_mask & concept.eq('Postnatal complications') & ~combined_lower.isin(['', 'no', 'none', 'negative', 'unknown']),
+    )
+    _assign_flag(
+        'mnid_pnc_newborn_complication',
+        pnc_mask & concept.eq('Newborn baby complications') & ~combined_lower.isin(['', 'no', 'none', 'negative', 'unknown']),
+    )
+    _assign_flag('mnid_pnc_mother_status_recorded', pnc_mask & concept.eq('Status of the mother'))
+    _assign_flag('mnid_pnc_baby_status_recorded', pnc_mask & concept.eq('Status of baby'))
+    _assign_flag(
+        'mnid_pnc_newborn_death',
+        pnc_mask & concept.eq('Status of baby') & combined_lower.isin(['death', 'died', 'dead', 'deceased']),
+    )
+    _assign_flag('mnid_newborn_status_recorded', newborn_mask & concept.eq('Status of baby'))
+    _assign_flag(
+        'mnid_newborn_neonatal_death',
+        newborn_mask & concept.eq('Status of baby') & combined_lower.isin(['death', 'died', 'dead', 'deceased']),
+    )
+    person_ctx['mnid_labour_complication'] = (
+        _ctx_series('mnid_labour_maternal_sepsis').eq('Yes')
+        | _ctx_series('mnid_labour_pph').eq('Yes')
+        | _ctx_series('mnid_labour_eclampsia').eq('Yes')
+    ).map({True: 'Yes', False: ''})
+    person_ctx['mnid_labour_live_birth'] = (
+        _ctx_series('mnid_labour_visit_documented').eq('Yes')
+        & _ctx_series('mnid_labour_stillbirth').ne('Yes')
+    ).map({True: 'Yes', False: ''})
+    person_ctx['mnid_anc_not_reaching_labour'] = (
+        _ctx_series('mnid_anc_visit_documented').eq('Yes')
+        & _ctx_series('mnid_labour_visit_documented').ne('Yes')
+    ).map({True: 'Yes', False: ''})
+    person_ctx['mnid_labour_not_reaching_pnc'] = (
+        _ctx_series('mnid_labour_visit_documented').eq('Yes')
+        & _ctx_series('mnid_pnc_visit_documented').ne('Yes')
+    ).map({True: 'Yes', False: ''})
+    person_ctx['mnid_newborn_complication_at_birth'] = (
+        _ctx_series('mnid_newborn_birth_asphyxia').eq('Yes')
+        | _ctx_series('mnid_newborn_sepsis').eq('Yes')
+        | _ctx_series('mnid_newborn_jaundice').eq('Yes')
+    ).map({True: 'Yes', False: ''})
 
     # Pulls birth weight in one vectorized pass instead of looping row by row and
     # building a pd.Series per row, which got slow once there were a lot of rows.

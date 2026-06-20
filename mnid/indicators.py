@@ -43,6 +43,35 @@ def _program_based_priority_indicators(categories: list[str] | None = None) -> l
     if 'ANC' in wanted:
         indicators.extend([
             {
+                'id': 'mnid_anc_overview_001',
+                'label': 'ANC Visits',
+                'category': 'ANC',
+                'target': 80,
+                'status': 'overview_only',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_anc_visit_documented', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
+            },
+            {
+                'id': 'mnid_anc_overview_002',
+                'label': 'ANC Complications',
+                'category': 'ANC',
+                'target': 15,
+                'target_mode': 'min',
+                'status': 'overview_only',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_anc_complication', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'ANC'},
+            },
+            {
+                'id': 'mnid_anc_overview_003',
+                'label': 'ANC Clients Not Admissioned to Labour',
+                'category': 'ANC',
+                'target': 35,
+                'target_mode': 'min',
+                'status': 'overview_only',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_anc_not_reaching_labour', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_anc_visit_documented', 'value1': 'Yes'},
+            },
+            {
                 'id': 'mnid_anc_prog_007',
                 'label': 'Blood pressure measured',
                 'category': 'ANC',
@@ -134,6 +163,54 @@ def _program_based_priority_indicators(categories: list[str] | None = None) -> l
 
     if 'Labour' in wanted:
         indicators.extend([
+            {
+                'id': 'mnid_lab_overview_001',
+                'label': 'Labour & Delivery Visits',
+                'category': 'Labour',
+                'target': 80,
+                'status': 'overview_only',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_visit_documented', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
+            },
+            {
+                'id': 'mnid_lab_overview_002',
+                'label': 'Labour Complications',
+                'category': 'Labour',
+                'target': 15,
+                'target_mode': 'min',
+                'status': 'overview_only',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_complication', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_visit_documented', 'value1': 'Yes'},
+            },
+            {
+                'id': 'mnid_lab_overview_003',
+                'label': 'Labour Clients Not Admissioned to PNC',
+                'category': 'Labour',
+                'target': 35,
+                'target_mode': 'min',
+                'status': 'overview_only',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_not_reaching_pnc', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_visit_documented', 'value1': 'Yes'},
+            },
+            {
+                'id': 'mnid_lab_overview_004',
+                'label': 'Live Births',
+                'category': 'Labour',
+                'target': 95,
+                'status': 'overview_only',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_live_birth', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_visit_documented', 'value1': 'Yes'},
+            },
+            {
+                'id': 'mnid_nb_overview_001',
+                'label': 'Stillbirths',
+                'category': 'Newborn',
+                'target': 5,
+                'target_mode': 'min',
+                'status': 'overview_only',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_stillbirth', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_visit_documented', 'value1': 'Yes'},
+            },
             {
                 'id': 'mnid_lab_prog_008',
                 'label': 'Partograph use',
@@ -269,6 +346,55 @@ def _program_based_priority_indicators(categories: list[str] | None = None) -> l
     if 'PNC' in wanted:
         indicators.extend([
             {
+                'id': 'mnid_pnc_overview_001',
+                'label': 'PNC Visits',
+                'category': 'PNC',
+                'target': 80,
+                'status': 'overview_only',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_pnc_visit_documented', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'PNC'},
+            },
+            {
+                'id': 'mnid_pnc_overview_002',
+                'label': 'Mother Complications',
+                'category': 'PNC',
+                'target': 15,
+                'target_mode': 'min',
+                'status': 'overview_only',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_pnc_mother_complication', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_pnc_visit_documented', 'value1': 'Yes'},
+            },
+            {
+                'id': 'mnid_pnc_overview_003',
+                'label': 'Newborn Complications',
+                'category': 'PNC',
+                'target': 15,
+                'target_mode': 'min',
+                'status': 'overview_only',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_pnc_newborn_complication', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_pnc_visit_documented', 'value1': 'Yes'},
+            },
+            {
+                'id': 'mnid_pnc_overview_004',
+                'label': 'Maternal Deaths',
+                'category': 'PNC',
+                'target': 1,
+                'target_mode': 'min',
+                'status': 'overview_only',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_pnc_maternal_death', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_pnc_mother_status_recorded', 'value1': 'Yes'},
+            },
+            {
+                'id': 'mnid_pnc_overview_005',
+                'label': 'Newborn Deaths',
+                'category': 'PNC',
+                'target': 1,
+                'target_mode': 'min',
+                'status': 'overview_only',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_pnc_newborn_death', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_pnc_baby_status_recorded', 'value1': 'Yes'},
+            },
+            {
                 'id': 'mnid_pnc_prog_007',
                 'label': 'Early initiation of breastfeeding within 1 hour of birth',
                 'category': 'PNC',
@@ -322,6 +448,35 @@ def _program_based_priority_indicators(categories: list[str] | None = None) -> l
 
     if 'Newborn' in wanted:
         indicators.extend([
+            {
+                'id': 'mnid_nb_overview_002',
+                'label': 'Neonatal Deaths',
+                'category': 'Newborn',
+                'target': 5,
+                'target_mode': 'min',
+                'status': 'overview_only',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_neonatal_death', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_status_recorded', 'value1': 'Yes'},
+            },
+            {
+                'id': 'mnid_nb_overview_003',
+                'label': 'Neonatal Complications at Birth',
+                'category': 'Newborn',
+                'target': 15,
+                'target_mode': 'min',
+                'status': 'overview_only',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_complication_at_birth', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn'},
+            },
+            {
+                'id': 'mnid_nb_overview_004',
+                'label': 'iKMC Initiated',
+                'category': 'Newborn',
+                'target': 80,
+                'status': 'overview_only',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_kmc', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn'},
+            },
             {
                 'id': 'mnid_nb_prog_002',
                 'label': 'Birth weight recorded',
@@ -743,18 +898,6 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
             'numerator_filters': {
                 'unique': 'person_id',
                 'variable1': 'concept_name', 'value1': 'Birth weight',
-            },
-            'denominator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'Newborn',
-            },
-        },
-        'Gestation weeks recorded': {
-            'status': 'tracked',
-            'numerator_filters': {
-                'unique': 'person_id',
-                'variable1': 'Service_Area', 'value1': 'Newborn',
-                'variable2': 'concept_name', 'value2': 'Gestation in weeks',
             },
             'denominator_filters': {
                 'unique': 'person_id',

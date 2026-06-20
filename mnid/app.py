@@ -598,19 +598,28 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         facility_df,
         effective_categories,
     )
+    removed_indicator_labels = {
+        'Gestation weeks recorded',
+        'Neonatal enrolment documented',
+        'Screened for infection',
+    }
+    all_inds = [i for i in all_inds if i.get('label') not in removed_indicator_labels]
     _validate_indicator_configs(all_inds)
     category_order = _resolve_category_order(all_inds, effective_categories)
     if category_order:
         allowed = set(category_order)
         all_inds = [i for i in all_inds if i.get('category') in allowed]
 
+    overview_inds = [i for i in all_inds if i.get('status') == 'overview_only']
+    display_inds = [i for i in all_inds if i.get('status') != 'overview_only']
+
     payload_key = hashlib.md5(pickle.dumps(
         (len(network_df), tuple(network_df.columns.tolist()) if not network_df.empty else (), start_date, end_date, tuple(category_order)),
         protocol=4,
     )).hexdigest()[:16] + f'_{start_date}_{end_date}'
 
-    tracked = [i for i in all_inds if i.get('status') == 'tracked']
-    awaiting = [i for i in all_inds if i.get('status') == 'awaiting_baseline']
+    tracked = [i for i in display_inds if i.get('status') == 'tracked']
+    awaiting = [i for i in display_inds if i.get('status') == 'awaiting_baseline']
     default_cat = category_order[0] if category_order else 'ANC'
 
     if category_order == ['Newborn']:
@@ -701,6 +710,19 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
     except Exception:
         prev_start = prev_end = None
 
+    _prev_df_filtered = pd.DataFrame()
+    if (
+        prev_start is not None and prev_end is not None
+        and 'Date' in network_df.columns and not network_df.empty
+    ):
+        _prev_df_filtered = network_df[
+            (network_df['Date'] >= prev_start) & (network_df['Date'] <= prev_end)
+        ]
+        if selected_facilities and 'Facility' in _prev_df_filtered.columns:
+            _prev_df_filtered = _prev_df_filtered[_prev_df_filtered['Facility'].isin(selected_facilities)]
+        elif selected_districts and 'District' in _prev_df_filtered.columns:
+            _prev_df_filtered = _prev_df_filtered[_prev_df_filtered['District'].isin(selected_districts)]
+
     # Batch aggregate queries: 2 groupbys replace ~84 individual query_coverage calls
     _cur_batch: dict = {}
     _prev_batch: dict = {}
@@ -763,10 +785,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
             if prev_den == 0:
                 # Indicator not in aggregate — fall back to raw prev-period scan.
                 try:
-                    prev_df_slice = network_df[
-                        (network_df['Date'] >= prev_start) & (network_df['Date'] <= prev_end)
-                    ] if 'Date' in network_df.columns and not network_df.empty else pd.DataFrame()
-                    _, _, prev_pct = _cov(prev_df_slice, c['numerator_filters'], c['denominator_filters'])
+                    _, _, prev_pct = _cov(_prev_df_filtered, c['numerator_filters'], c['denominator_filters'])
                 except Exception:
                     prev_pct = c['pct']
             c['delta_pct'] = round(c['pct'] - prev_pct, 1)
@@ -784,14 +803,61 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
                 c['delta_pct'] = None
         elif prev_start is not None:
             try:
-                prev_df = network_df[
-                    (network_df['Date'] >= prev_start) & (network_df['Date'] <= prev_end)
-                ] if 'Date' in network_df.columns and not network_df.empty else pd.DataFrame()
-                if not prev_df.empty and selected_facilities and 'Facility' in prev_df.columns:
-                    prev_df = prev_df[prev_df['Facility'].isin(selected_facilities)]
-                elif not prev_df.empty and selected_districts and 'District' in prev_df.columns:
-                    prev_df = prev_df[prev_df['District'].isin(selected_districts)]
-                _, _, prev_pct = _cov(prev_df, c['numerator_filters'], c['denominator_filters'])
+                _, _, prev_pct = _cov(_prev_df_filtered, c['numerator_filters'], c['denominator_filters'])
+                c['delta_pct'] = round(c['pct'] - prev_pct, 1)
+            except Exception:
+                c['delta_pct'] = None
+        else:
+            c['delta_pct'] = None
+
+    overview_computed = []
+    for ind in overview_inds:
+        if _cur_batch:
+            num, den, pct = _batch_cov(_cur_batch, ind['id'], _kpi_fallbacks)
+            if den == 0:
+                num, den, pct = _cov(facility_df, ind['numerator_filters'], ind['denominator_filters'])
+        elif _agg is not None and _s is not None:
+            num, den, pct = _agg_coverage(
+                _agg, ind['id'], _s, _e,
+                facility_codes=_fac_filter,
+                districts=_dist_filter if not _fac_filter else None,
+                grain=_kpi_grain,
+                indicator_label=ind.get('label'),
+            )
+        else:
+            num, den, pct = _cov(facility_df, ind['numerator_filters'], ind['denominator_filters'])
+        overview_computed.append({
+            **ind,
+            'pct': pct,
+            'numerator': num,
+            'denominator': den,
+            'attained_pct': _target_attainment_pct(pct, ind.get('target', 0), ind),
+        })
+
+    for c in overview_computed:
+        if _prev_batch and prev_start is not None:
+            _, prev_den, prev_pct = _batch_cov(_prev_batch, c['id'], _kpi_fallbacks)
+            if prev_den == 0:
+                try:
+                    _, _, prev_pct = _cov(_prev_df_filtered, c['numerator_filters'], c['denominator_filters'])
+                except Exception:
+                    prev_pct = c['pct']
+            c['delta_pct'] = round(c['pct'] - prev_pct, 1)
+        elif _agg is not None and prev_start is not None:
+            try:
+                _, _, prev_pct = _agg_coverage(
+                    _agg, c['id'], prev_start, prev_end,
+                    facility_codes=_fac_filter,
+                    districts=_dist_filter if not _fac_filter else None,
+                    grain=_kpi_grain,
+                    indicator_label=c.get('label'),
+                )
+                c['delta_pct'] = round(c['pct'] - prev_pct, 1)
+            except Exception:
+                c['delta_pct'] = None
+        elif prev_start is not None:
+            try:
+                _, _, prev_pct = _cov(_prev_df_filtered, c['numerator_filters'], c['denominator_filters'])
                 c['delta_pct'] = round(c['pct'] - prev_pct, 1)
             except Exception:
                 c['delta_pct'] = None
@@ -810,7 +876,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         'Low birthweight newborns',
     }
     by_cat = {}
-    for ind in all_inds:
+    for ind in display_inds:
         if ind.get('category') == 'Newborn' and ind.get('label') in coverage_hidden_labels:
             continue
         by_cat.setdefault(ind.get('category', 'Other'), []).append(ind)
@@ -832,7 +898,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
     _t2 = _time.monotonic()
     trend_switcher = _trend_switcher(
         facility_df,
-        all_inds,
+        display_inds,
         scope_meta=scope_meta,
         payload_key=payload_key,
     )
@@ -840,12 +906,12 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
 
     _t3 = _time.monotonic()
     performance_div, heatmap_div = _coverage_heatmap_section(
-        all_inds,
+        display_inds,
         facility_code,
         network_df,
         precomputed_store=_resolve_heatmap_store(
             network_df,
-            all_inds,
+            display_inds,
             facility_code,
             scope_meta,
             payload_key,
@@ -889,6 +955,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
                 'newborn_ikmc_initiated': 0,
             }
 
+        valid_person = df['person_id'].notna() if 'person_id' in df.columns else pd.Series(False, index=df.index)
         service_col = (
             'Service_Area' if 'Service_Area' in df.columns
             else ('Reporting_Program' if 'Reporting_Program' in df.columns else 'Program')
@@ -897,40 +964,72 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
             df[service_col].fillna('').astype(str).str.upper()
             if service_col in df.columns else pd.Series('', index=df.index)
         )
-        anc_pids = set(df[service_upper.str.contains('ANC', na=False)]['person_id'].dropna().astype(str))
-        labour_pids = set(df[service_upper.str.contains('LABOUR|DELIVERY', na=False)]['person_id'].dropna().astype(str))
-        pnc_pids = set(df[service_upper.str.contains('PNC|POSTNATAL', na=False)]['person_id'].dropna().astype(str))
+        anc_scope = service_upper.str.contains('ANC', na=False)
+        labour_scope = service_upper.str.contains('LABOUR|DELIVERY', na=False)
+        pnc_scope = service_upper.str.contains('PNC|POSTNATAL', na=False)
+        newborn_scope = service_upper.str.contains('NEWBORN|NEONATAL', na=False)
+
+        def _count_people(mask: pd.Series) -> int:
+            if 'person_id' not in df.columns:
+                return 0
+            scoped = mask.fillna(False) & valid_person
+            if not scoped.any():
+                return 0
+            return int(df.loc[scoped, 'person_id'].astype(str).nunique())
+
+        def _pid_set(mask: pd.Series) -> set[str]:
+            if 'person_id' not in df.columns:
+                return set()
+            scoped = mask.fillna(False) & valid_person
+            if not scoped.any():
+                return set()
+            return set(df.loc[scoped, 'person_id'].astype(str))
+
+        anc_pids = _pid_set(anc_scope)
+        labour_pids = _pid_set(labour_scope)
+        pnc_pids = _pid_set(pnc_scope)
+
+        if {'concept_name', 'obs_value_coded', 'person_id'}.issubset(df.columns):
+            concept_name = df['concept_name'].fillna('').astype(str).str.strip()
+            obs_value_lower = df['obs_value_coded'].fillna('').astype(str).str.strip().str.lower()
+            has_positive_obs = ~obs_value_lower.isin(['', 'no', 'none', 'negative', 'unknown'])
+            death_obs = obs_value_lower.isin(['death', 'died', 'dead', 'deceased'])
+        else:
+            concept_name = pd.Series('', index=df.index)
+            obs_value_lower = pd.Series('', index=df.index)
+            has_positive_obs = pd.Series(False, index=df.index)
+            death_obs = pd.Series(False, index=df.index)
 
         anc_visit_clients = len(anc_pids)
         if 'mnid_anc_visit_documented' in df.columns:
-            anc_visit_clients = int(df[df['mnid_anc_visit_documented'].eq('Yes')]['person_id'].nunique())
+            anc_visit_clients = _count_people(df['mnid_anc_visit_documented'].eq('Yes'))
 
         anc_complications = 0
         if {'concept_name', 'obs_value_coded', 'person_id'}.issubset(df.columns):
-            anc_complications = int(df[
-                service_upper.str.contains('ANC', na=False)
-                & df['concept_name'].eq('Obstetric complications')
-                & ~df['obs_value_coded'].fillna('').astype(str).str.lower().isin(['', 'no', 'none', 'negative', 'unknown'])
-            ]['person_id'].nunique())
+            anc_complications = _count_people(
+                anc_scope
+                & concept_name.eq('Obstetric complications')
+                & has_positive_obs
+            )
 
         complications_mask = pd.Series(False, index=df.index)
         for col in ['mnid_labour_maternal_sepsis', 'mnid_labour_pph', 'mnid_labour_eclampsia']:
             if col in df.columns:
                 complications_mask |= df[col].eq('Yes')
-        labour_complications = int(df[complications_mask]['person_id'].nunique())
+        labour_complications = _count_people(complications_mask)
 
         stillbirths = 0
         if 'mnid_labour_stillbirth' in df.columns:
-            stillbirths = int(df[df['mnid_labour_stillbirth'].eq('Yes')]['person_id'].nunique())
+            stillbirths = _count_people(df['mnid_labour_stillbirth'].eq('Yes'))
         live_births = max(len(labour_pids) - stillbirths, 0)
 
         labour_visit_documented = 0
         if 'mnid_labour_visit_documented' in df.columns:
-            labour_visit_documented = int(df[df['mnid_labour_visit_documented'].eq('Yes')]['person_id'].nunique())
+            labour_visit_documented = _count_people(df['mnid_labour_visit_documented'].eq('Yes'))
 
         pnc_visit_documented = 0
         if 'mnid_pnc_visit_documented' in df.columns:
-            pnc_visit_documented = int(df[df['mnid_pnc_visit_documented'].eq('Yes')]['person_id'].nunique())
+            pnc_visit_documented = _count_people(df['mnid_pnc_visit_documented'].eq('Yes'))
 
         pnc_mother_complications = 0
         pnc_newborn_complications = 0
@@ -939,42 +1038,40 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         pnc_mother_status_records = 0
         pnc_baby_status_records = 0
         if {'concept_name', 'obs_value_coded', 'person_id'}.issubset(df.columns):
-            pnc_scope = service_upper.str.contains('PNC|POSTNATAL', na=False)
-            newborn_scope = service_upper.str.contains('NEWBORN|NEONATAL', na=False)
-            pnc_mother_complications = int(df[
+            pnc_mother_complications = _count_people(
                 pnc_scope
-                & df['concept_name'].eq('Postnatal complications')
-                & ~df['obs_value_coded'].fillna('').astype(str).str.lower().isin(['', 'no', 'none', 'negative', 'unknown'])
-            ]['person_id'].nunique())
-            pnc_newborn_complications = int(df[
+                & concept_name.eq('Postnatal complications')
+                & has_positive_obs
+            )
+            pnc_newborn_complications = _count_people(
                 pnc_scope
-                & df['concept_name'].eq('Newborn baby complications')
-                & ~df['obs_value_coded'].fillna('').astype(str).str.lower().isin(['', 'no', 'none', 'negative', 'unknown'])
-            ]['person_id'].nunique())
-            pnc_mother_status_records = int(df[
-                pnc_scope & df['concept_name'].eq('Status of the mother')
-            ]['person_id'].nunique())
-            pnc_baby_status_records = int(df[
-                pnc_scope & df['concept_name'].eq('Status of baby')
-            ]['person_id'].nunique())
-            pnc_maternal_deaths = int(df[
+                & concept_name.eq('Newborn baby complications')
+                & has_positive_obs
+            )
+            pnc_mother_status_records = _count_people(
+                pnc_scope & concept_name.eq('Status of the mother')
+            )
+            pnc_baby_status_records = _count_people(
+                pnc_scope & concept_name.eq('Status of baby')
+            )
+            pnc_maternal_deaths = _count_people(
                 pnc_scope
-                & df['concept_name'].eq('Status of the mother')
-                & df['obs_value_coded'].fillna('').astype(str).str.lower().isin(['death', 'died', 'dead', 'deceased'])
-            ]['person_id'].nunique())
-            pnc_newborn_deaths = int(df[
+                & concept_name.eq('Status of the mother')
+                & death_obs
+            )
+            pnc_newborn_deaths = _count_people(
                 pnc_scope
-                & df['concept_name'].eq('Status of baby')
-                & df['obs_value_coded'].fillna('').astype(str).str.lower().isin(['death', 'died', 'dead', 'deceased'])
-            ]['person_id'].nunique())
-            newborn_status_records = int(df[
-                newborn_scope & df['concept_name'].eq('Status of baby')
-            ]['person_id'].nunique())
-            newborn_neonatal_deaths = int(df[
+                & concept_name.eq('Status of baby')
+                & death_obs
+            )
+            newborn_status_records = _count_people(
+                newborn_scope & concept_name.eq('Status of baby')
+            )
+            newborn_neonatal_deaths = _count_people(
                 newborn_scope
-                & df['concept_name'].eq('Status of baby')
-                & df['obs_value_coded'].fillna('').astype(str).str.lower().isin(['death', 'died', 'dead', 'deceased'])
-            ]['person_id'].nunique())
+                & concept_name.eq('Status of baby')
+                & death_obs
+            )
         else:
             newborn_status_records = 0
             newborn_neonatal_deaths = 0
@@ -983,11 +1080,11 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         for col in ['mnid_newborn_birth_asphyxia', 'mnid_newborn_sepsis', 'mnid_newborn_jaundice']:
             if col in df.columns:
                 newborn_complications_mask |= df[col].eq('Yes')
-        newborn_complications_at_birth = int(df[newborn_complications_mask]['person_id'].nunique())
+        newborn_complications_at_birth = _count_people(newborn_complications_mask)
 
         newborn_ikmc_initiated = 0
         if 'mnid_newborn_kmc' in df.columns:
-            newborn_ikmc_initiated = int(df[df['mnid_newborn_kmc'].eq('Yes')]['person_id'].nunique())
+            newborn_ikmc_initiated = _count_people(df['mnid_newborn_kmc'].eq('Yes'))
 
         return {
             'anc_clients': len(anc_pids),
@@ -1018,50 +1115,10 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
     _activity_stats = []
     if facility_df is not None and not facility_df.empty:
         try:
-            _current_activity = _programme_activity_counts(facility_df)
-            _prev_df = pd.DataFrame()
-            if (
-                prev_start is not None and prev_end is not None
-                and 'Date' in network_df.columns and not network_df.empty
-            ):
-                _prev_df = network_df[
-                    (network_df['Date'] >= prev_start) & (network_df['Date'] <= prev_end)
-                ]
-                if selected_facilities and 'Facility' in _prev_df.columns:
-                    _prev_df = _prev_df[_prev_df['Facility'].isin(selected_facilities)]
-                elif selected_districts and 'District' in _prev_df.columns:
-                    _prev_df = _prev_df[_prev_df['District'].isin(selected_districts)]
-            _previous_activity = _programme_activity_counts(_prev_df)
-
-            def _safe_pct(numerator: int, denominator: int) -> float:
-                if denominator <= 0:
-                    return 0.0
-                return round((numerator / denominator) * 100.0, 1)
-
-            def _activity_metric(
-                label: str,
-                numerator: int,
-                denominator: int,
-                prev_numerator: int,
-                prev_denominator: int,
-                target: float,
-                target_mode: str = 'max',
-                summary: str = '',
-                category: str = 'ANC',
-            ) -> dict:
-                current_pct = _safe_pct(numerator, denominator)
-                previous_pct = _safe_pct(prev_numerator, prev_denominator)
-                return {
-                    'label': label,
-                    'pct': current_pct,
-                    'target': target,
-                    'target_mode': target_mode,
-                    'delta_pct': round(current_pct - previous_pct, 1),
-                    'summary': summary,
-                    'category': category,
-                }
-
-            computed_by_label = {str(item.get('label', '')): item for item in computed}
+            computed_by_label = {
+                str(item.get('label', '')): item
+                for item in (computed + overview_computed)
+            }
 
             def _indicator_activity(label: str, override_label: str | None = None, summary: str | None = None):
                 item = computed_by_label.get(label)
@@ -1076,253 +1133,43 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
 
             if is_all_programmes:
                 _activity_stats = [
-                    _activity_metric(
-                        'ANC Complications',
-                        _current_activity['anc_complications'],
-                        _current_activity['anc_clients'],
-                        _previous_activity['anc_complications'],
-                        _previous_activity['anc_clients'],
-                        15,
-                        'min',
-                        f"{_current_activity['anc_complications']:,} of {_current_activity['anc_clients']:,} ANC clients",
-                        'ANC',
-                    ),
-                    _activity_metric(
-                        'Labour Complications',
-                        _current_activity['labour_complications'],
-                        _current_activity['labour_admissions'],
-                        _previous_activity['labour_complications'],
-                        _previous_activity['labour_admissions'],
-                        15,
-                        'min',
-                        f"{_current_activity['labour_complications']:,} of {_current_activity['labour_admissions']:,} labour admissions",
-                        'Labour',
-                    ),
-                    _activity_metric(
-                        'Live Births',
-                        _current_activity['live_births'],
-                        _current_activity['labour_admissions'],
-                        _previous_activity['live_births'],
-                        _previous_activity['labour_admissions'],
-                        95,
-                        'max',
-                        f"{_current_activity['live_births']:,} of {_current_activity['labour_admissions']:,} labour admissions",
-                        'PNC',
-                    ),
-                    _activity_metric(
-                        'Maternal Deaths',
-                        _current_activity['pnc_maternal_deaths'],
-                        _current_activity['pnc_mother_status_records'],
-                        _previous_activity['pnc_maternal_deaths'],
-                        _previous_activity['pnc_mother_status_records'],
-                        1,
-                        'min',
-                        f"{_current_activity['pnc_maternal_deaths']:,} of {_current_activity['pnc_mother_status_records']:,} mothers with outcome status",
-                        'PNC',
-                    ),
-                    _activity_metric(
-                        'Newborn Deaths',
-                        _current_activity['pnc_newborn_deaths'],
-                        _current_activity['pnc_baby_status_records'],
-                        _previous_activity['pnc_newborn_deaths'],
-                        _previous_activity['pnc_baby_status_records'],
-                        1,
-                        'min',
-                        f"{_current_activity['pnc_newborn_deaths']:,} of {_current_activity['pnc_baby_status_records']:,} babies with outcome status",
-                        'PNC',
-                    ),
+                    _indicator_activity('ANC Complications'),
+                    _indicator_activity('Labour Complications'),
+                    _indicator_activity('Live Births'),
+                    _indicator_activity('Maternal Deaths'),
+                    _indicator_activity('Newborn Deaths'),
                 ]
             elif default_cat == 'Labour':
                 _activity_stats = [
-                    _activity_metric(
-                        'Labour & Delivery Visits',
-                        _current_activity['labour_visit_documented'],
-                        _current_activity['labour_admissions'],
-                        _previous_activity['labour_visit_documented'],
-                        _previous_activity['labour_admissions'],
-                        80,
-                        'max',
-                        f"{_current_activity['labour_visit_documented']:,} of {_current_activity['labour_admissions']:,} labour admissions documented",
-                        'Labour',
-                    ),
-                    _activity_metric(
-                        'Labour Complications',
-                        _current_activity['labour_complications'],
-                        _current_activity['labour_admissions'],
-                        _previous_activity['labour_complications'],
-                        _previous_activity['labour_admissions'],
-                        15,
-                        'min',
-                        f"{_current_activity['labour_complications']:,} of {_current_activity['labour_admissions']:,} labour admissions",
-                        'Labour',
-                    ),
+                    _indicator_activity('Labour & Delivery Visits'),
+                    _indicator_activity('Labour Complications'),
                     _indicator_activity('Partograph use'),
                     _indicator_activity('Overall caesarean section rate'),
-                    _activity_metric(
-                        'Labour Clients Not Reaching PNC',
-                        _current_activity['labour_not_reaching_pnc'],
-                        _current_activity['labour_admissions'],
-                        _previous_activity['labour_not_reaching_pnc'],
-                        _previous_activity['labour_admissions'],
-                        35,
-                        'min',
-                        f"{_current_activity['labour_not_reaching_pnc']:,} of {_current_activity['labour_admissions']:,} labour clients",
-                        'Labour',
-                    ),
+                    _indicator_activity('Labour Clients Not Admissioned to PNC'),
                 ]
             elif default_cat == 'PNC':
                 _activity_stats = [
-                    _activity_metric(
-                        'PNC Visits',
-                        _current_activity['pnc_visit_documented'],
-                        _current_activity['pnc_clients'],
-                        _previous_activity['pnc_visit_documented'],
-                        _previous_activity['pnc_clients'],
-                        80,
-                        'max',
-                        f"{_current_activity['pnc_visit_documented']:,} of {_current_activity['pnc_clients']:,} PNC clients documented",
-                        'PNC',
-                    ),
-                    _activity_metric(
-                        'Mother Complications',
-                        _current_activity['pnc_mother_complications'],
-                        _current_activity['pnc_clients'],
-                        _previous_activity['pnc_mother_complications'],
-                        _previous_activity['pnc_clients'],
-                        15,
-                        'min',
-                        f"{_current_activity['pnc_mother_complications']:,} of {_current_activity['pnc_clients']:,} PNC clients",
-                        'PNC',
-                    ),
-                    _activity_metric(
-                        'Newborn Complications',
-                        _current_activity['pnc_newborn_complications'],
-                        _current_activity['pnc_clients'],
-                        _previous_activity['pnc_newborn_complications'],
-                        _previous_activity['pnc_clients'],
-                        15,
-                        'min',
-                        f"{_current_activity['pnc_newborn_complications']:,} of {_current_activity['pnc_clients']:,} PNC clients",
-                        'PNC',
-                    ),
-                    _activity_metric(
-                        'Maternal Deaths',
-                        _current_activity['pnc_maternal_deaths'],
-                        _current_activity['pnc_mother_status_records'],
-                        _previous_activity['pnc_maternal_deaths'],
-                        _previous_activity['pnc_mother_status_records'],
-                        1,
-                        'min',
-                        f"{_current_activity['pnc_maternal_deaths']:,} of {_current_activity['pnc_mother_status_records']:,} mothers with outcome status",
-                        'PNC',
-                    ),
-                    _activity_metric(
-                        'Newborn Deaths',
-                        _current_activity['pnc_newborn_deaths'],
-                        _current_activity['pnc_baby_status_records'],
-                        _previous_activity['pnc_newborn_deaths'],
-                        _previous_activity['pnc_baby_status_records'],
-                        1,
-                        'min',
-                        f"{_current_activity['pnc_newborn_deaths']:,} of {_current_activity['pnc_baby_status_records']:,} babies with outcome status",
-                        'PNC',
-                    ),
+                    _indicator_activity('PNC Visits'),
+                    _indicator_activity('Mother Complications'),
+                    _indicator_activity('Newborn Complications'),
+                    _indicator_activity('Maternal Deaths'),
+                    _indicator_activity('Newborn Deaths'),
                 ]
             elif default_cat == 'Newborn':
                 _activity_stats = [
-                    _activity_metric(
-                        'Stillbirths',
-                        _current_activity['stillbirths'],
-                        _current_activity['labour_admissions'],
-                        _previous_activity['stillbirths'],
-                        _previous_activity['labour_admissions'],
-                        5,
-                        'min',
-                        f"{_current_activity['stillbirths']:,} of {_current_activity['labour_admissions']:,} births",
-                        'Newborn',
-                    ),
-                    _activity_metric(
-                        'Live Births',
-                        _current_activity['live_births'],
-                        _current_activity['labour_admissions'],
-                        _previous_activity['live_births'],
-                        _previous_activity['labour_admissions'],
-                        95,
-                        'max',
-                        f"{_current_activity['live_births']:,} of {_current_activity['labour_admissions']:,} births",
-                        'Newborn',
-                    ),
-                    _activity_metric(
-                        'Neonatal Deaths',
-                        _current_activity['newborn_neonatal_deaths'],
-                        _current_activity['newborn_status_records'],
-                        _previous_activity['newborn_neonatal_deaths'],
-                        _previous_activity['newborn_status_records'],
-                        5,
-                        'min',
-                        f"{_current_activity['newborn_neonatal_deaths']:,} of {_current_activity['newborn_status_records']:,} babies with outcome status",
-                        'Newborn',
-                    ),
-                    _activity_metric(
-                        'Neonatal Complications at Birth',
-                        _current_activity['newborn_complications_at_birth'],
-                        _current_activity['pnc_clients'] + max(_current_activity['newborn_status_records'] - _current_activity['newborn_neonatal_deaths'], 0),
-                        _previous_activity['newborn_complications_at_birth'],
-                        _previous_activity['pnc_clients'] + max(_previous_activity['newborn_status_records'] - _previous_activity['newborn_neonatal_deaths'], 0),
-                        15,
-                        'min',
-                        f"{_current_activity['newborn_complications_at_birth']:,} newborn clients with complications recorded",
-                        'Newborn',
-                    ),
-                    _activity_metric(
-                        'iKMC Initiated',
-                        _current_activity['newborn_ikmc_initiated'],
-                        max(_current_activity['newborn_status_records'], _current_activity['pnc_clients']),
-                        _previous_activity['newborn_ikmc_initiated'],
-                        max(_previous_activity['newborn_status_records'], _previous_activity['pnc_clients']),
-                        80,
-                        'max',
-                        f"{_current_activity['newborn_ikmc_initiated']:,} newborn clients with iKMC initiated",
-                        'Newborn',
-                    ),
+                    _indicator_activity('Stillbirths'),
+                    _indicator_activity('Live Births'),
+                    _indicator_activity('Neonatal Deaths'),
+                    _indicator_activity('Neonatal Complications at Birth'),
+                    _indicator_activity('iKMC Initiated'),
                 ]
             else:
                 _activity_stats = [
-                    _activity_metric(
-                        'ANC Visits',
-                        _current_activity['anc_visit_clients'],
-                        _current_activity['anc_clients'],
-                        _previous_activity['anc_visit_clients'],
-                        _previous_activity['anc_clients'],
-                        80,
-                        'max',
-                        f"{_current_activity['anc_visit_clients']:,} ANC clients in selected period",
-                        'ANC',
-                    ),
-                    _activity_metric(
-                        'ANC Complications',
-                        _current_activity['anc_complications'],
-                        _current_activity['anc_clients'],
-                        _previous_activity['anc_complications'],
-                        _previous_activity['anc_clients'],
-                        15,
-                        'min',
-                        f"{_current_activity['anc_complications']:,} of {_current_activity['anc_clients']:,} ANC clients with obstetric complications recorded",
-                        'ANC',
-                    ),
+                    _indicator_activity('ANC Visits'),
+                    _indicator_activity('ANC Complications'),
                     _indicator_activity('Blood pressure measured'),
                     _indicator_activity('Tested for HIV'),
-                    _activity_metric(
-                        'ANC Clients Not Reaching Labour',
-                        _current_activity['anc_not_reaching_labour'],
-                        _current_activity['anc_clients'],
-                        _previous_activity['anc_not_reaching_labour'],
-                        _previous_activity['anc_clients'],
-                        35,
-                        'min',
-                        f"{_current_activity['anc_not_reaching_labour']:,} of {_current_activity['anc_clients']:,} ANC clients",
-                        'ANC',
-                    ),
+                    _indicator_activity('ANC Clients Not Admissioned to Labour'),
                 ]
             _activity_stats = [item for item in _activity_stats if item]
         except Exception:
@@ -2135,9 +1982,7 @@ def _service_table_payload(df: pd.DataFrame, scope_meta: dict | None = None) -> 
             'metrics': [
                 ('Neonatal records', lambda x: _count_entities(x, 'encounter_id')),
                 ('Unique babies', lambda x: _count_entities(x, 'person_id')),
-                ('Neonatal enrolment', lambda x: _count_entities(x[x['Encounter_Source'].fillna('').astype(str) == 'NEONATAL ENROLMENT'] if 'Encounter_Source' in x.columns else x, 'encounter_id')),
                 ('Birth weight recorded', lambda x: _concept_count(x, 'Birth weight', any_value=True)),
-                ('Gestation weeks recorded', lambda x: _concept_count(x, 'Gestation in weeks', any_value=True)),
                 ('Vitamin K given', lambda x: _concept_count(x, 'Vitamin K given', ['Yes'])),
                 ('Resuscitation recorded', lambda x: _concept_count(x, 'Neonatal resuscitation provided', any_value=True)),
                 ('Active resuscitation', lambda x: _concept_count(x, 'Neonatal resuscitation provided', ['Yes', 'Stimulation only', 'Bag and mask'])),
@@ -2163,7 +2008,6 @@ def _service_table_payload(df: pd.DataFrame, scope_meta: dict | None = None) -> 
                     'total_metric': 'Unique babies',
                     'segments': [
                         {'label': 'Birth weight recorded', 'metric': 'Birth weight recorded', 'color': '#7C3AED'},
-                        {'label': 'Gestation weeks recorded', 'metric': 'Gestation weeks recorded', 'color': '#0891B2'},
                     ],
                     'remainder_label': 'Other / missing documentation',
                     'remainder_color': '#CBD5E1',
