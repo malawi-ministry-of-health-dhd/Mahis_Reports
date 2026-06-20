@@ -102,6 +102,7 @@ _EXECUTIVE_CACHE_DIR = os.environ.get('MNID_EXEC_CACHE_DIR') or os.path.join(
 _MNID_EXECUTIVE_DISK_CACHE = diskcache.Cache(_EXECUTIVE_CACHE_DIR, size_limit=512 * 1024 * 1024)
 _MNID_WARNED_MESSAGES = set()
 _LOGGER = logging.getLogger(__name__)
+_COUNTRY_PROFILE_RENDER_VERSION = "country-profile-v2-two-column-trends"
 
 
 def _dk(prefix: str, key_data) -> str:
@@ -170,6 +171,22 @@ def _agg_version_stamp() -> str:
     except Exception:
         pass
     return ''
+
+
+def _country_profile_cache_key(scope_meta, opd_key, start_date, end_date, report_name, selected_facilities=(), selected_districts=()):
+    return (
+        (
+            (scope_meta or {}).get('dataset_version'),
+            opd_key,
+            tuple(sorted(selected_facilities or ())),
+            tuple(sorted(selected_districts or ())),
+        ),
+        start_date,
+        end_date,
+        report_name,
+        _agg_version_stamp(),
+        _COUNTRY_PROFILE_RENDER_VERSION,
+    )
 
 
 def _get_network_df_from_state(state: dict):
@@ -2894,12 +2911,12 @@ def _prewarm_country_profile() -> bool:
             if facility_df is None or facility_df.empty:
                 continue
 
-            cp_key = (
-                (scope_meta.get('dataset_version'), opd_key, (), ()),
+            cp_key = _country_profile_cache_key(
+                scope_meta,
+                opd_key,
                 start_date,
                 end_date,
                 config.get('report_name'),
-                _agg_version_stamp(),
             )
             _cp_disk_key = _dk('cp', cp_key)
             if _worker_view_cache.get(_cp_disk_key) or _MNID_EXECUTIVE_DISK_CACHE.get(_cp_disk_key):
@@ -3044,7 +3061,13 @@ def render_mnid_dashboard(data_opd, config,
     # behind the fixed loading overlay.
     _target_tab = resolved_initial_tab
     if _target_tab == 'country-profile':
-        _cp_disk_key = _dk('cp', (_opd_key, start_date, end_date, config.get('report_name')))
+        _cp_disk_key = _dk('cp', _country_profile_cache_key(
+            scope_meta,
+            _opd_key,
+            start_date,
+            end_date,
+            config.get('report_name'),
+        ))
         cp_cached = _MNID_EXECUTIVE_DISK_CACHE.get(_cp_disk_key)
         if cp_cached is None:
             cp_cached = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label)
@@ -3126,17 +3149,14 @@ def _build_executive_tab_view(selected: str, views: dict, state: dict,
         threading.Thread(target=_async_etv_write, daemon=True).start()
 
     if selected == 'country-profile' and facility_df is not None:
-        cp_key = (
-            (
-                (scope_meta or {}).get('dataset_version'),
-                state.get('opd_key'),
-                tuple(sorted((scope_meta or {}).get('selected_facilities') or [])),
-                tuple(sorted((scope_meta or {}).get('selected_districts') or [])),
-            ),
+        cp_key = _country_profile_cache_key(
+            scope_meta,
+            state.get('opd_key'),
             start_date,
             end_date,
             config.get('report_name') if config else None,
-            _agg_version_stamp(),
+            (scope_meta or {}).get('selected_facilities') or (),
+            (scope_meta or {}).get('selected_districts') or (),
         )
         _cp_disk_key = _dk('cp', cp_key)
         cp_cached = _worker_view_cache.get(_cp_disk_key)
