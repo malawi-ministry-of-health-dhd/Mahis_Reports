@@ -57,6 +57,13 @@ _EXEC_CHART_LAYOUT = dict(
     ),
 )
 
+_EXEC_GRAIN_OPTIONS = [
+    {"label": "Weekly", "value": "weekly"},
+    {"label": "Monthly", "value": "monthly"},
+    {"label": "Quarterly", "value": "quarterly"},
+    {"label": "Yearly", "value": "yearly"},
+]
+
 
 def _exec_chart_layout(
     height: int = 300,
@@ -88,6 +95,89 @@ def _hex_to_rgba(color: str, alpha: float) -> str:
         b = int(color[5:7], 16)
         return f"rgba({r},{g},{b},{alpha})"
     return f"rgba(15,23,42,{alpha})"
+
+
+def _bucket_start(series: pd.Series, grain: str) -> pd.Series:
+    dt = pd.to_datetime(series, errors="coerce")
+    grain = str(grain or "monthly").strip().lower()
+    if grain == "weekly":
+        return dt.dt.to_period("W-SUN").dt.start_time
+    if grain == "quarterly":
+        return dt.dt.to_period("Q").dt.start_time
+    if grain == "yearly":
+        return dt.dt.to_period("Y").dt.start_time
+    return dt.dt.to_period("M").dt.start_time
+
+
+def _format_grain_label(period_start: pd.Timestamp, grain: str) -> str:
+    if pd.isna(period_start):
+        return ""
+    grain = str(grain or "monthly").strip().lower()
+    if grain == "weekly":
+        period_end = period_start + pd.Timedelta(days=6)
+        if period_start.month == period_end.month:
+            return f"{period_start.strftime('%b')} {period_start.day}-{period_end.day}"
+        return f"{period_start.strftime('%b')} {period_start.day}-{period_end.strftime('%b')} {period_end.day}"
+    if grain == "quarterly":
+        quarter = ((period_start.month - 1) // 3) + 1
+        return f"Q{quarter} {period_start.year}"
+    if grain == "yearly":
+        return period_start.strftime("%Y")
+    return period_start.strftime("%b %Y")
+
+
+def bucket_time_series(series_df: pd.DataFrame, grain: str, value_col: str = "value") -> pd.DataFrame:
+    if series_df is None or series_df.empty or "month" not in series_df.columns or value_col not in series_df.columns:
+        return pd.DataFrame(columns=["period_start", "bucket_key", "bucket_label", value_col])
+    working = series_df.copy()
+    working["period_start"] = _bucket_start(working["month"], grain)
+    working = working.dropna(subset=["period_start"])
+    if working.empty:
+        return pd.DataFrame(columns=["period_start", "bucket_key", "bucket_label", value_col])
+    bucketed = (
+        working.groupby("period_start", as_index=False)[value_col]
+        .sum()
+        .sort_values("period_start")
+    )
+    bucketed["bucket_key"] = bucketed["period_start"].dt.strftime("%Y-%m-%d")
+    bucketed["bucket_label"] = bucketed["period_start"].apply(lambda ts: _format_grain_label(ts, grain))
+    if not bucketed.empty:
+        full_idx = pd.date_range(
+            bucketed["period_start"].min(),
+            bucketed["period_start"].max(),
+            freq={
+                "weekly": "W-MON",
+                "monthly": "MS",
+                "quarterly": "QS",
+                "yearly": "YS",
+            }.get(str(grain or "monthly").lower(), "MS"),
+        )
+        bucketed = (
+            bucketed.set_index("period_start")
+            .reindex(full_idx, fill_value=0)
+            .rename_axis("period_start")
+            .reset_index()
+        )
+        bucketed["bucket_key"] = bucketed["period_start"].dt.strftime("%Y-%m-%d")
+        bucketed["bucket_label"] = bucketed["period_start"].apply(lambda ts: _format_grain_label(ts, grain))
+    return bucketed
+
+
+def describe_grain_window(bucketed_df: pd.DataFrame, grain: str) -> str:
+    if bucketed_df is None or bucketed_df.empty or "period_start" not in bucketed_df.columns:
+        return f"Showing {grain} data"
+    start = bucketed_df["period_start"].min()
+    end = bucketed_df["period_start"].max()
+    if pd.isna(start) or pd.isna(end):
+        return f"Showing {grain} data"
+    grain = str(grain or "monthly").lower()
+    if grain == "weekly":
+        return f"Showing weekly data, {_format_grain_label(start, 'weekly')} to {_format_grain_label(end, 'weekly')}"
+    if grain == "quarterly":
+        return f"Showing quarterly data, {_format_grain_label(start, 'quarterly')} to {_format_grain_label(end, 'quarterly')}"
+    if grain == "yearly":
+        return f"Showing yearly data, {_format_grain_label(start, 'yearly')} to {_format_grain_label(end, 'yearly')}"
+    return f"Showing monthly data, {start.strftime('%b %Y')} to {end.strftime('%b %Y')}"
 
 
 def _section_header(title: str) -> html.Div:
@@ -596,9 +686,13 @@ def _run_chart(series: pd.DataFrame, title: str, color: str, y_title: str, targe
         )
         return fig
 
-    smoothed, _ = _moving_average_values(series["value"].tolist(), "monthly")
+    plot_series = series.copy()
+    x_values = plot_series["bucket_key"] if "bucket_key" in plot_series.columns else plot_series["month"]
+    hover_labels = plot_series["bucket_label"] if "bucket_label" in plot_series.columns else pd.to_datetime(plot_series["month"], errors="coerce").dt.strftime("%b %Y")
+    smooth_grain = "monthly" if len(plot_series) > 2 else "weekly"
+    smoothed, _ = _moving_average_values(plot_series["value"].tolist(), smooth_grain)
     fig.add_trace(go.Scatter(
-        x=series["month"],
+        x=x_values,
         y=smoothed,
         name=title,
         mode="lines+markers",
@@ -606,7 +700,8 @@ def _run_chart(series: pd.DataFrame, title: str, color: str, y_title: str, targe
         marker=dict(size=7, color=color, line=dict(color="#fff", width=1.5)),
         fill="tozeroy",
         fillcolor=_hex_to_rgba(color, 0.08),
-        hovertemplate="%{x|%b %Y}<br>%{y:.1f}<extra></extra>",
+        customdata=hover_labels,
+        hovertemplate="%{customdata}<br>%{y:.1f}<extra></extra>",
     ))
     if target is not None:
         fig.add_hline(
@@ -624,9 +719,9 @@ def _run_chart(series: pd.DataFrame, title: str, color: str, y_title: str, targe
             showline=False,
             zeroline=False,
             tickfont=dict(size=11, color="#94a3b8"),
-            tickformat="%b %Y",
             tickangle=0,
             title=dict(text="Month", font=dict(size=10, color="#64748b")),
+            type="category",
         ),
         yaxis=dict(
             showgrid=True,
@@ -720,7 +815,16 @@ def _multi_run_chart(series_df: pd.DataFrame, title: str, y_title: str, target: 
     return fig
 
 
-def _trend_chart_card(title: str, subtitle: str, figure: go.Figure, accent: str) -> dmc.Paper:
+def _trend_chart_card(
+    title: str,
+    subtitle: str,
+    figure: go.Figure,
+    accent: str,
+    header_right=None,
+    graph_id: str | None = None,
+    caption: str | None = None,
+    caption_id: str | None = None,
+) -> dmc.Paper:
     return dmc.Paper(
         withBorder=True,
         radius="md",
@@ -734,23 +838,32 @@ def _trend_chart_card(title: str, subtitle: str, figure: go.Figure, accent: str)
         },
         children=[
             html.Div([
-                html.Div(title, style={
-                    "fontSize": "13px",
-                    "fontWeight": "800",
-                    "color": "#0f172a",
-                    "lineHeight": "1.2",
-                    "marginBottom": "4px",
-                }),
-                html.Div(subtitle, style={
-                    "fontSize": "11px",
-                    "color": "#64748b",
-                }),
-            ], style={"padding": "2px 4px 6px 4px"}),
+                html.Div([
+                    html.Div(title, style={
+                        "fontSize": "13px",
+                        "fontWeight": "800",
+                        "color": "#0f172a",
+                        "lineHeight": "1.2",
+                        "marginBottom": "4px",
+                    }),
+                    html.Div(subtitle, style={
+                        "fontSize": "11px",
+                        "color": "#64748b",
+                    }),
+                ], style={"flex": "1", "minWidth": "0"}),
+                *([header_right] if header_right is not None else []),
+            ], style={"padding": "2px 4px 6px 4px", "display": "flex", "justifyContent": "space-between", "alignItems": "flex-start", "gap": "12px", "flexWrap": "wrap"}),
             dcc.Graph(
+                **({"id": graph_id} if graph_id is not None else {}),
                 figure=figure,
                 config={"displayModeBar": False, "responsive": True},
                 style={"height": "240px"},
             ),
+            *([html.Div(caption or "", id=caption_id, style={
+                "fontSize": "11px",
+                "color": "#64748b",
+                "padding": "0 4px 2px 4px",
+            })] if caption is not None or caption_id is not None else []),
         ],
     )
 
@@ -1053,6 +1166,7 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
         PRIMARY_GREEN,
     )}, df)
     total_births_series = total_births_series[["month", "value"]].copy() if not total_births_series.empty else pd.DataFrame(columns=["month", "value"])
+    total_births_bucketed = bucket_time_series(total_births_series, "monthly")
     stillbirth_trend_series = _monthly_multiseries({
         "Total stillbirths": (_yn_mask(df, "mnid_labour_stillbirth"), STILLBIRTH_BLUE),
         "Fresh stillbirths": (
@@ -1173,9 +1287,32 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
             _two_column_chart_grid([
                 _trend_chart_card(
                     "Total Births",
-                    _trend_subtitle("Total Births"),
-                    _run_chart(total_births_series, "Total Births", PRIMARY_GREEN, "Births"),
+                    "Birth volume over time",
+                    _run_chart(total_births_bucketed, "Total Births", PRIMARY_GREEN, "Births"),
                     PRIMARY_GREEN,
+                    header_right=html.Div([
+                        dmc.SegmentedControl(
+                            id="mnid-cp-total-births-grain",
+                            value="monthly",
+                            data=_EXEC_GRAIN_OPTIONS,
+                            radius="xl",
+                            size="xs",
+                            color="green",
+                            styles={
+                                "root": {"background": "#fff", "border": f"1px solid {_hex_to_rgba(PRIMARY_GREEN, 0.22)}", "padding": "2px"},
+                                "control": {"border": "0"},
+                                "label": {"fontSize": "11px", "fontWeight": 600, "color": "#64748b", "padding": "4px 10px"},
+                                "indicator": {"background": _hex_to_rgba(PRIMARY_GREEN, 0.14), "border": f"1px solid {_hex_to_rgba(PRIMARY_GREEN, 0.18)}"},
+                            },
+                        ),
+                        dcc.Store(
+                            id="mnid-cp-total-births-series",
+                            data=total_births_series.assign(month=lambda x: pd.to_datetime(x["month"], errors="coerce").dt.strftime("%Y-%m-%d")).to_dict("records"),
+                        ),
+                    ], style={"display": "flex", "alignItems": "center", "gap": "8px"}),
+                    graph_id="mnid-cp-total-births-graph",
+                    caption=describe_grain_window(total_births_bucketed, "monthly"),
+                    caption_id="mnid-cp-total-births-caption",
                 ),
                 _trend_chart_card(
                     "Maternal Mortality",
