@@ -824,6 +824,21 @@ def _mortality_card(
     delta_prefix = "+" if delta_count > 0 else ""
     delta_label = f"{delta_prefix}{delta_count:,}"
     is_worse = delta_count > 0
+    breakdown = breakdown or []
+    breakdown_widths = []
+    if breakdown:
+        parsed_values = []
+        for _label, value in breakdown:
+            pct_match = None
+            if isinstance(value, str):
+                import re
+                pct_match = re.search(r"(\d+(?:\.\d+)?)%", value)
+            parsed_values.append(float(pct_match.group(1)) if pct_match else 0.0)
+        total_pct = sum(parsed_values)
+        if total_pct > 0:
+            breakdown_widths = [max((pct / total_pct) * 100, 0) for pct in parsed_values]
+        else:
+            breakdown_widths = [50.0 for _ in breakdown]
     return dmc.Paper(
         withBorder=False,
         radius="lg",
@@ -841,43 +856,81 @@ def _mortality_card(
                 "fontSize": "10px", "fontWeight": "700", "letterSpacing": ".08em",
                 "textTransform": "uppercase", "color": accent, "marginBottom": "10px",
             }),
-            html.Div(f"{count:,}", style={
-                "fontSize": "36px", "fontWeight": "800", "letterSpacing": "-.04em",
-                "color": accent, "lineHeight": "1", "marginBottom": "6px",
-            }),
-            html.Span(delta_label, style={
-                "fontSize": "11px", "fontWeight": "700", "padding": "3px 9px",
-                "borderRadius": "99px",
-                "background": f"rgba({tokens['shadow_rgba']},.12)",
-                "color": accent, "display": "inline-block", "marginBottom": "14px",
-            }),
+            html.Div([
+                html.Div([
+                    html.Div(f"{count:,}", style={
+                        "fontSize": "44px", "fontWeight": "800", "letterSpacing": "-.05em",
+                        "color": accent, "lineHeight": "0.95", "marginBottom": "8px",
+                    }),
+                    html.Div("Recorded in the selected reporting period", style={
+                        "fontSize": "11px", "color": "#64748b",
+                    }),
+                ], style={"flex": "1", "minWidth": "0"}),
+                html.Div([
+                    html.Div("Change vs last period", style={
+                        "fontSize": "10px", "fontWeight": "700", "color": "#64748b",
+                        "textTransform": "uppercase", "letterSpacing": ".05em", "marginBottom": "6px",
+                    }),
+                    html.Span(
+                        f"{'Increase' if is_worse else 'Decrease'} {delta_label}",
+                        style={
+                            "fontSize": "12px", "fontWeight": "800", "padding": "5px 10px",
+                            "borderRadius": "999px",
+                            "background": "#FEE2E2" if is_worse else "#DCFCE7",
+                            "color": "#DC2626" if is_worse else "#15803D",
+                            "display": "inline-block",
+                        },
+                    ),
+                ], style={"minWidth": "170px"}),
+            ], style={"display": "flex", "gap": "14px", "justifyContent": "space-between", "alignItems": "flex-start", "marginBottom": "12px", "flexWrap": "wrap"}),
             html.Hr(style={"border": "none", "borderTop": "1px solid rgba(0,0,0,.07)", "margin": "10px 0"}),
             html.Div([
                 html.Div([
-                    html.Div(rate_label, style={"fontSize": "10px", "color": "#64748b", "marginBottom": "2px"}),
-                    html.Div(f"{rate_value:,.1f}", style={"fontSize": "12px", "fontWeight": "700", "color": "#0f172a"}),
+                    html.Div(rate_label, style={"fontSize": "10px", "color": "#64748b", "marginBottom": "4px"}),
+                    html.Div(f"{rate_value:,.1f}", style={"fontSize": "18px", "fontWeight": "800", "color": "#0f172a"}),
                 ]),
                 html.Div([
-                    html.Div("vs. last period", style={"fontSize": "10px", "color": "#64748b", "marginBottom": "2px"}),
+                    html.Div("Interpretation", style={"fontSize": "10px", "color": "#64748b", "marginBottom": "4px"}),
                     html.Div(
-                        f"{'▲' if is_worse else '▼'} {delta_label}",
-                        style={"fontSize": "12px", "fontWeight": "700", "color": "#dc2626" if is_worse else "#16a34a"},
+                        "Stillbirth burden needs attention" if count > 0 else "No stillbirths recorded",
+                        style={"fontSize": "12px", "fontWeight": "700", "color": "#dc2626" if count > 0 else "#16a34a"},
                     ),
                 ]),
             ], style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "8px"}),
             *([
                 html.Div([
+                    html.Div("Stillbirth breakdown", style={
+                        "fontSize": "10px", "fontWeight": "700", "color": "#64748b",
+                        "textTransform": "uppercase", "letterSpacing": ".05em", "marginBottom": "8px",
+                    }),
                     html.Div([
-                        html.Span(label, style={"fontSize": "10px", "fontWeight": "700", "color": accent}),
-                        html.Span(value, style={"fontSize": "10px", "color": "#334155"}),
+                        html.Div(style={
+                            "height": "10px",
+                            "width": f"{breakdown_widths[idx]:.1f}%",
+                            "background": ["#8B5CF6", "#C084FC"][idx % 2],
+                        })
+                        for idx, _ in enumerate(breakdown)
                     ], style={
-                        "padding": "6px 8px",
-                        "background": "#fff",
-                        "border": f"1px solid rgba({tokens['shadow_rgba']},.16)",
-                        "borderRadius": "8px",
-                    })
-                    for label, value in breakdown
-                ], style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "8px", "marginTop": "12px"})
+                        "display": "flex",
+                        "width": "100%",
+                        "overflow": "hidden",
+                        "borderRadius": "999px",
+                        "background": "#E9D5FF",
+                        "marginBottom": "10px",
+                    }),
+                    html.Div([
+                        html.Div([
+                            html.Div(label, style={"fontSize": "11px", "fontWeight": "700", "color": accent, "marginBottom": "4px"}),
+                            html.Div(value, style={"fontSize": "12px", "fontWeight": "600", "color": "#334155"}),
+                        ], style={
+                            "padding": "10px 12px",
+                            "background": "#fff",
+                            "border": f"1px solid rgba({tokens['shadow_rgba']},.16)",
+                            "borderRadius": "10px",
+                        })
+                        for label, value in breakdown
+                    ], style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "8px"})
+                ], style={"marginTop": "14px"})
             ] if breakdown else []),
         ],
     )
