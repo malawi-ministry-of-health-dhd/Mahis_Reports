@@ -58,6 +58,20 @@ _EXEC_CHART_LAYOUT = dict(
 )
 
 
+def _exec_chart_layout(height: int = 300, xaxis: dict | None = None, yaxis: dict | None = None) -> dict:
+    layout = dict(_EXEC_CHART_LAYOUT)
+    layout["height"] = height
+    if xaxis is not None:
+        merged_xaxis = dict(_EXEC_CHART_LAYOUT.get("xaxis", {}))
+        merged_xaxis.update(xaxis)
+        layout["xaxis"] = merged_xaxis
+    if yaxis is not None:
+        merged_yaxis = dict(_EXEC_CHART_LAYOUT.get("yaxis", {}))
+        merged_yaxis.update(yaxis)
+        layout["yaxis"] = merged_yaxis
+    return layout
+
+
 def _section_header(title: str) -> html.Div:
     return html.Div([
         html.Span(style={
@@ -538,8 +552,7 @@ def _run_chart(series: pd.DataFrame, title: str, color: str, y_title: str, targe
     fig = go.Figure()
     if series.empty:
         fig.update_layout(
-            **_EXEC_CHART_LAYOUT,
-            height=300,
+            **_exec_chart_layout(height=300),
             annotations=[dict(text="No trend data available", x=0.5, y=0.5, xref="paper", yref="paper", showarrow=False, font=dict(size=12, color=MUTED))],
         )
         return fig
@@ -560,8 +573,7 @@ def _run_chart(series: pd.DataFrame, title: str, color: str, y_title: str, targe
             annotation_font=dict(color="#f59e0b", size=10),
             annotation_position="right",
         )
-    fig.update_layout(
-        **_EXEC_CHART_LAYOUT,
+    fig.update_layout(**_exec_chart_layout(
         height=300,
         xaxis=dict(
             showgrid=False,
@@ -581,7 +593,7 @@ def _run_chart(series: pd.DataFrame, title: str, color: str, y_title: str, targe
             title=dict(text=y_title, font=dict(size=10, color="#64748b")),
             rangemode="tozero",
         ),
-    )
+    ))
     return fig
 
 
@@ -589,8 +601,7 @@ def _multi_run_chart(series_df: pd.DataFrame, title: str, y_title: str, target: 
     fig = go.Figure()
     if series_df.empty:
         fig.update_layout(
-            **_EXEC_CHART_LAYOUT,
-            height=300,
+            **_exec_chart_layout(height=300),
             annotations=[dict(text="No trend data available", x=0.5, y=0.5, xref="paper", yref="paper", showarrow=False, font=dict(size=12, color=MUTED))],
         )
         return fig
@@ -616,8 +627,7 @@ def _multi_run_chart(series_df: pd.DataFrame, title: str, y_title: str, target: 
             annotation_position="right",
         )
 
-    fig.update_layout(
-        **_EXEC_CHART_LAYOUT,
+    fig.update_layout(**_exec_chart_layout(
         height=300,
         xaxis=dict(
             showgrid=False,
@@ -637,7 +647,7 @@ def _multi_run_chart(series_df: pd.DataFrame, title: str, y_title: str, target: 
             title=dict(text=y_title, font=dict(size=10, color="#64748b")),
             rangemode="tozero",
         ),
-    )
+    ))
     return fig
 
 
