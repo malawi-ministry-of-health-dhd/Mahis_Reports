@@ -557,13 +557,27 @@ def _run_chart(series: pd.DataFrame, title: str, color: str, y_title: str, targe
         )
         return fig
 
+    smoothed, _ = _moving_average_values(series["value"].tolist(), "monthly")
+    r = int(color[1:3], 16) if color.startswith("#") and len(color) == 7 else 21
+    g_v = int(color[3:5], 16) if color.startswith("#") and len(color) == 7 else 128
+    b = int(color[5:7], 16) if color.startswith("#") and len(color) == 7 else 61
     fig.add_trace(go.Scatter(
         x=series["month"],
         y=series["value"],
-        name=title,
+        name="Actual",
         mode="lines+markers",
         line=dict(color=color, width=2.4),
         marker=dict(size=5, color=color, line=dict(color="#fff", width=1.2)),
+        fill="tozeroy",
+        fillcolor=f"rgba({r},{g_v},{b},0.08)",
+    ))
+    fig.add_trace(go.Scatter(
+        x=series["month"],
+        y=smoothed,
+        name="3-mo avg",
+        mode="lines",
+        line=dict(color=color, width=1.4, dash="dot"),
+        opacity=0.7,
     ))
     if target is not None:
         fig.add_hline(
@@ -606,17 +620,33 @@ def _multi_run_chart(series_df: pd.DataFrame, title: str, y_title: str, target: 
         )
         return fig
 
+    first_trace = True
     for label in series_df["series"].dropna().unique():
         trace_df = series_df[series_df["series"] == label]
         color = trace_df["color"].iloc[0] if "color" in trace_df.columns and not trace_df.empty else PRIMARY_GREEN
+        smoothed, _ = _moving_average_values(trace_df["value"].tolist(), "monthly")
+        r = int(color[1:3], 16) if color.startswith("#") and len(color) == 7 else 21
+        g_v = int(color[3:5], 16) if color.startswith("#") and len(color) == 7 else 128
+        b = int(color[5:7], 16) if color.startswith("#") and len(color) == 7 else 61
         fig.add_trace(go.Scatter(
             x=trace_df["month"],
             y=trace_df["value"],
-            name=label,
+            name=f"{label} Actual",
             mode="lines+markers",
             line=dict(color=color, width=2.2),
             marker=dict(size=5, color=color, line=dict(color="#fff", width=1.0)),
+            fill="tozeroy" if first_trace else None,
+            fillcolor=f"rgba({r},{g_v},{b},0.05)" if first_trace else None,
         ))
+        fig.add_trace(go.Scatter(
+            x=trace_df["month"],
+            y=smoothed,
+            name=f"{label} 3-mo avg",
+            mode="lines",
+            line=dict(color=color, width=1.2, dash="dot"),
+            opacity=0.65,
+        ))
+        first_trace = False
 
     if target is not None:
         fig.add_hline(
