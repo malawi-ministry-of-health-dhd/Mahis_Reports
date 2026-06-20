@@ -521,10 +521,26 @@ def _coverage_phase_fig(
         def _get_cov(ind):
             return _cov(df, ind['numerator_filters'], ind['denominator_filters'])
 
+    def _wrap(text, width=28):
+        if len(text) <= width:
+            return text
+        words = text.split()
+        lines, cur = [], ''
+        for w in words:
+            if cur and len(cur) + 1 + len(w) > width:
+                lines.append(cur)
+                cur = w
+            else:
+                cur = (cur + ' ' + w).strip()
+        if cur:
+            lines.append(cur)
+        return '<br>'.join(lines)
+
     rows = []
     for ind in indicators:
+        lbl = _wrap(ind['label'])
         if ind.get('status') == 'awaiting_baseline':
-            rows.append({'label': ind['label'][:36], 'pct': None,
+            rows.append({'label': lbl, 'pct': None,
                          'target': ind['target'], 'cls': 'await',
                          'sub': 'Awaiting baseline'})
         else:
@@ -533,7 +549,7 @@ def _coverage_phase_fig(
             else:
                 num, den, pct = _get_cov(ind)
             cls = _css(pct, ind['target'])
-            rows.append({'label': ind['label'][:36], 'pct': pct,
+            rows.append({'label': lbl, 'pct': pct,
                          'target': ind['target'], 'cls': cls,
                          'sub': f'{num}/{den}'})
 
@@ -550,7 +566,10 @@ def _coverage_phase_fig(
     text_vals = [f"{r['pct']:.0f}%" if r['pct'] is not None else 'No data' for r in rows]
 
     wide = row_height > 38
-    height = max(len(rows) * row_height + 70, CHART_HEIGHT_SM)
+    # Increase row height for wrapped (multi-line) labels
+    has_wrapped = any('<br>' in r['label'] for r in rows)
+    effective_row_height = max(row_height, 52 if has_wrapped else row_height)
+    height = max(len(rows) * effective_row_height + 70, CHART_HEIGHT_SM)
 
     fig = go.Figure()
 
@@ -582,7 +601,7 @@ def _coverage_phase_fig(
         paper_bgcolor=BG, plot_bgcolor=BG,
         font=dict(family=FONT, color=TEXT, size=11),
         height=height,
-        margin=dict(l=8, r=60, t=8, b=8),
+        margin=dict(l=12, r=60, t=8, b=8),
         xaxis=dict(range=[0, 115], showgrid=True, gridcolor=GRID_C,
                    zeroline=False, showline=False,
                    ticksuffix='%', tickfont=dict(size=10 if wide else 9, color=MUTED)),
