@@ -74,46 +74,17 @@ def _section_header(title: str) -> html.Div:
 def _exec_alert_banner(maternal_deaths: int, mmr: float, neonatal_deaths: int, stillbirths: int) -> html.Div:
     items = []
     if maternal_deaths > 0:
-        items.append(("Maternal Deaths", maternal_deaths, f"MMR {mmr:.0f}/100k"))
+        items.append(("Maternal deaths", maternal_deaths, f"MMR {mmr:.0f} per 100,000 live births"))
     if neonatal_deaths > 0:
-        items.append(("Neonatal Deaths", neonatal_deaths, "this period"))
+        items.append(("Neonatal deaths", neonatal_deaths, "Recorded in the selected period"))
     if stillbirths > 0:
-        items.append(("Stillbirths", stillbirths, "this period"))
+        items.append(("Stillbirths", stillbirths, "Recorded in the selected period"))
     if not items:
         return html.Div()
 
-    n = len(items)
-    slot = 3.5
-    total = n * slot
-    kf_name = f'mnid-alert-rotate-{min(n, 15)}'
-
-    def _item(label, count, sub, i):
-        return html.Div(
-            style={
-                "position": "absolute", "top": "0", "left": "0",
-                "display": "flex", "alignItems": "center", "gap": "6px",
-                "opacity": 0,
-                "animation": f"{kf_name} {total:.1f}s {i * slot:.1f}s ease-in-out infinite",
-                "animationFillMode": "both",
-            },
-            children=[
-                html.Span(f"▼ {label}", style={
-                    "fontSize": "12px", "fontWeight": "600", "color": "#991B1B",
-                    "background": "#FEE2E2", "padding": "3px 10px",
-                    "borderRadius": "999px", "whiteSpace": "nowrap",
-                }),
-                html.Span(f"{count}", style={
-                    "fontSize": "13px", "fontWeight": "800", "color": "#991B1B",
-                }),
-                html.Span(sub, style={
-                    "fontSize": "11px", "color": "#9A3412",
-                }),
-            ]
-        )
-
     return html.Div(
         style={
-            "display": "flex", "alignItems": "center", "gap": "12px",
+            "display": "flex", "alignItems": "flex-start", "gap": "12px",
             "background": "#FFF7ED", "border": "1px solid #FED7AA",
             "borderRadius": "10px", "padding": "10px 14px",
             "marginBottom": "20px",
@@ -131,13 +102,28 @@ def _exec_alert_banner(maternal_deaths: int, mmr: float, neonatal_deaths: int, s
                 html.Span(f"{sum(c for _, c, _ in items)}", style={
                     "fontSize": "15px", "fontWeight": "800", "color": "#DC2626", "lineHeight": "1",
                 }),
-                html.Span("alert", style={"fontSize": "8px", "color": "#9A3412", "lineHeight": "1"}),
+                html.Span("events", style={"fontSize": "8px", "color": "#9A3412", "lineHeight": "1"}),
             ]),
-            html.Div(style={"width": "1px", "height": "38px", "background": "#FED7AA", "flexShrink": "0"}),
-            html.Div(
-                style={"position": "relative", "height": "28px", "flex": "1", "minWidth": "0"},
-                children=[_item(lbl, cnt, sub, i) for i, (lbl, cnt, sub) in enumerate(items)],
-            ),
+            html.Div(style={"width": "1px", "alignSelf": "stretch", "background": "#FED7AA", "flexShrink": "0"}),
+            html.Div(style={"flex": "1", "minWidth": "0"}, children=[
+                html.Div("Priority Alert", style={
+                    "fontSize": "12px", "fontWeight": "800", "color": "#9A3412", "marginBottom": "4px",
+                }),
+                html.Div("Maternal, neonatal, or stillbirth deaths were recorded in this reporting window.", style={
+                    "fontSize": "11px", "color": "#9A3412", "marginBottom": "8px",
+                }),
+                html.Div([
+                    html.Div([
+                        html.Span(label, style={"fontSize": "11px", "fontWeight": "700", "color": "#7C2D12"}),
+                        html.Span(f"{count:,}", style={"fontSize": "18px", "fontWeight": "800", "color": "#991B1B"}),
+                        html.Span(sub, style={"fontSize": "10px", "color": "#9A3412"}),
+                    ], style={
+                        "padding": "8px 10px", "borderRadius": "10px", "background": "#FFF",
+                        "border": "1px solid #FED7AA", "minWidth": "160px", "flex": "1",
+                    })
+                    for label, count, sub in items
+                ], style={"display": "flex", "gap": "10px", "flexWrap": "wrap"}),
+            ]),
         ]
     )
 
@@ -367,19 +353,20 @@ def _hierarchy_scope(df: pd.DataFrame, scope_meta: dict | None, period_label: st
 def _metric_snapshot(df: pd.DataFrame) -> dict:
     if df is None or df.empty:
         return {
-            "total_admissions": 0,
             "maternal_admissions": 0,
             "neonatal_admissions": 0,
-            "total_deliveries": 0,
-            "facility_deliveries": 0,
             "live_births": 0,
             "total_births": 0,
+            "fresh_stillbirths": 0,
+            "macerated_stillbirths": 0,
             "maternal_deaths": 0,
             "neonatal_deaths": 0,
             "stillbirths": 0,
             "institutional_mmr": 0.0,
             "neonatal_mortality_rate": 0.0,
             "stillbirth_rate": 0.0,
+            "fresh_stillbirth_pct": 0.0,
+            "macerated_stillbirth_pct": 0.0,
             "completeness": 0.0,
         }
 
@@ -388,13 +375,17 @@ def _metric_snapshot(df: pd.DataFrame) -> dict:
     maternal_mask = _service_mask(df, ["ANC", "Labour", "PNC"])
     newborn_mask = _service_mask(df, ["Newborn"])
     labour_mask = _service_mask(df, ["Labour"])
-    facility_delivery_mask = (
-        _contains_mask(df, "concept_name", ["Place of delivery"])
-        & _contains_mask(df, "obs_value_coded", ["This facility", "this facility"])
-    )
     live_birth_mask = (
         _contains_mask(df, "concept_name", ["Outcome of the delivery"])
         & _contains_mask(df, "obs_value_coded", ["Live birth", "Live births", "Alive"])
+    )
+    fresh_stillbirth_mask = (
+        _contains_mask(df, "concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"])
+        & _contains_mask(df, "obs_value_coded", ["Fresh stillbirth", "Fresh still birth"])
+    )
+    macerated_stillbirth_mask = (
+        _contains_mask(df, "concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"])
+        & _contains_mask(df, "obs_value_coded", ["Macerated stillbirth", "Macerated still birth"])
     )
     stillbirth_mask = _yn_mask(df, "mnid_labour_stillbirth") | (
         _contains_mask(df, "concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"])
@@ -409,12 +400,11 @@ def _metric_snapshot(df: pd.DataFrame) -> dict:
         & _contains_mask(df, "obs_value_coded", ["Died", "Dead", "Death", "Neonatal death"])
     )
 
-    total_admissions = _unique_count(df, pd.Series(True, index=df.index), encounter_col)
     maternal_admissions = _unique_count(df, maternal_mask, encounter_col)
     neonatal_admissions = _unique_count(df, newborn_mask, encounter_col)
-    total_deliveries = _unique_count(df, labour_mask, encounter_col)
-    facility_deliveries = _unique_count(df, facility_delivery_mask, "person_id")
     live_births = _unique_count(df, live_birth_mask, "person_id")
+    fresh_stillbirths = _unique_count(df, fresh_stillbirth_mask, "person_id")
+    macerated_stillbirths = _unique_count(df, macerated_stillbirth_mask, "person_id")
     stillbirths = _unique_count(df, stillbirth_mask, "person_id")
     total_births = live_births + stillbirths
     maternal_deaths = _unique_count(df, maternal_death_mask, "person_id")
@@ -425,19 +415,20 @@ def _metric_snapshot(df: pd.DataFrame) -> dict:
         completeness = round(df["concept_name"].fillna("").astype(str).str.strip().ne("").mean() * 100, 1)
 
     return {
-        "total_admissions": total_admissions,
         "maternal_admissions": maternal_admissions,
         "neonatal_admissions": neonatal_admissions,
-        "total_deliveries": total_deliveries,
-        "facility_deliveries": facility_deliveries,
         "live_births": live_births,
         "total_births": total_births,
+        "fresh_stillbirths": fresh_stillbirths,
+        "macerated_stillbirths": macerated_stillbirths,
         "maternal_deaths": maternal_deaths,
         "neonatal_deaths": neonatal_deaths,
         "stillbirths": stillbirths,
         "institutional_mmr": _safe_div(maternal_deaths, live_births, 100000),
         "neonatal_mortality_rate": _safe_div(neonatal_deaths, live_births, 1000),
         "stillbirth_rate": _safe_div(stillbirths, total_births, 1000),
+        "fresh_stillbirth_pct": _safe_div(fresh_stillbirths, stillbirths, 100),
+        "macerated_stillbirth_pct": _safe_div(macerated_stillbirths, stillbirths, 100),
         "completeness": completeness,
     }
 
@@ -456,7 +447,28 @@ def _monthly_series(df: pd.DataFrame, mask: pd.Series, unique_col: str = "person
         .reset_index(name="value")
         .sort_values("month")
     )
-    return summary.tail(12)
+    summary = summary.tail(12)
+    if summary.empty:
+        return summary
+    full_months = pd.date_range(summary["month"].min(), summary["month"].max(), freq="MS")
+    return (
+        summary.set_index("month")
+        .reindex(full_months, fill_value=0)
+        .rename_axis("month")
+        .reset_index()
+    )
+
+
+def _monthly_multiseries(series_map: dict[str, tuple[pd.Series, str]], df: pd.DataFrame, unique_col: str = "person_id") -> pd.DataFrame:
+    frames = []
+    for label, (mask, color) in series_map.items():
+        series_df = _monthly_series(df, mask, unique_col)
+        if series_df.empty:
+            continue
+        frames.append(series_df.assign(series=label, color=color))
+    if not frames:
+        return pd.DataFrame(columns=["month", "value", "series", "color"])
+    return pd.concat(frames, ignore_index=True)
 
 
 def _delta_percent(current: float, previous: float) -> float:
@@ -510,38 +522,23 @@ def _sparkline_figure(series: pd.DataFrame, color: str) -> go.Figure:
     return fig
 
 
-def _moving_average_chart(series: pd.DataFrame, title: str, color: str, target: float | None = None) -> go.Figure:
+def _run_chart(series: pd.DataFrame, title: str, color: str, y_title: str, target: float | None = None) -> go.Figure:
     fig = go.Figure()
     if series.empty:
         fig.update_layout(
             **_EXEC_CHART_LAYOUT,
-            height=260,
+            height=300,
             annotations=[dict(text="No trend data available", x=0.5, y=0.5, xref="paper", yref="paper", showarrow=False, font=dict(size=12, color=MUTED))],
         )
         return fig
 
-    smoothed, _ = _moving_average_values(series["value"].tolist(), "monthly")
-    r = int(color[1:3], 16) if color.startswith("#") and len(color) == 7 else 21
-    g_v = int(color[3:5], 16) if color.startswith("#") and len(color) == 7 else 128
-    b = int(color[5:7], 16) if color.startswith("#") and len(color) == 7 else 61
     fig.add_trace(go.Scatter(
         x=series["month"],
         y=series["value"],
-        name="Actual",
+        name=title,
         mode="lines+markers",
-        line=dict(color=color, width=2.2, shape="spline", smoothing=1.0),
+        line=dict(color=color, width=2.4),
         marker=dict(size=5, color=color, line=dict(color="#fff", width=1.2)),
-        fill="tozeroy",
-        fillcolor=f"rgba({r},{g_v},{b},0.07)",
-    ))
-    fig.add_trace(go.Scatter(
-        x=series["month"],
-        y=smoothed,
-        name="3-mo avg",
-        mode="lines",
-        line=dict(color=color, width=1.5, dash="dot"),
-        opacity=0.6,
-        showlegend=True,
     ))
     if target is not None:
         fig.add_hline(
@@ -553,41 +550,86 @@ def _moving_average_chart(series: pd.DataFrame, title: str, color: str, target: 
         )
     fig.update_layout(
         **_EXEC_CHART_LAYOUT,
-        height=260,
+        height=300,
+        xaxis=dict(
+            showgrid=False,
+            showline=False,
+            zeroline=False,
+            tickfont=dict(size=10, color="#94a3b8"),
+            tickformat="%b %Y",
+            title=dict(text="Month", font=dict(size=10, color="#64748b")),
+        ),
+        yaxis=dict(
+            showgrid=True,
+            gridcolor="#f1f5f9",
+            gridwidth=1,
+            showline=False,
+            zeroline=False,
+            tickfont=dict(size=10, color="#94a3b8"),
+            title=dict(text=y_title, font=dict(size=10, color="#64748b")),
+            rangemode="tozero",
+        ),
     )
     return fig
 
 
-def _status_badge(delta_value: float, positive_is_good: bool = True):
-    good = delta_value >= 0 if positive_is_good else delta_value <= 0
-    color = SUCCESS_GREEN if good else MORTALITY_ROSE
-    prefix = "+" if delta_value > 0 else ""
-    return html.Div(
-        f"{prefix}{delta_value:.1f}%",
-        style={
-            "display": "inline-flex",
-            "alignItems": "center",
-            "padding": "3px 8px",
-            "borderRadius": "999px",
-            "fontSize": "11px",
-            "fontWeight": "700",
-            "color": color,
-            "background": SOFT_GREEN if good else "#FFF1F2",
-        },
+def _multi_run_chart(series_df: pd.DataFrame, title: str, y_title: str, target: float | None = None) -> go.Figure:
+    fig = go.Figure()
+    if series_df.empty:
+        fig.update_layout(
+            **_EXEC_CHART_LAYOUT,
+            height=300,
+            annotations=[dict(text="No trend data available", x=0.5, y=0.5, xref="paper", yref="paper", showarrow=False, font=dict(size=12, color=MUTED))],
+        )
+        return fig
+
+    for label in series_df["series"].dropna().unique():
+        trace_df = series_df[series_df["series"] == label]
+        color = trace_df["color"].iloc[0] if "color" in trace_df.columns and not trace_df.empty else PRIMARY_GREEN
+        fig.add_trace(go.Scatter(
+            x=trace_df["month"],
+            y=trace_df["value"],
+            name=label,
+            mode="lines+markers",
+            line=dict(color=color, width=2.2),
+            marker=dict(size=5, color=color, line=dict(color="#fff", width=1.0)),
+        ))
+
+    if target is not None:
+        fig.add_hline(
+            y=target,
+            line=dict(color="#f59e0b", width=1.4, dash="dash"),
+            annotation_text="Target",
+            annotation_font=dict(color="#f59e0b", size=10),
+            annotation_position="right",
+        )
+
+    fig.update_layout(
+        **_EXEC_CHART_LAYOUT,
+        height=300,
+        xaxis=dict(
+            showgrid=False,
+            showline=False,
+            zeroline=False,
+            tickfont=dict(size=10, color="#94a3b8"),
+            tickformat="%b %Y",
+            title=dict(text="Month", font=dict(size=10, color="#64748b")),
+        ),
+        yaxis=dict(
+            showgrid=True,
+            gridcolor="#f1f5f9",
+            gridwidth=1,
+            showline=False,
+            zeroline=False,
+            tickfont=dict(size=10, color="#94a3b8"),
+            title=dict(text=y_title, font=dict(size=10, color="#64748b")),
+            rangemode="tozero",
+        ),
     )
+    return fig
 
 
-def _kpi_card(title: str, value: int | float, delta_value: float, series: pd.DataFrame, color: str, note: str):
-    is_up = delta_value >= 0
-    prefix = "+" if delta_value > 0 else ""
-    delta_label = f"{prefix}{delta_value:.1f}%"
-    delta_style = {
-        "fontSize": "10px", "fontWeight": "800",
-        "padding": "2px 7px", "borderRadius": "99px",
-        "background": "#dcfce7" if is_up else "#fee2e2",
-        "color": "#15803d" if is_up else "#dc2626",
-    }
-    val_str = f"{int(value):,}" if isinstance(value, (int, float)) and float(value).is_integer() else f"{value:,.1f}"
+def _summary_card(title: str, value: str, subtitle: str, accent: str) -> dmc.Paper:
     return dmc.Paper(
         withBorder=True,
         radius="md",
@@ -595,28 +637,23 @@ def _kpi_card(title: str, value: int | float, delta_value: float, series: pd.Dat
         style={
             "background": "#fff",
             "borderColor": "#e2e8f0",
-            "borderTop": f"3px solid {color}",
+            "borderTop": f"3px solid {accent}",
             "height": "100%",
-            "transition": "box-shadow .2s",
         },
         children=[
-            html.Div([
-                html.Span(title, style={
-                    "fontSize": "10px", "fontWeight": "700", "color": "#64748b",
-                    "textTransform": "uppercase", "letterSpacing": ".06em",
-                }),
-                html.Span(delta_label, style=delta_style),
-            ], style={"display": "flex", "justifyContent": "space-between", "alignItems": "flex-start", "marginBottom": "8px"}),
-            html.Div(val_str, style={
+            html.Div(title, style={
+                "fontSize": "10px",
+                "fontWeight": "700",
+                "color": "#64748b",
+                "textTransform": "uppercase",
+                "letterSpacing": ".06em",
+                "marginBottom": "10px",
+            }),
+            html.Div(value, style={
                 "fontSize": "24px", "fontWeight": "800", "color": "#0f172a",
                 "letterSpacing": "-.03em", "lineHeight": "1",
             }),
-            html.Div(note, style={"fontSize": "11px", "color": "#94a3b8", "marginTop": "3px"}),
-            dcc.Graph(
-                figure=_sparkline_figure(series, color),
-                config={"displayModeBar": False, "responsive": True},
-                style={"height": "66px", "marginTop": "12px"},
-            ),
+            html.Div(subtitle, style={"fontSize": "11px", "color": "#94a3b8", "marginTop": "5px"}),
         ],
     )
 
@@ -628,7 +665,16 @@ _MORTALITY_TOKENS = {
 }
 
 
-def _mortality_card(title: str, count: int, rate_label: str, rate_value: float, delta_count: int, color: str, background: str):
+def _mortality_card(
+    title: str,
+    count: int,
+    rate_label: str,
+    rate_value: float,
+    delta_count: int,
+    color: str,
+    background: str,
+    breakdown: list[tuple[str, str]] | None = None,
+):
     tokens = _MORTALITY_TOKENS.get(title, {"accent": color, "bg": background, "bdr": color, "shadow_rgba": "0,0,0"})
     accent = tokens["accent"]
     delta_prefix = "+" if delta_count > 0 else ""
@@ -675,6 +721,20 @@ def _mortality_card(title: str, count: int, rate_label: str, rate_value: float, 
                     ),
                 ]),
             ], style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "8px"}),
+            *([
+                html.Div([
+                    html.Div([
+                        html.Span(label, style={"fontSize": "10px", "fontWeight": "700", "color": accent}),
+                        html.Span(value, style={"fontSize": "10px", "color": "#334155"}),
+                    ], style={
+                        "padding": "6px 8px",
+                        "background": "#fff",
+                        "border": f"1px solid rgba({tokens['shadow_rgba']},.16)",
+                        "borderRadius": "8px",
+                    })
+                    for label, value in breakdown
+                ], style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "8px", "marginTop": "12px"})
+            ] if breakdown else []),
         ],
     )
 
@@ -758,90 +818,72 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
     facilities_reporting = int(df["Facility_CODE"].dropna().astype(str).nunique()) if "Facility_CODE" in df.columns else 0
     districts_covered = int(df["District"].dropna().astype(str).nunique()) if "District" in df.columns else 0
 
-    kpi_specs = [
-        ("Total Admissions",   "total_admissions",   ADMISSIONS_BLUE, "12-month reporting window", pd.Series(True, index=df.index)),
-        ("Maternal Admissions","maternal_admissions", PRIMARY_GREEN,   "ANC, labour, and PNC",      _service_mask(df, ["ANC", "Labour", "PNC"])),
-        ("Neonatal Admissions","neonatal_admissions", NEONATAL_ORANGE, "Neonatal care service area", _service_mask(df, ["Newborn"])),
-        ("Total Deliveries",   "total_deliveries",    "#7C3AED",        "Labour encounters",          _service_mask(df, ["Labour"])),
-        ("Live Births",        "live_births",         PRIMARY_GREEN,   "Outcome = live birth",       _contains_mask(df, "obs_value_coded", ["Live birth", "Live births", "Alive"])),
-        ("Total Births",       "total_births",        STILLBIRTH_BLUE, "Live births + stillbirths",  _contains_mask(df, "concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"])),
+    summary_cards = [
+        _summary_card("Maternity Unit Admissions", f"{current_metrics['maternal_admissions']:,}", "ANC, labour, and PNC encounters", PRIMARY_GREEN),
+        _summary_card("Neonatal Care Unit Admissions", f"{current_metrics['neonatal_admissions']:,}", "Newborn care encounters", NEONATAL_ORANGE),
+        _summary_card("Total Births", f"{current_metrics['total_births']:,}", "Live births and stillbirths", STILLBIRTH_BLUE),
+        _summary_card("Live Births", f"{current_metrics['live_births']:,}", "Outcome recorded as live birth", SUCCESS_GREEN),
+        _summary_card("Stillbirths", f"{current_metrics['stillbirths']:,}", "Stillbirths in current reporting period", "#7C3AED"),
+        _summary_card("Maternal Deaths", f"{current_metrics['maternal_deaths']:,}", "Deaths recorded in selected scope", MORTALITY_ROSE),
+        _summary_card("Neonatal Deaths", f"{current_metrics['neonatal_deaths']:,}", "Deaths recorded in selected scope", WARNING_AMBER),
+        _summary_card("Districts Covered", f"{districts_covered:,}", f"{facilities_reporting:,} facilities reporting", ADMISSIONS_BLUE),
     ]
-
-    kpi_cards = []
-    for label, key, color, note, mask in kpi_specs:
-        series = _monthly_series(df, mask if len(df) else pd.Series(dtype=bool),
-                                 "encounter_id" if key.endswith("admissions") or key == "total_deliveries" else "person_id")
-        delta = _delta_percent(current_metrics[key], previous_metrics[key])
-        kpi_cards.append(_kpi_card(label, current_metrics[key], delta, series, color, note))
 
     mortality_specs = [
-        ("Maternal Deaths", current_metrics["maternal_deaths"], "MMR per 100k live births",   current_metrics["institutional_mmr"],      current_metrics["maternal_deaths"]  - previous_metrics["maternal_deaths"],  MORTALITY_ROSE,   "#FFF1F2"),
-        ("Neonatal Deaths", current_metrics["neonatal_deaths"], "NMR per 1,000 live births",  current_metrics["neonatal_mortality_rate"], current_metrics["neonatal_deaths"] - previous_metrics["neonatal_deaths"],   NEONATAL_ORANGE, "#FFF8EB"),
-        ("Stillbirths",     current_metrics["stillbirths"],     "SBR per 1,000 total births", current_metrics["stillbirth_rate"],        current_metrics["stillbirths"]     - previous_metrics["stillbirths"],       STILLBIRTH_BLUE, "#EFF6FF"),
+        ("Maternal Deaths", current_metrics["maternal_deaths"], "MMR per 100k live births",   current_metrics["institutional_mmr"],      current_metrics["maternal_deaths"]  - previous_metrics["maternal_deaths"],  MORTALITY_ROSE,   "#FFF1F2", None),
+        ("Neonatal Deaths", current_metrics["neonatal_deaths"], "NMR per 1,000 live births",  current_metrics["neonatal_mortality_rate"], current_metrics["neonatal_deaths"] - previous_metrics["neonatal_deaths"],   NEONATAL_ORANGE, "#FFF8EB", None),
+        (
+            "Stillbirths",
+            current_metrics["stillbirths"],
+            "SBR per 1,000 total births",
+            current_metrics["stillbirth_rate"],
+            current_metrics["stillbirths"] - previous_metrics["stillbirths"],
+            STILLBIRTH_BLUE,
+            "#EFF6FF",
+            [
+                ("Fresh stillbirths", f"{current_metrics['fresh_stillbirth_pct']:.1f}% ({current_metrics['fresh_stillbirths']:,})"),
+                ("Macerated stillbirths", f"{current_metrics['macerated_stillbirth_pct']:.1f}% ({current_metrics['macerated_stillbirths']:,})"),
+            ] if current_metrics["stillbirths"] > 0 else [
+                ("Fresh stillbirths", "Breakdown unavailable"),
+                ("Macerated stillbirths", "Breakdown unavailable"),
+            ],
+        ),
     ]
 
-    admissions_series     = _monthly_series(df, pd.Series(True, index=df.index), "encounter_id")
     maternal_death_series = _monthly_series(df, _yn_mask(df, "mnid_pnc_maternal_death"), "person_id")
     neonatal_death_series = _monthly_series(df, _contains_mask(df, "obs_value_coded", ["Died", "Dead", "Death", "Neonatal death"]), "person_id")
-    stillbirth_series     = _monthly_series(df, _yn_mask(df, "mnid_labour_stillbirth"), "person_id")
+    total_births_series = _monthly_multiseries({"Total births": (
+        _contains_mask(df, "concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"]),
+        PRIMARY_GREEN,
+    )}, df)
+    total_births_series = total_births_series[["month", "value"]].copy() if not total_births_series.empty else pd.DataFrame(columns=["month", "value"])
+    stillbirth_trend_series = _monthly_multiseries({
+        "Total stillbirths": (_yn_mask(df, "mnid_labour_stillbirth"), STILLBIRTH_BLUE),
+        "Fresh stillbirths": (
+            _contains_mask(df, "obs_value_coded", ["Fresh stillbirth", "Fresh still birth"]),
+            "#DB2777",
+        ),
+        "Macerated stillbirths": (
+            _contains_mask(df, "obs_value_coded", ["Macerated stillbirth", "Macerated still birth"]),
+            "#7C3AED",
+        ),
+    }, df)
 
-    geography_df = pd.DataFrame()
-    region_rows: list[tuple[str, int]] = []
-    if not df.empty and "District" in df.columns:
-        geo_work = df.copy()
-        geo_work["region"] = geo_work["District"].map(lambda x: DISTRICT_REGION_ZONE.get(str(x), ("Unknown", "Unknown"))[0])
-        geo_group = geo_work.groupby("District", as_index=False).agg(
-            maternal=("mnid_pnc_maternal_death",  lambda s: s.fillna("").astype(str).str.lower().isin({"yes", "true", "1"}).sum() if len(s) else 0),
-            neonatal=("obs_value_coded",           lambda s: s.fillna("").astype(str).str.lower().isin({"died", "dead", "death", "neonatal death"}).sum() if len(s) else 0),
-            stillbirth=("mnid_labour_stillbirth",  lambda s: s.fillna("").astype(str).str.lower().isin({"yes", "true", "1"}).sum() if len(s) else 0),
-        )
-        geo_group["total"] = geo_group[["maternal", "neonatal", "stillbirth"]].sum(axis=1)
-        geography_df = geo_group.sort_values("total", ascending=False).head(6)
-        region_ranking = (
-            geo_work.assign(maternal=_yn_mask(geo_work, "mnid_pnc_maternal_death").astype(int))
-            .groupby("region", as_index=False)["maternal"]
-            .sum()
-            .sort_values("maternal", ascending=False)
-        )
-        region_rows = [(row["region"], int(row["maternal"])) for _, row in region_ranking.iterrows()]
-
-    hotspot_rows = [(row["District"], int(row["total"])) for _, row in geography_df.iterrows()] if not geography_df.empty else []
-
-    explorer_specs = [
-        ("Maternal deaths", MORTALITY_ROSE,   geography_df.assign(value=geography_df["maternal"])  if not geography_df.empty else pd.DataFrame(), maternal_death_series),
-        ("Neonatal deaths", NEONATAL_ORANGE,  geography_df.assign(value=geography_df["neonatal"])  if not geography_df.empty else pd.DataFrame(), neonatal_death_series),
-        ("Stillbirths",     STILLBIRTH_BLUE,  geography_df.assign(value=geography_df["stillbirth"]) if not geography_df.empty else pd.DataFrame(), stillbirth_series),
+    complication_specs = [
+        ("Pre-eclampsia and Eclampsia", MORTALITY_ROSE, _yn_mask(df, "mnid_labour_eclampsia") | _contains_mask(df, "obs_value_coded", ["Pre-eclampsia", "Pre eclampsia", "Preeclampsia", "Eclampsia"])),
+        ("Postpartum Haemorrhage", WARNING_AMBER, _yn_mask(df, "mnid_labour_pph")),
+        ("Maternal Sepsis", "#B91C1C", _yn_mask(df, "mnid_labour_maternal_sepsis")),
+        ("Obstructed or Prolonged Labour", "#7C3AED", _yn_mask(df, "mnid_labour_obstructed_labour") | _contains_mask(df, "obs_value_coded", ["Obstructed labour", "Prolonged labour", "Prolonged Labor"])),
+        ("Ruptured Uterus", "#475569", _contains_mask(df, "obs_value_coded", ["Ruptured uterus", "Uterine rupture"])),
+        ("Birth Asphyxia", "#D97706", _yn_mask(df, "mnid_newborn_birth_asphyxia")),
+        ("Preterm Birth", PRIMARY_GREEN, _yn_mask(df, "mnid_labour_preterm")),
+        ("Neonatal Sepsis", ADMISSIONS_BLUE, _yn_mask(df, "mnid_newborn_sepsis")),
     ]
-
-    explorer_tabs = dcc.Tabs(
-        value="Maternal deaths",
-        className="mnid-exec-subtabs",
-        children=[
-            dcc.Tab(
-                label=label, value=label,
-                className="mnid-exec-subtab",
-                selected_className="mnid-exec-subtab--selected",
-                children=html.Div(style={"paddingTop": "18px"}, children=[
-                    dmc.SimpleGrid(cols=2, spacing="lg", children=[
-                        dcc.Graph(
-                            figure=_mortality_distribution_chart(dist_df[["District", "value"]] if not dist_df.empty else pd.DataFrame(), f"{label} distribution", color),
-                            config={"displayModeBar": False},
-                            style=_graph_style(CHART_HEIGHT_MD),
-                        ),
-                        dcc.Graph(figure=_moving_average_chart(series_df, f"{label[:-1]} trend", color, None), config={"displayModeBar": False}),
-                    ]),
-                ]),
-            )
-            for label, color, dist_df, series_df in explorer_specs
-        ],
-    )
-
-    # ---------- Hero section ----------
-    hero_stats = [
-        ("Total Admissions",    f"{current_metrics['total_admissions']:,}",   f"↑ {_delta_percent(current_metrics['total_admissions'], previous_metrics['total_admissions']):.1f}% vs prior"),
-        ("Facility Deliveries", f"{current_metrics['facility_deliveries']:,}", f"↑ {_delta_percent(current_metrics['facility_deliveries'], previous_metrics['facility_deliveries']):.1f}% vs prior"),
-        ("Live Births",         f"{current_metrics['live_births']:,}",         f"↑ {_delta_percent(current_metrics['live_births'], previous_metrics['live_births']):.1f}% vs prior"),
-        ("Districts Covered",   f"{districts_covered} / 28",                   "✓ Full coverage" if districts_covered >= 28 else f"{districts_covered} reporting"),
+    complication_cards = [
+        dmc.Paper(withBorder=True, radius="md", shadow="xs", style={"overflow": "hidden", "borderColor": "#e2e8f0"}, children=[
+            dcc.Graph(figure=_run_chart(_monthly_series(df, mask, "person_id"), title, color, "Cases"), config={"displayModeBar": False}),
+        ])
+        for title, color, mask in complication_specs
     ]
 
     hero = dmc.Paper(
@@ -883,17 +925,6 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
                         }),
                     ], style={"display": "flex", "gap": "8px", "flexWrap": "wrap"}),
                 ], style={"flex": "1", "minWidth": "280px"}),
-                html.Div([
-                    *[html.Div([
-                        html.Div(lbl, style={"fontSize": "9px", "color": "#94a3b8", "textTransform": "uppercase", "letterSpacing": ".08em", "marginBottom": "4px"}),
-                        html.Div(val, style={"fontSize": "18px", "fontWeight": "700", "color": "#0f172a", "letterSpacing": "-.02em"}),
-                        html.Div(sub, style={"fontSize": "10px", "color": "#64748b", "marginTop": "2px"}),
-                    ], style={"background": "#f8fafc", "padding": "14px 16px", "border": "1px solid #e2e8f0", "borderRadius": "12px"})
-                    for lbl, val, sub in hero_stats],
-                ], style={
-                    "flex": "1.1", "minWidth": "320px", "display": "grid",
-                    "gridTemplateColumns": "repeat(2, minmax(0, 1fr))", "gap": "12px",
-                }),
             ], style={"display": "flex", "gap": "18px", "flexWrap": "wrap", "alignItems": "stretch"}),
         ],
     )
@@ -935,42 +966,23 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
             hero,
             *([alert] if alert else []),
             scope_band,
-            _section_header("Data Volume · 12-Month Period"),
-            dmc.SimpleGrid(cols=3, spacing="lg", mb="lg", children=kpi_cards),
+            _section_header("Country Summary · Current Reporting Period"),
+            dmc.SimpleGrid(cols=4, spacing="md", mb="lg", children=summary_cards),
             _section_header("Mortality Snapshot · Immediate Attention Required"),
             dmc.SimpleGrid(cols=3, spacing="md", mb="lg", children=[_mortality_card(*spec) for spec in mortality_specs]),
-            _section_header("National Trends · 12-Month Run Charts"),
+            _section_header("Mortality Trends · 12-Month Run Charts"),
             dmc.SimpleGrid(cols=2, spacing="lg", mb="lg", children=[
                 dmc.Paper(withBorder=True, radius="md", shadow="xs", style={"overflow": "hidden", "borderColor": "#e2e8f0"},
-                    children=[dcc.Graph(figure=_moving_average_chart(admissions_series, "Admissions trend", ADMISSIONS_BLUE, None), config={"displayModeBar": False})]),
+                    children=[dcc.Graph(figure=_run_chart(total_births_series, "Total Births", PRIMARY_GREEN, "Births"), config={"displayModeBar": False})]),
                 dmc.Paper(withBorder=True, radius="md", shadow="xs", style={"overflow": "hidden", "borderColor": "#e2e8f0"},
-                    children=[dcc.Graph(figure=_moving_average_chart(maternal_death_series, "Maternal death trend", MORTALITY_ROSE, None), config={"displayModeBar": False})]),
+                    children=[dcc.Graph(figure=_run_chart(maternal_death_series, "Maternal Mortality", MORTALITY_ROSE, "Deaths"), config={"displayModeBar": False})]),
                 dmc.Paper(withBorder=True, radius="md", shadow="xs", style={"overflow": "hidden", "borderColor": "#e2e8f0"},
-                    children=[dcc.Graph(figure=_moving_average_chart(neonatal_death_series, "Neonatal death trend", NEONATAL_ORANGE, None), config={"displayModeBar": False})]),
+                    children=[dcc.Graph(figure=_run_chart(neonatal_death_series, "Neonatal Mortality", NEONATAL_ORANGE, "Deaths"), config={"displayModeBar": False})]),
                 dmc.Paper(withBorder=True, radius="md", shadow="xs", style={"overflow": "hidden", "borderColor": "#e2e8f0"},
-                    children=[dcc.Graph(figure=_moving_average_chart(stillbirth_series, "Stillbirth trend", STILLBIRTH_BLUE, None), config={"displayModeBar": False})]),
+                    children=[dcc.Graph(figure=_multi_run_chart(stillbirth_trend_series, "Stillbirths", "Cases"), config={"displayModeBar": False})]),
             ]),
-            _section_header("Where is Mortality Happening? · Geographic Breakdown"),
-            dmc.SimpleGrid(cols=2, spacing="lg", mb="lg", children=[
-                _ranking_list("Region ranking · maternal deaths", region_rows or [("No data", 0)], [MORTALITY_ROSE, "#FB7185", "#FCA5A5", "#FECACA"]),
-                dmc.Paper(withBorder=True, radius="md", p="md", style={"borderColor": "#e2e8f0", "overflow": "hidden"}, children=[
-                    html.Div("District ranking · all mortality", style={"fontSize": "13px", "fontWeight": "700", "color": "#0f172a", "marginBottom": "10px"}),
-                    dcc.Graph(
-                        figure=_stacked_mortality_chart(geography_df),
-                        config={"displayModeBar": False},
-                        style=_graph_style(CHART_HEIGHT_LG),
-                    ),
-                ]),
-            ]),
-            dmc.SimpleGrid(cols=2, spacing="lg", mb="lg", children=[
-                _ranking_list("Facility hotspots", hotspot_rows or [("No data", 0)], [MORTALITY_ROSE, "#FB7185", "#FDA4AF", "#FCD34D"]),
-                dmc.Paper(withBorder=True, radius="md", p="md", style={"borderColor": "#e2e8f0"}, children=[
-                    html.Div("Zone comparison", style={"fontSize": "13px", "fontWeight": "700", "color": "#0f172a", "marginBottom": "6px"}),
-                    html.P("Derived from district mortality distribution in the current scope.", style={"fontSize": "11px", "color": "#64748b", "marginTop": "4px"}),
-                ]),
-            ]),
-            _section_header("Mortality Explorer · Interactive"),
-            dmc.Paper(withBorder=True, radius="md", p="md", style={"borderColor": "#e2e8f0"}, children=[explorer_tabs]),
+            _section_header("Complication Trends"),
+            dmc.SimpleGrid(cols=2, spacing="lg", mb="lg", children=complication_cards),
         ],
     )
 
