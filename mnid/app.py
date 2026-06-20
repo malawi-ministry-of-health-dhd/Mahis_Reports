@@ -102,7 +102,7 @@ _EXECUTIVE_CACHE_DIR = os.environ.get('MNID_EXEC_CACHE_DIR') or os.path.join(
 _MNID_EXECUTIVE_DISK_CACHE = diskcache.Cache(_EXECUTIVE_CACHE_DIR, size_limit=512 * 1024 * 1024)
 _MNID_WARNED_MESSAGES = set()
 _LOGGER = logging.getLogger(__name__)
-_COUNTRY_PROFILE_RENDER_VERSION = "country-profile-v2-two-column-trends"
+_COUNTRY_PROFILE_RENDER_VERSION = "country-profile-v3-chart-legend-removed"
 
 
 def _dk(prefix: str, key_data) -> str:
