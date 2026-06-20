@@ -1,6 +1,7 @@
 """
 Generate synthetic MNID demo data for demo_parquet/.
-Covers 8 Malawi districts, last year through today, ~31% average indicator coverage.
+Creates richer MNH event patterns so the Country Profile renders non-zero
+births, stillbirths, deaths, and complication trends across multiple scenarios.
 Run: python generate_demo_parquet.py
 """
 import calendar
@@ -185,11 +186,97 @@ def _r(key: str, jitter: float) -> float:
     return max(0.02, min(0.98, RATES[key] + jitter))
 
 
+SCENARIOS = [
+    {
+        "name": "baseline",
+        "labour_volume": 1.0,
+        "pnc_volume": 1.0,
+        "newborn_volume": 1.0,
+        "live_birth": 0.90,
+        "fresh_stillbirth": 0.05,
+        "macerated_stillbirth": 0.05,
+        "maternal_death": 0.04,
+        "neonatal_death": 0.08,
+        "obstetric_weights": [0.10, 0.07, 0.08, 0.10, 0.65],
+        "newborn_comp_weights": [0.12, 0.12, 0.10, 0.66],
+        "maternal_sepsis": 0.10,
+        "pph": 0.13,
+        "ruptured_uterus": 0.04,
+        "birth_asphyxia": 0.12,
+        "neonatal_sepsis": 0.11,
+    },
+    {
+        "name": "stillbirth_spike",
+        "labour_volume": 1.1,
+        "pnc_volume": 1.0,
+        "newborn_volume": 0.95,
+        "live_birth": 0.78,
+        "fresh_stillbirth": 0.13,
+        "macerated_stillbirth": 0.09,
+        "maternal_death": 0.05,
+        "neonatal_death": 0.10,
+        "obstetric_weights": [0.12, 0.10, 0.11, 0.13, 0.54],
+        "newborn_comp_weights": [0.18, 0.14, 0.11, 0.57],
+        "maternal_sepsis": 0.12,
+        "pph": 0.16,
+        "ruptured_uterus": 0.07,
+        "birth_asphyxia": 0.18,
+        "neonatal_sepsis": 0.12,
+    },
+    {
+        "name": "sepsis_pressure",
+        "labour_volume": 1.0,
+        "pnc_volume": 1.1,
+        "newborn_volume": 1.15,
+        "live_birth": 0.88,
+        "fresh_stillbirth": 0.06,
+        "macerated_stillbirth": 0.06,
+        "maternal_death": 0.06,
+        "neonatal_death": 0.16,
+        "obstetric_weights": [0.11, 0.08, 0.08, 0.10, 0.63],
+        "newborn_comp_weights": [0.10, 0.15, 0.24, 0.51],
+        "maternal_sepsis": 0.20,
+        "pph": 0.14,
+        "ruptured_uterus": 0.05,
+        "birth_asphyxia": 0.13,
+        "neonatal_sepsis": 0.26,
+    },
+    {
+        "name": "recovery",
+        "labour_volume": 0.95,
+        "pnc_volume": 0.95,
+        "newborn_volume": 0.9,
+        "live_birth": 0.94,
+        "fresh_stillbirth": 0.03,
+        "macerated_stillbirth": 0.03,
+        "maternal_death": 0.02,
+        "neonatal_death": 0.05,
+        "obstetric_weights": [0.07, 0.04, 0.05, 0.07, 0.77],
+        "newborn_comp_weights": [0.08, 0.08, 0.07, 0.77],
+        "maternal_sepsis": 0.05,
+        "pph": 0.08,
+        "ruptured_uterus": 0.02,
+        "birth_asphyxia": 0.08,
+        "neonatal_sepsis": 0.08,
+    },
+]
+
+
+def _scenario_for(fac_code: str, tag: str) -> dict:
+    idx = (int(fac_code) + int(tag[-2:]) + int(tag[:4])) % len(SCENARIOS)
+    return SCENARIOS[idx]
+
+
+def _scaled_count(low: int, high: int, multiplier: float) -> int:
+    return max(1, round(random.randint(low, high) * multiplier))
+
+
 for district, facilities in DISTRICTS.items():
     for fac_name, fac_code in facilities:
         fac_jitter = random.uniform(-JITTER, JITTER)
 
         for tag, year, month, days in MONTHS:
+            scenario = _scenario_for(fac_code, tag)
             # ── ANC ──────────────────────────────────────────────────────────
             anc_pids = [_next_id() for _ in range(random.randint(28, 42))]
             anc_sets = {key: _sample_n(anc_pids, _r(key, fac_jitter)) for key in [
@@ -231,7 +318,7 @@ for district, facilities in DISTRICTS.items():
                     _obs(tmpl, "Danger signs present", "Yes")
 
             # ── Labour ───────────────────────────────────────────────────────
-            lab_pids = [_next_id() for _ in range(random.randint(10, 18))]
+            lab_pids = [_next_id() for _ in range(_scaled_count(10, 18, scenario["labour_volume"]))]
             num_lab = _sample_n(lab_pids, _r("lab_core", fac_jitter))
             vitk_lab_num = _sample_n(lab_pids, _r("vitk_lab", fac_jitter))
             breastfeeding_num = _sample_n(lab_pids, _r("breastfeeding_lab", fac_jitter))
@@ -262,10 +349,44 @@ for district, facilities in DISTRICTS.items():
                 )
                 all_rows.append(tmpl)
 
+                outcome = random.choices(
+                    ["Live birth", "Fresh still birth", "Macerated still birth"],
+                    weights=[
+                        scenario["live_birth"],
+                        scenario["fresh_stillbirth"],
+                        scenario["macerated_stillbirth"],
+                    ],
+                    k=1,
+                )[0]
+                obstetric_comp = random.choices(
+                    ["PPH", "Eclampsia", "Obstructed labour", "Preterm labour", "None"],
+                    weights=scenario["obstetric_weights"],
+                    k=1,
+                )[0]
+                newborn_comp = random.choices(
+                    ["Birth asphyxia", "Prematurity", "Sepsis", "None"],
+                    weights=scenario["newborn_comp_weights"],
+                    k=1,
+                )[0]
+
+                _obs(tmpl, "Place of delivery", "This facility")
+                _obs(tmpl, "Outcome of the delivery", outcome)
+                _obs(tmpl, "Obstetric complications", obstetric_comp)
+                _obs(tmpl, "Newborn baby complications", newborn_comp)
+                _obs(tmpl, "Estimated blood loss", value_n=float(random.randint(150, 700)))
+
                 if pid in num_lab:
-                    _obs(tmpl, "Place of delivery", "This facility")
-                    _obs(tmpl, "Maternal sepsis", "Yes")
-                    _obs(tmpl, "Estimated blood loss", value_n=float(random.randint(150, 500)))
+                    if random.random() < scenario["maternal_sepsis"] or obstetric_comp == "None":
+                        _obs(tmpl, "Maternal sepsis", "Yes" if random.random() < scenario["maternal_sepsis"] else "No")
+                    if random.random() < scenario["pph"] or obstetric_comp == "PPH":
+                        _obs(tmpl, "PPH", "Yes")
+                        _obs(tmpl, "Oxytocin 10 iu given", "Yes")
+                        if random.random() < 0.72:
+                            _obs(tmpl, "1g Tranexamic Acid IV slow push over 10 minutes", "Yes")
+                        if random.random() < 0.55:
+                            _obs(tmpl, "Misoprostol 800 micrograms", "Yes")
+                    if random.random() < scenario["ruptured_uterus"]:
+                        _obs(tmpl, "Obstetric complications", "Ruptured uterus")
 
                 # Vitamin K and Breast feeding: recorded for ALL Labour patients
                 # (denominator = all Labour), each with its own coverage rate.
@@ -286,17 +407,21 @@ for district, facilities in DISTRICTS.items():
                 if pid in mgmt_denom:
                     _obs(
                         tmpl, "Management given to newborn",
-                        "KMC" if pid in kmc_num else "Routine care",
+                        "KMC" if pid in kmc_num else (
+                            "Antibiotics" if newborn_comp == "Sepsis"
+                            else "Resuscitation" if newborn_comp == "Birth asphyxia"
+                            else "Routine care"
+                        ),
                     )
 
             # ── PNC ──────────────────────────────────────────────────────────
-            pnc_pids = [_next_id() for _ in range(random.randint(8, 14))]
+            pnc_pids = [_next_id() for _ in range(_scaled_count(8, 14, scenario["pnc_volume"]))]
             num_pnc = _sample_n(pnc_pids, _r("pnc_core", fac_jitter))
 
             mother_denom = _sample_n(pnc_pids, 0.85)
-            mother_alive = _sample_n(list(mother_denom), _r("mother_alive", fac_jitter))
+            mother_alive = _sample_n(list(mother_denom), max(0.02, 1 - scenario["maternal_death"]))
             baby_denom = _sample_n(pnc_pids, 0.85)
-            baby_alive = _sample_n(list(baby_denom), _r("baby_alive", fac_jitter))
+            baby_alive = _sample_n(list(baby_denom), max(0.02, 1 - scenario["neonatal_death"]))
             immun_denom = _sample_n(pnc_pids, 0.75)
             bcg_num = _sample_n(list(immun_denom), _r("bcg", fac_jitter))
             hiv_denom = _sample_n(pnc_pids, 0.70)
@@ -331,7 +456,7 @@ for district, facilities in DISTRICTS.items():
                     _obs(tmpl, "Prematurity/Kangaroo", "Low birth weight" if pid in lbw_num else "Normal weight")
 
             # ── Newborn ───────────────────────────────────────────────────────
-            nb_pids = [_next_id() for _ in range(random.randint(5, 11))]
+            nb_pids = [_next_id() for _ in range(_scaled_count(5, 11, scenario["newborn_volume"]))]
             num_nb = _sample_n(nb_pids, _r("nb_core", fac_jitter))
 
             ikmc_denom = _sample_n(nb_pids, 0.55)
@@ -368,8 +493,13 @@ for district, facilities in DISTRICTS.items():
                     _obs(tmpl, "Birth weight", value_n=round(bw, 1))
                     _obs(tmpl, "Gestation in weeks", value_n=float(random.randint(28, 42)))
                     _obs(tmpl, "thermal care", "Yes")
+                    _obs(tmpl, "Admission outcome", "Died" if random.random() < scenario["neonatal_death"] else "Discharged")
                     if pid in cpap_1000_pids or pid in cpap_1500_pids:
                         _obs(tmpl, "CPAP support", "Bubble CPAP")
+                    if random.random() < scenario["birth_asphyxia"]:
+                        _obs(tmpl, "Birth asphyxia suspected", "Yes")
+                    if random.random() < scenario["neonatal_sepsis"]:
+                        _obs(tmpl, "Neonatal Sepsis - Early Onset", "Yes")
 
                 if pid in ikmc_denom:
                     _obs(tmpl, "iKMC initiated", "Yes" if pid in ikmc_num else "No")
@@ -384,6 +514,8 @@ for district, facilities in DISTRICTS.items():
                     _obs(tmpl, "Eligible for neonatal resuscitation", "Yes")
                     _obs(tmpl, "Neonatal resuscitation provided",
                          "Yes" if pid in eligible_resus else "No")
+                if random.random() < scenario["neonatal_sepsis"]:
+                    _obs(tmpl, "Parenteral antibiotics given", "Yes")
 
             # ── Operational readiness (facility-level, once per month) ─────────
             ready_pid, ready_enc = _next_id(), _next_id()

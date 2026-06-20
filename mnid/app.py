@@ -18,7 +18,7 @@ import plotly.graph_objects as go
 from datetime import datetime
 from pathlib import Path
 import os
-from dash import html, dcc, callback, callback_context, no_update, Input, Output, State, ALL
+from dash import html, dcc, callback, callback_context, no_update, Input, Output, State, ALL, MATCH
 from dash.exceptions import PreventUpdate
 from helpers.helpers import create_count_from_config
 from mnid.constants import (
@@ -91,7 +91,15 @@ from mnid.layout import (
     _pph_cascade, _topbar, _sidebar, _alert_banner,
     _avg_ring, _count_bar, _kpi, _kpi_row, _section_anchor,
 )
-from mnid.executive_views import render_country_profile, render_operational_readiness
+from mnid.executive_views import (
+    render_country_profile,
+    render_operational_readiness,
+    bucket_time_series,
+    bucket_multi_series,
+    describe_grain_window,
+    _run_chart,
+    _multi_run_chart,
+)
 
 _MNID_UI_CACHE_MAX = 16
 _MNID_UI_CACHE_TTL_SECONDS = 3600
@@ -102,6 +110,7 @@ _EXECUTIVE_CACHE_DIR = os.environ.get('MNID_EXEC_CACHE_DIR') or os.path.join(
 _MNID_EXECUTIVE_DISK_CACHE = diskcache.Cache(_EXECUTIVE_CACHE_DIR, size_limit=512 * 1024 * 1024)
 _MNID_WARNED_MESSAGES = set()
 _LOGGER = logging.getLogger(__name__)
+_COUNTRY_PROFILE_RENDER_VERSION = "country-profile-v5-all-country-profile-grains"
 
 
 def _dk(prefix: str, key_data) -> str:
@@ -170,6 +179,22 @@ def _agg_version_stamp() -> str:
     except Exception:
         pass
     return ''
+
+
+def _country_profile_cache_key(scope_meta, opd_key, start_date, end_date, report_name, selected_facilities=(), selected_districts=()):
+    return (
+        (
+            (scope_meta or {}).get('dataset_version'),
+            opd_key,
+            tuple(sorted(selected_facilities or ())),
+            tuple(sorted(selected_districts or ())),
+        ),
+        start_date,
+        end_date,
+        report_name,
+        _agg_version_stamp(),
+        _COUNTRY_PROFILE_RENDER_VERSION,
+    )
 
 
 def _get_network_df_from_state(state: dict):
@@ -3386,12 +3411,12 @@ def _prewarm_country_profile() -> bool:
             if facility_df is None or facility_df.empty:
                 continue
 
-            cp_key = (
-                (scope_meta.get('dataset_version'), opd_key, (), ()),
+            cp_key = _country_profile_cache_key(
+                scope_meta,
+                opd_key,
                 start_date,
                 end_date,
                 config.get('report_name'),
-                _agg_version_stamp(),
             )
             _cp_disk_key = _dk('cp', cp_key)
             if _worker_view_cache.get(_cp_disk_key) or _MNID_EXECUTIVE_DISK_CACHE.get(_cp_disk_key):
@@ -3536,7 +3561,13 @@ def render_mnid_dashboard(data_opd, config,
     # behind the fixed loading overlay.
     _target_tab = resolved_initial_tab
     if _target_tab == 'country-profile':
-        _cp_disk_key = _dk('cp', (_opd_key, start_date, end_date, config.get('report_name')))
+        _cp_disk_key = _dk('cp', _country_profile_cache_key(
+            scope_meta,
+            _opd_key,
+            start_date,
+            end_date,
+            config.get('report_name'),
+        ))
         cp_cached = _MNID_EXECUTIVE_DISK_CACHE.get(_cp_disk_key)
         if cp_cached is None:
             cp_cached = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label)
@@ -3618,17 +3649,14 @@ def _build_executive_tab_view(selected: str, views: dict, state: dict,
         threading.Thread(target=_async_etv_write, daemon=True).start()
 
     if selected == 'country-profile' and facility_df is not None:
-        cp_key = (
-            (
-                (scope_meta or {}).get('dataset_version'),
-                state.get('opd_key'),
-                tuple(sorted((scope_meta or {}).get('selected_facilities') or [])),
-                tuple(sorted((scope_meta or {}).get('selected_districts') or [])),
-            ),
+        cp_key = _country_profile_cache_key(
+            scope_meta,
+            state.get('opd_key'),
             start_date,
             end_date,
             config.get('report_name') if config else None,
-            _agg_version_stamp(),
+            (scope_meta or {}).get('selected_facilities') or (),
+            (scope_meta or {}).get('selected_districts') or (),
         )
         _cp_disk_key = _dk('cp', cp_key)
         cp_cached = _worker_view_cache.get(_cp_disk_key)
@@ -3715,6 +3743,38 @@ def _render_mnid_executive_tab(active_tab, executive_token):
             f'Tab failed to load ({selected}): {_exc}',
             style={'padding': '24px', 'color': '#dc2626', 'fontSize': '13px'},
         )
+
+
+@callback(
+    Output({'type': 'mnid-cp-graph', 'chart': MATCH}, 'figure'),
+    Output({'type': 'mnid-cp-caption', 'chart': MATCH}, 'children'),
+    Input({'type': 'mnid-cp-grain', 'chart': MATCH}, 'value'),
+    State({'type': 'mnid-cp-series', 'chart': MATCH}, 'data'),
+    State({'type': 'mnid-cp-meta', 'chart': MATCH}, 'data'),
+    prevent_initial_call=False,
+)
+def _update_country_profile_chart_grain(grain, stored_rows, meta):
+    if not stored_rows:
+        raise PreventUpdate
+    series_df = pd.DataFrame(stored_rows)
+    if series_df.empty:
+        raise PreventUpdate
+    meta = meta or {}
+    if 'month' in series_df.columns:
+        series_df['month'] = pd.to_datetime(series_df['month'], errors='coerce')
+    grain = (grain or 'monthly').strip().lower()
+    title = meta.get('title') or 'Chart'
+    accent = meta.get('accent') or '#15803D'
+    y_title = meta.get('y_title') or 'Cases'
+    is_multi = bool(meta.get('multi'))
+    if is_multi:
+        bucketed = bucket_multi_series(series_df.copy(), grain)
+        figure = _multi_run_chart(bucketed, title, y_title, grain=grain)
+    else:
+        bucketed = bucket_time_series(series_df[['month', 'value']].copy(), grain)
+        figure = _run_chart(bucketed, title, accent, y_title, grain=grain)
+    caption = describe_grain_window(bucketed, grain)
+    return figure, caption
 
 
 @callback(

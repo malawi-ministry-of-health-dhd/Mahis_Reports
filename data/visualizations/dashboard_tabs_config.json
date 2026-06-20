@@ -2,6 +2,5 @@
   "mode": "mnh_only",
   "visible_reports": [],
   "default_report": "Maternal Health",
-  "hidden_mnid_tabs": [
-  ]
+  "hidden_mnid_tabs": []
 }
