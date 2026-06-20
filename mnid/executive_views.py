@@ -755,6 +755,24 @@ def _trend_chart_card(title: str, subtitle: str, figure: go.Figure, accent: str)
     )
 
 
+def _trend_subtitle(title: str) -> str:
+    custom = {
+        "Total Births": "Smoothed monthly total births across the selected reporting period.",
+        "Maternal Mortality": "Smoothed monthly maternal deaths reported in the selected scope.",
+        "Neonatal Mortality": "Smoothed monthly neonatal deaths reported in the selected scope.",
+        "Stillbirths": "Smoothed monthly stillbirth trend, including fresh and macerated cases.",
+        "Pre-eclampsia and Eclampsia": "Smoothed monthly reported cases of hypertensive complications.",
+        "Postpartum Haemorrhage": "Smoothed monthly reported postpartum haemorrhage cases.",
+        "Maternal Sepsis": "Smoothed monthly reported maternal sepsis cases.",
+        "Obstructed or Prolonged Labour": "Smoothed monthly reported obstructed or prolonged labour cases.",
+        "Ruptured Uterus": "Smoothed monthly reported uterine rupture cases.",
+        "Birth Asphyxia": "Smoothed monthly reported birth asphyxia cases.",
+        "Preterm Birth": "Smoothed monthly reported preterm birth cases.",
+        "Neonatal Sepsis": "Smoothed monthly reported neonatal sepsis cases.",
+    }
+    return custom.get(title, "Smoothed monthly reported cases in the selected scope.")
+
+
 def _summary_card(title: str, value: str, subtitle: str, accent: str) -> dmc.Paper:
     return dmc.Paper(
         withBorder=True,
@@ -1007,7 +1025,7 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
     complication_cards = [
         _trend_chart_card(
             title,
-            "Monthly smoothed complication volume in the selected reporting scope.",
+            _trend_subtitle(title),
             _run_chart(_monthly_series(df, mask, "person_id"), title, color, "Cases"),
             color,
         )
@@ -1102,25 +1120,25 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
             _two_column_chart_grid([
                 _trend_chart_card(
                     "Total Births",
-                    "Monthly smoothed birth volume across the selected reporting period.",
+                    _trend_subtitle("Total Births"),
                     _run_chart(total_births_series, "Total Births", PRIMARY_GREEN, "Births"),
                     PRIMARY_GREEN,
                 ),
                 _trend_chart_card(
                     "Maternal Mortality",
-                    "Monthly smoothed trend of maternal deaths recorded in the selected scope.",
+                    _trend_subtitle("Maternal Mortality"),
                     _run_chart(maternal_death_series, "Maternal Mortality", MORTALITY_ROSE, "Deaths"),
                     MORTALITY_ROSE,
                 ),
                 _trend_chart_card(
                     "Neonatal Mortality",
-                    "Monthly smoothed trend of neonatal deaths recorded in the selected scope.",
+                    _trend_subtitle("Neonatal Mortality"),
                     _run_chart(neonatal_death_series, "Neonatal Mortality", NEONATAL_ORANGE, "Deaths"),
                     NEONATAL_ORANGE,
                 ),
                 _trend_chart_card(
                     "Stillbirths",
-                    "Smoothed monthly trend with fresh and macerated stillbirth breakdown.",
+                    _trend_subtitle("Stillbirths"),
                     _multi_run_chart(stillbirth_trend_series, "Stillbirths", "Cases"),
                     STILLBIRTH_BLUE,
                 ),

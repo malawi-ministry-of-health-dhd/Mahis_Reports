@@ -201,6 +201,7 @@ SCENARIOS = [
         "newborn_comp_weights": [0.12, 0.12, 0.10, 0.66],
         "maternal_sepsis": 0.10,
         "pph": 0.13,
+        "ruptured_uterus": 0.04,
         "birth_asphyxia": 0.12,
         "neonatal_sepsis": 0.11,
     },
@@ -218,6 +219,7 @@ SCENARIOS = [
         "newborn_comp_weights": [0.18, 0.14, 0.11, 0.57],
         "maternal_sepsis": 0.12,
         "pph": 0.16,
+        "ruptured_uterus": 0.07,
         "birth_asphyxia": 0.18,
         "neonatal_sepsis": 0.12,
     },
@@ -235,6 +237,7 @@ SCENARIOS = [
         "newborn_comp_weights": [0.10, 0.15, 0.24, 0.51],
         "maternal_sepsis": 0.20,
         "pph": 0.14,
+        "ruptured_uterus": 0.05,
         "birth_asphyxia": 0.13,
         "neonatal_sepsis": 0.26,
     },
@@ -252,6 +255,7 @@ SCENARIOS = [
         "newborn_comp_weights": [0.08, 0.08, 0.07, 0.77],
         "maternal_sepsis": 0.05,
         "pph": 0.08,
+        "ruptured_uterus": 0.02,
         "birth_asphyxia": 0.08,
         "neonatal_sepsis": 0.08,
     },
@@ -381,6 +385,8 @@ for district, facilities in DISTRICTS.items():
                             _obs(tmpl, "1g Tranexamic Acid IV slow push over 10 minutes", "Yes")
                         if random.random() < 0.55:
                             _obs(tmpl, "Misoprostol 800 micrograms", "Yes")
+                    if random.random() < scenario["ruptured_uterus"]:
+                        _obs(tmpl, "Obstetric complications", "Ruptured uterus")
 
                 # Vitamin K and Breast feeding: recorded for ALL Labour patients
                 # (denominator = all Labour), each with its own coverage rate.
