@@ -1,6 +1,7 @@
 """Executive Country Profile and Operational Readiness views for MNID."""
 from __future__ import annotations
 
+import re
 import dash_mantine_components as dmc
 import pandas as pd
 import plotly.graph_objects as go
@@ -63,6 +64,21 @@ _EXEC_GRAIN_OPTIONS = [
     {"label": "Quarterly", "value": "quarterly"},
     {"label": "Yearly", "value": "yearly"},
 ]
+
+_EXEC_DEFAULT_GRAINS = {
+    "total-births": "monthly",
+    "maternal-mortality": "weekly",
+    "neonatal-mortality": "weekly",
+    "stillbirths": "weekly",
+    "pre-eclampsia-and-eclampsia": "monthly",
+    "postpartum-haemorrhage": "monthly",
+    "maternal-sepsis": "monthly",
+    "obstructed-or-prolonged-labour": "monthly",
+    "ruptured-uterus": "weekly",
+    "birth-asphyxia": "monthly",
+    "preterm-birth": "monthly",
+    "neonatal-sepsis": "monthly",
+}
 
 
 def _exec_chart_layout(
@@ -178,6 +194,97 @@ def describe_grain_window(bucketed_df: pd.DataFrame, grain: str) -> str:
     if grain == "yearly":
         return f"Showing yearly data, {_format_grain_label(start, 'yearly')} to {_format_grain_label(end, 'yearly')}"
     return f"Showing monthly data, {start.strftime('%b %Y')} to {end.strftime('%b %Y')}"
+
+
+def bucket_multi_series(series_df: pd.DataFrame, grain: str, value_col: str = "value") -> pd.DataFrame:
+    if series_df is None or series_df.empty or "month" not in series_df.columns or "series" not in series_df.columns:
+        return pd.DataFrame(columns=["period_start", "bucket_key", "bucket_label", "series", "color", value_col])
+    frames = []
+    for label in series_df["series"].dropna().unique():
+        trace_df = series_df[series_df["series"] == label].copy()
+        color = trace_df["color"].iloc[0] if "color" in trace_df.columns and not trace_df.empty else PRIMARY_GREEN
+        bucketed = bucket_time_series(trace_df[["month", value_col]].copy(), grain, value_col=value_col)
+        if bucketed.empty:
+            continue
+        bucketed["series"] = label
+        bucketed["color"] = color
+        frames.append(bucketed)
+    if not frames:
+        return pd.DataFrame(columns=["period_start", "bucket_key", "bucket_label", "series", "color", value_col])
+    return pd.concat(frames, ignore_index=True)
+
+
+def _grain_axis_title(grain: str) -> str:
+    return {
+        "weekly": "Week",
+        "monthly": "Month",
+        "quarterly": "Quarter",
+        "yearly": "Year",
+    }.get(str(grain or "monthly").lower(), "Month")
+
+
+def _grain_tick_angle(grain: str) -> int:
+    return {
+        "weekly": -32,
+        "monthly": -28,
+        "quarterly": 0,
+        "yearly": 0,
+    }.get(str(grain or "monthly").lower(), -28)
+
+
+def _serialize_trend_series(series_df: pd.DataFrame) -> list[dict]:
+    if series_df is None or series_df.empty:
+        return []
+    out = series_df.copy()
+    if "month" in out.columns:
+        out["month"] = pd.to_datetime(out["month"], errors="coerce").dt.strftime("%Y-%m-%d")
+    return out.to_dict("records")
+
+
+def _chart_key_slug(title: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", str(title or "").strip().lower()).strip("-")
+    return slug or "chart"
+
+
+def _trend_chart_payload(chart_key: str, title: str, subtitle: str, accent: str, y_title: str, series_df: pd.DataFrame, multi: bool = False) -> dict:
+    default_grain = _EXEC_DEFAULT_GRAINS.get(chart_key, "monthly")
+    bucketed = bucket_multi_series(series_df, default_grain) if multi else bucket_time_series(series_df, default_grain)
+    figure = _multi_run_chart(bucketed, title, y_title, grain=default_grain) if multi else _run_chart(bucketed, title, accent, y_title, grain=default_grain)
+    return {
+        "card": _trend_chart_card(
+            title,
+            subtitle,
+            figure,
+            accent,
+            header_right=html.Div([
+                dmc.SegmentedControl(
+                    id={"type": "mnid-cp-grain", "chart": chart_key},
+                    value=default_grain,
+                    data=_EXEC_GRAIN_OPTIONS,
+                    radius="xl",
+                    size="xs",
+                    color="green",
+                    styles={
+                        "root": {"background": "#fff", "border": f"1px solid {_hex_to_rgba(accent, 0.22)}", "padding": "2px"},
+                        "control": {"border": "0"},
+                        "label": {"fontSize": "11px", "fontWeight": 600, "color": "#64748b", "padding": "4px 10px"},
+                        "indicator": {"background": _hex_to_rgba(accent, 0.14), "border": f"1px solid {_hex_to_rgba(accent, 0.18)}"},
+                    },
+                ),
+                dcc.Store(id={"type": "mnid-cp-series", "chart": chart_key}, data=_serialize_trend_series(series_df)),
+                dcc.Store(id={"type": "mnid-cp-meta", "chart": chart_key}, data={
+                    "title": title,
+                    "accent": accent,
+                    "y_title": y_title,
+                    "multi": multi,
+                }),
+            ], style={"display": "flex", "alignItems": "center", "gap": "8px"}),
+            graph_id={"type": "mnid-cp-graph", "chart": chart_key},
+            caption=describe_grain_window(bucketed, default_grain),
+            caption_id={"type": "mnid-cp-caption", "chart": chart_key},
+        ),
+        "default_grain": default_grain,
+    }
 
 
 def _section_header(title: str) -> html.Div:
@@ -668,7 +775,7 @@ def _sparkline_figure(series: pd.DataFrame, color: str) -> go.Figure:
     return fig
 
 
-def _run_chart(series: pd.DataFrame, title: str, color: str, y_title: str, target: float | None = None) -> go.Figure:
+def _run_chart(series: pd.DataFrame, title: str, color: str, y_title: str, target: float | None = None, grain: str = "monthly") -> go.Figure:
     fig = go.Figure()
     if series.empty:
         fig.update_layout(
@@ -687,9 +794,9 @@ def _run_chart(series: pd.DataFrame, title: str, color: str, y_title: str, targe
         return fig
 
     plot_series = series.copy()
-    x_values = plot_series["bucket_key"] if "bucket_key" in plot_series.columns else plot_series["month"]
+    x_values = plot_series["bucket_label"] if "bucket_label" in plot_series.columns else pd.to_datetime(plot_series["month"], errors="coerce").dt.strftime("%b %Y")
     hover_labels = plot_series["bucket_label"] if "bucket_label" in plot_series.columns else pd.to_datetime(plot_series["month"], errors="coerce").dt.strftime("%b %Y")
-    smooth_grain = "monthly" if len(plot_series) > 2 else "weekly"
+    smooth_grain = grain if grain in {"weekly", "monthly", "quarterly", "yearly"} else "monthly"
     smoothed, _ = _moving_average_values(plot_series["value"].tolist(), smooth_grain)
     fig.add_trace(go.Scatter(
         x=x_values,
@@ -719,9 +826,10 @@ def _run_chart(series: pd.DataFrame, title: str, color: str, y_title: str, targe
             showline=False,
             zeroline=False,
             tickfont=dict(size=11, color="#94a3b8"),
-            tickangle=0,
-            title=dict(text="Month", font=dict(size=10, color="#64748b")),
+            tickangle=_grain_tick_angle(grain),
+            title=dict(text=_grain_axis_title(grain), font=dict(size=10, color="#64748b")),
             type="category",
+            automargin=True,
         ),
         yaxis=dict(
             showgrid=True,
@@ -734,11 +842,11 @@ def _run_chart(series: pd.DataFrame, title: str, color: str, y_title: str, targe
             rangemode="tozero",
         ),
     ))
-    fig.update_layout(showlegend=False)
+    fig.update_layout(showlegend=False, transition={"duration": 260, "easing": "cubic-in-out"})
     return fig
 
 
-def _multi_run_chart(series_df: pd.DataFrame, title: str, y_title: str, target: float | None = None) -> go.Figure:
+def _multi_run_chart(series_df: pd.DataFrame, title: str, y_title: str, target: float | None = None, grain: str = "monthly") -> go.Figure:
     fig = go.Figure()
     if series_df.empty:
         fig.update_layout(
@@ -759,9 +867,9 @@ def _multi_run_chart(series_df: pd.DataFrame, title: str, y_title: str, target: 
     for label in series_df["series"].dropna().unique():
         trace_df = series_df[series_df["series"] == label]
         color = trace_df["color"].iloc[0] if "color" in trace_df.columns and not trace_df.empty else PRIMARY_GREEN
-        smoothed, _ = _moving_average_values(trace_df["value"].tolist(), "monthly")
+        smoothed, _ = _moving_average_values(trace_df["value"].tolist(), grain)
         fig.add_trace(go.Scatter(
-            x=trace_df["month"],
+            x=trace_df["bucket_label"] if "bucket_label" in trace_df.columns else pd.to_datetime(trace_df["month"], errors="coerce").dt.strftime("%b %Y"),
             y=smoothed,
             name=label,
             mode="lines+markers",
@@ -787,8 +895,10 @@ def _multi_run_chart(series_df: pd.DataFrame, title: str, y_title: str, target: 
             showline=False,
             zeroline=False,
             tickfont=dict(size=11, color="#94a3b8"),
-            tickformat="%b %Y",
-            title=dict(text="Month", font=dict(size=10, color="#64748b")),
+            tickangle=_grain_tick_angle(grain),
+            title=dict(text=_grain_axis_title(grain), font=dict(size=10, color="#64748b")),
+            type="category",
+            automargin=True,
         ),
         yaxis=dict(
             showgrid=True,
@@ -811,6 +921,7 @@ def _multi_run_chart(series_df: pd.DataFrame, title: str, y_title: str, target: 
             x=0,
             font=dict(size=10, color="#64748b"),
         ),
+        transition={"duration": 260, "easing": "cubic-in-out"},
     )
     return fig
 
@@ -870,20 +981,20 @@ def _trend_chart_card(
 
 def _trend_subtitle(title: str) -> str:
     custom = {
-        "Total Births": "Smoothed monthly total births across the selected reporting period.",
-        "Maternal Mortality": "Smoothed monthly maternal deaths reported in the selected scope.",
-        "Neonatal Mortality": "Smoothed monthly neonatal deaths reported in the selected scope.",
-        "Stillbirths": "Smoothed monthly stillbirth trend, including fresh and macerated cases.",
-        "Pre-eclampsia and Eclampsia": "Smoothed monthly reported cases of hypertensive complications.",
-        "Postpartum Haemorrhage": "Smoothed monthly reported postpartum haemorrhage cases.",
-        "Maternal Sepsis": "Smoothed monthly reported maternal sepsis cases.",
-        "Obstructed or Prolonged Labour": "Smoothed monthly reported obstructed or prolonged labour cases.",
-        "Ruptured Uterus": "Smoothed monthly reported uterine rupture cases.",
-        "Birth Asphyxia": "Smoothed monthly reported birth asphyxia cases.",
-        "Preterm Birth": "Smoothed monthly reported preterm birth cases.",
-        "Neonatal Sepsis": "Smoothed monthly reported neonatal sepsis cases.",
+        "Total Births": "Reported total births across the selected reporting period.",
+        "Maternal Mortality": "Reported maternal deaths in the selected scope.",
+        "Neonatal Mortality": "Reported neonatal deaths in the selected scope.",
+        "Stillbirths": "Stillbirth trend, including fresh and macerated cases.",
+        "Pre-eclampsia and Eclampsia": "Reported cases of hypertensive complications.",
+        "Postpartum Haemorrhage": "Reported postpartum haemorrhage cases.",
+        "Maternal Sepsis": "Reported maternal sepsis cases.",
+        "Obstructed or Prolonged Labour": "Reported obstructed or prolonged labour cases.",
+        "Ruptured Uterus": "Reported uterine rupture cases.",
+        "Birth Asphyxia": "Reported birth asphyxia cases.",
+        "Preterm Birth": "Reported preterm birth cases.",
+        "Neonatal Sepsis": "Reported neonatal sepsis cases.",
     }
-    return custom.get(title, "Smoothed monthly reported cases in the selected scope.")
+    return custom.get(title, "Reported cases in the selected scope.")
 
 
 def _summary_card(title: str, value: str, subtitle: str, accent: str) -> dmc.Paper:
@@ -1166,7 +1277,6 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
         PRIMARY_GREEN,
     )}, df)
     total_births_series = total_births_series[["month", "value"]].copy() if not total_births_series.empty else pd.DataFrame(columns=["month", "value"])
-    total_births_bucketed = bucket_time_series(total_births_series, "monthly")
     stillbirth_trend_series = _monthly_multiseries({
         "Total stillbirths": (_yn_mask(df, "mnid_labour_stillbirth"), STILLBIRTH_BLUE),
         "Fresh stillbirths": (
@@ -1189,15 +1299,55 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
         ("Preterm Birth", PRIMARY_GREEN, _yn_mask(df, "mnid_labour_preterm")),
         ("Neonatal Sepsis", ADMISSIONS_BLUE, _yn_mask(df, "mnid_newborn_sepsis")),
     ]
-    complication_cards = [
-        _trend_chart_card(
+    complication_cards = []
+    for title, color, mask in complication_specs:
+        chart_key = _chart_key_slug(title)
+        complication_cards.append(_trend_chart_payload(
+            chart_key,
             title,
             _trend_subtitle(title),
-            _run_chart(_monthly_series(df, mask, "person_id"), title, color, "Cases"),
             color,
-        )
-        for title, color, mask in complication_specs
-    ]
+            "Cases",
+            _monthly_series(df, mask, "person_id"),
+            multi=False,
+        )["card"])
+
+    total_births_chart = _trend_chart_payload(
+        "total-births",
+        "Total Births",
+        "Birth volume over time",
+        PRIMARY_GREEN,
+        "Births",
+        total_births_series,
+        multi=False,
+    )["card"]
+    maternal_mortality_chart = _trend_chart_payload(
+        "maternal-mortality",
+        "Maternal Mortality",
+        _trend_subtitle("Maternal Mortality"),
+        MORTALITY_ROSE,
+        "Deaths",
+        maternal_death_series,
+        multi=False,
+    )["card"]
+    neonatal_mortality_chart = _trend_chart_payload(
+        "neonatal-mortality",
+        "Neonatal Mortality",
+        _trend_subtitle("Neonatal Mortality"),
+        NEONATAL_ORANGE,
+        "Deaths",
+        neonatal_death_series,
+        multi=False,
+    )["card"]
+    stillbirths_chart = _trend_chart_payload(
+        "stillbirths",
+        "Stillbirths",
+        _trend_subtitle("Stillbirths"),
+        STILLBIRTH_BLUE,
+        "Cases",
+        stillbirth_trend_series,
+        multi=True,
+    )["card"]
 
     hero = dmc.Paper(
         withBorder=True,
@@ -1285,53 +1435,10 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
             _responsive_grid([_mortality_card(*spec) for spec in mortality_specs], min_width="260px", gap="14px"),
             _section_header("Mortality Trends · 12-Month Run Charts"),
             _two_column_chart_grid([
-                _trend_chart_card(
-                    "Total Births",
-                    "Birth volume over time",
-                    _run_chart(total_births_bucketed, "Total Births", PRIMARY_GREEN, "Births"),
-                    PRIMARY_GREEN,
-                    header_right=html.Div([
-                        dmc.SegmentedControl(
-                            id="mnid-cp-total-births-grain",
-                            value="monthly",
-                            data=_EXEC_GRAIN_OPTIONS,
-                            radius="xl",
-                            size="xs",
-                            color="green",
-                            styles={
-                                "root": {"background": "#fff", "border": f"1px solid {_hex_to_rgba(PRIMARY_GREEN, 0.22)}", "padding": "2px"},
-                                "control": {"border": "0"},
-                                "label": {"fontSize": "11px", "fontWeight": 600, "color": "#64748b", "padding": "4px 10px"},
-                                "indicator": {"background": _hex_to_rgba(PRIMARY_GREEN, 0.14), "border": f"1px solid {_hex_to_rgba(PRIMARY_GREEN, 0.18)}"},
-                            },
-                        ),
-                        dcc.Store(
-                            id="mnid-cp-total-births-series",
-                            data=total_births_series.assign(month=lambda x: pd.to_datetime(x["month"], errors="coerce").dt.strftime("%Y-%m-%d")).to_dict("records"),
-                        ),
-                    ], style={"display": "flex", "alignItems": "center", "gap": "8px"}),
-                    graph_id="mnid-cp-total-births-graph",
-                    caption=describe_grain_window(total_births_bucketed, "monthly"),
-                    caption_id="mnid-cp-total-births-caption",
-                ),
-                _trend_chart_card(
-                    "Maternal Mortality",
-                    _trend_subtitle("Maternal Mortality"),
-                    _run_chart(maternal_death_series, "Maternal Mortality", MORTALITY_ROSE, "Deaths"),
-                    MORTALITY_ROSE,
-                ),
-                _trend_chart_card(
-                    "Neonatal Mortality",
-                    _trend_subtitle("Neonatal Mortality"),
-                    _run_chart(neonatal_death_series, "Neonatal Mortality", NEONATAL_ORANGE, "Deaths"),
-                    NEONATAL_ORANGE,
-                ),
-                _trend_chart_card(
-                    "Stillbirths",
-                    _trend_subtitle("Stillbirths"),
-                    _multi_run_chart(stillbirth_trend_series, "Stillbirths", "Cases"),
-                    STILLBIRTH_BLUE,
-                ),
+                total_births_chart,
+                maternal_mortality_chart,
+                neonatal_mortality_chart,
+                stillbirths_chart,
             ]),
             _section_header("Complication Trends"),
             _two_column_chart_grid(complication_cards),
