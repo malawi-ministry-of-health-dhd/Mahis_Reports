@@ -71,6 +71,18 @@ def _section_header(title: str) -> html.Div:
     ], style={"display": "flex", "alignItems": "center", "gap": "7px", "marginBottom": "12px", "marginTop": "8px"})
 
 
+def _responsive_grid(children: list, min_width: str = "220px", gap: str = "16px", margin_bottom: str = "20px") -> html.Div:
+    return html.Div(
+        children,
+        style={
+            "display": "grid",
+            "gridTemplateColumns": f"repeat(auto-fit, minmax({min_width}, 1fr))",
+            "gap": gap,
+            "marginBottom": margin_bottom,
+        },
+    )
+
+
 def _exec_alert_banner(maternal_deaths: int, mmr: float, neonatal_deaths: int, stillbirths: int) -> html.Div:
     items = []
     if maternal_deaths > 0:
@@ -967,11 +979,11 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
             *([alert] if alert else []),
             scope_band,
             _section_header("Country Summary · Current Reporting Period"),
-            dmc.SimpleGrid(cols=4, spacing="md", mb="lg", children=summary_cards),
+            _responsive_grid(summary_cards, min_width="200px", gap="14px"),
             _section_header("Mortality Snapshot · Immediate Attention Required"),
-            dmc.SimpleGrid(cols=3, spacing="md", mb="lg", children=[_mortality_card(*spec) for spec in mortality_specs]),
+            _responsive_grid([_mortality_card(*spec) for spec in mortality_specs], min_width="260px", gap="14px"),
             _section_header("Mortality Trends · 12-Month Run Charts"),
-            dmc.SimpleGrid(cols=2, spacing="lg", mb="lg", children=[
+            _responsive_grid([
                 dmc.Paper(withBorder=True, radius="md", shadow="xs", style={"overflow": "hidden", "borderColor": "#e2e8f0"},
                     children=[dcc.Graph(figure=_run_chart(total_births_series, "Total Births", PRIMARY_GREEN, "Births"), config={"displayModeBar": False})]),
                 dmc.Paper(withBorder=True, radius="md", shadow="xs", style={"overflow": "hidden", "borderColor": "#e2e8f0"},
@@ -980,9 +992,9 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
                     children=[dcc.Graph(figure=_run_chart(neonatal_death_series, "Neonatal Mortality", NEONATAL_ORANGE, "Deaths"), config={"displayModeBar": False})]),
                 dmc.Paper(withBorder=True, radius="md", shadow="xs", style={"overflow": "hidden", "borderColor": "#e2e8f0"},
                     children=[dcc.Graph(figure=_multi_run_chart(stillbirth_trend_series, "Stillbirths", "Cases"), config={"displayModeBar": False})]),
-            ]),
+            ], min_width="320px", gap="18px"),
             _section_header("Complication Trends"),
-            dmc.SimpleGrid(cols=2, spacing="lg", mb="lg", children=complication_cards),
+            _responsive_grid(complication_cards, min_width="320px", gap="18px"),
         ],
     )
 
