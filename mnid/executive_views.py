@@ -952,7 +952,6 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
         _summary_card("Stillbirths", f"{current_metrics['stillbirths']:,}", "Stillbirths in current reporting period", "#7C3AED"),
         _summary_card("Maternal Deaths", f"{current_metrics['maternal_deaths']:,}", "Deaths recorded in selected scope", MORTALITY_ROSE),
         _summary_card("Neonatal Deaths", f"{current_metrics['neonatal_deaths']:,}", "Deaths recorded in selected scope", WARNING_AMBER),
-        _summary_card("Districts Covered", f"{districts_covered:,}", f"{facilities_reporting:,} facilities reporting", ADMISSIONS_BLUE),
     ]
 
     mortality_specs = [
