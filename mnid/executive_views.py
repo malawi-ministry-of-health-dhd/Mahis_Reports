@@ -67,14 +67,14 @@ _EXEC_GRAIN_OPTIONS = [
 
 _EXEC_DEFAULT_GRAINS = {
     "total-births": "monthly",
-    "maternal-mortality": "weekly",
-    "neonatal-mortality": "weekly",
-    "stillbirths": "weekly",
+    "maternal-mortality": "monthly",
+    "neonatal-mortality": "monthly",
+    "stillbirths": "monthly",
     "pre-eclampsia-and-eclampsia": "monthly",
     "postpartum-haemorrhage": "monthly",
     "maternal-sepsis": "monthly",
     "obstructed-or-prolonged-labour": "monthly",
-    "ruptured-uterus": "weekly",
+    "ruptured-uterus": "monthly",
     "birth-asphyxia": "monthly",
     "preterm-birth": "monthly",
     "neonatal-sepsis": "monthly",
