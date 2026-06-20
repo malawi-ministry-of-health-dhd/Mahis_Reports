@@ -155,8 +155,6 @@ def bucket_time_series(series_df: pd.DataFrame, grain: str, value_col: str = "va
         .sum()
         .sort_values("period_start")
     )
-    bucketed["bucket_key"] = bucketed["period_start"].dt.strftime("%Y-%m-%d")
-    bucketed["bucket_label"] = bucketed["period_start"].apply(lambda ts: _format_grain_label(ts, grain))
     if not bucketed.empty:
         full_idx = pd.date_range(
             bucketed["period_start"].min(),
@@ -168,14 +166,10 @@ def bucket_time_series(series_df: pd.DataFrame, grain: str, value_col: str = "va
                 "yearly": "YS",
             }.get(str(grain or "monthly").lower(), "MS"),
         )
-        bucketed = (
-            bucketed.set_index("period_start")
-            .reindex(full_idx, fill_value=0)
-            .rename_axis("period_start")
-            .reset_index()
-        )
-        bucketed["bucket_key"] = bucketed["period_start"].dt.strftime("%Y-%m-%d")
-        bucketed["bucket_label"] = bucketed["period_start"].apply(lambda ts: _format_grain_label(ts, grain))
+        bucketed = bucketed.set_index("period_start").reindex(full_idx).rename_axis("period_start").reset_index()
+        bucketed[value_col] = pd.to_numeric(bucketed[value_col], errors="coerce").fillna(0)
+    bucketed["bucket_key"] = bucketed["period_start"].dt.strftime("%Y-%m-%d")
+    bucketed["bucket_label"] = bucketed["period_start"].apply(lambda ts: _format_grain_label(ts, grain))
     return bucketed
 
 
