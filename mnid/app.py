@@ -18,7 +18,7 @@ import plotly.graph_objects as go
 from datetime import datetime
 from pathlib import Path
 import os
-from dash import html, dcc, callback, callback_context, no_update, Input, Output, State, ALL
+from dash import html, dcc, callback, callback_context, no_update, Input, Output, State, ALL, MATCH
 from dash.exceptions import PreventUpdate
 from helpers.helpers import create_count_from_config
 from mnid.constants import (
@@ -86,12 +86,20 @@ from mnid.coverage import (
     _build_compare_heatmap, _comparative_analysis_section,
 )
 from mnid.layout import (
-    _TH, _hero_donut_card, _hero_donut_row,
+    _TH, _hero_donut_card, _hero_donut_row, _count_stat_row,
     _district_gauge_fig, _build_district_gauge_row,
     _pph_cascade, _topbar, _sidebar, _alert_banner,
     _avg_ring, _count_bar, _kpi, _kpi_row, _section_anchor,
 )
-from mnid.executive_views import render_country_profile, render_operational_readiness
+from mnid.executive_views import (
+    render_country_profile,
+    render_operational_readiness,
+    bucket_time_series,
+    bucket_multi_series,
+    describe_grain_window,
+    _run_chart,
+    _multi_run_chart,
+)
 
 _MNID_UI_CACHE_MAX = 16
 _MNID_UI_CACHE_TTL_SECONDS = 3600
@@ -102,6 +110,7 @@ _EXECUTIVE_CACHE_DIR = os.environ.get('MNID_EXEC_CACHE_DIR') or os.path.join(
 _MNID_EXECUTIVE_DISK_CACHE = diskcache.Cache(_EXECUTIVE_CACHE_DIR, size_limit=512 * 1024 * 1024)
 _MNID_WARNED_MESSAGES = set()
 _LOGGER = logging.getLogger(__name__)
+_COUNTRY_PROFILE_RENDER_VERSION = "country-profile-v5-all-country-profile-grains"
 
 
 def _dk(prefix: str, key_data) -> str:
@@ -170,6 +179,22 @@ def _agg_version_stamp() -> str:
     except Exception:
         pass
     return ''
+
+
+def _country_profile_cache_key(scope_meta, opd_key, start_date, end_date, report_name, selected_facilities=(), selected_districts=()):
+    return (
+        (
+            (scope_meta or {}).get('dataset_version'),
+            opd_key,
+            tuple(sorted(selected_facilities or ())),
+            tuple(sorted(selected_districts or ())),
+        ),
+        start_date,
+        end_date,
+        report_name,
+        _agg_version_stamp(),
+        _COUNTRY_PROFILE_RENDER_VERSION,
+    )
 
 
 def _get_network_df_from_state(state: dict):
@@ -573,19 +598,28 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         facility_df,
         effective_categories,
     )
+    removed_indicator_labels = {
+        'Gestation weeks recorded',
+        'Neonatal enrolment documented',
+        'Screened for infection',
+    }
+    all_inds = [i for i in all_inds if i.get('label') not in removed_indicator_labels]
     _validate_indicator_configs(all_inds)
     category_order = _resolve_category_order(all_inds, effective_categories)
     if category_order:
         allowed = set(category_order)
         all_inds = [i for i in all_inds if i.get('category') in allowed]
 
+    overview_inds = [i for i in all_inds if i.get('status') == 'overview_only']
+    display_inds = [i for i in all_inds if i.get('status') != 'overview_only']
+
     payload_key = hashlib.md5(pickle.dumps(
         (len(network_df), tuple(network_df.columns.tolist()) if not network_df.empty else (), start_date, end_date, tuple(category_order)),
         protocol=4,
     )).hexdigest()[:16] + f'_{start_date}_{end_date}'
 
-    tracked = [i for i in all_inds if i.get('status') == 'tracked']
-    awaiting = [i for i in all_inds if i.get('status') == 'awaiting_baseline']
+    tracked = [i for i in display_inds if i.get('status') == 'tracked']
+    awaiting = [i for i in display_inds if i.get('status') == 'awaiting_baseline']
     default_cat = category_order[0] if category_order else 'ANC'
 
     if category_order == ['Newborn']:
@@ -593,7 +627,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         dashboard_subtitle = 'Program monitoring for admissions, outcomes, clinical interventions, coverage, and readiness.'
         dashboard_theme = 'newborn'
     elif set(category_order) == {'ANC', 'Labour', 'PNC'}:
-        dashboard_title = 'Maternal Health Dashboard'
+        dashboard_title = 'Maternal Care Health Dashboard'
         dashboard_subtitle = 'ANC, labour, and postnatal performance, comparison, coverage, and readiness.'
         dashboard_theme = 'default'
     else:
@@ -676,6 +710,19 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
     except Exception:
         prev_start = prev_end = None
 
+    _prev_df_filtered = pd.DataFrame()
+    if (
+        prev_start is not None and prev_end is not None
+        and 'Date' in network_df.columns and not network_df.empty
+    ):
+        _prev_df_filtered = network_df[
+            (network_df['Date'] >= prev_start) & (network_df['Date'] <= prev_end)
+        ]
+        if selected_facilities and 'Facility' in _prev_df_filtered.columns:
+            _prev_df_filtered = _prev_df_filtered[_prev_df_filtered['Facility'].isin(selected_facilities)]
+        elif selected_districts and 'District' in _prev_df_filtered.columns:
+            _prev_df_filtered = _prev_df_filtered[_prev_df_filtered['District'].isin(selected_districts)]
+
     # Batch aggregate queries: 2 groupbys replace ~84 individual query_coverage calls
     _cur_batch: dict = {}
     _prev_batch: dict = {}
@@ -738,10 +785,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
             if prev_den == 0:
                 # Indicator not in aggregate — fall back to raw prev-period scan.
                 try:
-                    prev_df_slice = network_df[
-                        (network_df['Date'] >= prev_start) & (network_df['Date'] <= prev_end)
-                    ] if 'Date' in network_df.columns and not network_df.empty else pd.DataFrame()
-                    _, _, prev_pct = _cov(prev_df_slice, c['numerator_filters'], c['denominator_filters'])
+                    _, _, prev_pct = _cov(_prev_df_filtered, c['numerator_filters'], c['denominator_filters'])
                 except Exception:
                     prev_pct = c['pct']
             c['delta_pct'] = round(c['pct'] - prev_pct, 1)
@@ -759,14 +803,61 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
                 c['delta_pct'] = None
         elif prev_start is not None:
             try:
-                prev_df = network_df[
-                    (network_df['Date'] >= prev_start) & (network_df['Date'] <= prev_end)
-                ] if 'Date' in network_df.columns and not network_df.empty else pd.DataFrame()
-                if not prev_df.empty and selected_facilities and 'Facility' in prev_df.columns:
-                    prev_df = prev_df[prev_df['Facility'].isin(selected_facilities)]
-                elif not prev_df.empty and selected_districts and 'District' in prev_df.columns:
-                    prev_df = prev_df[prev_df['District'].isin(selected_districts)]
-                _, _, prev_pct = _cov(prev_df, c['numerator_filters'], c['denominator_filters'])
+                _, _, prev_pct = _cov(_prev_df_filtered, c['numerator_filters'], c['denominator_filters'])
+                c['delta_pct'] = round(c['pct'] - prev_pct, 1)
+            except Exception:
+                c['delta_pct'] = None
+        else:
+            c['delta_pct'] = None
+
+    overview_computed = []
+    for ind in overview_inds:
+        if _cur_batch:
+            num, den, pct = _batch_cov(_cur_batch, ind['id'], _kpi_fallbacks)
+            if den == 0:
+                num, den, pct = _cov(facility_df, ind['numerator_filters'], ind['denominator_filters'])
+        elif _agg is not None and _s is not None:
+            num, den, pct = _agg_coverage(
+                _agg, ind['id'], _s, _e,
+                facility_codes=_fac_filter,
+                districts=_dist_filter if not _fac_filter else None,
+                grain=_kpi_grain,
+                indicator_label=ind.get('label'),
+            )
+        else:
+            num, den, pct = _cov(facility_df, ind['numerator_filters'], ind['denominator_filters'])
+        overview_computed.append({
+            **ind,
+            'pct': pct,
+            'numerator': num,
+            'denominator': den,
+            'attained_pct': _target_attainment_pct(pct, ind.get('target', 0), ind),
+        })
+
+    for c in overview_computed:
+        if _prev_batch and prev_start is not None:
+            _, prev_den, prev_pct = _batch_cov(_prev_batch, c['id'], _kpi_fallbacks)
+            if prev_den == 0:
+                try:
+                    _, _, prev_pct = _cov(_prev_df_filtered, c['numerator_filters'], c['denominator_filters'])
+                except Exception:
+                    prev_pct = c['pct']
+            c['delta_pct'] = round(c['pct'] - prev_pct, 1)
+        elif _agg is not None and prev_start is not None:
+            try:
+                _, _, prev_pct = _agg_coverage(
+                    _agg, c['id'], prev_start, prev_end,
+                    facility_codes=_fac_filter,
+                    districts=_dist_filter if not _fac_filter else None,
+                    grain=_kpi_grain,
+                    indicator_label=c.get('label'),
+                )
+                c['delta_pct'] = round(c['pct'] - prev_pct, 1)
+            except Exception:
+                c['delta_pct'] = None
+        elif prev_start is not None:
+            try:
+                _, _, prev_pct = _cov(_prev_df_filtered, c['numerator_filters'], c['denominator_filters'])
                 c['delta_pct'] = round(c['pct'] - prev_pct, 1)
             except Exception:
                 c['delta_pct'] = None
@@ -776,8 +867,18 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
     below = [(c['label'], c['pct']) for c in computed if not _on_target(c['pct'], c['target'], c)]
     strong = [c['label'] for c in computed if _on_target(c['pct'], c['target'], c)]
 
+    coverage_hidden_labels = {
+        'Birth weight recorded',
+        'Vitamin K given',
+        'Thermal care recorded',
+        'Resuscitation intervention recorded',
+        'KMC support recorded',
+        'Low birthweight newborns',
+    }
     by_cat = {}
-    for ind in all_inds:
+    for ind in display_inds:
+        if ind.get('category') == 'Newborn' and ind.get('label') in coverage_hidden_labels:
+            continue
         by_cat.setdefault(ind.get('category', 'Other'), []).append(ind)
 
     _t1 = _time.monotonic()
@@ -797,7 +898,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
     _t2 = _time.monotonic()
     trend_switcher = _trend_switcher(
         facility_df,
-        all_inds,
+        display_inds,
         scope_meta=scope_meta,
         payload_key=payload_key,
     )
@@ -805,12 +906,12 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
 
     _t3 = _time.monotonic()
     performance_div, heatmap_div = _coverage_heatmap_section(
-        all_inds,
+        display_inds,
         facility_code,
         network_df,
         precomputed_store=_resolve_heatmap_store(
             network_df,
-            all_inds,
+            display_inds,
             facility_code,
             scope_meta,
             payload_key,
@@ -826,6 +927,253 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         payload_key=payload_key,
     )
     _LOGGER.info('MNID timing: comparative %.2fs', _time.monotonic() - _t4)
+
+    def _programme_activity_counts(df: pd.DataFrame) -> dict[str, int]:
+        if df is None or df.empty:
+            return {
+                'anc_clients': 0,
+                'anc_visit_clients': 0,
+                'anc_complications': 0,
+                'labour_admissions': 0,
+                'anc_not_reaching_labour': 0,
+                'pnc_clients': 0,
+                'labour_not_reaching_pnc': 0,
+                'labour_visit_documented': 0,
+                'labour_complications': 0,
+                'pnc_visit_documented': 0,
+                'pnc_mother_complications': 0,
+                'pnc_newborn_complications': 0,
+                'pnc_maternal_deaths': 0,
+                'pnc_newborn_deaths': 0,
+                'pnc_mother_status_records': 0,
+                'pnc_baby_status_records': 0,
+                'stillbirths': 0,
+                'live_births': 0,
+                'newborn_neonatal_deaths': 0,
+                'newborn_status_records': 0,
+                'newborn_complications_at_birth': 0,
+                'newborn_ikmc_initiated': 0,
+            }
+
+        valid_person = df['person_id'].notna() if 'person_id' in df.columns else pd.Series(False, index=df.index)
+        service_col = (
+            'Service_Area' if 'Service_Area' in df.columns
+            else ('Reporting_Program' if 'Reporting_Program' in df.columns else 'Program')
+        )
+        service_upper = (
+            df[service_col].fillna('').astype(str).str.upper()
+            if service_col in df.columns else pd.Series('', index=df.index)
+        )
+        anc_scope = service_upper.str.contains('ANC', na=False)
+        labour_scope = service_upper.str.contains('LABOUR|DELIVERY', na=False)
+        pnc_scope = service_upper.str.contains('PNC|POSTNATAL', na=False)
+        newborn_scope = service_upper.str.contains('NEWBORN|NEONATAL', na=False)
+
+        def _count_people(mask: pd.Series) -> int:
+            if 'person_id' not in df.columns:
+                return 0
+            scoped = mask.fillna(False) & valid_person
+            if not scoped.any():
+                return 0
+            return int(df.loc[scoped, 'person_id'].astype(str).nunique())
+
+        def _pid_set(mask: pd.Series) -> set[str]:
+            if 'person_id' not in df.columns:
+                return set()
+            scoped = mask.fillna(False) & valid_person
+            if not scoped.any():
+                return set()
+            return set(df.loc[scoped, 'person_id'].astype(str))
+
+        anc_pids = _pid_set(anc_scope)
+        labour_pids = _pid_set(labour_scope)
+        pnc_pids = _pid_set(pnc_scope)
+
+        if {'concept_name', 'obs_value_coded', 'person_id'}.issubset(df.columns):
+            concept_name = df['concept_name'].fillna('').astype(str).str.strip()
+            obs_value_lower = df['obs_value_coded'].fillna('').astype(str).str.strip().str.lower()
+            has_positive_obs = ~obs_value_lower.isin(['', 'no', 'none', 'negative', 'unknown'])
+            death_obs = obs_value_lower.isin(['death', 'died', 'dead', 'deceased'])
+        else:
+            concept_name = pd.Series('', index=df.index)
+            obs_value_lower = pd.Series('', index=df.index)
+            has_positive_obs = pd.Series(False, index=df.index)
+            death_obs = pd.Series(False, index=df.index)
+
+        anc_visit_clients = len(anc_pids)
+        if 'mnid_anc_visit_documented' in df.columns:
+            anc_visit_clients = _count_people(df['mnid_anc_visit_documented'].eq('Yes'))
+
+        anc_complications = 0
+        if {'concept_name', 'obs_value_coded', 'person_id'}.issubset(df.columns):
+            anc_complications = _count_people(
+                anc_scope
+                & concept_name.eq('Obstetric complications')
+                & has_positive_obs
+            )
+
+        complications_mask = pd.Series(False, index=df.index)
+        for col in ['mnid_labour_maternal_sepsis', 'mnid_labour_pph', 'mnid_labour_eclampsia']:
+            if col in df.columns:
+                complications_mask |= df[col].eq('Yes')
+        labour_complications = _count_people(complications_mask)
+
+        stillbirths = 0
+        if 'mnid_labour_stillbirth' in df.columns:
+            stillbirths = _count_people(df['mnid_labour_stillbirth'].eq('Yes'))
+        live_births = max(len(labour_pids) - stillbirths, 0)
+
+        labour_visit_documented = 0
+        if 'mnid_labour_visit_documented' in df.columns:
+            labour_visit_documented = _count_people(df['mnid_labour_visit_documented'].eq('Yes'))
+
+        pnc_visit_documented = 0
+        if 'mnid_pnc_visit_documented' in df.columns:
+            pnc_visit_documented = _count_people(df['mnid_pnc_visit_documented'].eq('Yes'))
+
+        pnc_mother_complications = 0
+        pnc_newborn_complications = 0
+        pnc_maternal_deaths = 0
+        pnc_newborn_deaths = 0
+        pnc_mother_status_records = 0
+        pnc_baby_status_records = 0
+        if {'concept_name', 'obs_value_coded', 'person_id'}.issubset(df.columns):
+            pnc_mother_complications = _count_people(
+                pnc_scope
+                & concept_name.eq('Postnatal complications')
+                & has_positive_obs
+            )
+            pnc_newborn_complications = _count_people(
+                pnc_scope
+                & concept_name.eq('Newborn baby complications')
+                & has_positive_obs
+            )
+            pnc_mother_status_records = _count_people(
+                pnc_scope & concept_name.eq('Status of the mother')
+            )
+            pnc_baby_status_records = _count_people(
+                pnc_scope & concept_name.eq('Status of baby')
+            )
+            pnc_maternal_deaths = _count_people(
+                pnc_scope
+                & concept_name.eq('Status of the mother')
+                & death_obs
+            )
+            pnc_newborn_deaths = _count_people(
+                pnc_scope
+                & concept_name.eq('Status of baby')
+                & death_obs
+            )
+            newborn_status_records = _count_people(
+                newborn_scope & concept_name.eq('Status of baby')
+            )
+            newborn_neonatal_deaths = _count_people(
+                newborn_scope
+                & concept_name.eq('Status of baby')
+                & death_obs
+            )
+        else:
+            newborn_status_records = 0
+            newborn_neonatal_deaths = 0
+
+        newborn_complications_mask = pd.Series(False, index=df.index)
+        for col in ['mnid_newborn_birth_asphyxia', 'mnid_newborn_sepsis', 'mnid_newborn_jaundice']:
+            if col in df.columns:
+                newborn_complications_mask |= df[col].eq('Yes')
+        newborn_complications_at_birth = _count_people(newborn_complications_mask)
+
+        newborn_ikmc_initiated = 0
+        if 'mnid_newborn_kmc' in df.columns:
+            newborn_ikmc_initiated = _count_people(df['mnid_newborn_kmc'].eq('Yes'))
+
+        return {
+            'anc_clients': len(anc_pids),
+            'anc_visit_clients': anc_visit_clients,
+            'anc_complications': anc_complications,
+            'labour_admissions': len(labour_pids),
+            'anc_not_reaching_labour': len(anc_pids - labour_pids),
+            'pnc_clients': len(pnc_pids),
+            'labour_not_reaching_pnc': len(labour_pids - pnc_pids),
+            'labour_visit_documented': labour_visit_documented,
+            'labour_complications': labour_complications,
+            'pnc_visit_documented': pnc_visit_documented,
+            'pnc_mother_complications': pnc_mother_complications,
+            'pnc_newborn_complications': pnc_newborn_complications,
+            'pnc_maternal_deaths': pnc_maternal_deaths,
+            'pnc_newborn_deaths': pnc_newborn_deaths,
+            'pnc_mother_status_records': pnc_mother_status_records,
+            'pnc_baby_status_records': pnc_baby_status_records,
+            'stillbirths': stillbirths,
+            'live_births': live_births,
+            'newborn_neonatal_deaths': newborn_neonatal_deaths,
+            'newborn_status_records': newborn_status_records,
+            'newborn_complications_at_birth': newborn_complications_at_birth,
+            'newborn_ikmc_initiated': newborn_ikmc_initiated,
+        }
+
+    # Compute programme activity counts for the overview row
+    _activity_stats = []
+    if facility_df is not None and not facility_df.empty:
+        try:
+            computed_by_label = {
+                str(item.get('label', '')): item
+                for item in (computed + overview_computed)
+            }
+
+            def _indicator_activity(label: str, override_label: str | None = None, summary: str | None = None):
+                item = computed_by_label.get(label)
+                if not item:
+                    return None
+                out = dict(item)
+                out['label'] = override_label or item['label']
+                out['summary'] = summary or f"{int(item.get('numerator', 0)):,} of {int(item.get('denominator', 0)):,}"
+                return out
+
+            is_all_programmes = selected_program == 'All' and len(category_order) > 1
+
+            if is_all_programmes:
+                _activity_stats = [
+                    _indicator_activity('ANC Complications'),
+                    _indicator_activity('Labour Complications'),
+                    _indicator_activity('Live Births'),
+                    _indicator_activity('Maternal Deaths'),
+                    _indicator_activity('Newborn Deaths'),
+                ]
+            elif default_cat == 'Labour':
+                _activity_stats = [
+                    _indicator_activity('Labour & Delivery Visits'),
+                    _indicator_activity('Labour Complications'),
+                    _indicator_activity('Partograph use'),
+                    _indicator_activity('Overall caesarean section rate'),
+                    _indicator_activity('Labour Clients Not Admissioned to PNC'),
+                ]
+            elif default_cat == 'PNC':
+                _activity_stats = [
+                    _indicator_activity('PNC Visits'),
+                    _indicator_activity('Mother Complications'),
+                    _indicator_activity('Newborn Complications'),
+                    _indicator_activity('Maternal Deaths'),
+                    _indicator_activity('Newborn Deaths'),
+                ]
+            elif default_cat == 'Newborn':
+                _activity_stats = [
+                    _indicator_activity('Stillbirths'),
+                    _indicator_activity('Live Births'),
+                    _indicator_activity('Neonatal Deaths'),
+                    _indicator_activity('Neonatal Complications at Birth'),
+                    _indicator_activity('iKMC Initiated'),
+                ]
+            else:
+                _activity_stats = [
+                    _indicator_activity('ANC Visits'),
+                    _indicator_activity('ANC Complications'),
+                    _indicator_activity('Blood pressure measured'),
+                    _indicator_activity('Tested for HIV'),
+                    _indicator_activity('ANC Clients Not Admissioned to Labour'),
+                ]
+            _activity_stats = [item for item in _activity_stats if item]
+        except Exception:
+            _activity_stats = []
 
     def _sec_header(title, count=None, desc=None, eyebrow=None):
         return html.Div(className=f'mnid-section-header{" mnid-section-header-newborn" if dashboard_theme == "newborn" else ""}', children=[
@@ -849,7 +1197,23 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
             eyebrow='Overview' if dashboard_theme == 'newborn' else None,
         ),
         _kpi_row(computed),
-        _hero_donut_row(computed, preferred_cat=default_cat, section_title=hero_title),
+        _hero_donut_row(
+            _activity_stats,
+            preferred_cat='All' if selected_program == 'All' and len(category_order) > 1 else default_cat,
+            section_title=(
+                'ALL PROGRAMME CRITICAL ACTIVITY'
+                if selected_program == 'All' and len(category_order) > 1
+                else 'ANC PROGRAMME ACTIVITY'
+                if default_cat == 'ANC'
+                else 'LABOUR & DELIVERY ACTIVITY'
+                if default_cat == 'Labour'
+                else 'PNC ACTIVITY'
+                if default_cat == 'PNC'
+                else 'NEWBORN ACTIVITY'
+                if default_cat == 'Newborn'
+                else 'PROGRAMME ACTIVITY'
+            ),
+        ) if _activity_stats else None,
 
         _section_anchor('mnid-coverage'),
         _sec_header(
@@ -1618,9 +1982,7 @@ def _service_table_payload(df: pd.DataFrame, scope_meta: dict | None = None) -> 
             'metrics': [
                 ('Neonatal records', lambda x: _count_entities(x, 'encounter_id')),
                 ('Unique babies', lambda x: _count_entities(x, 'person_id')),
-                ('Neonatal enrolment', lambda x: _count_entities(x[x['Encounter_Source'].fillna('').astype(str) == 'NEONATAL ENROLMENT'] if 'Encounter_Source' in x.columns else x, 'encounter_id')),
                 ('Birth weight recorded', lambda x: _concept_count(x, 'Birth weight', any_value=True)),
-                ('Gestation weeks recorded', lambda x: _concept_count(x, 'Gestation in weeks', any_value=True)),
                 ('Vitamin K given', lambda x: _concept_count(x, 'Vitamin K given', ['Yes'])),
                 ('Resuscitation recorded', lambda x: _concept_count(x, 'Neonatal resuscitation provided', any_value=True)),
                 ('Active resuscitation', lambda x: _concept_count(x, 'Neonatal resuscitation provided', ['Yes', 'Stimulation only', 'Bag and mask'])),
@@ -1646,7 +2008,6 @@ def _service_table_payload(df: pd.DataFrame, scope_meta: dict | None = None) -> 
                     'total_metric': 'Unique babies',
                     'segments': [
                         {'label': 'Birth weight recorded', 'metric': 'Birth weight recorded', 'color': '#7C3AED'},
-                        {'label': 'Gestation weeks recorded', 'metric': 'Gestation weeks recorded', 'color': '#0891B2'},
                     ],
                     'remainder_label': 'Other / missing documentation',
                     'remainder_color': '#CBD5E1',
@@ -2894,12 +3255,12 @@ def _prewarm_country_profile() -> bool:
             if facility_df is None or facility_df.empty:
                 continue
 
-            cp_key = (
-                (scope_meta.get('dataset_version'), opd_key, (), ()),
+            cp_key = _country_profile_cache_key(
+                scope_meta,
+                opd_key,
                 start_date,
                 end_date,
                 config.get('report_name'),
-                _agg_version_stamp(),
             )
             _cp_disk_key = _dk('cp', cp_key)
             if _worker_view_cache.get(_cp_disk_key) or _MNID_EXECUTIVE_DISK_CACHE.get(_cp_disk_key):
@@ -3044,7 +3405,13 @@ def render_mnid_dashboard(data_opd, config,
     # behind the fixed loading overlay.
     _target_tab = resolved_initial_tab
     if _target_tab == 'country-profile':
-        _cp_disk_key = _dk('cp', (_opd_key, start_date, end_date, config.get('report_name')))
+        _cp_disk_key = _dk('cp', _country_profile_cache_key(
+            scope_meta,
+            _opd_key,
+            start_date,
+            end_date,
+            config.get('report_name'),
+        ))
         cp_cached = _MNID_EXECUTIVE_DISK_CACHE.get(_cp_disk_key)
         if cp_cached is None:
             cp_cached = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label)
@@ -3126,17 +3493,14 @@ def _build_executive_tab_view(selected: str, views: dict, state: dict,
         threading.Thread(target=_async_etv_write, daemon=True).start()
 
     if selected == 'country-profile' and facility_df is not None:
-        cp_key = (
-            (
-                (scope_meta or {}).get('dataset_version'),
-                state.get('opd_key'),
-                tuple(sorted((scope_meta or {}).get('selected_facilities') or [])),
-                tuple(sorted((scope_meta or {}).get('selected_districts') or [])),
-            ),
+        cp_key = _country_profile_cache_key(
+            scope_meta,
+            state.get('opd_key'),
             start_date,
             end_date,
             config.get('report_name') if config else None,
-            _agg_version_stamp(),
+            (scope_meta or {}).get('selected_facilities') or (),
+            (scope_meta or {}).get('selected_districts') or (),
         )
         _cp_disk_key = _dk('cp', cp_key)
         cp_cached = _worker_view_cache.get(_cp_disk_key)
@@ -3223,6 +3587,38 @@ def _render_mnid_executive_tab(active_tab, executive_token):
             f'Tab failed to load ({selected}): {_exc}',
             style={'padding': '24px', 'color': '#dc2626', 'fontSize': '13px'},
         )
+
+
+@callback(
+    Output({'type': 'mnid-cp-graph', 'chart': MATCH}, 'figure'),
+    Output({'type': 'mnid-cp-caption', 'chart': MATCH}, 'children'),
+    Input({'type': 'mnid-cp-grain', 'chart': MATCH}, 'value'),
+    State({'type': 'mnid-cp-series', 'chart': MATCH}, 'data'),
+    State({'type': 'mnid-cp-meta', 'chart': MATCH}, 'data'),
+    prevent_initial_call=False,
+)
+def _update_country_profile_chart_grain(grain, stored_rows, meta):
+    if not stored_rows:
+        raise PreventUpdate
+    series_df = pd.DataFrame(stored_rows)
+    if series_df.empty:
+        raise PreventUpdate
+    meta = meta or {}
+    if 'month' in series_df.columns:
+        series_df['month'] = pd.to_datetime(series_df['month'], errors='coerce')
+    grain = (grain or 'monthly').strip().lower()
+    title = meta.get('title') or 'Chart'
+    accent = meta.get('accent') or '#15803D'
+    y_title = meta.get('y_title') or 'Cases'
+    is_multi = bool(meta.get('multi'))
+    if is_multi:
+        bucketed = bucket_multi_series(series_df.copy(), grain)
+        figure = _multi_run_chart(bucketed, title, y_title, grain=grain)
+    else:
+        bucketed = bucket_time_series(series_df[['month', 'value']].copy(), grain)
+        figure = _run_chart(bucketed, title, accent, y_title, grain=grain)
+    caption = describe_grain_window(bucketed, grain)
+    return figure, caption
 
 
 @callback(

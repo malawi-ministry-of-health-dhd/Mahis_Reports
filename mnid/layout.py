@@ -39,7 +39,7 @@ _TH = {
 # # MNID hero indicator donut row
 
 def _hero_donut_card(label, pct, target, color, mode='max', delta_pct=None,
-                     numerator=None, denominator=None):
+                     numerator=None, denominator=None, summary=None):
     """Large CSS conic-gradient donut card with period delta and num/den counts."""
     p = max(0.0, min(float(pct), 100.0))
     r_v = int(color[1:3], 16)
@@ -103,6 +103,10 @@ def _hero_donut_card(label, pct, target, color, mode='max', delta_pct=None,
             ]),
         ]),
         html.Div(label, className='mnid-hero-label'),
+        html.Div(summary, style={
+            'fontSize': '10px', 'color': MUTED, 'lineHeight': '1.3',
+            'marginTop': '4px', 'maxWidth': '180px', 'marginLeft': 'auto', 'marginRight': 'auto',
+        }) if summary else None,
         html.Span(txt, style={
             'background': bg, 'color': fg, 'border': f'1px solid {border}',
             'fontSize': '9px', 'fontWeight': '600',
@@ -115,8 +119,11 @@ def _hero_donut_card(label, pct, target, color, mode='max', delta_pct=None,
 
 def _hero_donut_row(computed, preferred_cat: str = 'ANC', section_title: str | None = None):
     """Row of large hero donut cards favouring the requested category first."""
-    preferred = [c for c in computed if c.get('category') == preferred_cat]
-    heroes = preferred[:5] if preferred else computed[:5]
+    if preferred_cat in (None, '', 'All', '__all__'):
+        heroes = computed[:5]
+    else:
+        preferred = [c for c in computed if c.get('category') == preferred_cat]
+        heroes = preferred[:5] if preferred else computed[:5]
     if not heroes:
         return html.Div()
 
@@ -133,6 +140,7 @@ def _hero_donut_row(computed, preferred_cat: str = 'ANC', section_title: str | N
             delta_pct=ind.get('delta_pct'),
             numerator=ind.get('numerator'),
             denominator=ind.get('denominator'),
+            summary=ind.get('summary'),
         ))
 
     return html.Div(style={'marginBottom': '12px'}, children=[
@@ -708,6 +716,63 @@ def _kpi(label, value, sub, cls, bottom_bar=None, ring=None):
             ring or html.Div(),
         ]),
         bottom_bar or html.Div(),
+    ])
+
+
+def _count_stat_card(label, value, sublabel, color='#0F766E', delta_text=None, delta_tone='neutral'):
+    """Compact count-stat card for the overview row with prior-period delta."""
+    delta_styles = {
+        'up': {'background': '#ECFDF5', 'color': '#047857', 'border': '1px solid #A7F3D0'},
+        'down': {'background': '#FEF2F2', 'color': '#B91C1C', 'border': '1px solid #FECACA'},
+        'neutral': {'background': '#F8FAFC', 'color': '#475569', 'border': '1px solid #E2E8F0'},
+    }
+    delta_style = delta_styles.get(delta_tone, delta_styles['neutral'])
+
+    return html.Div(className='mnid-hero-card', style={'textAlign': 'center', 'padding': '20px 14px'}, children=[
+        html.Div(str(value), style={
+            'fontSize': '36px', 'fontWeight': '800', 'color': color,
+            'lineHeight': '1', 'marginBottom': '8px',
+        }),
+        html.Div(label, style={
+            'fontSize': '12px', 'fontWeight': '600', 'color': '#1E293B',
+            'marginBottom': '4px', 'lineHeight': '1.3',
+        }),
+        html.Div(sublabel, style={
+            'fontSize': '10px', 'color': '#64748B',
+        }),
+        html.Div(
+            delta_text,
+            style={
+                **delta_style,
+                'fontSize': '9px',
+                'fontWeight': '600',
+                'borderRadius': '999px',
+                'padding': '4px 8px',
+                'marginTop': '10px',
+                'display': 'inline-block',
+            },
+        ) if delta_text else None,
+    ])
+
+
+def _count_stat_row(stats: list, section_title: str = 'PROGRAMME SNAPSHOT'):
+    """Row of count-stat cards shown in the overview instead of repeating coverage donuts."""
+    if not stats:
+        return html.Div()
+    cards = [
+        _count_stat_card(
+            s['label'],
+            s['value'],
+            s.get('sub', 'count'),
+            s.get('color', '#0F766E'),
+            delta_text=s.get('delta_text'),
+            delta_tone=s.get('delta_tone', 'neutral'),
+        )
+        for s in stats
+    ]
+    return html.Div(style={'marginBottom': '12px'}, children=[
+        html.Div(section_title, className='mnid-section-lbl'),
+        html.Div(className='mnid-hero-row', children=cards),
     ])
 
 

@@ -301,6 +301,10 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
     _cp_phototherapy = (concept.isin(['Phototherapy given'])
                         | concept_lower.str.contains('phototherapy', na=False)
                         | combined_lower.str.contains('phototherapy', na=False))
+    _cp_bilirubin = (
+        concept_lower.str.contains('bilirubin', na=False)
+        | combined_lower.str.contains('bilirubin', na=False)
+    )
     _cp_jaundice = (concept.isin(['Clinical jaundice'])
                     | concept_lower.str.contains('jaundice', na=False)
                     | combined_lower.str.contains('jaundice', na=False))
@@ -353,6 +357,14 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
         'mnid_anc_ga_ultrasound',
         anc_mask & concept.eq('Gestational age recorded') & combined_lower.eq('ga by ultrasound'),
     )
+    _assign_flag(
+        'mnid_anc_visit_documented',
+        anc_mask & encounter_source_lower.eq('anc visit'),
+    )
+    # Count distinct visit dates per ANC patient — flag persons with ≥4 contacts
+    _anc_date_counts = out.loc[anc_mask, ['person_id', 'Date']].groupby('person_id')['Date'].nunique()
+    _anc_4plus = frozenset(_anc_date_counts[_anc_date_counts >= 4].index.astype(str))
+    _assign_flag('mnid_anc_4plus_contacts', out['person_id'].astype(str).isin(_anc_4plus))
 
     _assign_flag(
         'mnid_labour_partograph_used',
@@ -435,6 +447,52 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
     )
     obstetric_care = labour_mask & _cp_obstetric_care
     _assign_flag('mnid_labour_azithromycin', labour_mask & _cp_azithromycin)
+    _assign_flag(
+        'mnid_labour_vit_k',
+        labour_like_mask & concept.eq('Vitamin K given') & combined_lower.eq('yes'),
+    )
+    _assign_flag(
+        'mnid_labour_magnesium_sulphate',
+        labour_like_mask & (
+            concept.isin(['Magnesium sulphate given', 'Magnesium Sulfate', 'MgSO4'])
+            | concept_lower.str.contains('magnesium', na=False)
+        ),
+    )
+    _assign_flag(
+        'mnid_labour_antibiotic_raw',
+        labour_like_mask & (
+            _cp_azithromycin
+            | concept_lower.str.contains(
+                r'ampicillin|cefazolin|benzylpenicillin|prophylactic antibiotic',
+                regex=True, na=False,
+            )
+        ),
+    )
+
+    _assign_flag(
+        'mnid_pnc_bp_measured',
+        pnc_mask & concept.isin([
+            'Systolic blood pressure', 'Diastolic blood pressure', 'Systolic', 'Diastolic',
+        ]),
+    )
+    _assign_flag(
+        'mnid_pnc_temperature_measured',
+        pnc_mask & (
+            concept.isin(['Temperature', 'Body temperature', 'Maternal temperature'])
+            | concept_lower.str.contains(r'temperature|maternal temp', regex=True, na=False)
+        ),
+    )
+    _assign_flag(
+        'mnid_pnc_birth_weight_assessed',
+        pnc_mask & (
+            (concept.eq('Prematurity/Kangaroo') & combined_lower.ne(''))
+            | concept.eq('Birth weight')
+        ),
+    )
+    _assign_flag(
+        'mnid_pnc_breastfeeding_initiated',
+        (pnc_mask | labour_mask) & concept.eq('Breast feeding') & combined_lower.eq('yes'),
+    )
 
     _assign_flag(
         'mnid_pnc_hiv_test_positive',
@@ -518,6 +576,17 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
         newborn_mask & concept.eq('Can measure oxygen saturation') & combined_lower.eq('yes'),
     )
     _assign_flag(
+        'mnid_newborn_pulse_oximeter_admission',
+        newborn_mask & (
+            (concept.eq('Pulse oximeter used at admission') & combined_lower.isin(['yes', 'used']))
+            | concept_lower.str.contains(r'pulse oximeter|oxygen saturation|spo2|saturation', regex=True, na=False)
+        ),
+    )
+    _assign_flag(
+        'mnid_newborn_bilirubin_measured',
+        newborn_mask & _cp_bilirubin & ~combined_lower.isin(['', 'no', 'none', 'unknown']),
+    )
+    _assign_flag(
         'mnid_newborn_not_hypothermic_admission',
         newborn_mask & concept.eq('Thermal status on admission') & combined_lower.eq('not hypothermic'),
     )
@@ -527,6 +596,17 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
             (concept.eq('Thermal status on admission') & combined_lower.eq('not hypothermic'))
             | combined_lower.eq('not hypothermic')
         ),
+    )
+    _assign_flag(
+        'mnid_newborn_skin_to_skin',
+        newborn_mask & (
+            (concept.eq('thermal care') & combined_lower.eq('yes'))
+            | (concept.eq('Thermal status on admission') & combined_lower.eq('not hypothermic'))
+        ),
+    )
+    _assign_flag(
+        'mnid_newborn_vit_k',
+        newborn_mask & concept.eq('Vitamin K given') & combined_lower.eq('yes'),
     )
 
     pph_component_cols = ['mnid_labour_pph_oxytocin', 'mnid_labour_pph_txa', 'mnid_labour_pph_misoprostol']
@@ -567,13 +647,71 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
         _ctx_series('mnid_newborn_resuscitation_eligible').eq('Yes')
         & _ctx_series('mnid_newborn_resuscitation_given').eq('Yes')
     ).map({True: 'Yes', False: ''})
+    # Jaundice identification used as phototherapy proxy (MAHIS jaundice → phototherapy care pathway)
     person_ctx['mnid_newborn_jaundice_phototherapy'] = (
         _ctx_series('mnid_newborn_jaundice').eq('Yes')
-        & _ctx_series('mnid_newborn_phototherapy').eq('Yes')
+        | _ctx_series('mnid_newborn_phototherapy').eq('Yes')
+    ).map({True: 'Yes', False: ''})
+    person_ctx['mnid_newborn_jaundice_bilirubin_measured'] = (
+        _ctx_series('mnid_newborn_jaundice').eq('Yes')
+        & _ctx_series('mnid_newborn_bilirubin_measured').eq('Yes')
     ).map({True: 'Yes', False: ''})
     person_ctx['mnid_newborn_sepsis_antibiotics'] = (
         _ctx_series('mnid_newborn_sepsis').eq('Yes')
         & _ctx_series('mnid_newborn_parenteral_antibiotics').eq('Yes')
+    ).map({True: 'Yes', False: ''})
+    person_ctx['mnid_labour_antibiotic_prophylaxis'] = (
+        _ctx_series('mnid_labour_antibiotic_raw').eq('Yes')
+        | _ctx_series('mnid_labour_azithromycin').eq('Yes')
+    ).map({True: 'Yes', False: ''})
+    person_ctx['mnid_pnc_vitamin_k_at_birth'] = (
+        _ctx_series('mnid_labour_vit_k').eq('Yes')
+        | _ctx_series('mnid_newborn_vit_k').eq('Yes')
+    ).map({True: 'Yes', False: ''})
+    _assign_flag(
+        'mnid_anc_complication',
+        anc_mask & _cp_obs_complications & ~combined_lower.isin(['', 'no', 'none', 'negative', 'unknown']),
+    )
+    _assign_flag(
+        'mnid_pnc_mother_complication',
+        pnc_mask & concept.eq('Postnatal complications') & ~combined_lower.isin(['', 'no', 'none', 'negative', 'unknown']),
+    )
+    _assign_flag(
+        'mnid_pnc_newborn_complication',
+        pnc_mask & concept.eq('Newborn baby complications') & ~combined_lower.isin(['', 'no', 'none', 'negative', 'unknown']),
+    )
+    _assign_flag('mnid_pnc_mother_status_recorded', pnc_mask & concept.eq('Status of the mother'))
+    _assign_flag('mnid_pnc_baby_status_recorded', pnc_mask & concept.eq('Status of baby'))
+    _assign_flag(
+        'mnid_pnc_newborn_death',
+        pnc_mask & concept.eq('Status of baby') & combined_lower.isin(['death', 'died', 'dead', 'deceased']),
+    )
+    _assign_flag('mnid_newborn_status_recorded', newborn_mask & concept.eq('Status of baby'))
+    _assign_flag(
+        'mnid_newborn_neonatal_death',
+        newborn_mask & concept.eq('Status of baby') & combined_lower.isin(['death', 'died', 'dead', 'deceased']),
+    )
+    person_ctx['mnid_labour_complication'] = (
+        _ctx_series('mnid_labour_maternal_sepsis').eq('Yes')
+        | _ctx_series('mnid_labour_pph').eq('Yes')
+        | _ctx_series('mnid_labour_eclampsia').eq('Yes')
+    ).map({True: 'Yes', False: ''})
+    person_ctx['mnid_labour_live_birth'] = (
+        _ctx_series('mnid_labour_visit_documented').eq('Yes')
+        & _ctx_series('mnid_labour_stillbirth').ne('Yes')
+    ).map({True: 'Yes', False: ''})
+    person_ctx['mnid_anc_not_reaching_labour'] = (
+        _ctx_series('mnid_anc_visit_documented').eq('Yes')
+        & _ctx_series('mnid_labour_visit_documented').ne('Yes')
+    ).map({True: 'Yes', False: ''})
+    person_ctx['mnid_labour_not_reaching_pnc'] = (
+        _ctx_series('mnid_labour_visit_documented').eq('Yes')
+        & _ctx_series('mnid_pnc_visit_documented').ne('Yes')
+    ).map({True: 'Yes', False: ''})
+    person_ctx['mnid_newborn_complication_at_birth'] = (
+        _ctx_series('mnid_newborn_birth_asphyxia').eq('Yes')
+        | _ctx_series('mnid_newborn_sepsis').eq('Yes')
+        | _ctx_series('mnid_newborn_jaundice').eq('Yes')
     ).map({True: 'Yes', False: ''})
 
     # Pulls birth weight in one vectorized pass instead of looping row by row and

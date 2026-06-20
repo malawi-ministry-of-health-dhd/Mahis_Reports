@@ -21,6 +21,7 @@ app = dash.Dash(
     suppress_callback_exceptions=True,
     requests_pathname_prefix=pathname_prefix,
 )
+app.title = "Maternal and Neonatal Outcomes Dashboard"
 server = app.server
 
 app.layout = dmc.MantineProvider(

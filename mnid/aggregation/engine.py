@@ -63,8 +63,11 @@ def _load_all_indicators(viz_dir: str) -> list[dict]:
     # Add program-based indicators (ANC, Labour, PNC, Newborn) defined in
     # mnid/indicators.py — these are Python-only and have no JSON counterpart.
     try:
-        from mnid.indicators import _program_based_priority_indicators
-        for ind in _program_based_priority_indicators():
+        from mnid.indicators import (
+            _program_based_priority_indicators,
+            _program_based_overlay_fallbacks,
+        )
+        for ind in _program_based_priority_indicators() + _program_based_overlay_fallbacks():
             iid = ind.get('id')
             if (
                 iid and iid not in seen
