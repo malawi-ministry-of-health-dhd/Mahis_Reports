@@ -589,7 +589,6 @@ def _run_chart(series: pd.DataFrame, title: str, color: str, y_title: str, targe
         )
     fig.update_layout(**_exec_chart_layout(
         height=300,
-        title=dict(text=title, x=0.02, xanchor="left", font=dict(size=13, color="#0f172a", family=_GEIST)),
         xaxis=dict(
             showgrid=False,
             showline=False,
@@ -609,6 +608,7 @@ def _run_chart(series: pd.DataFrame, title: str, color: str, y_title: str, targe
             rangemode="tozero",
         ),
     ))
+    fig.update_layout(title=dict(text=title, x=0.02, xanchor="left", font=dict(size=13, color="#0f172a", family=_GEIST)))
     return fig
 
 
@@ -646,7 +646,6 @@ def _multi_run_chart(series_df: pd.DataFrame, title: str, y_title: str, target: 
 
     fig.update_layout(**_exec_chart_layout(
         height=300,
-        title=dict(text=title, x=0.02, xanchor="left", font=dict(size=13, color="#0f172a", family=_GEIST)),
         xaxis=dict(
             showgrid=False,
             showline=False,
@@ -666,6 +665,7 @@ def _multi_run_chart(series_df: pd.DataFrame, title: str, y_title: str, target: 
             rangemode="tozero",
         ),
     ))
+    fig.update_layout(title=dict(text=title, x=0.02, xanchor="left", font=dict(size=13, color="#0f172a", family=_GEIST)))
     return fig
 
 
