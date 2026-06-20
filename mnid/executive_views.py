@@ -858,7 +858,7 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
             }),
             html.Div([
                 html.Div([
-                    html.H1("Maternal & Neonatal Health", style={
+                    html.H1("Maternal and Neonatal Outcomes Dashboard", style={
                         "fontSize": "26px", "fontWeight": "800", "color": "#0f172a",
                         "letterSpacing": "-.04em", "lineHeight": "1.15", "marginBottom": "6px",
                     }),
