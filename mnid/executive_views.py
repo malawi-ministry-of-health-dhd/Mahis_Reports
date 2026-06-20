@@ -58,7 +58,12 @@ _EXEC_CHART_LAYOUT = dict(
 )
 
 
-def _exec_chart_layout(height: int = 300, xaxis: dict | None = None, yaxis: dict | None = None) -> dict:
+def _exec_chart_layout(
+    height: int = 300,
+    xaxis: dict | None = None,
+    yaxis: dict | None = None,
+    margin: dict | None = None,
+) -> dict:
     layout = dict(_EXEC_CHART_LAYOUT)
     layout["height"] = height
     if xaxis is not None:
@@ -69,6 +74,10 @@ def _exec_chart_layout(height: int = 300, xaxis: dict | None = None, yaxis: dict
         merged_yaxis = dict(_EXEC_CHART_LAYOUT.get("yaxis", {}))
         merged_yaxis.update(yaxis)
         layout["yaxis"] = merged_yaxis
+    if margin is not None:
+        merged_margin = dict(_EXEC_CHART_LAYOUT.get("margin", {}))
+        merged_margin.update(margin)
+        layout["margin"] = merged_margin
     return layout
 
 
