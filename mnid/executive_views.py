@@ -72,6 +72,15 @@ def _exec_chart_layout(height: int = 300, xaxis: dict | None = None, yaxis: dict
     return layout
 
 
+def _hex_to_rgba(color: str, alpha: float) -> str:
+    if color.startswith("#") and len(color) == 7:
+        r = int(color[1:3], 16)
+        g = int(color[3:5], 16)
+        b = int(color[5:7], 16)
+        return f"rgba({r},{g},{b},{alpha})"
+    return f"rgba(15,23,42,{alpha})"
+
+
 def _section_header(title: str) -> html.Div:
     return html.Div([
         html.Span(style={
@@ -564,9 +573,17 @@ def _run_chart(series: pd.DataFrame, title: str, color: str, y_title: str, targe
     fig = go.Figure()
     if series.empty:
         fig.update_layout(
-            **_exec_chart_layout(height=300),
-            title=dict(text=title, x=0.02, xanchor="left", font=dict(size=13, color="#0f172a", family=_GEIST)),
-            annotations=[dict(text="No trend data available", x=0.5, y=0.5, xref="paper", yref="paper", showarrow=False, font=dict(size=12, color=MUTED))],
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=0, r=0, t=0, b=0),
+            height=240,
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            annotations=[dict(
+                text="No trend data available",
+                x=0.5, y=0.5, xref="paper", yref="paper",
+                showarrow=False, font=dict(size=13, color=MUTED, family=_GEIST),
+            )],
         )
         return fig
 
@@ -576,8 +593,11 @@ def _run_chart(series: pd.DataFrame, title: str, color: str, y_title: str, targe
         y=smoothed,
         name=title,
         mode="lines+markers",
-        line=dict(color=color, width=3.2),
-        marker=dict(size=5, color=color, line=dict(color="#fff", width=1.2)),
+        line=dict(color=color, width=3.8, shape="spline", smoothing=0.55),
+        marker=dict(size=7, color=color, line=dict(color="#fff", width=1.5)),
+        fill="tozeroy",
+        fillcolor=_hex_to_rgba(color, 0.08),
+        hovertemplate="%{x|%b %Y}<br>%{y:.1f}<extra></extra>",
     ))
     if target is not None:
         fig.add_hline(
@@ -588,27 +608,29 @@ def _run_chart(series: pd.DataFrame, title: str, color: str, y_title: str, targe
             annotation_position="right",
         )
     fig.update_layout(**_exec_chart_layout(
-        height=300,
+        height=240,
+        margin=dict(l=42, r=18, t=12, b=42),
         xaxis=dict(
             showgrid=False,
             showline=False,
             zeroline=False,
-            tickfont=dict(size=10, color="#94a3b8"),
+            tickfont=dict(size=11, color="#94a3b8"),
             tickformat="%b %Y",
+            tickangle=0,
             title=dict(text="Month", font=dict(size=10, color="#64748b")),
         ),
         yaxis=dict(
             showgrid=True,
-            gridcolor="#f1f5f9",
+            gridcolor="#e2e8f0",
             gridwidth=1,
             showline=False,
             zeroline=False,
-            tickfont=dict(size=10, color="#94a3b8"),
+            tickfont=dict(size=11, color="#94a3b8"),
             title=dict(text=y_title, font=dict(size=10, color="#64748b")),
             rangemode="tozero",
         ),
     ))
-    fig.update_layout(title=dict(text=title, x=0.02, xanchor="left", font=dict(size=13, color="#0f172a", family=_GEIST)))
+    fig.update_layout(showlegend=False)
     return fig
 
 
@@ -616,9 +638,17 @@ def _multi_run_chart(series_df: pd.DataFrame, title: str, y_title: str, target: 
     fig = go.Figure()
     if series_df.empty:
         fig.update_layout(
-            **_exec_chart_layout(height=300),
-            title=dict(text=title, x=0.02, xanchor="left", font=dict(size=13, color="#0f172a", family=_GEIST)),
-            annotations=[dict(text="No trend data available", x=0.5, y=0.5, xref="paper", yref="paper", showarrow=False, font=dict(size=12, color=MUTED))],
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=0, r=0, t=0, b=0),
+            height=240,
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            annotations=[dict(
+                text="No trend data available",
+                x=0.5, y=0.5, xref="paper", yref="paper",
+                showarrow=False, font=dict(size=13, color=MUTED, family=_GEIST),
+            )],
         )
         return fig
 
@@ -631,8 +661,9 @@ def _multi_run_chart(series_df: pd.DataFrame, title: str, y_title: str, target: 
             y=smoothed,
             name=label,
             mode="lines+markers",
-            line=dict(color=color, width=3.0),
-            marker=dict(size=5, color=color, line=dict(color="#fff", width=1.0)),
+            line=dict(color=color, width=3.0, shape="spline", smoothing=0.45),
+            marker=dict(size=6, color=color, line=dict(color="#fff", width=1.0)),
+            hovertemplate=f"{label}<br>%{{x|%b %Y}}<br>%{{y:.1f}}<extra></extra>",
         ))
 
     if target is not None:
@@ -645,28 +676,74 @@ def _multi_run_chart(series_df: pd.DataFrame, title: str, y_title: str, target: 
         )
 
     fig.update_layout(**_exec_chart_layout(
-        height=300,
+        height=240,
+        margin=dict(l=42, r=18, t=12, b=42),
         xaxis=dict(
             showgrid=False,
             showline=False,
             zeroline=False,
-            tickfont=dict(size=10, color="#94a3b8"),
+            tickfont=dict(size=11, color="#94a3b8"),
             tickformat="%b %Y",
             title=dict(text="Month", font=dict(size=10, color="#64748b")),
         ),
         yaxis=dict(
             showgrid=True,
-            gridcolor="#f1f5f9",
+            gridcolor="#e2e8f0",
             gridwidth=1,
             showline=False,
             zeroline=False,
-            tickfont=dict(size=10, color="#94a3b8"),
+            tickfont=dict(size=11, color="#94a3b8"),
             title=dict(text=y_title, font=dict(size=10, color="#64748b")),
             rangemode="tozero",
         ),
     ))
-    fig.update_layout(title=dict(text=title, x=0.02, xanchor="left", font=dict(size=13, color="#0f172a", family=_GEIST)))
+    fig.update_layout(
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
+            x=0,
+            font=dict(size=10, color="#64748b"),
+        ),
+    )
     return fig
+
+
+def _trend_chart_card(title: str, subtitle: str, figure: go.Figure, accent: str) -> dmc.Paper:
+    return dmc.Paper(
+        withBorder=True,
+        radius="md",
+        shadow="xs",
+        p="md",
+        style={
+            "overflow": "hidden",
+            "borderColor": "#dbe4f0",
+            "background": "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)",
+            "borderTop": f"3px solid {accent}",
+        },
+        children=[
+            html.Div([
+                html.Div(title, style={
+                    "fontSize": "13px",
+                    "fontWeight": "800",
+                    "color": "#0f172a",
+                    "lineHeight": "1.2",
+                    "marginBottom": "4px",
+                }),
+                html.Div(subtitle, style={
+                    "fontSize": "11px",
+                    "color": "#64748b",
+                }),
+            ], style={"padding": "2px 4px 6px 4px"}),
+            dcc.Graph(
+                figure=figure,
+                config={"displayModeBar": False, "responsive": True},
+                style={"height": "240px"},
+            ),
+        ],
+    )
 
 
 def _summary_card(title: str, value: str, subtitle: str, accent: str) -> dmc.Paper:
@@ -920,9 +997,12 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
         ("Neonatal Sepsis", ADMISSIONS_BLUE, _yn_mask(df, "mnid_newborn_sepsis")),
     ]
     complication_cards = [
-        dmc.Paper(withBorder=True, radius="md", shadow="xs", style={"overflow": "hidden", "borderColor": "#e2e8f0"}, children=[
-            dcc.Graph(figure=_run_chart(_monthly_series(df, mask, "person_id"), title, color, "Cases"), config={"displayModeBar": False}),
-        ])
+        _trend_chart_card(
+            title,
+            "Monthly smoothed complication volume in the selected reporting scope.",
+            _run_chart(_monthly_series(df, mask, "person_id"), title, color, "Cases"),
+            color,
+        )
         for title, color, mask in complication_specs
     ]
 
@@ -1012,14 +1092,30 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
             _responsive_grid([_mortality_card(*spec) for spec in mortality_specs], min_width="260px", gap="14px"),
             _section_header("Mortality Trends · 12-Month Run Charts"),
             _two_column_chart_grid([
-                dmc.Paper(withBorder=True, radius="md", shadow="xs", style={"overflow": "hidden", "borderColor": "#e2e8f0"},
-                    children=[dcc.Graph(figure=_run_chart(total_births_series, "Total Births", PRIMARY_GREEN, "Births"), config={"displayModeBar": False})]),
-                dmc.Paper(withBorder=True, radius="md", shadow="xs", style={"overflow": "hidden", "borderColor": "#e2e8f0"},
-                    children=[dcc.Graph(figure=_run_chart(maternal_death_series, "Maternal Mortality", MORTALITY_ROSE, "Deaths"), config={"displayModeBar": False})]),
-                dmc.Paper(withBorder=True, radius="md", shadow="xs", style={"overflow": "hidden", "borderColor": "#e2e8f0"},
-                    children=[dcc.Graph(figure=_run_chart(neonatal_death_series, "Neonatal Mortality", NEONATAL_ORANGE, "Deaths"), config={"displayModeBar": False})]),
-                dmc.Paper(withBorder=True, radius="md", shadow="xs", style={"overflow": "hidden", "borderColor": "#e2e8f0"},
-                    children=[dcc.Graph(figure=_multi_run_chart(stillbirth_trend_series, "Stillbirths", "Cases"), config={"displayModeBar": False})]),
+                _trend_chart_card(
+                    "Total Births",
+                    "Monthly smoothed birth volume across the selected reporting period.",
+                    _run_chart(total_births_series, "Total Births", PRIMARY_GREEN, "Births"),
+                    PRIMARY_GREEN,
+                ),
+                _trend_chart_card(
+                    "Maternal Mortality",
+                    "Monthly smoothed trend of maternal deaths recorded in the selected scope.",
+                    _run_chart(maternal_death_series, "Maternal Mortality", MORTALITY_ROSE, "Deaths"),
+                    MORTALITY_ROSE,
+                ),
+                _trend_chart_card(
+                    "Neonatal Mortality",
+                    "Monthly smoothed trend of neonatal deaths recorded in the selected scope.",
+                    _run_chart(neonatal_death_series, "Neonatal Mortality", NEONATAL_ORANGE, "Deaths"),
+                    NEONATAL_ORANGE,
+                ),
+                _trend_chart_card(
+                    "Stillbirths",
+                    "Smoothed monthly trend with fresh and macerated stillbirth breakdown.",
+                    _multi_run_chart(stillbirth_trend_series, "Stillbirths", "Cases"),
+                    STILLBIRTH_BLUE,
+                ),
             ]),
             _section_header("Complication Trends"),
             _two_column_chart_grid(complication_cards),
