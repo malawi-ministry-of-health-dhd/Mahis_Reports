@@ -483,11 +483,15 @@ def _trend_chart_card(
                 config=graph_config or {"displayModeBar": False, "responsive": True},
                 style=graph_style or {"height": "240px"},
             ),
-            *([html.Div(caption or "", id=caption_id, style={
-                "fontSize": "11px",
-                "color": "#64748b",
-                "padding": "0 4px 2px 4px",
-            })] if caption is not None or caption_id is not None else []),
+            *([html.Div(
+                caption or "",
+                **({"id": caption_id} if caption_id is not None else {}),
+                style={
+                    "fontSize": "11px",
+                    "color": "#64748b",
+                    "padding": "0 4px 2px 4px",
+                },
+            )] if caption is not None or caption_id is not None else []),
         ],
     )
 

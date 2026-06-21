@@ -92,8 +92,11 @@ from mnid.layout import (
     _avg_ring, _count_bar, _kpi, _kpi_row, _section_anchor,
 )
 from mnid.components.run_charts import (
+    _EXEC_GRAIN_OPTIONS,
+    _format_grain_label,
     _multi_run_chart,
     _run_chart,
+    _hex_to_rgba,
     bucket_multi_series,
     bucket_time_series,
     build_trend_chart_card,
@@ -1430,6 +1433,70 @@ def update_trend_chart(n_clicks_list, location, selected_inds, stored_trend, act
     return cards, cat, classes, loc_options, ind_options, ind_value_out
 
 
+@callback(
+    Output({'type': 'mnid-dash-trend-graph', 'chart': MATCH}, 'figure'),
+    Output({'type': 'mnid-dash-trend-caption', 'chart': MATCH}, 'children'),
+    Input({'type': 'mnid-dash-trend-grain', 'chart': MATCH}, 'value'),
+    State({'type': 'mnid-dash-trend-meta', 'chart': MATCH}, 'data'),
+    State('mnid-trend-store', 'data'),
+    State('mnid-trend-location', 'value'),
+    prevent_initial_call=False,
+)
+def _update_dashboard_trend_chart_grain(grain, meta, stored_trend, location):
+    meta = meta or {}
+    indicator = meta.get('indicator') or {}
+    color = meta.get('color') or '#15803D'
+    if not indicator:
+        raise PreventUpdate
+
+    trend_payload = stored_trend or {}
+    scope_meta = trend_payload.get('scope_meta') or {}
+    grain = (grain or 'monthly').strip().lower()
+    if grain not in {'weekly', 'monthly', 'quarterly', 'yearly'}:
+        grain = 'monthly'
+
+    df_full = _restore_ui_dataframe(trend_payload.get('data_key'))
+    if df_full is None or df_full.empty:
+        raise PreventUpdate
+
+    plot_df, fac_filter, dist_filter = _trend_scope_filters(df_full, location or 'all')
+    if fac_filter is None and dist_filter is None and scope_meta:
+        _, fac_codes, districts = _resolve_scope_filters(plot_df, scope_meta)
+        fac_filter = fac_codes or None
+        dist_filter = districts or None
+
+    dates = pd.to_datetime(plot_df['Date'], errors='coerce').dropna() if 'Date' in plot_df.columns else pd.Series([], dtype='datetime64[ns]')
+    if dates.empty:
+        raise PreventUpdate
+
+    plot_df, periods, tickfmt, hfmt = _trend_period_context(plot_df, grain)
+    if not periods:
+        raise PreventUpdate
+
+    date_min, date_max = dates.min(), dates.max()
+    agg_df = _get_aggregate()
+    precomputed = None
+    if agg_df is not None and not agg_df.empty:
+        precomputed = _agg_time_series(
+            agg_df,
+            indicator['id'],
+            grain=grain,
+            facility_codes=fac_filter,
+            districts=dist_filter if not fac_filter else None,
+            start_date=date_min,
+            end_date=date_max,
+            indicator_label=indicator.get('label'),
+        )
+
+    if precomputed is None or precomputed.empty:
+        figure = _indicator_run_fig(plot_df, indicator, color, periods, tickfmt, hfmt, grain, precomputed=None)
+    else:
+        figure = _indicator_run_fig(plot_df, indicator, color, periods, tickfmt, hfmt, grain, precomputed=precomputed)
+
+    caption = f"{describe_grain_window(pd.DataFrame({'period_start': pd.to_datetime(periods)}), grain)}."
+    return figure, caption
+
+
 def _location_options_for_df(df: pd.DataFrame, scope_meta: dict) -> list[dict]:
     level = str((scope_meta or {}).get('level') or '').strip().lower()
     opts = [{'label': 'All locations', 'value': 'all'}]
@@ -1480,76 +1547,143 @@ def _indicator_run_fig(plot_df: pd.DataFrame, ind: dict, color: str,
             n_vals.append(n_val)
             d_vals.append(d_val)
 
+    period_labels = [_format_grain_label(pd.Timestamp(x), grain) for x in xs]
     smoothed, _ = _moving_average_values(ys, grain)
     valid_ys = [y for y in smoothed if y is not None]
     if not valid_ys:
         return go.Figure(layout={
-            'paper_bgcolor': BG, 'plot_bgcolor': BG, 'height': 200,
-            'margin': {'l': 8, 'r': 8, 't': 4, 'b': 4},
+            'paper_bgcolor': 'white', 'plot_bgcolor': 'white', 'height': 220,
+            'margin': {'l': 16, 'r': 16, 't': 10, 'b': 28},
+            'xaxis': {'visible': False},
+            'yaxis': {'visible': False},
             'annotations': [{'text': 'No data for this period',
                               'xref': 'paper', 'yref': 'paper', 'x': 0.5, 'y': 0.5,
-                              'showarrow': False, 'font': {'size': 11, 'color': MUTED}}],
+                              'showarrow': False, 'font': {'size': 13, 'color': '#94a3b8', 'family': 'Geist, system-ui, sans-serif'}}],
         })
 
     target = ind.get('target')
     traces = []
     if target is not None:
         traces.append(go.Scatter(
-            x=xs, y=[target] * len(xs), mode='lines',
-            line={'color': '#94A3B8', 'width': 1.5, 'dash': 'dot'},
+            x=period_labels, y=[target] * len(period_labels), mode='lines',
+            line={'color': '#94A3B8', 'width': 1.4, 'dash': 'dot'},
             showlegend=False,
             hovertemplate=f'Target: {target}%<extra></extra>',
         ))
 
-    valid_pts = [(x, y, raw) for x, y, raw in zip(xs, smoothed, ys) if y is not None]
+    valid_pts = [(x, label, y, raw) for x, label, y, raw in zip(xs, period_labels, smoothed, ys) if y is not None]
     kp_set, key_pts = set(), []
-    for pt in [valid_pts[0], max(valid_pts, key=lambda p: p[1]), valid_pts[-1]]:
-        if pt[0] not in kp_set:
-            kp_set.add(pt[0])
+    for pt in [valid_pts[0], valid_pts[-1]]:
+        if pt[1] not in kp_set:
+            kp_set.add(pt[1])
             key_pts.append(pt)
     traces.append(go.Scatter(
-        x=[p[0] for p in key_pts], y=[p[1] for p in key_pts],
+        x=[p[1] for p in key_pts], y=[p[2] for p in key_pts],
         mode='markers+text',
-        text=[f'{p[1]:.0f}%' for p in key_pts],
+        text=[f'{p[2]:.0f}%' for p in key_pts],
         textposition='top center',
-        textfont={'size': 9, 'color': '#374151'},
-        marker={'size': 7, 'color': '#1e293b'},
+        textfont={'size': 10, 'color': '#475569', 'family': 'Geist, system-ui, sans-serif'},
+        marker={'size': 0, 'color': color},
         showlegend=False,
-        hovertemplate=f'%{{x|{hfmt}}}: %{{y:.0f}}%<extra></extra>',
+        hovertemplate='%{x}: %{y:.0f}%<extra></extra>',
     ))
     traces.append(go.Scatter(
-        x=xs, y=smoothed, mode='lines+markers',
-        line={'color': color, 'width': 2.4, 'shape': 'linear'},
-        marker={'size': 5, 'color': color, 'line': {'color': '#fff', 'width': 1.2}},
+        x=period_labels, y=smoothed, mode='lines+markers',
+        line={'color': color, 'width': 3.2, 'shape': 'spline', 'smoothing': 0.45},
+        marker={'size': 6, 'color': color, 'line': {'color': '#fff', 'width': 1.2}},
+        fill='tozeroy',
+        fillcolor=_hex_to_rgba(color, 0.08),
         connectgaps=False, showlegend=False,
-        customdata=list(zip(n_vals, d_vals)),
+        customdata=list(zip(period_labels, n_vals, d_vals)),
         hovertemplate=(
-            f'<b>%{{x|{hfmt}}}</b><br>'
-            'Moving Avg: <b>%{y:.1f}%</b><br>'
-            'Clients: %{customdata[0]} / %{customdata[1]}'
+            '<b>%{customdata[0]}</b><br>'
+            'Coverage: <b>%{y:.1f}%</b><br>'
+            'Clients: %{customdata[1]} / %{customdata[2]}'
             '<extra></extra>'
         ),
     ))
     layout_annotations = []
     if target is not None:
         layout_annotations.append({
-            'x': 1.0, 'y': target / 112, 'xref': 'paper', 'yref': 'paper',
-            'text': f'<b>target {target:.0f}%</b>',
-            'showarrow': False, 'font': {'size': 9, 'color': '#64748B'},
+            'x': 1.005, 'y': target / 112, 'xref': 'paper', 'yref': 'paper',
+            'text': f'target {target:.0f}%',
+            'showarrow': False, 'font': {'size': 10, 'color': '#64748B', 'family': 'Geist, system-ui, sans-serif'},
             'xanchor': 'left', 'yanchor': 'middle',
         })
+    tick_angle = -28 if grain in {'daily', 'weekly', 'monthly'} else 0
     return go.Figure(data=traces, layout={
-        'paper_bgcolor': BG, 'plot_bgcolor': BG,
-        'font': {'family': FONT, 'color': TEXT, 'size': 10},
-        'height': 200, 'margin': {'l': 6, 'r': 80, 't': 6, 'b': 24},
+        'paper_bgcolor': 'white', 'plot_bgcolor': 'white',
+        'font': {'family': 'Geist, system-ui, sans-serif', 'color': '#64748b', 'size': 11},
+        'height': 220, 'margin': {'l': 42, 'r': 24, 't': 16, 'b': 44},
         'showlegend': False,
-        'hoverlabel': {'bgcolor': '#fff', 'bordercolor': BORDER, 'font_size': 11},
-        'xaxis': {'showgrid': False, 'zeroline': False, 'showline': False,
-                  'tickformat': tickfmt, 'tickfont': {'size': 9, 'color': MUTED}},
-        'yaxis': {'showgrid': True, 'gridcolor': GRID_C, 'zeroline': False, 'showline': False,
-                  'tickfont': {'size': 9, 'color': MUTED}, 'ticksuffix': '%', 'range': [0, 112]},
+        'hovermode': 'x unified',
+        'hoverlabel': {
+            'bgcolor': '#0f172a',
+            'bordercolor': '#0f172a',
+            'font_size': 11,
+            'font_family': 'Geist, system-ui, sans-serif',
+            'font_color': '#ffffff',
+        },
+        'xaxis': {
+            'showgrid': False,
+            'zeroline': False,
+            'showline': False,
+            'type': 'category',
+            'tickfont': {'size': 10, 'color': '#94a3b8'},
+            'tickangle': tick_angle,
+            'automargin': True,
+        },
+        'yaxis': {
+            'showgrid': True,
+            'gridcolor': '#e2e8f0',
+            'gridwidth': 1,
+            'zeroline': False,
+            'showline': False,
+            'tickfont': {'size': 10, 'color': '#94a3b8'},
+            'ticksuffix': '%',
+            'range': [0, 112],
+        },
         'annotations': layout_annotations,
     })
+
+
+def _trend_period_context(plot_df: pd.DataFrame, grain: str) -> tuple[pd.DataFrame, list, str, str]:
+    working = plot_df.copy()
+    dates = pd.to_datetime(working['Date'], errors='coerce')
+    grain = (grain or 'monthly').strip().lower()
+    if grain == 'weekly':
+        tickfmt, hfmt = '%d %b', '%d %b %Y'
+        working['_p'] = dates.dt.to_period('W').dt.start_time
+    elif grain == 'quarterly':
+        tickfmt, hfmt = '%b %Y', '%b %Y'
+        working['_p'] = dates.dt.to_period('Q').dt.start_time
+    elif grain == 'yearly':
+        tickfmt, hfmt = '%Y', '%Y'
+        working['_p'] = dates.dt.to_period('Y').dt.start_time
+    else:
+        tickfmt, hfmt = '%b %y', '%b %Y'
+        working['_p'] = dates.dt.to_period('M').dt.start_time
+        grain = 'monthly'
+    periods = sorted(working['_p'].dropna().unique())
+    return working, periods, tickfmt, hfmt
+
+
+def _trend_scope_filters(df: pd.DataFrame, location: str | None = None) -> tuple[pd.DataFrame, list[str] | None, list[str] | None]:
+    plot_df = df.copy()
+    fac_filter: list[str] | None = None
+    dist_filter: list[str] | None = None
+    if location and location != 'all':
+        if 'Facility_CODE' in df.columns:
+            mask = df['Facility_CODE'].astype(str) == str(location)
+            if mask.any():
+                plot_df = df[mask].copy()
+                fac_filter = [str(location)]
+        if fac_filter is None and 'District' in df.columns:
+            mask = df['District'].astype(str) == str(location)
+            if mask.any():
+                plot_df = df[mask].copy()
+                dist_filter = [str(location)]
+    return plot_df, fac_filter, dist_filter
 
 
 def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
@@ -1566,37 +1700,15 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
         return [html.Div('No indicators configured for this category.',
                          style={'color': MUTED, 'fontSize': '13px', 'padding': '24px'})]
 
-    plot_df = df.copy()
-    fac_filter: list[str] | None = None
-    dist_filter: list[str] | None = None
-    if location and location != 'all':
-        if 'Facility_CODE' in df.columns:
-            mask = df['Facility_CODE'].astype(str) == str(location)
-            if mask.any():
-                plot_df = df[mask].copy()
-                fac_filter = [str(location)]
-        if fac_filter is None and 'District' in df.columns:
-            mask = df['District'].astype(str) == str(location)
-            if mask.any():
-                plot_df = df[mask].copy()
-                dist_filter = [str(location)]
-
+    default_grain = 'monthly'
+    source_df = fallback_df if fallback_df is not None and not fallback_df.empty else df
+    plot_df, fac_filter, dist_filter = _trend_scope_filters(source_df, location)
     dates = pd.to_datetime(plot_df['Date'], errors='coerce').dropna()
     if dates.empty:
         return [html.Div('No data for the selected location.',
                          style={'color': MUTED, 'fontSize': '13px', 'padding': '24px'})]
 
-    span = max(int((dates.max() - dates.min()).days), 0)
-    if span <= 45:
-        tickfmt, hfmt, grain = '%d %b', '%d %b %Y', 'daily'
-        plot_df['_p'] = dates.dt.floor('D')
-    elif span <= 180:
-        tickfmt, hfmt, grain = '%d %b', '%d %b %Y', 'weekly'
-        plot_df['_p'] = dates.dt.to_period('W').dt.start_time
-    else:
-        tickfmt, hfmt, grain = '%b %y', '%b %Y', 'monthly'
-        plot_df['_p'] = dates.dt.to_period('M').dt.start_time
-
+    plot_df, periods, tickfmt, hfmt = _trend_period_context(plot_df, default_grain)
     periods = sorted(plot_df['_p'].dropna().unique())
     if not periods:
         return [html.Div('No time periods available.',
@@ -1617,7 +1729,7 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
     _agg_slice = None
     if agg_df is not None and not agg_df.empty:
         _ind_ids = {_agg_resolve_id(agg_df, i['id'], i.get('label')) for i in tracked}
-        _grain_set = set(_agg_candidate_grains(grain))
+        _grain_set = set(_agg_candidate_grains(default_grain))
         # Use the earliest period floor across all candidate grains so fallback grains
         # (e.g. monthly when primary is weekly) are not cut off by the slice.
         _pf = min(_agg_floor_period(date_min, g) for g in _grain_set)
@@ -1642,7 +1754,7 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
         precomputed = None
         if _agg_slice is not None:
             precomputed = _agg_time_series(
-                _agg_slice, ind['id'], grain=grain,
+                _agg_slice, ind['id'], grain=default_grain,
                 facility_codes=fac_filter,
                 districts=dist_filter if not fac_filter else None,
                 start_date=date_min, end_date=date_max,
@@ -1664,18 +1776,12 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
                         _fb = _fb[_lm]
             _fb_dates = pd.to_datetime(_fb['Date'], errors='coerce').dropna() if 'Date' in _fb.columns else pd.Series([], dtype='datetime64[ns]')
             if not _fb_dates.empty:
-                if grain == 'monthly':
-                    _fb['_p'] = _fb_dates.dt.to_period('M').dt.start_time
-                elif grain == 'weekly':
-                    _fb['_p'] = _fb_dates.dt.to_period('W').dt.start_time
-                else:
-                    _fb['_p'] = _fb_dates.dt.floor('D')
-                _fb_periods = sorted(_fb['_p'].dropna().unique())
-                fig = _indicator_run_fig(_fb, ind, color, _fb_periods, tickfmt, hfmt, grain, precomputed=None)
+                _fb, _fb_periods, _fb_tickfmt, _fb_hfmt = _trend_period_context(_fb, default_grain)
+                fig = _indicator_run_fig(_fb, ind, color, _fb_periods, _fb_tickfmt, _fb_hfmt, default_grain, precomputed=None)
             else:
-                fig = _indicator_run_fig(plot_df, ind, color, periods, tickfmt, hfmt, grain, precomputed=None)
+                fig = _indicator_run_fig(plot_df, ind, color, periods, tickfmt, hfmt, default_grain, precomputed=None)
         else:
-            fig = _indicator_run_fig(plot_df, ind, color, periods, tickfmt, hfmt, grain, precomputed=precomputed)
+            fig = _indicator_run_fig(plot_df, ind, color, periods, tickfmt, hfmt, default_grain, precomputed=precomputed)
 
         target = ind.get('target')
         target_badge = None
@@ -1685,7 +1791,7 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
                 cur_pct = _agg_coverage(_agg_slice, ind['id'], date_min, date_max,
                                         facility_codes=fac_filter,
                                         districts=dist_filter if not fac_filter else None,
-                                        grain=grain,
+                                        grain=default_grain,
                                         indicator_label=ind.get('label'))[2]
             else:
                 cur_pct = _cov(plot_df, ind['numerator_filters'], ind['denominator_filters'])[2]
@@ -1694,23 +1800,64 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
             bg, fg = badge_colors.get(cls, ('#F1F5F9', '#475569'))
             target_badge = html.Span(
                 f'Target {target}%',
-                style={'fontSize': '10px', 'fontWeight': '600', 'padding': '2px 7px',
-                       'borderRadius': '999px', 'backgroundColor': bg, 'color': fg,
-                       'marginLeft': '6px'},
+                style={
+                    'fontSize': '10px',
+                    'fontWeight': '700',
+                    'padding': '5px 10px',
+                    'borderRadius': '999px',
+                    'backgroundColor': bg,
+                    'color': fg,
+                    'border': f'1px solid {bg}',
+                    'lineHeight': '1',
+                    'marginLeft': '6px',
+                },
             )
+        chart_key = str(ind.get('id') or f'{cat}-{idx}')
         subtitle = (
-            f"Smoothed {grain} coverage trend in the selected scope."
-            if grain in {'weekly', 'monthly', 'quarterly', 'yearly'}
-            else "Smoothed coverage trend in the selected scope."
+            f"Smoothed {default_grain} coverage trend in the selected scope."
         )
-        caption = f"{describe_grain_window(pd.DataFrame({'period_start': periods}), grain)}."
+        caption = f"{describe_grain_window(pd.DataFrame({'period_start': pd.to_datetime(periods)}), default_grain)}."
         card = build_trend_chart_card(
             ind['label'],
             subtitle[:1].upper() + subtitle[1:],
             fig,
             color,
-            header_right=target_badge,
+            header_right=html.Div([
+                dmc.SegmentedControl(
+                    id={'type': 'mnid-dash-trend-grain', 'chart': chart_key},
+                    value=default_grain,
+                    data=_EXEC_GRAIN_OPTIONS,
+                    radius='xl',
+                    size='xs',
+                    color='green',
+                    styles={
+                        'root': {
+                            'background': '#fff',
+                            'border': f'1px solid {_hex_to_rgba(color, 0.22)}',
+                            'padding': '2px',
+                        },
+                        'control': {'border': '0'},
+                        'label': {
+                            'fontSize': '11px',
+                            'fontWeight': 600,
+                            'color': '#64748b',
+                            'padding': '4px 10px',
+                        },
+                        'indicator': {
+                            'background': _hex_to_rgba(color, 0.14),
+                            'border': f'1px solid {_hex_to_rgba(color, 0.18)}',
+                        },
+                    },
+                ),
+                *([target_badge] if target_badge is not None else []),
+                dcc.Store(
+                    id={'type': 'mnid-dash-trend-meta', 'chart': chart_key},
+                    data={'indicator': ind, 'color': color},
+                ),
+            ], style={'display': 'flex', 'alignItems': 'center', 'gap': '8px', 'flexWrap': 'wrap'}),
+            graph_id={'type': 'mnid-dash-trend-graph', 'chart': chart_key},
             caption=caption,
+            caption_id={'type': 'mnid-dash-trend-caption', 'chart': chart_key},
             graph_config={
                 'displayModeBar': 'hover',
                 'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'],
