@@ -91,11 +91,12 @@ from mnid.layout import (
     _pph_cascade, _topbar, _sidebar, _alert_banner,
     _avg_ring, _count_bar, _kpi, _kpi_row, _section_anchor,
 )
-from mnid.components.country_profile_trends import (
+from mnid.components.run_charts import (
     _multi_run_chart,
     _run_chart,
     bucket_multi_series,
     bucket_time_series,
+    build_trend_chart_card,
     describe_grain_window,
 )
 from mnid.executive_views import (
@@ -1697,22 +1698,27 @@ def _run_chart_cards(df: pd.DataFrame, indicators: list, cat: str,
                        'borderRadius': '999px', 'backgroundColor': bg, 'color': fg,
                        'marginLeft': '6px'},
             )
-        card = html.Div(className='mnid-chart-card', children=[
-            html.Div(style={'display': 'flex', 'alignItems': 'center',
-                            'justifyContent': 'space-between', 'marginBottom': '2px'}, children=[
-                html.Div(ind['label'], style={
-                    'fontSize': '11px', 'fontWeight': '600', 'color': TEXT, 'lineHeight': '1.3',
-                }),
-                target_badge,
-            ]),
-            dcc.Graph(
-                figure=fig,
-                config={'displayModeBar': 'hover',
-                        'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'],
-                        'toImageButtonOptions': {'format': 'png', 'scale': 2}},
-                style={'height': '200px'},
-            ),
-        ])
+        subtitle = (
+            f"Smoothed {grain} coverage trend in the selected scope."
+            if grain in {'weekly', 'monthly', 'quarterly', 'yearly'}
+            else "Smoothed coverage trend in the selected scope."
+        )
+        caption = f"{describe_grain_window(pd.DataFrame({'period_start': periods}), grain)}."
+        card = build_trend_chart_card(
+            ind['label'],
+            subtitle[:1].upper() + subtitle[1:],
+            fig,
+            color,
+            header_right=target_badge,
+            caption=caption,
+            graph_config={
+                'displayModeBar': 'hover',
+                'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'],
+                'toImageButtonOptions': {'format': 'png', 'scale': 2},
+                'responsive': True,
+            },
+            graph_style={'height': '200px'},
+        )
         cards.append(card)
     return cards
 

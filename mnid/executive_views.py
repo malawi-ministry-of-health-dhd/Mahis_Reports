@@ -11,7 +11,7 @@ from mnid.chart_helpers import (
     CHART_HEIGHT_MD, CHART_HEIGHT_LG,
     _graph_style, _graph_scroll_wrap, _clamp_chart_height,
 )
-from mnid.components.country_profile_trends import (
+from mnid.components.run_charts import (
     _EXEC_CHART_LAYOUT,
     _chart_key_slug,
     _trend_chart_payload,
