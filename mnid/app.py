@@ -91,14 +91,16 @@ from mnid.layout import (
     _pph_cascade, _topbar, _sidebar, _alert_banner,
     _avg_ring, _count_bar, _kpi, _kpi_row, _section_anchor,
 )
+from mnid.components.country_profile_trends import (
+    _multi_run_chart,
+    _run_chart,
+    bucket_multi_series,
+    bucket_time_series,
+    describe_grain_window,
+)
 from mnid.executive_views import (
     render_country_profile,
     render_operational_readiness,
-    bucket_time_series,
-    bucket_multi_series,
-    describe_grain_window,
-    _run_chart,
-    _multi_run_chart,
 )
 
 _MNID_UI_CACHE_MAX = 16
