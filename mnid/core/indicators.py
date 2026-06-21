@@ -6,7 +6,7 @@ MNID indicator definitions from static config and live data schema.
 """
 import pandas as pd
 import logging
-from mnid.chart_helpers import (
+from mnid.charts.chart_helpers import (
     _warn_once, _filter_columns_missing, _cov, _moving_average_values,
     _CAT_ORDER, _CAT_LABELS,
 )

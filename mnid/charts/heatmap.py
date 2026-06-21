@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 import logging
 from dash import html, dcc
 
-from mnid.constants import (
+from mnid.core.constants import (
     OK_C, WARN_C, DANGER_C, INFO_C, MUTED, GRID_C, BG, BORDER, TEXT, DIM, FONT,
     HEATMAP_CS,
     FACILITY_DISTRICT as _FACILITY_DISTRICT,
@@ -18,8 +18,8 @@ from mnid.constants import (
     ALL_DISTRICTS as _ALL_DISTRICTS,
     FACILITY_NAMES as _FACILITY_NAMES,
 )
-from mnid.chart_helpers import _display_pct, _infer_facility_type, _contrast_text
-from mnid.geo_utils import (
+from mnid.charts.chart_helpers import _display_pct, _infer_facility_type, _contrast_text
+from mnid.charts.geo_utils import (
     load_malawi_district_geojson as _load_malawi_district_geojson,
     build_geo_reference as _build_geo_reference,
     derive_facility_positions as _derive_facility_positions,

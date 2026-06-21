@@ -6,8 +6,8 @@ import pandas as pd
 import plotly.graph_objects as go
 from dash import dcc, html
 
-from mnid.chart_helpers import _cov, _moving_average_values, _grouped_filter_counts
-from mnid.chart_helpers import (
+from mnid.charts.chart_helpers import _cov, _moving_average_values, _grouped_filter_counts
+from mnid.charts.chart_helpers import (
     CHART_HEIGHT_MD, CHART_HEIGHT_LG,
     _graph_style, _graph_scroll_wrap, _clamp_chart_height,
 )
@@ -16,8 +16,8 @@ from mnid.components.run_charts import (
     _chart_key_slug,
     _trend_chart_payload,
 )
-from mnid.coverage import _system_readiness
-from mnid.constants import BG, BORDER, DIM, FONT, GRID_C, MUTED, OK_C, TEXT, WARN_C
+from mnid.charts.coverage import _system_readiness
+from mnid.core.constants import BG, BORDER, DIM, FONT, GRID_C, MUTED, OK_C, TEXT, WARN_C
 
 PRIMARY_GREEN = "#15803D"
 SUCCESS_GREEN = "#16A34A"
