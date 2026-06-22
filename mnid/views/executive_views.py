@@ -133,6 +133,7 @@ def _readiness_ring_card(icon: str, name: str, score: float, col: str) -> dmc.Pa
         bg, tc, lbl = "#fef3c7", "#92400e", "Moderate"
     else:
         bg, tc, lbl = "#fee2e2", "#dc2626", "At Risk"
+    accent = _readiness_traffic_color(p)
     return dmc.Paper([
         html.Div(icon, style={"fontSize": "22px", "textAlign": "center", "marginBottom": "8px"}),
         html.Div(name, style={
@@ -141,7 +142,7 @@ def _readiness_ring_card(icon: str, name: str, score: float, col: str) -> dmc.Pa
         }),
         html.Div(style={
             "width": "72px", "height": "72px", "borderRadius": "50%",
-            "background": f"conic-gradient({col} {p:.1f}%, #e2e8f0 0)",
+            "background": f"conic-gradient({accent} {p:.1f}%, #e2e8f0 0)",
             "display": "flex", "alignItems": "center", "justifyContent": "center",
             "margin": "0 auto 10px",
         }, children=[
@@ -151,7 +152,7 @@ def _readiness_ring_card(icon: str, name: str, score: float, col: str) -> dmc.Pa
                 "alignItems": "center", "justifyContent": "center",
             }, children=[
                 html.Span(f"{score:.0f}", style={
-                    "fontSize": "16px", "fontWeight": "800", "color": col,
+                    "fontSize": "16px", "fontWeight": "800", "color": accent,
                 }),
             ]),
         ]),
@@ -1335,10 +1336,10 @@ def render_operational_readiness(
 
     # ---------- Domain ring cards ----------
     domain_rings = dmc.SimpleGrid(cols=4, spacing="lg", mb="lg", children=[
-        _readiness_ring_card("👥", "Workforce",     workforce_score, "#15803d"),
-        _readiness_ring_card("💊", "Commodities",   supply_score,    "#d97706"),
-        _readiness_ring_card("🔧", "Equipment",     supply_score,    "#0284c7"),
-        _readiness_ring_card("📊", "Data Quality",  dq_score,        "#7c3aed"),
+        _readiness_ring_card("👥", "Workforce",     workforce_score, SUCCESS_GREEN),
+        _readiness_ring_card("💊", "Commodities",   supply_score,    SUCCESS_GREEN),
+        _readiness_ring_card("🔧", "Equipment",     supply_score,    SUCCESS_GREEN),
+        _readiness_ring_card("📊", "Data Quality",  dq_score,        SUCCESS_GREEN),
     ])
 
     # ---------- Commodity cards ----------
@@ -1353,10 +1354,10 @@ def render_operational_readiness(
 
     # ---------- Workforce domain score bars ----------
     workforce_summary = [
-        ("Workforce score",    workforce_score, "#15803d"),
-        ("Supply score",       supply_score,    "#d97706"),
-        ("Data quality score", dq_score,        "#e11d48"),
-        ("Overall readiness",  national_score,  "#2563eb"),
+        ("Workforce score",    workforce_score, _readiness_traffic_color(workforce_score)),
+        ("Supply score",       supply_score,    _readiness_traffic_color(supply_score)),
+        ("Data quality score", dq_score,        _readiness_traffic_color(dq_score)),
+        ("Overall readiness",  national_score,  _readiness_traffic_color(national_score)),
     ]
 
     # ---------- Procurement rows ----------
