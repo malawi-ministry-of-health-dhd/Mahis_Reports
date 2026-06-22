@@ -8,8 +8,8 @@ import pandas as pd
 import plotly.graph_objects as go
 from dash import dcc, html
 
-from mnid.chart_helpers import _moving_average_values
-from mnid.constants import MUTED
+from mnid.charts.chart_helpers import _moving_average_values
+from mnid.core.constants import MUTED
 
 PRIMARY_GREEN = "#15803D"
 _GEIST = "Geist, system-ui, sans-serif"

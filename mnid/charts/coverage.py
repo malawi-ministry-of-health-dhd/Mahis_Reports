@@ -11,7 +11,7 @@ import logging
 from dash import html, dcc
 import dash_mantine_components as dmc
 
-from mnid.constants import (
+from mnid.core.constants import (
     OK_C, WARN_C, DANGER_C, INFO_C, MUTED, GRID_C, BG, BORDER, TEXT, DIM, FONT,
     CAT_PALETTES,
     FACILITY_DISTRICT as _FACILITY_DISTRICT,
@@ -19,7 +19,7 @@ from mnid.constants import (
     ALL_DISTRICTS as _ALL_DISTRICTS,
     FACILITY_NAMES as _FACILITY_NAMES,
 )
-from mnid.chart_helpers import (
+from mnid.charts.chart_helpers import (
     _CHART_LAYOUT, _TREND_ACCENT, _CAT_LABELS,
     _cov, _css, _display_pct, _value_counts, _monthly_visits,
     _chart_card, _donut, _hbar, _line,
@@ -27,7 +27,7 @@ from mnid.chart_helpers import (
     CHART_HEIGHT_SM, CHART_HEIGHT_MD, CHART_HEIGHT_LG,
     _clamp_chart_height, _graph_style, _graph_scroll_wrap,
 )
-from mnid.heatmap import (
+from mnid.charts.heatmap import (
     _cov_color,
     _compute_heatmap_store,
     _build_heatmap_fig,
@@ -35,8 +35,8 @@ from mnid.heatmap import (
     _build_facility_performance_heatmap_fig,
     _build_performance_attention_table,
 )
-from mnid.indicators import _resolve_category_order
-from mnid.data_utils import (
+from mnid.core.indicators import _resolve_category_order
+from mnid.core.data_utils import (
     serialize_store_df as _serialize_store_df,
     _remember_ui_payload,
 )
@@ -185,7 +185,7 @@ def _coverage_heatmap_section(
     precomputed_store: dict | None = None,
 ) -> tuple:
     """Multi-view indicator heatmap with Malawi district panel and live filters."""
-    from mnid.layout import _build_district_gauge_row
+    from mnid.charts.layout import _build_district_gauge_row
     tracked = [i for i in indicators if i.get('status') == 'tracked']
     store   = precomputed_store if precomputed_store is not None else _compute_heatmap_store(mch_full, tracked, facility_code)
 
@@ -806,7 +806,7 @@ def _anc_charts(df):
 
 
 def _labour_charts(df):
-    from mnid.layout import _pph_cascade
+    from mnid.charts.layout import _pph_cascade
     charts = []
 
     cascade = _pph_cascade(df)

@@ -10,18 +10,18 @@ import plotly.graph_objects as go
 import logging
 from dash import html, dcc
 
-from mnid.constants import (
+from mnid.core.constants import (
     OK_C, WARN_C, DANGER_C, INFO_C, MUTED, GRID_C, BG, BORDER, TEXT, DIM, FONT,
     CAT_PALETTES,
     FACILITY_DISTRICT as _FACILITY_DISTRICT,
     FACILITY_NAMES as _FACILITY_NAMES,
 )
-from mnid.chart_helpers import (
+from mnid.charts.chart_helpers import (
     _CHART_LAYOUT, _CAT_LABELS,
     _css, _display_pct, _target_attainment_pct, _target_mode, _is_inverse_indicator,
     CHART_HEIGHT_MD, CHART_HEIGHT_LG, _clamp_chart_height, _graph_style, _graph_scroll_wrap,
 )
-from mnid.heatmap import _cov_color
+from mnid.charts.heatmap import _cov_color
 
 _LOGGER = logging.getLogger(__name__)
 

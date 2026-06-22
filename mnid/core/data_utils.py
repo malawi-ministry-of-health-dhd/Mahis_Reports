@@ -104,8 +104,13 @@ def _derive_contextual_concepts(out: pd.DataFrame) -> pd.DataFrame:
     def _cstr(col: str) -> pd.Series:
         if col not in out.columns:
             return pd.Series('', index=out.index)
-        s = out[col].fillna('').astype('category')
-        return s.cat.rename_categories(dict(zip(s.cat.categories, s.cat.categories.astype(str).str.strip())))
+        raw = out[col].astype(object).fillna('').astype('category')
+        old = raw.cat.categories
+        new_vals = old.astype(str).str.strip()
+        if len(set(new_vals)) == len(new_vals):
+            return raw.cat.rename_categories(dict(zip(old, new_vals)))
+        m = dict(zip(old, new_vals))
+        return raw.astype(object).map(m)
 
     concept_series = _cstr('concept_name')
     obs_series     = _cstr('obs_value_coded')
@@ -185,16 +190,19 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
         return out
 
     def _cat_str(col: str, transform=None) -> pd.Series:
-        """Build a categorical series from out[col] — kept as categorical so that
-        str.contains/str.lower/str.upper etc. run on unique category values only
-        (~100-200 values) instead of all 143k rows, giving an 8x+ speedup."""
         if col not in out.columns:
             return pd.Series('', index=out.index)
-        s = out[col].fillna('').astype('category')
-        cats = s.cat.categories.astype(str).str.strip()
+        raw = out[col].astype(object).fillna('').astype('category')
+        old = raw.cat.categories
+        new_vals = old.astype(str).str.strip()
         if transform:
-            cats = transform(cats)
-        return s.cat.rename_categories(dict(zip(s.cat.categories, cats)))
+            new_vals = transform(new_vals)
+        # Fast path: rename_categories only when mapping is 1-to-1 (no collisions)
+        if len(set(new_vals)) == len(new_vals):
+            return raw.cat.rename_categories(dict(zip(old, new_vals)))
+        # Collision fallback: build a plain string series via value map
+        m = dict(zip(old, new_vals))
+        return raw.astype(object).map(m)
 
     concept  = _cat_str('concept_name')
     obs      = _cat_str('obs_value_coded')
@@ -771,16 +779,20 @@ def _derive_service_area_vectorized(df: pd.DataFrame) -> pd.Series:
     def _cat_upper(col):
         if col not in df.columns:
             return pd.Series('', index=df.index)
-        s = df[col].fillna('').astype('category')
-        return s.cat.rename_categories(s.cat.categories.astype(str).str.strip().str.upper())
+        raw = df[col].astype(object).fillna('').astype('category')
+        old = raw.cat.categories
+        new_vals = old.astype(str).str.strip().str.upper()
+        if len(set(new_vals)) == len(new_vals):
+            return raw.cat.rename_categories(dict(zip(old, new_vals)))
+        m = dict(zip(old, new_vals))
+        return raw.astype(object).map(m)
 
-    program = _cat_upper('Program')
+    program  = _cat_upper('Program')
     encounter = _cat_upper('Encounter')
 
-    # Map program categories to service areas — runs on unique category values only.
-    from_program = program.cat.rename_categories(
-        {c: _PROGRAM_SERVICE_AREA_MAP.get(c, '') for c in program.cat.categories}
-    )
+    # Map each unique program value to its service area (runs on unique values only)
+    _prog_uniq = program.cat.categories if hasattr(program, 'cat') else program.unique()
+    from_program = program.map({c: _PROGRAM_SERVICE_AREA_MAP.get(c, '') for c in _prog_uniq})
     enc_newborn = encounter.str.contains('NEONATAL', na=False)
     enc_pnc     = encounter.str.contains('PNC|POSTNATAL', na=False)
     enc_labour  = encounter.str.contains('LABOUR|DELIVERY|BIRTH', na=False)
@@ -860,13 +872,14 @@ def _normalize_mnid_semantics(df: pd.DataFrame) -> pd.DataFrame:
         out['Source_Program'] = out['Program']
 
     def _apply_alias_cat(col: str, alias_map: dict) -> None:
-        """Strip and alias-map a column using categorical operations on unique values."""
         if col not in out.columns:
             return
-        cat = out[col].fillna('').astype('category')
-        old = cat.cat.categories
-        new = old.astype(str).str.strip().map(lambda c: alias_map.get(c, c))
-        out[col] = cat.cat.rename_categories(dict(zip(old, new))).astype(str)
+        # rename_categories crashes when multiple source values alias to the same
+        # target that already exists in the category list. Map over unique values
+        # directly instead — same O(unique) cost, no uniqueness constraint.
+        s = out[col].astype(object).fillna('').astype(str).str.strip()
+        m = {v: alias_map.get(v, v) for v in s.unique()}
+        out[col] = s.map(m)
 
     _apply_alias_cat('concept_name', _CONCEPT_ALIASES)
     _apply_alias_cat('obs_value_coded', _OBS_VALUE_ALIASES)
@@ -874,10 +887,9 @@ def _normalize_mnid_semantics(df: pd.DataFrame) -> pd.DataFrame:
     # The new parquet stores several clinically relevant coded answers in `Value`.
     if {'obs_value_coded', 'Value'}.issubset(out.columns):
         obs_blank = out['obs_value_coded'].eq('')
-        _v_cat = out['Value'].fillna('').astype('category')
-        _v_old = _v_cat.cat.categories
-        _v_new = _v_old.astype(str).str.strip().map(lambda c: _OBS_VALUE_ALIASES.get(c, c))
-        val_aliased = _v_cat.cat.rename_categories(dict(zip(_v_old, _v_new))).astype(str)
+        _v_s = out['Value'].astype(object).fillna('').astype(str).str.strip()
+        _v_m = {v: _OBS_VALUE_ALIASES.get(v, v) for v in _v_s.unique()}
+        val_aliased = _v_s.map(_v_m)
         val_present = val_aliased.ne('')
         out.loc[obs_blank & val_present, 'obs_value_coded'] = val_aliased.loc[obs_blank & val_present]
 

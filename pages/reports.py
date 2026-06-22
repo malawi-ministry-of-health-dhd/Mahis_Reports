@@ -9,7 +9,7 @@ import os
 import json
 from dash.exceptions import PreventUpdate
 from helpers.reports_class import ReportTableBuilder
-from mnid.data_utils import prepare_mnid_dataframe
+from mnid.core.data_utils import prepare_mnid_dataframe
 import warnings
 warnings.filterwarnings("ignore")
 from helpers.date_ranges import (
