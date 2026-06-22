@@ -22,7 +22,8 @@ _EXECUTIVE_CACHE_DIR = os.environ.get('MNID_EXEC_CACHE_DIR') or os.path.join(
 )
 _MNID_EXECUTIVE_DISK_CACHE = diskcache.Cache(_EXECUTIVE_CACHE_DIR, size_limit=512 * 1024 * 1024)
 _MNID_WARNED_MESSAGES: set = set()
-_COUNTRY_PROFILE_RENDER_VERSION = "country-profile-v5-all-country-profile-grains"
+_COUNTRY_PROFILE_RENDER_VERSION = "country-profile-v7-complication-rates"
+_EXECUTIVE_RENDER_VERSION = "executive-v2-operational-readiness-traffic-lights"
 
 
 _network_df_cache: dict = {}
@@ -75,6 +76,7 @@ def _executive_view_cache_key(selected: str, state: dict,
         tuple(sorted((effective_scope or {}).get('mnid_categories') or [])),
         (effective_scope or {}).get('dataset_version'),
         _agg_version_stamp(),
+        _EXECUTIVE_RENDER_VERSION,
     )
 
 
