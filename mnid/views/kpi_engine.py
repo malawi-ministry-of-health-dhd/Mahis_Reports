@@ -579,7 +579,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
                     _indicator_activity('Labour Complications'),
                     _indicator_activity('Live Births'),
                     _indicator_activity('Maternal Deaths'),
-                    _indicator_activity('Newborn Deaths'),
+                    _indicator_activity('Stillbirths'),
                 ]
             elif default_cat == 'Labour':
                 _activity_stats = [
@@ -599,10 +599,9 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
                 ]
             elif default_cat == 'Newborn':
                 _activity_stats = [
-                    _indicator_activity('Stillbirths'),
-                    _indicator_activity('Live Births'),
-                    _indicator_activity('Neonatal Deaths'),
+                    _indicator_activity('Outborn babies'),
                     _indicator_activity('Neonatal Complications at Birth'),
+                    _indicator_activity('Birth asphyxia among newborn admissions'),
                     _indicator_activity('iKMC Initiated'),
                 ]
             else:

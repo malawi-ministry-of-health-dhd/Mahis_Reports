@@ -4924,9 +4924,9 @@
         }
       },
       {
-        "id": "mnid_nb_overview_001",
+        "id": "mnid_lab_overview_005",
         "label": "Stillbirths",
-        "category": "Newborn",
+        "category": "Labour",
         "target": 5,
         "target_mode": "min",
         "status": "overview_only",
@@ -4939,6 +4939,24 @@
           "unique": "person_id",
           "variable1": "mnid_labour_visit_documented",
           "value1": "Yes"
+        }
+      },
+      {
+        "id": "mnid_nb_overview_001",
+        "label": "Outborn babies",
+        "category": "Newborn",
+        "target": 10,
+        "target_mode": "min",
+        "status": "overview_only",
+        "numerator_filters": {
+          "unique": "person_id",
+          "variable1": "mnid_newborn_outborn",
+          "value1": "Yes"
+        },
+        "denominator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "Newborn"
         }
       },
       {
@@ -6397,9 +6415,9 @@
         }
       },
       {
-        "id": "mnid_nb_overview_001",
+        "id": "mnid_lab_overview_005",
         "label": "Stillbirths",
-        "category": "Newborn",
+        "category": "Labour",
         "target": 5,
         "target_mode": "min",
         "status": "overview_only",
@@ -6412,6 +6430,24 @@
           "unique": "person_id",
           "variable1": "mnid_labour_visit_documented",
           "value1": "Yes"
+        }
+      },
+      {
+        "id": "mnid_nb_overview_001",
+        "label": "Outborn babies",
+        "category": "Newborn",
+        "target": 10,
+        "target_mode": "min",
+        "status": "overview_only",
+        "numerator_filters": {
+          "unique": "person_id",
+          "variable1": "mnid_newborn_outborn",
+          "value1": "Yes"
+        },
+        "denominator_filters": {
+          "unique": "person_id",
+          "variable1": "Service_Area",
+          "value1": "Newborn"
         }
       },
       {

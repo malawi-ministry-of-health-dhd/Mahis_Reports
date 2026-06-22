@@ -398,6 +398,10 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
         labour_mask & concept.eq('Place of delivery') & combined_lower.eq('this facility'),
     )
     _assign_flag(
+        'mnid_newborn_outborn',
+        concept.eq('Place of delivery') & ~combined_lower.isin(['', 'this facility']),
+    )
+    _assign_flag(
         'mnid_labour_csection',
         labour_mask & concept.eq('Mode of delivery') & combined_lower.eq('caesarean section'),
     )
