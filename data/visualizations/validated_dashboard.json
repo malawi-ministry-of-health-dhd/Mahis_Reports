@@ -6292,11 +6292,11 @@
         },
         {
           "id": "mnid_nb_004",
-          "label": "Eligible babies between 1500 and 1999g who receive CPAP",
+          "label": "Babies between 1500-1999g who receive prophylactic CPAP",
           "category": "Newborn",
           "target": 80,
           "status": "awaiting_baseline",
-          "note": "Requires birth weight field to separate 1500-1999g cohort from 1000-1499g. Birth weight not yet captured as a distinct filterable concept."
+          "note": "Tracked from birth-weight bands plus newborn CPAP treatment observations already normalized into the parquet. This remains a weight-band proxy because respiratory distress syndrome is not modeled separately."
         },
         {
           "id": "mnid_nb_005",

@@ -227,7 +227,13 @@ _CLR = {'ok': OK_C, 'warn': WARN_C, 'danger': DANGER_C, 'info': INFO_C}
 def _display_pct(pct):
     if pct is None:
         return None
-    return max(0.0, min(float(pct), 100.0))
+    try:
+        v = float(pct)
+    except (TypeError, ValueError):
+        return None
+    if v != v:  # NaN check (NaN != NaN is True)
+        return None
+    return max(0.0, min(v, 100.0))
 
 
 def _axis_wrap(label: str, width: int = 14, max_lines: int = 3) -> str:

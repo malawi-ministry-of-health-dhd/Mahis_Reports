@@ -551,9 +551,11 @@ def _sidebar(facility_code: str, theme: str = 'default') -> html.Div:
             ('Map View',    '#mnid-heatmap'),
             ('Comparison',  '#mnid-comparative'),
         ]
+    # IDs are intentionally absent — the scrollspy JS in assets/mnid_scrollspy.js
+    # owns the active class. Dash IDs would cause Dash to reset className on every
+    # re-render, overwriting the JS updates.
     return html.Div(className='mnid-nav', children=[
         html.A(
-            id={'type': 'mnid-nav-btn', 'index': href},
             href=href,
             className='mnid-nav-btn active' if index == 0 else 'mnid-nav-btn',
             children=label,

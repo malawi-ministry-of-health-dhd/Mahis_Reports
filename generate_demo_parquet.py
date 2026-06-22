@@ -369,7 +369,13 @@ for district, facilities in DISTRICTS.items():
                     k=1,
                 )[0]
 
-                _obs(tmpl, "Place of delivery", "This facility")
+                # ~12% of deliveries are outborn (born outside this facility)
+                _delivery_location = (
+                    "This facility"
+                    if random.random() > 0.12
+                    else random.choice(["Home", "Referral facility", "Community"])
+                )
+                _obs(tmpl, "Place of delivery", _delivery_location)
                 _obs(tmpl, "Outcome of the delivery", outcome)
                 _obs(tmpl, "Obstetric complications", obstetric_comp)
                 _obs(tmpl, "Newborn baby complications", newborn_comp)
