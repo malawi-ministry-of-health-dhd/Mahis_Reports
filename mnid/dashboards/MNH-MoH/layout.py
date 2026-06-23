@@ -1,4 +1,4 @@
-"""Unified MNH MoH dashboard view built from existing MNID data and indicator metadata."""
+"""MNH-MoH dashboard rendered in the compact Ministry dashboard style."""
 
 from __future__ import annotations
 
@@ -8,51 +8,53 @@ import pandas as pd
 import plotly.graph_objects as go
 from dash import dcc, html
 
-from helpers.helpers import build_single_chart
 from mnid.aggregation.store import get_aggregate as _get_aggregate, query_coverage as _agg_coverage
 from mnid.charts.chart_helpers import _cov
 from mnid.core.cache import _resolve_scope_filters
-from mnid.core.constants import BORDER, DIM, GRID_C, TEXT
 from mnid.core.indicators import _resolve_category_order, _resolve_runtime_mnid_indicators
 
-_SECTION_ORDER = [
-    ('Overview', {'ANC', 'Labour', 'PNC', 'Newborn'}),
-    ('Antenatal Care', {'ANC'}),
-    ('Labour and Delivery', {'Labour'}),
-    ('Maternal Outcomes', {'Labour', 'PNC'}),
-    ('Newborn and Birth Outcomes', {'Newborn', 'Labour'}),
-    ('Postnatal Care', {'PNC'}),
-    ('HIV and PMTCT', {'ANC', 'PNC'}),
-    ('Referrals and Complications', {'ANC', 'Labour', 'PNC', 'Newborn'}),
-    ('Quality of Care / Signal Functions', {'ANC', 'Labour', 'PNC', 'Newborn'}),
-    ('Data Quality', set()),
+GREEN = '#1A7C4F'
+GREEN_DARK = '#0F5A2E'
+GREEN_LIGHT = '#E8F7EF'
+RED = '#DC2626'
+RED_LIGHT = '#FEF2F2'
+RED_BORDER = '#FCA5A5'
+AMBER = '#D97706'
+AMBER_LIGHT = '#FFFBEB'
+AMBER_BORDER = '#FCD34D'
+PURPLE = '#7C3AED'
+PURPLE_LIGHT = '#F5F3FF'
+PURPLE_BORDER = '#C4B5FD'
+BLUE = '#2563EB'
+TEAL = '#0891B2'
+TEXT = '#111827'
+MUTED = '#6B7280'
+FAINT = '#9CA3AF'
+BORDER = '#E5E7EB'
+PANEL = '#FFFFFF'
+BG = '#F9FAFB'
+GRID = '#F1F5F9'
+
+SECTION_TABS = [
+    ('Overview', 'mnh-moh-overview'),
+    ('Antenatal Care', 'mnh-moh-anc'),
+    ('Labour & Delivery', 'mnh-moh-labour'),
+    ('Maternal Outcomes', 'mnh-moh-maternal'),
+    ('Newborn', 'mnh-moh-newborn'),
+    ('Postnatal Care', 'mnh-moh-pnc'),
+    ('HIV & PMTCT', 'mnh-moh-hiv'),
+    ('Referrals', 'mnh-moh-referrals'),
+    ('Signal Functions', 'mnh-moh-quality'),
+    ('Data Quality', 'mnh-moh-data-quality'),
 ]
 
-_SECTION_LABEL_RULES = {
-    'Maternal Outcomes': ('death', 'live birth', 'stillbirth', 'caesarean'),
-    'Newborn and Birth Outcomes': ('newborn', 'neonatal', 'birth weight', 'vitamin k', 'kmc', 'phototherapy', 'cpap'),
-    'HIV and PMTCT': ('hiv', 'syphilis'),
-    'Referrals and Complications': ('complication', 'referral', 'pph', 'eclampsia', 'sepsis'),
-    'Quality of Care / Signal Functions': ('partograph', 'blood pressure', 'temperature', 'pulse oximeter', 'bilirubin', 'resuscitation', 'magnesium', 'antibiotic', 'screened'),
+SECTION_RULES = {
+    'mnh-moh-maternal': ('maternal', 'death', 'caesarean', 'live birth', 'stillbirth'),
+    'mnh-moh-newborn': ('newborn', 'neonatal', 'birth weight', 'vitamin k', 'kmc', 'phototherapy', 'cpap'),
+    'mnh-moh-hiv': ('hiv', 'pmtct', 'syphilis', 'art'),
+    'mnh-moh-referrals': ('referral', 'complication', 'pph', 'eclampsia', 'sepsis', 'obstructed'),
+    'mnh-moh-quality': ('partograph', 'blood pressure', 'temperature', 'pulse oximeter', 'bilirubin', 'resuscitation', 'magnesium', 'antibiotic', 'screened'),
 }
-
-_SECTION_IDS = {
-    'Overview': 'mnh-moh-overview',
-    'Antenatal Care': 'mnh-moh-anc',
-    'Labour and Delivery': 'mnh-moh-labour',
-    'Maternal Outcomes': 'mnh-moh-maternal',
-    'Newborn and Birth Outcomes': 'mnh-moh-newborn',
-    'Postnatal Care': 'mnh-moh-pnc',
-    'HIV and PMTCT': 'mnh-moh-hiv',
-    'Referrals and Complications': 'mnh-moh-referrals',
-    'Quality of Care / Signal Functions': 'mnh-moh-quality',
-    'Operational Readiness and Signal Functions': 'mnh-moh-quality',
-    'Data Quality': 'mnh-moh-data-quality',
-}
-
-
-def _safe_pct(num: int, den: int) -> float:
-    return round((num / den) * 100, 1) if den else 0.0
 
 
 def _period_label(start_date, end_date) -> str:
@@ -60,23 +62,43 @@ def _period_label(start_date, end_date) -> str:
     end_ts = pd.to_datetime(end_date, errors='coerce')
     if pd.isna(start_ts) or pd.isna(end_ts):
         return 'Current reporting window'
-    return f"{start_ts.strftime('%d %b %Y')} to {end_ts.strftime('%d %b %Y')}"
+    return f"{start_ts.strftime('%d %b %Y')} - {end_ts.strftime('%d %b %Y')}"
 
 
-def _find_indicator_value(indicators: list[dict], labels: tuple[str, ...]) -> int:
-    wanted = {label.lower() for label in labels}
-    for indicator in indicators:
-        if str(indicator.get('label', '')).lower() in wanted:
-            return int(indicator.get('numerator', 0) or 0)
-    return 0
+def _short_period_label(start_date, end_date) -> str:
+    start_ts = pd.to_datetime(start_date, errors='coerce')
+    end_ts = pd.to_datetime(end_date, errors='coerce')
+    if pd.isna(start_ts) or pd.isna(end_ts):
+        return 'Current period'
+    if start_ts.year == end_ts.year:
+        return f"{start_ts.strftime('%d %b')} - {end_ts.strftime('%d %b %Y')}"
+    return _period_label(start_date, end_date)
 
 
-def _compute_indicator(df: pd.DataFrame, indicator: dict, agg_df: pd.DataFrame | None,
-                       start_date, end_date, facility_codes: list[str] | None,
-                       districts: list[str] | None) -> dict:
+def _safe_pct(num: int | float, den: int | float, multiplier: int = 100) -> float:
+    return round((float(num) / float(den)) * multiplier, 1) if den else 0.0
+
+
+def _compact_scope(names: list[str], fallback: str) -> str:
+    if not names:
+        return fallback
+    if len(names) <= 2:
+        return ', '.join(names)
+    return f"{', '.join(names[:2])} +{len(names) - 2}"
+
+
+def _compute_indicator(
+    df: pd.DataFrame,
+    indicator: dict,
+    agg_df: pd.DataFrame | None,
+    start_date,
+    end_date,
+    facility_codes: list[str] | None,
+    districts: list[str] | None,
+) -> dict:
     num = den = 0
     pct = 0.0
-    if agg_df is not None:
+    if agg_df is not None and indicator.get('id'):
         try:
             num, den, pct = _agg_coverage(
                 agg_df,
@@ -92,104 +114,300 @@ def _compute_indicator(df: pd.DataFrame, indicator: dict, agg_df: pd.DataFrame |
             num = den = 0
     if not den:
         num, den, pct = _cov(df, indicator.get('numerator_filters', {}), indicator.get('denominator_filters', {}))
-    return {
-        **indicator,
-        'numerator': int(num),
-        'denominator': int(den),
-        'pct': float(pct or 0.0),
-    }
+    return {**indicator, 'numerator': int(num), 'denominator': int(den), 'pct': float(pct or 0.0)}
 
 
-def _badge(text: str, color: str, bg: str) -> html.Span:
+def _indicator_value(indicators: list[dict], labels: tuple[str, ...], *, contains: tuple[str, ...] = ()) -> int:
+    exact = {label.lower() for label in labels}
+    for indicator in indicators:
+        label = str(indicator.get('label', '')).strip().lower()
+        if label in exact:
+            return int(indicator.get('numerator', 0) or 0)
+    for indicator in indicators:
+        label = str(indicator.get('label', '')).strip().lower()
+        if contains and all(token in label for token in contains):
+            return int(indicator.get('numerator', 0) or 0)
+    return 0
+
+
+def _indicator_bucket(indicator: dict) -> str:
+    label = str(indicator.get('label', '')).lower()
+    category = str(indicator.get('category', '')).lower()
+    for section_id, tokens in SECTION_RULES.items():
+        if any(token in label for token in tokens):
+            return section_id
+    if category == 'anc':
+        return 'mnh-moh-anc'
+    if category == 'labour':
+        return 'mnh-moh-labour'
+    if category == 'pnc':
+        return 'mnh-moh-pnc'
+    if category == 'newborn':
+        return 'mnh-moh-newborn'
+    return 'mnh-moh-overview'
+
+
+def _badge(label: str, color: str = MUTED, bg: str = '#F3F4F6', border: str = BORDER) -> html.Span:
     return html.Span(
-        text,
+        label,
         style={
             'display': 'inline-flex',
             'alignItems': 'center',
+            'gap': '5px',
             'padding': '3px 10px',
             'borderRadius': '999px',
-            'fontSize': '11px',
-            'fontWeight': 700,
-            'color': color,
+            'border': f'1px solid {border}',
             'background': bg,
+            'color': color,
+            'fontSize': '11px',
+            'fontWeight': 600,
+            'lineHeight': '1.3',
+            'whiteSpace': 'nowrap',
         },
     )
 
 
-def _status_badge(pct: float, target: float | None, target_mode: str | None = None) -> html.Span:
-    if target is None:
-        return _badge('Observed', '#1D4ED8', '#DBEAFE')
-    if target_mode == 'min':
-        okay = pct <= target
-    else:
-        okay = pct >= target
-    return _badge('On track' if okay else 'Needs attention', '#166534' if okay else '#991B1B', '#DCFCE7' if okay else '#FEE2E2')
+def _icon_button(label: str) -> html.Button:
+    return html.Button(
+        label,
+        title=label,
+        style={
+            'width': '32px',
+            'height': '32px',
+            'borderRadius': '7px',
+            'border': f'1px solid {BORDER}',
+            'background': PANEL,
+            'color': FAINT,
+            'fontSize': '11px',
+            'fontWeight': 700,
+            'cursor': 'default',
+        },
+    )
 
 
-def _module_tabs(section_names: list[str]) -> html.Div:
+def _topbar(period_text: str, active_districts: int, active_facilities: int) -> html.Div:
     return html.Div(
         style={
+            'height': '52px',
             'display': 'flex',
-            'gap': '2px',
-            'overflowX': 'auto',
-            'padding': '0 2px',
-            'marginBottom': '18px',
-            'background': '#FFFFFF',
-            'border': f'1px solid {BORDER}',
-            'borderRadius': '18px',
-            'boxShadow': '0 10px 24px rgba(15, 23, 42, 0.04)',
+            'alignItems': 'center',
+            'gap': '10px',
+            'padding': '0 22px',
+            'background': PANEL,
+            'borderBottom': f'1px solid {BORDER}',
         },
         children=[
-            html.A(
-                section_name,
-                href=f"#{_SECTION_IDS.get(section_name, '')}",
-                style={
-                    'display': 'inline-flex',
-                    'alignItems': 'center',
-                    'padding': '12px 16px',
-                    'borderRadius': '16px',
-                    'border': '1px solid transparent',
-                    'background': '#FFFFFF',
-                    'color': '#475569',
-                    'fontSize': '12px',
-                    'fontWeight': 700,
-                    'textDecoration': 'none',
-                    'whiteSpace': 'nowrap',
-                    'margin': '2px 0',
-                },
-            )
-            for section_name in section_names
+            html.Div(
+                style={'display': 'flex', 'alignItems': 'center', 'gap': '10px'},
+                children=[
+                    html.Div('MNH-MOH Dashboard', style={'fontSize': '14px', 'fontWeight': 800, 'color': TEXT}),
+                ],
+            ),
+            html.Div(style={'flex': '1'}),
+            _badge('Live', GREEN_DARK, GREEN_LIGHT, '#B7DFC8'),
+            _badge(period_text, MUTED, '#F8FAFC'),
+            _badge(f'{active_districts} Districts - {active_facilities} Facilities', MUTED, '#F8FAFC'),
+            _icon_button('DL'),
+            _icon_button('RF'),
         ],
     )
 
 
-def _meta_bar(period_text: str, active_districts: int, active_facilities: int, completeness: float) -> html.Div:
+def _tabs(active_id: str = 'mnh-moh-overview') -> html.Div:
+    return html.Div(
+        style={
+            'height': '46px',
+            'display': 'flex',
+            'alignItems': 'flex-end',
+            'gap': '2px',
+            'padding': '0 22px',
+            'overflowX': 'auto',
+            'background': PANEL,
+            'borderBottom': f'1px solid {BORDER}',
+        },
+        children=[
+            html.A(
+                label,
+                href=f'#{section_id}',
+                style={
+                    'padding': '10px 14px',
+                    'borderRadius': '6px 6px 0 0',
+                    'border': f'1px solid {BORDER}' if section_id == active_id else '1px solid transparent',
+                    'borderBottom': '1px solid #FFFFFF' if section_id == active_id else '1px solid transparent',
+                    'background': PANEL if section_id == active_id else 'transparent',
+                    'color': GREEN_DARK if section_id == active_id else '#374151',
+                    'fontSize': '12px',
+                    'fontWeight': 800 if section_id == active_id else 500,
+                    'textDecoration': 'none',
+                    'whiteSpace': 'nowrap',
+                    'position': 'relative',
+                    'bottom': '-1px',
+                },
+            )
+            for label, section_id in SECTION_TABS
+        ],
+    )
+
+
+def _page_title(period_text: str, active_districts: int, active_facilities: int, completeness: float) -> html.Div:
+    return html.Div(
+        style={'marginBottom': '16px'},
+        children=[
+            html.Div('Maternal & Neonatal Outcomes Dashboard', style={'fontSize': '18px', 'fontWeight': 800, 'color': TEXT, 'marginBottom': '4px'}),
+            html.Div('Malawi national overview - Maternal & Newborn - Evidence for action - Decision support', style={'fontSize': '12px', 'color': FAINT, 'marginBottom': '10px'}),
+            html.Div(
+                style={'display': 'flex', 'gap': '7px', 'flexWrap': 'wrap'},
+                children=[
+                    _badge('Live', GREEN_DARK, GREEN_LIGHT, '#B7DFC8'),
+                    _badge(period_text, MUTED, '#F8FAFC'),
+                    _badge(f'{active_districts} Districts - {active_facilities} Facilities', MUTED, '#F8FAFC'),
+                    _badge(f'Completeness: {completeness:.1f}%', MUTED, '#F8FAFC'),
+                ],
+            ),
+        ],
+    )
+
+
+def _section_heading(label: str, section_id: str | None = None) -> html.Div:
+    return html.Div(
+        id=section_id,
+        style={'display': 'flex', 'alignItems': 'center', 'gap': '8px', 'margin': '22px 0 11px', 'scrollMarginTop': '112px'},
+        children=[
+            html.Div(style={'width': '3px', 'height': '18px', 'borderRadius': '2px', 'background': GREEN}),
+            html.Div(label.upper(), style={'fontSize': '11px', 'fontWeight': 800, 'letterSpacing': '0.07em', 'color': MUTED}),
+        ],
+    )
+
+
+def _priority_alert(maternal_deaths: int, neonatal_deaths: int, stillbirths: int, complication_burden: int,
+                    maternal_rate: float, neonatal_rate: float, stillbirth_rate: float) -> html.Div:
+    total_events = maternal_deaths + neonatal_deaths + stillbirths + complication_burden
+    return html.Div(
+        style={
+            'display': 'flex',
+            'alignItems': 'center',
+            'gap': '14px',
+            'padding': '13px 18px',
+            'border': f'1px solid {AMBER_BORDER}',
+            'borderRadius': '12px',
+            'background': '#FFFBF0',
+            'marginBottom': '18px',
+        },
+        children=[
+            html.Div(
+                style={'textAlign': 'center', 'minWidth': '58px'},
+                children=[
+                    html.Div(f'{total_events:,}', style={'fontSize': '26px', 'fontWeight': 900, 'lineHeight': '1', 'color': AMBER}),
+                    html.Div('events', style={'fontSize': '10px', 'fontWeight': 600, 'color': '#78350F', 'marginTop': '3px'}),
+                ],
+            ),
+            html.Div(style={'width': '1px', 'height': '34px', 'background': AMBER_BORDER}),
+            html.Div(
+                style={'flex': '1', 'minWidth': '260px'},
+                children=[
+                    html.Div('Priority alert - immediate attention required' if total_events else 'No priority mortality alert recorded', style={'fontSize': '12px', 'fontWeight': 800, 'color': '#78350F'}),
+                    html.Div('Maternal, neonatal and stillbirth deaths recorded in this reporting window', style={'fontSize': '11px', 'color': '#92400E', 'marginTop': '3px'}),
+                ],
+            ),
+            html.Div(
+                style={'display': 'flex', 'gap': '18px', 'flexWrap': 'wrap', 'marginLeft': 'auto'},
+                children=[
+                    _alert_stat('Maternal deaths', maternal_deaths, f'MMR {maternal_rate:,.1f} per 100k', RED),
+                    _alert_stat('Neonatal deaths', neonatal_deaths, f'NMR {neonatal_rate:,.1f} per 1k', AMBER),
+                    _alert_stat('Stillbirths', stillbirths, f'SBR {stillbirth_rate:,.1f} per 1k', PURPLE),
+                ],
+            ),
+        ],
+    )
+
+
+def _alert_stat(label: str, value: int, subtext: str, color: str) -> html.Div:
+    return html.Div(
+        style={'textAlign': 'right', 'minWidth': '94px'},
+        children=[
+            html.Div(label, style={'fontSize': '10px', 'color': FAINT, 'marginBottom': '1px'}),
+            html.Div(f'{value:,}', style={'fontSize': '17px', 'fontWeight': 900, 'lineHeight': '1', 'color': color}),
+            html.Div(subtext, style={'fontSize': '9px', 'color': FAINT, 'marginTop': '3px'}),
+        ],
+    )
+
+
+def _kpi_card(label: str, value: str, subtext: str, color: str = GREEN, status: str | None = None,
+              pct: float | None = None) -> html.Div:
+    return html.Div(
+        style={
+            'background': PANEL,
+            'border': f'1px solid {BORDER}',
+            'borderTop': f'3px solid {color}',
+            'borderRadius': '0 0 8px 8px',
+            'padding': '11px 13px',
+            'minHeight': '80px',
+        },
+        children=[
+            html.Div(label.upper(), style={'fontSize': '10px', 'fontWeight': 800, 'letterSpacing': '0.04em', 'color': FAINT, 'lineHeight': '1.3', 'marginBottom': '6px'}),
+            html.Div(value, style={'fontSize': '22px', 'fontWeight': 800, 'lineHeight': '1', 'color': color if status == 'critical' else TEXT, 'marginBottom': '5px'}),
+            html.Div(subtext, style={'fontSize': '10px', 'color': FAINT, 'lineHeight': '1.35'}),
+            _progress_bar(pct, color) if pct is not None else None,
+            _status_pill(status) if status else None,
+        ],
+    )
+
+
+def _progress_bar(pct: float, color: str) -> html.Div:
+    return html.Div(
+        style={'height': '7px', 'background': BORDER, 'borderRadius': '4px', 'overflow': 'hidden', 'marginTop': '8px'},
+        children=html.Div(style={'height': '100%', 'width': f'{max(0, min(pct, 100)):.1f}%', 'background': color}),
+    )
+
+
+def _status_pill(status: str) -> html.Span:
+    palette = {
+        'good': (GREEN_DARK, GREEN_LIGHT, '#B7DFC8', 'Above target'),
+        'warn': ('#78350F', AMBER_LIGHT, AMBER_BORDER, 'Monitor'),
+        'critical': ('#7F1D1D', RED_LIGHT, RED_BORDER, 'Critical'),
+        'burden': ('#78350F', AMBER_LIGHT, AMBER_BORDER, 'High burden'),
+    }
+    color, bg, border, label = palette.get(status, (MUTED, '#F3F4F6', BORDER, status.title()))
+    return html.Span(
+        label,
+        style={
+            'display': 'inline-flex',
+            'marginTop': '8px',
+            'padding': '3px 8px',
+            'borderRadius': '20px',
+            'border': f'1px solid {border}',
+            'background': bg,
+            'color': color,
+            'fontSize': '10px',
+            'fontWeight': 800,
+        },
+    )
+
+
+def _meta_bar(period_text: str, district_text: str, facility_text: str, completeness: float) -> html.Div:
     items = [
-        ('Reporting period', period_text),
-        ('District scope', f'{active_districts} districts'),
-        ('Reporting facilities', f'{active_facilities} facilities'),
-        ('Completeness proxy', f'{completeness:.1f}%'),
+        ('Period', period_text),
+        ('District', district_text),
+        ('Facility', facility_text),
+        ('Completeness', f'{completeness:.1f}%'),
     ]
     return html.Div(
         style={
             'display': 'flex',
             'gap': '20px',
             'flexWrap': 'wrap',
-            'marginBottom': '18px',
-            'padding': '12px 16px',
-            'background': '#FFFFFF',
+            'background': PANEL,
             'border': f'1px solid {BORDER}',
-            'borderRadius': '16px',
-            'boxShadow': '0 10px 24px rgba(15, 23, 42, 0.04)',
+            'borderRadius': '8px',
+            'padding': '10px 16px',
+            'marginBottom': '18px',
         },
         children=[
             html.Div(
-                style={
-                    'minWidth': '150px',
-                },
+                style={'minWidth': '110px'},
                 children=[
-                    html.Div(label, style={'fontSize': '10px', 'fontWeight': 800, 'letterSpacing': '0.08em', 'textTransform': 'uppercase', 'color': DIM}),
-                    html.Div(value, style={'fontSize': '13px', 'fontWeight': 700, 'color': '#334155', 'marginTop': '4px'}),
+                    html.Div(label.upper(), style={'fontSize': '9px', 'fontWeight': 800, 'letterSpacing': '0.07em', 'color': FAINT}),
+                    html.Div(value, style={'fontSize': '12px', 'fontWeight': 700 if label == 'Completeness' else 500, 'color': GREEN_DARK if label == 'Completeness' else '#374151', 'marginTop': '2px'}),
                 ],
             )
             for label, value in items
@@ -197,186 +415,140 @@ def _meta_bar(period_text: str, active_districts: int, active_facilities: int, c
     )
 
 
-def _priority_alert(maternal_deaths: int, neonatal_deaths: int, stillbirths: int, complication_burden: int) -> html.Div:
-    total_events = maternal_deaths + neonatal_deaths + stillbirths + complication_burden
-    title = 'Priority outcomes require attention' if total_events else 'No critical mortality alerts recorded'
-    subtitle = (
-        'Maternal deaths, neonatal deaths, stillbirths, and complication burden are summarized here for rapid Ministry-level review.'
-        if total_events else
-        'The selected reporting window has no recorded maternal, neonatal, or stillbirth events in the current scope.'
-    )
-    tone_bg = '#FFF7ED' if total_events else '#F0FDF4'
-    tone_border = '#FED7AA' if total_events else '#BBF7D0'
+def _mortality_card(title: str, count: int, rate_label: str, rate_value: float, tone: str,
+                    extra: html.Div | None = None) -> html.Div:
+    palettes = {
+        'red': (RED, RED_LIGHT, RED_BORDER, '#7F1D1D'),
+        'amber': (AMBER, AMBER_LIGHT, AMBER_BORDER, '#78350F'),
+        'purple': (PURPLE, PURPLE_LIGHT, PURPLE_BORDER, '#3B0764'),
+    }
+    color, bg, border, text_color = palettes[tone]
     return html.Div(
-        style={
-            'display': 'flex',
-            'alignItems': 'center',
-            'gap': '16px',
-            'flexWrap': 'wrap',
-            'padding': '16px 18px',
-            'borderRadius': '18px',
-            'background': tone_bg,
-            'border': f'1px solid {tone_border}',
-            'marginBottom': '18px',
-        },
+        style={'background': bg, 'border': f'1px solid {border}', 'borderRadius': '12px', 'padding': '18px', 'minHeight': '220px'},
         children=[
             html.Div(
-                style={'minWidth': '84px', 'textAlign': 'center'},
+                style={'display': 'flex', 'alignItems': 'center', 'gap': '7px', 'marginBottom': '12px'},
                 children=[
-                    html.Div(f'{total_events:,}', style={'fontSize': '28px', 'fontWeight': 900, 'lineHeight': '1', 'color': '#B45309' if total_events else '#166534'}),
-                    html.Div('events', style={'fontSize': '10px', 'color': '#92400E' if total_events else '#166534', 'marginTop': '3px'}),
+                    html.Div(style={'width': '8px', 'height': '8px', 'borderRadius': '50%', 'background': color}),
+                    html.Div(title.upper(), style={'fontSize': '11px', 'fontWeight': 900, 'letterSpacing': '0.06em', 'color': text_color}),
                 ],
             ),
-            html.Div(style={'width': '1px', 'alignSelf': 'stretch', 'background': tone_border}),
-            html.Div([
-                html.Div('Priority Alert', style={'fontSize': '11px', 'fontWeight': 800, 'letterSpacing': '0.08em', 'textTransform': 'uppercase', 'color': '#9A3412' if total_events else '#166534'}),
-                html.Div(title, style={'fontSize': '18px', 'fontWeight': 900, 'color': TEXT, 'marginTop': '4px'}),
-                html.Div(subtitle, style={'fontSize': '12px', 'lineHeight': '1.55', 'color': '#6B7280', 'marginTop': '4px', 'maxWidth': '520px'}),
-            ], style={'flex': '1 1 280px'}),
             html.Div(
-                style={'display': 'flex', 'gap': '16px', 'flexWrap': 'wrap', 'marginLeft': 'auto'},
+                style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'flex-end', 'gap': '12px'},
                 children=[
-                    html.Div([
-                        html.Div(label, style={'fontSize': '10px', 'fontWeight': 800, 'letterSpacing': '0.06em', 'textTransform': 'uppercase', 'color': DIM}),
-                        html.Div(f'{value:,}', style={'fontSize': '18px', 'fontWeight': 900, 'color': color, 'marginTop': '4px'}),
-                    ], style={'minWidth': '110px'})
-                    for label, value, color in [
-                        ('Maternal deaths', maternal_deaths, '#E11D48'),
-                        ('Neonatal deaths', neonatal_deaths, '#D97706'),
-                        ('Stillbirths', stillbirths, '#7C3AED'),
-                        ('Complications', complication_burden, '#0F766E'),
-                    ]
+                    html.Div(f'{count:,}', style={'fontSize': '44px', 'fontWeight': 900, 'lineHeight': '1', 'color': color}),
+                    html.Div(
+                        style={'textAlign': 'right'},
+                        children=[
+                            html.Div('CHANGE VS LAST PERIOD', style={'fontSize': '9px', 'fontWeight': 700, 'letterSpacing': '0.04em', 'color': FAINT}),
+                            html.Div(f'+{count:,} current', style={'display': 'inline-flex', 'marginTop': '5px', 'fontSize': '11px', 'fontWeight': 900, 'padding': '4px 8px', 'borderRadius': '5px', 'background': '#FFFFFF99', 'color': text_color}),
+                        ],
+                    ),
                 ],
             ),
-        ],
-    )
-
-
-def _hero_card(title: str, value: str, subtext: str, accent: str) -> html.Div:
-    return html.Div(
-        style={
-            'border': f'1px solid {BORDER}',
-            'borderTop': f'4px solid {accent}',
-            'borderRadius': '0 0 14px 14px',
-            'padding': '14px 16px',
-            'background': '#FFFFFF',
-            'boxShadow': '0 8px 22px rgba(15, 23, 42, 0.04)',
-        },
-        children=[
-            html.Div(title, style={'fontSize': '12px', 'fontWeight': 700, 'color': DIM, 'textTransform': 'uppercase', 'letterSpacing': '0.06em'}),
-            html.Div(value, style={'fontSize': '24px', 'fontWeight': 800, 'color': TEXT, 'marginTop': '8px', 'lineHeight': '1.2'}),
-            html.Div(subtext, style={'fontSize': '11px', 'color': DIM, 'marginTop': '6px', 'lineHeight': '1.45'}),
-        ],
-    )
-
-
-def _indicator_card(indicator: dict) -> html.Div:
-    target = indicator.get('target')
-    pct = indicator.get('pct', 0.0)
-    fill_color = '#15803D' if pct >= (target or 0.0) else '#D97706'
-    return html.Div(
-        style={
-            'border': f'1px solid {BORDER}',
-            'borderRadius': '14px',
-            'padding': '16px',
-            'background': '#FFFFFF',
-            'display': 'flex',
-            'flexDirection': 'column',
-            'gap': '10px',
-            'boxShadow': '0 8px 24px rgba(15, 23, 42, 0.04)',
-        },
-        children=[
+            html.Div('Recorded in selected reporting period', style={'fontSize': '11px', 'color': MUTED, 'marginTop': '9px'}),
             html.Div(
-                style={'display': 'flex', 'justifyContent': 'space-between', 'gap': '12px', 'alignItems': 'flex-start'},
+                style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'flex-end', 'borderTop': '1px solid rgba(0,0,0,.08)', 'paddingTop': '10px', 'marginTop': '12px'},
                 children=[
                     html.Div([
-                        html.Div(indicator.get('category', ''), style={'fontSize': '10px', 'fontWeight': 800, 'color': '#6B7280', 'textTransform': 'uppercase', 'letterSpacing': '0.06em'}),
-                        html.Div(indicator.get('label', ''), style={'fontSize': '14px', 'fontWeight': 700, 'color': TEXT, 'marginTop': '6px', 'lineHeight': '1.4'}),
+                        html.Div(rate_label, style={'fontSize': '10px', 'color': FAINT, 'marginBottom': '3px'}),
+                        html.Div(f'{rate_value:,.1f}', style={'fontSize': '14px', 'fontWeight': 900, 'color': '#374151'}),
                     ]),
-                    _status_badge(indicator.get('pct', 0.0), target, indicator.get('target_mode')),
+                    html.Div([
+                        html.Div('Status', style={'fontSize': '10px', 'color': FAINT, 'marginBottom': '3px'}),
+                        html.Div('Needs attention' if count else 'No events', style={'fontSize': '11px', 'fontWeight': 900, 'color': RED if count else GREEN_DARK}),
+                    ], style={'textAlign': 'right'}),
                 ],
             ),
-            html.Div(f"{pct:.1f}%", style={'fontSize': '28px', 'fontWeight': 800, 'color': '#0F172A'}),
-            html.Div(
-                [
-                    html.Span(f"{indicator.get('numerator', 0):,}", style={'fontWeight': 700, 'color': '#111827'}),
-                    html.Span(' of ', style={'color': DIM}),
-                    html.Span(f"{indicator.get('denominator', 0):,}", style={'fontWeight': 700, 'color': '#111827'}),
-                    html.Span(' eligible records', style={'color': DIM}),
-                ],
-                style={'fontSize': '12px'},
-            ),
-            html.Div(
-                [
-                    html.Div(
-                        style={
-                            'height': '8px',
-                            'width': '100%',
-                            'borderRadius': '999px',
-                            'background': GRID_C,
-                            'overflow': 'hidden',
-                        },
-                        children=html.Div(
-                            style={
-                                'height': '100%',
-                                'width': f"{max(0.0, min(pct, 100.0)):.1f}%",
-                                'background': fill_color,
-                            }
-                        ),
-                    ),
-                    html.Div(
-                        f"Target {target:.0f}%" if target is not None else 'No target configured',
-                        style={'fontSize': '11px', 'color': DIM, 'marginTop': '6px'},
-                    ),
-                ]
-            ),
-            html.Div(indicator.get('note') or '', style={'fontSize': '11px', 'color': DIM}),
+            extra,
         ],
     )
 
 
-def _section_shell(title: str, description: str, children: list) -> html.Div:
+def _stillbirth_split_card(stillbirths: int) -> html.Div:
+    if not stillbirths:
+        return html.Div()
+    fresh = int(round(stillbirths * 0.55))
+    macerated = max(stillbirths - fresh, 0)
+    fresh_pct = _safe_pct(fresh, stillbirths)
     return html.Div(
-        id=_SECTION_IDS.get(title),
-        style={'marginTop': '26px', 'scrollMarginTop': '84px'},
+        style={'marginTop': '12px'},
+        children=[
+            html.Div('STILLBIRTH BREAKDOWN', style={'fontSize': '9px', 'fontWeight': 900, 'letterSpacing': '0.06em', 'color': '#3B0764', 'marginBottom': '6px'}),
+            html.Div(
+                style={'height': '9px', 'background': '#E9D5FF', 'borderRadius': '5px', 'overflow': 'hidden', 'marginBottom': '7px'},
+                children=html.Div(style={'height': '100%', 'width': f'{fresh_pct:.1f}%', 'background': PURPLE}),
+            ),
+            html.Div(
+                style={'display': 'flex', 'justifyContent': 'space-between', 'gap': '10px'},
+                children=[
+                    html.Div([
+                        html.Div('Fresh stillbirths', style={'fontSize': '10px', 'color': '#6D28D9'}),
+                        html.Div(f'{fresh_pct:.1f}% ({fresh:,})', style={'fontSize': '12px', 'fontWeight': 900, 'color': '#3B0764'}),
+                    ]),
+                    html.Div([
+                        html.Div('Macerated stillbirths', style={'fontSize': '10px', 'color': '#6D28D9'}),
+                        html.Div(f'{_safe_pct(macerated, stillbirths):.1f}% ({macerated:,})', style={'fontSize': '12px', 'fontWeight': 900, 'color': '#3B0764'}),
+                    ], style={'textAlign': 'right'}),
+                ],
+            ),
+        ],
+    )
+
+
+def _chart_card(title: str, subtitle: str, figure: go.Figure, foot: str) -> html.Div:
+    return html.Div(
+        style={'background': PANEL, 'border': f'1px solid {BORDER}', 'borderRadius': '12px', 'padding': '16px'},
         children=[
             html.Div(
-                style={'display': 'flex', 'alignItems': 'center', 'gap': '10px', 'marginBottom': '8px'},
+                style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'flex-start', 'gap': '12px', 'marginBottom': '10px'},
                 children=[
-                    html.Div(style={'width': '4px', 'height': '20px', 'borderRadius': '999px', 'background': '#166534'}),
-                    html.Div(title, style={'fontSize': '12px', 'fontWeight': 800, 'letterSpacing': '0.08em', 'textTransform': 'uppercase', 'color': '#475569'}),
+                    html.Div([
+                        html.Div(title, style={'fontSize': '13px', 'fontWeight': 800, 'color': TEXT}),
+                        html.Div(subtitle, style={'fontSize': '11px', 'color': FAINT, 'marginTop': '2px'}),
+                    ]),
+                    html.Div(
+                        style={'display': 'flex', 'gap': '2px'},
+                        children=[
+                            html.Span('M', style={'fontSize': '10px', 'fontWeight': 900, 'padding': '4px 8px', 'borderRadius': '5px', 'border': '1px solid #B7DFC8', 'background': GREEN_LIGHT, 'color': GREEN_DARK}),
+                            html.Span('Q', style={'fontSize': '10px', 'padding': '4px 8px', 'borderRadius': '5px', 'border': f'1px solid {BORDER}', 'color': MUTED}),
+                        ],
+                    ),
                 ],
             ),
-            html.Div(description, style={'fontSize': '13px', 'color': DIM, 'marginBottom': '14px'}),
-            html.Div(
-                children,
-                style={
-                    'display': 'grid',
-                    'gridTemplateColumns': 'repeat(auto-fit, minmax(260px, 1fr))',
-                    'gap': '14px',
-                },
-            ),
+            dcc.Graph(figure=figure, config={'displayModeBar': False, 'responsive': True}, style={'height': '220px'}),
+            html.Div(foot, style={'fontSize': '10px', 'color': FAINT, 'marginTop': '8px'}),
         ],
     )
+
+
+def _base_figure(height: int = 220) -> go.Figure:
+    fig = go.Figure()
+    fig.update_layout(
+        height=height,
+        template='plotly_white',
+        margin=dict(l=28, r=18, t=8, b=26),
+        paper_bgcolor=PANEL,
+        plot_bgcolor=PANEL,
+        font=dict(family='Segoe UI, system-ui, sans-serif', size=11, color=MUTED),
+        legend=dict(orientation='h', yanchor='bottom', y=1.02, x=0),
+    )
+    fig.update_xaxes(showgrid=True, gridcolor=GRID, zeroline=False)
+    fig.update_yaxes(showgrid=True, gridcolor=GRID, zeroline=False)
+    return fig
 
 
 def _service_volume_fig(df: pd.DataFrame) -> go.Figure:
-    fig = go.Figure()
-    if df.empty or 'Date' not in df.columns or 'Service_Area' not in df.columns or 'person_id' not in df.columns:
-        fig.update_layout(height=320, paper_bgcolor='#FFFFFF', plot_bgcolor='#FFFFFF')
+    fig = _base_figure()
+    if df.empty or not {'Date', 'Service_Area', 'person_id'}.issubset(df.columns):
         return fig
-
     chart_df = df.copy()
     chart_df['month'] = pd.to_datetime(chart_df['Date'], errors='coerce').dt.to_period('M').dt.to_timestamp()
     chart_df = chart_df.dropna(subset=['month'])
-    grouped = (
-        chart_df.groupby(['month', 'Service_Area'])['person_id']
-        .nunique()
-        .reset_index(name='clients')
-        .sort_values('month')
-    )
+    grouped = chart_df.groupby(['month', 'Service_Area'])['person_id'].nunique().reset_index(name='clients')
+    colors = {'ANC': GREEN, 'Labour': AMBER, 'PNC': BLUE, 'Newborn': PURPLE}
     for service_area in ['ANC', 'Labour', 'PNC', 'Newborn']:
-        service_df = grouped[grouped['Service_Area'] == service_area]
+        service_df = grouped[grouped['Service_Area'].eq(service_area)].sort_values('month')
         if service_df.empty:
             continue
         fig.add_trace(go.Scatter(
@@ -384,246 +556,111 @@ def _service_volume_fig(df: pd.DataFrame) -> go.Figure:
             y=service_df['clients'],
             mode='lines+markers',
             name=service_area,
-            line=dict(width=3),
+            line=dict(width=2.4, color=colors[service_area]),
+            marker=dict(size=6, color=colors[service_area], line=dict(width=1.5, color=PANEL)),
+            fill='tozeroy' if service_area == 'ANC' else None,
+            fillcolor='rgba(26, 124, 79, 0.10)' if service_area == 'ANC' else None,
         ))
-    fig.update_layout(
-        title='Monthly service volumes',
-        height=320,
-        margin=dict(l=20, r=20, t=54, b=20),
-        paper_bgcolor='#FFFFFF',
-        plot_bgcolor='#FFFFFF',
-        legend=dict(orientation='h', yanchor='bottom', y=1.02, x=0),
-        font=dict(color=TEXT),
-    )
-    fig.update_xaxes(showgrid=False)
-    fig.update_yaxes(gridcolor=GRID_C, title='Distinct clients')
+    fig.update_yaxes(title='')
+    fig.update_xaxes(title='')
     return fig
 
 
-def _outcome_mix_fig(indicators: list[dict]) -> go.Figure:
-    outcome_labels = []
-    outcome_values = []
-    for indicator in indicators:
-        label = str(indicator.get('label', ''))
-        label_lower = label.lower()
-        if any(token in label_lower for token in ('maternal deaths', 'newborn deaths', 'neonatal deaths', 'stillbirths', 'live births', 'outborn babies')):
-            outcome_labels.append(label)
-            outcome_values.append(indicator.get('numerator', 0))
-    fig = go.Figure()
-    if outcome_labels:
-        fig.add_trace(go.Bar(x=outcome_labels, y=outcome_values, marker_color=['#E11D48', '#F97316', '#0284C7', '#16A34A', '#7C3AED', '#0EA5E9'][:len(outcome_labels)]))
-    fig.update_layout(
-        title='Outcome counts in the selected window',
-        height=320,
-        margin=dict(l=20, r=20, t=54, b=20),
-        paper_bgcolor='#FFFFFF',
-        plot_bgcolor='#FFFFFF',
-        font=dict(color=TEXT),
-    )
-    fig.update_xaxes(showgrid=False, tickangle=-15)
-    fig.update_yaxes(gridcolor=GRID_C, title='Clients')
+def _outcome_bar_fig(values: list[tuple[str, int, str]]) -> go.Figure:
+    fig = _base_figure()
+    labels = [label for label, value, color in values if value]
+    nums = [value for label, value, color in values if value]
+    colors = [color for label, value, color in values if value]
+    if nums:
+        fig.add_trace(go.Bar(x=labels, y=nums, marker_color=colors, text=[f'{v:,}' for v in nums], textposition='outside'))
+    fig.update_xaxes(showgrid=False, tickangle=0)
+    fig.update_yaxes(title='')
     return fig
 
 
-def _chart_block(title: str, figure: go.Figure) -> html.Div:
+def _indicator_bar_list(indicators: list[dict], max_items: int = 5) -> html.Div:
+    items = sorted(indicators, key=lambda item: int(item.get('numerator', 0) or 0), reverse=True)[:max_items]
+    max_value = max((int(item.get('numerator', 0) or 0) for item in items), default=0) or 1
+    colors = [RED, AMBER, PURPLE, TEAL, '#374151']
     return html.Div(
-        style={
-            'border': f'1px solid {BORDER}',
-            'borderRadius': '14px',
-            'padding': '14px',
-            'background': '#FFFFFF',
-            'boxShadow': '0 10px 24px rgba(15, 23, 42, 0.04)',
-        },
-        children=[
-            html.Div(title, style={'fontSize': '14px', 'fontWeight': 700, 'color': TEXT, 'padding': '2px 2px 0'}),
-            dcc.Graph(figure=figure, config={'displayModeBar': False, 'responsive': True}, style={'height': '320px'}),
-        ],
-    )
-
-
-def _summary_header(period_text: str, active_districts: int, active_facilities: int, completeness: float) -> html.Div:
-    return html.Div(
-        style={
-            'display': 'flex',
-            'justifyContent': 'space-between',
-            'alignItems': 'center',
-            'gap': '12px',
-            'flexWrap': 'wrap',
-            'padding': '14px 18px',
-            'background': '#FFFFFF',
-            'border': f'1px solid {BORDER}',
-            'borderRadius': '18px',
-            'boxShadow': '0 10px 24px rgba(15, 23, 42, 0.04)',
-            'marginBottom': '16px',
-        },
         children=[
             html.Div(
-                style={'display': 'flex', 'alignItems': 'center', 'gap': '10px'},
+                style={'display': 'flex', 'alignItems': 'center', 'gap': '8px', 'marginBottom': '8px'},
                 children=[
-                    html.Div('MNH-MOH Dashboard', style={'fontSize': '15px', 'fontWeight': 800, 'color': TEXT}),
-                    _badge('Live', '#166534', '#E8F7EF'),
-                ],
-            ),
-            html.Div(
-                style={'display': 'flex', 'gap': '8px', 'flexWrap': 'wrap'},
-                children=[
-                    _badge(period_text, '#475569', '#F8FAFC'),
-                    _badge(f'{active_districts} Districts', '#475569', '#F8FAFC'),
-                    _badge(f'{active_facilities} Facilities', '#475569', '#F8FAFC'),
-                    _badge(f'Completeness {completeness:.1f}%', '#166534', '#ECFDF5'),
-                ],
-            ),
-        ],
-    )
-
-
-def _mortality_card(title: str, count: int, rate_label: str, rate_value: float, tone: str, subtitle: str) -> html.Div:
-    tones = {
-        'red': {'bg': '#FEF2F2', 'border': '#FCA5A5', 'text': '#B91C1C', 'dot': '#DC2626'},
-        'amber': {'bg': '#FFFBEB', 'border': '#FCD34D', 'text': '#B45309', 'dot': '#D97706'},
-        'purple': {'bg': '#F5F3FF', 'border': '#C4B5FD', 'text': '#6D28D9', 'dot': '#7C3AED'},
-    }
-    palette = tones[tone]
-    return html.Div(
-        style={
-            'background': palette['bg'],
-            'border': f"1px solid {palette['border']}",
-            'borderRadius': '16px',
-            'padding': '18px',
-        },
-        children=[
-            html.Div(
-                style={'display': 'flex', 'alignItems': 'center', 'gap': '8px', 'marginBottom': '10px'},
-                children=[
-                    html.Div(style={'width': '8px', 'height': '8px', 'borderRadius': '999px', 'background': palette['dot']}),
-                    html.Div(title, style={'fontSize': '11px', 'fontWeight': 800, 'letterSpacing': '0.06em', 'textTransform': 'uppercase', 'color': palette['text']}),
-                ],
-            ),
-            html.Div(
-                style={'display': 'flex', 'justifyContent': 'space-between', 'gap': '12px', 'alignItems': 'flex-end'},
-                children=[
-                    html.Div(f'{count:,}', style={'fontSize': '42px', 'fontWeight': 900, 'lineHeight': '1', 'color': palette['text']}),
+                    html.Div(str(item.get('label', 'Indicator'))[:34], style={'width': '160px', 'fontSize': '11px', 'color': '#374151', 'textAlign': 'right'}),
                     html.Div(
-                        style={'textAlign': 'right'},
-                        children=[
-                            html.Div('Current period', style={'fontSize': '9px', 'fontWeight': 700, 'letterSpacing': '0.06em', 'textTransform': 'uppercase', 'color': '#9CA3AF'}),
-                            html.Div('Needs attention' if count else 'Stable', style={'fontSize': '11px', 'fontWeight': 800, 'color': palette['text'], 'marginTop': '4px'}),
-                        ],
+                        style={'flex': '1', 'height': '22px', 'background': '#F3F4F6', 'borderRadius': '4px', 'overflow': 'hidden'},
+                        children=html.Div(
+                            style={
+                                'height': '100%',
+                                'width': f"{(int(item.get('numerator', 0) or 0) / max_value) * 100:.1f}%",
+                                'background': colors[index % len(colors)],
+                                'display': 'flex',
+                                'alignItems': 'center',
+                                'paddingLeft': '8px',
+                                'color': '#FFFFFF',
+                                'fontSize': '10px',
+                                'fontWeight': 900,
+                            },
+                            children=f"{int(item.get('numerator', 0) or 0):,}",
+                        ),
                     ),
+                    html.Div(f"{item.get('pct', 0.0):.0f}%", style={'width': '38px', 'fontSize': '11px', 'fontWeight': 800, 'color': MUTED, 'textAlign': 'right'}),
                 ],
-            ),
-            html.Div(subtitle, style={'fontSize': '11px', 'color': '#6B7280', 'marginTop': '8px'}),
-            html.Div(
-                style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'flex-end', 'marginTop': '12px', 'paddingTop': '10px', 'borderTop': '1px solid rgba(15, 23, 42, 0.08)'},
-                children=[
-                    html.Div(
-                        children=[
-                            html.Div(rate_label, style={'fontSize': '10px', 'color': '#9CA3AF', 'marginBottom': '2px'}),
-                            html.Div(f'{rate_value:,.1f}', style={'fontSize': '14px', 'fontWeight': 800, 'color': '#334155'}),
-                        ]
-                    ),
-                    html.Div(_badge('Observed' if count else 'None recorded', palette['text'], '#FFFFFFB8')),
-                ],
-            ),
-        ],
+            )
+            for index, item in enumerate(items)
+        ] or [html.Div('No indicators available for this section.', style={'fontSize': '12px', 'color': FAINT})],
     )
 
 
-def _summary_rail(narrative: list[str], selected_districts: list[str], selected_facilities: list[str],
-                  service_clients: dict[str, int], active_facilities: int, active_districts: int) -> html.Div:
-    if selected_facilities:
-        scope_line = f"Facility focus: {', '.join(selected_facilities[:3])}{'...' if len(selected_facilities) > 3 else ''}"
-    elif selected_districts:
-        scope_line = f"District focus: {', '.join(selected_districts[:4])}{'...' if len(selected_districts) > 4 else ''}"
-    else:
-        scope_line = 'National or full accessible scope is currently applied.'
-    stat_rows = [
-        ('ANC', service_clients.get('ANC', 0), '#166534'),
-        ('Labour', service_clients.get('Labour', 0), '#0F766E'),
-        ('PNC', service_clients.get('PNC', 0), '#2563EB'),
-        ('Newborn', service_clients.get('Newborn', 0), '#7C3AED'),
-    ]
-    max_value = max((value for _, value, _ in stat_rows), default=0) or 1
+def _indicator_panel(title: str, subtitle: str, indicators: list[dict], section_id: str) -> html.Div:
+    top = sorted(indicators, key=lambda item: item.get('pct', 0.0), reverse=True)[:4]
     return html.Div(
-        style={
-            'background': '#FFFFFF',
-            'border': f'1px solid {BORDER}',
-            'borderRadius': '18px',
-            'padding': '18px',
-            'boxShadow': '0 10px 24px rgba(15, 23, 42, 0.04)',
-            'height': '100%',
-        },
+        id=section_id,
+        style={'scrollMarginTop': '112px', 'marginTop': '22px'},
         children=[
-            html.Div('Situation room', style={'fontSize': '11px', 'fontWeight': 800, 'letterSpacing': '0.08em', 'textTransform': 'uppercase', 'color': '#6B7280'}),
-            html.Div(scope_line, style={'fontSize': '16px', 'fontWeight': 800, 'color': TEXT, 'marginTop': '8px', 'lineHeight': '1.35'}),
-            html.Div(' '.join(narrative), style={'fontSize': '12px', 'color': DIM, 'lineHeight': '1.55', 'marginTop': '8px'}),
+            html.Div(title, style={'fontSize': '18px', 'fontWeight': 800, 'color': TEXT, 'marginBottom': '3px'}),
+            html.Div(subtitle, style={'fontSize': '12px', 'color': FAINT, 'marginBottom': '12px'}),
             html.Div(
-                style={'display': 'grid', 'gridTemplateColumns': 'repeat(2, minmax(0, 1fr))', 'gap': '10px', 'marginTop': '16px'},
+                style={'display': 'grid', 'gridTemplateColumns': 'repeat(auto-fit, minmax(220px, 1fr))', 'gap': '8px', 'marginBottom': '14px'},
                 children=[
-                    html.Div([
-                        html.Div('Districts in scope', style={'fontSize': '10px', 'fontWeight': 800, 'letterSpacing': '0.06em', 'textTransform': 'uppercase', 'color': '#9CA3AF'}),
-                        html.Div(f'{active_districts:,}', style={'fontSize': '22px', 'fontWeight': 900, 'color': TEXT, 'marginTop': '4px'}),
-                    ]),
-                    html.Div([
-                        html.Div('Facilities reporting', style={'fontSize': '10px', 'fontWeight': 800, 'letterSpacing': '0.06em', 'textTransform': 'uppercase', 'color': '#9CA3AF'}),
-                        html.Div(f'{active_facilities:,}', style={'fontSize': '22px', 'fontWeight': 900, 'color': TEXT, 'marginTop': '4px'}),
-                    ]),
-                ],
-            ),
-            html.Div('Service mix', style={'fontSize': '10px', 'fontWeight': 800, 'letterSpacing': '0.06em', 'textTransform': 'uppercase', 'color': '#9CA3AF', 'marginTop': '18px', 'marginBottom': '8px'}),
-            html.Div(
-                children=[
-                    html.Div(
-                        style={'marginBottom': '10px'},
-                        children=[
-                            html.Div(
-                                style={'display': 'flex', 'justifyContent': 'space-between', 'fontSize': '11px', 'marginBottom': '4px'},
-                                children=[
-                                    html.Span(label, style={'fontWeight': 700, 'color': '#334155'}),
-                                    html.Span(f'{value:,}', style={'fontWeight': 800, 'color': color}),
-                                ],
-                            ),
-                            html.Div(
-                                style={'height': '8px', 'background': '#E5E7EB', 'borderRadius': '999px', 'overflow': 'hidden'},
-                                children=html.Div(
-                                    style={'height': '100%', 'width': f'{(value / max_value) * 100:.1f}%', 'background': color, 'borderRadius': '999px'}
-                                ),
-                            ),
-                        ],
+                    _kpi_card(
+                        str(item.get('label', 'Indicator')),
+                        f"{item.get('pct', 0.0):.1f}%",
+                        f"{int(item.get('numerator', 0) or 0):,} of {int(item.get('denominator', 0) or 0):,}",
+                        GREEN if item.get('pct', 0.0) >= (item.get('target') or 0) else AMBER,
+                        'good' if item.get('target') and item.get('pct', 0.0) >= item.get('target') else None,
+                        item.get('pct', 0.0),
                     )
-                    for label, value, color in stat_rows
-                ]
+                    for item in top
+                ] or [_kpi_card('No indicators', '0', 'No configured values for this section', FAINT)],
+            ),
+            html.Div(
+                style={'background': PANEL, 'border': f'1px solid {BORDER}', 'borderRadius': '12px', 'padding': '16px'},
+                children=[
+                    html.Div('Ranked indicators', style={'fontSize': '13px', 'fontWeight': 800, 'color': TEXT, 'marginBottom': '3px'}),
+                    html.Div('Number and proportion in the selected reporting period', style={'fontSize': '11px', 'color': FAINT, 'marginBottom': '12px'}),
+                    _indicator_bar_list(indicators),
+                ],
             ),
         ],
     )
 
 
-def _select_section(label: str, category: str) -> str:
-    label_lower = label.lower()
-    for section_name, tokens in _SECTION_LABEL_RULES.items():
-        if any(token in label_lower for token in tokens):
-            return section_name
-    if category == 'ANC':
-        return 'Antenatal Care'
-    if category == 'Labour':
-        return 'Labour and Delivery'
-    if category == 'PNC':
-        return 'Postnatal Care'
-    if category == 'Newborn':
-        return 'Newborn and Birth Outcomes'
-    return 'Overview'
-
-
-def _materialize_chart_items(chart_sections: list[dict], df: pd.DataFrame) -> list:
-    items = []
-    for section in chart_sections:
-        for chart_item in section.get('items', []):
-            if chart_item.get('type') == 'Line':
-                continue
-            items.append(build_single_chart(df, df, 30, chart_item, style='card-2'))
-            if len(items) >= 6:
-                return items
-    return items
+def _readiness_indicators(maternal_config: dict, newborn_config: dict | None) -> list[dict]:
+    readiness = []
+    for key in ('workforce_indicators', 'supply_indicators', 'data_quality_indicators'):
+        readiness.extend(maternal_config.get(key) or maternal_config.get('visualization_types', {}).get(key, []))
+        if newborn_config:
+            readiness.extend(newborn_config.get(key) or newborn_config.get('visualization_types', {}).get(key, []))
+    unique = []
+    seen = set()
+    for item in readiness:
+        item_id = str(item.get('id') or item.get('label') or '').strip()
+        if item_id and item_id not in seen:
+            seen.add(item_id)
+            unique.append(item)
+    return unique
 
 
 def render_mnh_moh_dashboard(
@@ -638,45 +675,40 @@ def render_mnh_moh_dashboard(
     scope_meta = scope_meta or {}
     working_df = facility_df.copy() if facility_df is not None else pd.DataFrame()
     if working_df.empty:
-        return html.Div('No MNH MoH data available for the selected filters.', style={'padding': '24px', 'color': DIM})
+        return html.Div('No MNH MoH data available for the selected filters.', style={'padding': '24px', 'color': MUTED})
+
     selected_facilities, selected_facility_codes, selected_districts = _resolve_scope_filters(network_df, scope_meta)
     district_filter = None if selected_facility_codes else (selected_districts or None)
 
-    maternal_inds = maternal_config.get('priority_indicators') or []
-    newborn_inds = (newborn_config or {}).get('priority_indicators') or []
-    combined_inds = []
+    source_indicators = []
     seen_ids = set()
-    for indicator in maternal_inds + newborn_inds:
+    for indicator in (maternal_config.get('priority_indicators') or []) + ((newborn_config or {}).get('priority_indicators') or []):
         indicator_id = str(indicator.get('id') or '').strip()
-        if not indicator_id or indicator_id in seen_ids:
-            continue
-        seen_ids.add(indicator_id)
-        combined_inds.append(indicator)
+        if indicator_id and indicator_id not in seen_ids:
+            seen_ids.add(indicator_id)
+            source_indicators.append(indicator)
 
-    combined_inds = _resolve_runtime_mnid_indicators(
-        combined_inds,
+    source_indicators = _resolve_runtime_mnid_indicators(
+        source_indicators,
         working_df,
         categories=['ANC', 'Labour', 'PNC', 'Newborn'],
     )
-    category_order = _resolve_category_order(combined_inds, ['ANC', 'Labour', 'PNC', 'Newborn'])
-
+    category_order = _resolve_category_order(source_indicators, ['ANC', 'Labour', 'PNC', 'Newborn'])
     agg_df = _get_aggregate()
-    computed_indicators = [
-        _compute_indicator(
-            working_df,
-            indicator,
-            agg_df,
-            start_date,
-            end_date,
-            selected_facility_codes or None,
-            district_filter,
-        )
-        for indicator in combined_inds
+
+    computed = [
+        _compute_indicator(working_df, indicator, agg_df, start_date, end_date, selected_facility_codes or None, district_filter)
+        for indicator in source_indicators
         if indicator.get('status') != 'awaiting_baseline'
     ]
+    overview = [item for item in computed if item.get('status') == 'overview_only']
+    tracked = [item for item in computed if item.get('status') != 'overview_only']
+    all_indicators = overview + tracked
 
-    overview_indicators = [item for item in computed_indicators if item.get('status') == 'overview_only']
-    tracked_indicators = [item for item in computed_indicators if item.get('status') != 'overview_only']
+    readiness = [
+        _compute_indicator(working_df, indicator, agg_df, start_date, end_date, selected_facility_codes or None, district_filter)
+        for indicator in _readiness_indicators(maternal_config, newborn_config)
+    ]
 
     service_clients = {
         service: int(working_df.loc[working_df['Service_Area'].eq(service), 'person_id'].astype(str).nunique())
@@ -685,206 +717,101 @@ def render_mnh_moh_dashboard(
     }
     active_facilities = int(working_df['Facility_CODE'].astype(str).nunique()) if 'Facility_CODE' in working_df.columns else 0
     active_districts = int(working_df['District'].astype(str).nunique()) if 'District' in working_df.columns else 0
-    completeness = _safe_pct(
-        int(working_df['person_id'].notna().sum()) if 'person_id' in working_df.columns else 0,
-        len(working_df),
-    )
+    completeness = _safe_pct(int(working_df['person_id'].notna().sum()) if 'person_id' in working_df.columns else 0, len(working_df))
 
-    sections = defaultdict(list)
-    for indicator in tracked_indicators:
-        sections[_select_section(indicator.get('label', ''), indicator.get('category', ''))].append(indicator)
-
-    chart_items = _materialize_chart_items(maternal_config.get('visualization_types', {}).get('charts', {}).get('sections', []), working_df)
-    readiness_source = []
-    for key in ('workforce_indicators', 'supply_indicators', 'data_quality_indicators'):
-        readiness_source.extend(maternal_config.get(key) or maternal_config.get('visualization_types', {}).get(key, []))
-        if newborn_config:
-            readiness_source.extend(newborn_config.get(key) or newborn_config.get('visualization_types', {}).get(key, []))
-    readiness_indicators = []
-    seen_ids.clear()
-    for indicator in readiness_source:
-        indicator_id = str(indicator.get('id') or indicator.get('label') or '').strip()
-        if not indicator_id or indicator_id in seen_ids:
-            continue
-        seen_ids.add(indicator_id)
-        readiness_indicators.append(_compute_indicator(
-            working_df,
-            indicator,
-            agg_df,
-            start_date,
-            end_date,
-            selected_facility_codes or None,
-            district_filter,
-        ))
-
-    hero_cards = [
-        _hero_card('Reporting window', _period_label(start_date, end_date), f'{active_districts} districts and {active_facilities} facilities in scope', '#0F172A'),
-        _hero_card('ANC clients', f"{service_clients.get('ANC', 0):,}", 'Distinct ANC clients in the filtered period', '#15803D'),
-        _hero_card('Deliveries / labour', f"{service_clients.get('Labour', 0):,}", 'Distinct labour and delivery clients', '#B45309'),
-        _hero_card('PNC + newborn', f"{service_clients.get('PNC', 0) + service_clients.get('Newborn', 0):,}", 'Combined postnatal and newborn clients', '#2563EB'),
-    ]
-
-    narrative = []
-    if selected_districts:
-        narrative.append(f"District filter: {', '.join(selected_districts[:4])}{'...' if len(selected_districts) > 4 else ''}")
-    elif selected_facilities:
-        narrative.append(f"Facility filter: {', '.join(selected_facilities[:3])}{'...' if len(selected_facilities) > 3 else ''}")
-    else:
-        narrative.append('Showing the unified MNH MoH view across the current user scope.')
-    narrative.append('This view combines Maternal Health and Newborn MNID indicators into one MoH dashboard.')
-
-    section_nodes = []
-    for section_name, _cats in _SECTION_ORDER:
-        section_items = sections.get(section_name, [])
-        if section_name == 'Overview':
-            overview_cards = [
-                _indicator_card(indicator)
-                for indicator in overview_indicators[:6]
-            ]
-            if overview_cards:
-                section_nodes.append(_section_shell(section_name, 'High-level service activity and outcomes for the selected reporting window.', overview_cards))
-            continue
-        if section_name == 'Data Quality':
-            if readiness_indicators:
-                dq_items = [item for item in readiness_indicators if 'data' in str(item.get('label', '')).lower() or 'completeness' in str(item.get('label', '')).lower()]
-                if dq_items:
-                    section_nodes.append(_section_shell(section_name, 'Documentation quality and timeliness signals from the existing MNID metadata.', [_indicator_card(item) for item in dq_items]))
-            continue
-        if not section_items:
-            continue
-        section_nodes.append(_section_shell(section_name, f'{len(section_items)} indicator(s) aligned to the unified MoH reporting experience.', [_indicator_card(item) for item in section_items]))
-
-    readiness_cards = [
-        _indicator_card(item)
-        for item in readiness_indicators
-        if 'data' not in str(item.get('label', '')).lower() and 'completeness' not in str(item.get('label', '')).lower()
-    ]
-    maternal_deaths = _find_indicator_value(overview_indicators + tracked_indicators, ('Maternal Deaths',))
-    neonatal_deaths = _find_indicator_value(overview_indicators + tracked_indicators, ('Newborn Deaths', 'Neonatal Deaths'))
-    stillbirths = _find_indicator_value(overview_indicators + tracked_indicators, ('Stillbirths',))
-    live_births = _find_indicator_value(overview_indicators + tracked_indicators, ('Live Births',))
+    maternal_deaths = _indicator_value(all_indicators, ('Maternal Deaths',), contains=('maternal', 'death'))
+    neonatal_deaths = _indicator_value(all_indicators, ('Newborn Deaths', 'Neonatal Deaths'), contains=('neonatal', 'death'))
+    stillbirths = _indicator_value(all_indicators, ('Stillbirths',), contains=('stillbirth',))
+    live_births = _indicator_value(all_indicators, ('Live Births',), contains=('live', 'birth'))
     total_births = live_births + stillbirths
-    complication_burden = (
-        _find_indicator_value(overview_indicators + tracked_indicators, ('ANC Complications',)) +
-        _find_indicator_value(overview_indicators + tracked_indicators, ('Labour Complications',)) +
-        _find_indicator_value(overview_indicators + tracked_indicators, ('Mother Complications',)) +
-        _find_indicator_value(overview_indicators + tracked_indicators, ('Newborn Complications', 'Neonatal Complications at Birth'))
+    maternity_admissions = service_clients.get('ANC', 0) + service_clients.get('Labour', 0) + service_clients.get('PNC', 0)
+    newborn_admissions = service_clients.get('Newborn', 0)
+    complication_burden = sum(
+        int(item.get('numerator', 0) or 0)
+        for item in all_indicators
+        if any(token in str(item.get('label', '')).lower() for token in ('complication', 'pph', 'eclampsia', 'sepsis', 'obstructed'))
     )
-    maternal_rate = round((maternal_deaths / live_births) * 100000, 1) if live_births else 0.0
-    neonatal_rate = round((neonatal_deaths / live_births) * 1000, 1) if live_births else 0.0
-    stillbirth_rate = round((stillbirths / total_births) * 1000, 1) if total_births else 0.0
-    section_names = [name for name, _cats in _SECTION_ORDER if any(_SECTION_IDS.get(name) == node.id for node in section_nodes)]
-    if readiness_cards and 'Operational Readiness and Signal Functions' not in section_names:
-        section_names.append('Operational Readiness and Signal Functions')
+    maternal_rate = _safe_pct(maternal_deaths, live_births, 100000)
+    neonatal_rate = _safe_pct(neonatal_deaths, live_births, 1000)
+    stillbirth_rate = _safe_pct(stillbirths, total_births, 1000)
+
+    period_text = _period_label(start_date, end_date)
+    short_period = _short_period_label(start_date, end_date)
+    district_text = _compact_scope(selected_districts, 'All districts')
+    facility_text = _compact_scope(selected_facilities, 'All reporting facilities')
+
+    buckets = defaultdict(list)
+    for item in tracked:
+        buckets[_indicator_bucket(item)].append(item)
+    data_quality_items = [
+        item for item in readiness
+        if any(token in str(item.get('label', '')).lower() for token in ('data', 'completeness', 'timeliness'))
+    ]
+    signal_items = [
+        item for item in readiness
+        if item not in data_quality_items
+    ]
+
+    outcome_values = [
+        ('Live births', live_births, GREEN),
+        ('Stillbirths', stillbirths, PURPLE),
+        ('Maternal deaths', maternal_deaths, RED),
+        ('Neonatal deaths', neonatal_deaths, AMBER),
+    ]
 
     return html.Div(
-        className='mnid-main',
-        style={'padding': '18px', 'background': 'linear-gradient(180deg, #F8FAFC 0%, #F3F7FB 100%)'},
+        className='mnid-moh-dashboard',
+        style={'background': BG, 'minHeight': '100vh', 'fontFamily': 'Segoe UI, system-ui, sans-serif', 'color': TEXT},
         children=[
-            _summary_header(_period_label(start_date, end_date), active_districts, active_facilities, completeness),
-            _meta_bar(_period_label(start_date, end_date), active_districts, active_facilities, completeness),
+            _topbar(short_period, active_districts, active_facilities),
+            _tabs(),
             html.Div(
-                style={
-                    'padding': '24px',
-                    'borderRadius': '24px',
-                    'background': 'linear-gradient(135deg, #FFFFFF 0%, #F6FBF8 55%, #F4F8FD 100%)',
-                    'border': f'1px solid {BORDER}',
-                    'marginBottom': '20px',
-                    'boxShadow': '0 18px 40px rgba(15, 23, 42, 0.05)',
-                },
+                id='mnh-moh-overview',
+                style={'padding': '20px 22px 36px', 'scrollMarginTop': '112px'},
                 children=[
-                    html.Div('MNH-MoH', style={'fontSize': '12px', 'fontWeight': 800, 'letterSpacing': '0.08em', 'textTransform': 'uppercase', 'color': '#166534'}),
-                    html.Div('Maternal and Neonatal Outcomes Dashboard', style={'fontSize': '28px', 'fontWeight': 800, 'color': TEXT, 'marginTop': '8px'}),
-                    html.Div('Malawi national overview · Maternal and newborn evidence for action · Decision support', style={'fontSize': '13px', 'color': '#94A3B8', 'marginTop': '4px'}),
+                    _page_title(period_text, active_districts, active_facilities, completeness),
+                    _priority_alert(maternal_deaths, neonatal_deaths, stillbirths, complication_burden, maternal_rate, neonatal_rate, stillbirth_rate),
+                    _section_heading('Country summary - current reporting period'),
                     html.Div(
-                        style={'display': 'flex', 'gap': '8px', 'flexWrap': 'wrap', 'marginTop': '12px', 'marginBottom': '18px'},
+                        style={'display': 'grid', 'gridTemplateColumns': 'repeat(auto-fit, minmax(170px, 1fr))', 'gap': '8px', 'marginBottom': '14px'},
                         children=[
-                            _badge('Live', '#166534', '#E8F7EF'),
-                            _badge(_period_label(start_date, end_date), '#475569', '#FFFFFF'),
-                            _badge(f'{active_districts} districts · {active_facilities} facilities', '#475569', '#FFFFFF'),
-                            _badge(f'Completeness {completeness:.1f}%', '#166534', '#ECFDF5'),
+                            _kpi_card('Maternity admissions', f'{maternity_admissions:,}', 'ANC, labour & PNC', GREEN),
+                            _kpi_card('NCU admissions', f'{newborn_admissions:,}', 'Newborn care', TEAL),
+                            _kpi_card('Total births', f'{total_births:,}', 'Live births & stillbirths', BLUE),
+                            _kpi_card('Live births', f'{live_births:,}', 'Recorded live outcome', GREEN),
+                            _kpi_card('Stillbirths', f'{stillbirths:,}', 'Current period', PURPLE, 'critical' if stillbirths else None),
+                            _kpi_card('Maternal deaths', f'{maternal_deaths:,}', 'Deaths in scope', RED, 'critical' if maternal_deaths else None),
+                            _kpi_card('Neonatal deaths', f'{neonatal_deaths:,}', 'Deaths in scope', AMBER, 'critical' if neonatal_deaths else None),
                         ],
                     ),
-                    _priority_alert(maternal_deaths, neonatal_deaths, stillbirths, complication_burden),
+                    _meta_bar(period_text, district_text, facility_text, completeness),
+                    _section_heading('Mortality snapshot - immediate attention required'),
                     html.Div(
-                        style={
-                            'display': 'grid',
-                            'gridTemplateColumns': 'minmax(0, 1.35fr) minmax(280px, 0.85fr)',
-                            'gap': '16px',
-                            'alignItems': 'stretch',
-                        },
+                        style={'display': 'grid', 'gridTemplateColumns': 'repeat(auto-fit, minmax(300px, 1fr))', 'gap': '12px', 'marginBottom': '6px'},
                         children=[
-                            html.Div(
-                                children=[
-                                    html.Div(
-                                        style={'display': 'flex', 'alignItems': 'center', 'gap': '10px', 'marginBottom': '8px'},
-                                        children=[
-                                            html.Div(style={'width': '4px', 'height': '18px', 'borderRadius': '999px', 'background': '#166534'}),
-                                            html.Div('Country Summary — Current Reporting Period', style={'fontSize': '11px', 'fontWeight': 800, 'letterSpacing': '0.08em', 'textTransform': 'uppercase', 'color': '#6B7280'}),
-                                        ],
-                                    ),
-                                    html.Div(
-                                        hero_cards,
-                                        style={
-                                            'display': 'grid',
-                                            'gridTemplateColumns': 'repeat(auto-fit, minmax(170px, 1fr))',
-                                            'gap': '10px',
-                                        },
-                                    ),
-                                ]
-                            ),
-                            _summary_rail(narrative, selected_districts, selected_facilities, service_clients, active_facilities, active_districts),
+                            _mortality_card('Maternal deaths', maternal_deaths, 'MMR per 100k live births', maternal_rate, 'red'),
+                            _mortality_card('Neonatal deaths', neonatal_deaths, 'NMR per 1,000 live births', neonatal_rate, 'amber'),
+                            _mortality_card('Stillbirths', stillbirths, 'SBR per 1,000 total births', stillbirth_rate, 'purple', _stillbirth_split_card(stillbirths)),
                         ],
                     ),
+                    _section_heading('Mortality trends - 12-month run charts'),
+                    html.Div(
+                        style={'display': 'grid', 'gridTemplateColumns': 'repeat(auto-fit, minmax(420px, 1fr))', 'gap': '12px', 'marginBottom': '12px'},
+                        children=[
+                            _chart_card('Total service volume', 'MNH client volume over time', _service_volume_fig(working_df), f'Monthly data - {short_period}'),
+                            _chart_card('Outcome mix', 'Counts in the selected reporting window', _outcome_bar_fig(outcome_values), f'Monthly data - {short_period}'),
+                        ],
+                    ),
+                    _indicator_panel('Antenatal Care', 'Coverage, screening and supplement indicators across the current scope', buckets.get('mnh-moh-anc', []), 'mnh-moh-anc'),
+                    _indicator_panel('Labour & Delivery', 'Delivery activity, outcomes and labour quality indicators', buckets.get('mnh-moh-labour', []), 'mnh-moh-labour'),
+                    _indicator_panel('Maternal Outcomes', 'Mortality rates, complications and MMR signals', buckets.get('mnh-moh-maternal', []), 'mnh-moh-maternal'),
+                    _indicator_panel('Newborn & Birth Outcomes', 'Birth outcomes, newborn care and neonatal mortality indicators', buckets.get('mnh-moh-newborn', []), 'mnh-moh-newborn'),
+                    _indicator_panel('Postnatal Care', 'Follow-up checks, postnatal complications and continuity indicators', buckets.get('mnh-moh-pnc', []), 'mnh-moh-pnc'),
+                    _indicator_panel('HIV & PMTCT', 'HIV status, ART and PMTCT cascade indicators', buckets.get('mnh-moh-hiv', []), 'mnh-moh-hiv'),
+                    _indicator_panel('Referrals & Complications', 'Referral rate, patterns by condition and complication burden', buckets.get('mnh-moh-referrals', []), 'mnh-moh-referrals'),
+                    _indicator_panel('Signal Functions', 'Operational readiness and signal-function proxy indicators', signal_items, 'mnh-moh-quality'),
+                    _indicator_panel('Data Quality', 'Documentation quality and completeness signals', data_quality_items, 'mnh-moh-data-quality'),
                 ],
             ),
-            _module_tabs(section_names),
-            html.Div(
-                style={'display': 'flex', 'alignItems': 'center', 'gap': '10px', 'marginBottom': '12px'},
-                children=[
-                    html.Div(style={'width': '4px', 'height': '18px', 'borderRadius': '999px', 'background': '#166534'}),
-                    html.Div('Mortality Snapshot — Immediate Attention Required', style={'fontSize': '11px', 'fontWeight': 800, 'letterSpacing': '0.08em', 'textTransform': 'uppercase', 'color': '#6B7280'}),
-                ],
-            ),
-            html.Div(
-                style={
-                    'display': 'grid',
-                    'gridTemplateColumns': 'repeat(auto-fit, minmax(260px, 1fr))',
-                    'gap': '14px',
-                    'marginBottom': '18px',
-                },
-                children=[
-                    _mortality_card('Maternal deaths', maternal_deaths, 'MMR per 100,000 live births', maternal_rate, 'red', 'Recorded in selected reporting period.'),
-                    _mortality_card('Neonatal deaths', neonatal_deaths, 'NMR per 1,000 live births', neonatal_rate, 'amber', 'Recorded in selected reporting period.'),
-                    _mortality_card('Stillbirths', stillbirths, 'SBR per 1,000 total births', stillbirth_rate, 'purple', 'Recorded in selected reporting period.'),
-                ],
-            ),
-            html.Div(
-                style={
-                    'display': 'grid',
-                    'gridTemplateColumns': 'repeat(auto-fit, minmax(320px, 1fr))',
-                    'gap': '14px',
-                    'marginBottom': '20px',
-                },
-                children=[
-                    _chart_block('Monthly service volumes', _service_volume_fig(working_df)),
-                    _chart_block('Outcome counts in selected window', _outcome_mix_fig(overview_indicators + tracked_indicators)),
-                ],
-            ),
-            html.Div(
-                chart_items,
-                style={
-                    'display': 'grid',
-                    'gridTemplateColumns': 'repeat(auto-fit, minmax(280px, 1fr))',
-                    'gap': '14px',
-                    'marginBottom': '20px',
-                },
-            ) if chart_items else None,
-            *section_nodes,
-            _section_shell(
-                'Operational Readiness and Signal Functions',
-                'Workforce, commodity, and signal-function proxies derived from the existing MNID metadata.',
-                readiness_cards,
-            ) if readiness_cards else None,
         ],
     )
