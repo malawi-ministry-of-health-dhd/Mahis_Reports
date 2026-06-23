@@ -214,38 +214,46 @@ def _topbar(period_text: str, active_districts: int, active_facilities: int) -> 
     )
 
 
-def _tabs(active_id: str = 'mnh-moh-overview') -> html.Div:
-    return html.Div(
+def _tabs(tab_defs: list[tuple[str, str, html.Div]]) -> dcc.Tabs:
+    tab_style = {
+        'padding': '10px 14px',
+        'border': '1px solid transparent',
+        'borderBottom': '1px solid transparent',
+        'background': PANEL,
+        'color': '#374151',
+        'fontSize': '12px',
+        'fontWeight': 500,
+        'whiteSpace': 'nowrap',
+        'height': '45px',
+        'lineHeight': '24px',
+    }
+    selected_style = {
+        **tab_style,
+        'border': f'1px solid {BORDER}',
+        'borderBottom': '1px solid #FFFFFF',
+        'borderRadius': '6px 6px 0 0',
+        'color': GREEN_DARK,
+        'fontWeight': 800,
+    }
+    return dcc.Tabs(
+        value=tab_defs[0][1],
         style={
             'height': '46px',
-            'display': 'flex',
-            'alignItems': 'flex-end',
-            'gap': '2px',
-            'padding': '0 22px',
-            'overflowX': 'auto',
             'background': PANEL,
             'borderBottom': f'1px solid {BORDER}',
+            'padding': '0 22px',
         },
+        parent_style={'background': PANEL},
+        content_style={'padding': '20px 22px 36px', 'background': BG},
         children=[
-            html.A(
-                label,
-                href=f'#{section_id}',
-                style={
-                    'padding': '10px 14px',
-                    'borderRadius': '6px 6px 0 0',
-                    'border': f'1px solid {BORDER}' if section_id == active_id else '1px solid transparent',
-                    'borderBottom': '1px solid #FFFFFF' if section_id == active_id else '1px solid transparent',
-                    'background': PANEL if section_id == active_id else 'transparent',
-                    'color': GREEN_DARK if section_id == active_id else '#374151',
-                    'fontSize': '12px',
-                    'fontWeight': 800 if section_id == active_id else 500,
-                    'textDecoration': 'none',
-                    'whiteSpace': 'nowrap',
-                    'position': 'relative',
-                    'bottom': '-1px',
-                },
+            dcc.Tab(
+                label=label,
+                value=value,
+                style=tab_style,
+                selected_style=selected_style,
+                children=content,
             )
-            for label, section_id in SECTION_TABS
+            for label, value, content in tab_defs
         ],
     )
 
@@ -767,59 +775,63 @@ def render_mnh_moh_dashboard(
         ('Neonatal deaths', neonatal_deaths, AMBER),
     ]
 
+    overview_tab = html.Div(
+        id='mnh-moh-overview',
+        style={'scrollMarginTop': '112px'},
+        children=[
+            _page_title(period_text, active_districts, active_facilities, completeness),
+            _priority_alert(maternal_deaths, neonatal_deaths, stillbirths, complication_burden, maternal_rate, neonatal_rate, stillbirth_rate),
+            _section_heading('Country summary - current reporting period'),
+            html.Div(
+                style={'display': 'grid', 'gridTemplateColumns': 'repeat(auto-fit, minmax(170px, 1fr))', 'gap': '8px', 'marginBottom': '14px'},
+                children=[
+                    _kpi_card('Maternity admissions', f'{maternity_admissions:,}', 'ANC, labour & PNC', GREEN),
+                    _kpi_card('NCU admissions', f'{newborn_admissions:,}', 'Newborn care', TEAL),
+                    _kpi_card('Total births', f'{total_births:,}', 'Live births & stillbirths', BLUE),
+                    _kpi_card('Live births', f'{live_births:,}', 'Recorded live outcome', GREEN),
+                    _kpi_card('Stillbirths', f'{stillbirths:,}', 'Current period', PURPLE, 'critical' if stillbirths else None),
+                    _kpi_card('Maternal deaths', f'{maternal_deaths:,}', 'Deaths in scope', RED, 'critical' if maternal_deaths else None),
+                    _kpi_card('Neonatal deaths', f'{neonatal_deaths:,}', 'Deaths in scope', AMBER, 'critical' if neonatal_deaths else None),
+                ],
+            ),
+            _meta_bar(period_text, district_text, facility_text, completeness),
+            _section_heading('Mortality snapshot - immediate attention required'),
+            html.Div(
+                style={'display': 'grid', 'gridTemplateColumns': 'repeat(auto-fit, minmax(300px, 1fr))', 'gap': '12px', 'marginBottom': '6px'},
+                children=[
+                    _mortality_card('Maternal deaths', maternal_deaths, 'MMR per 100k live births', maternal_rate, 'red'),
+                    _mortality_card('Neonatal deaths', neonatal_deaths, 'NMR per 1,000 live births', neonatal_rate, 'amber'),
+                    _mortality_card('Stillbirths', stillbirths, 'SBR per 1,000 total births', stillbirth_rate, 'purple', _stillbirth_split_card(stillbirths)),
+                ],
+            ),
+            _section_heading('Mortality trends - 12-month run charts'),
+            html.Div(
+                style={'display': 'grid', 'gridTemplateColumns': 'repeat(auto-fit, minmax(420px, 1fr))', 'gap': '12px', 'marginBottom': '12px'},
+                children=[
+                    _chart_card('Total service volume', 'MNH client volume over time', _service_volume_fig(working_df), f'Monthly data - {short_period}'),
+                    _chart_card('Outcome mix', 'Counts in the selected reporting window', _outcome_bar_fig(outcome_values), f'Monthly data - {short_period}'),
+                ],
+            ),
+        ],
+    )
+    tab_defs = [
+        ('Overview', 'overview', overview_tab),
+        ('Antenatal Care', 'anc', _indicator_panel('Antenatal Care', 'Coverage, screening and supplement indicators across the current scope', buckets.get('mnh-moh-anc', []), 'mnh-moh-anc')),
+        ('Labour & Delivery', 'labour', _indicator_panel('Labour & Delivery', 'Delivery activity, outcomes and labour quality indicators', buckets.get('mnh-moh-labour', []), 'mnh-moh-labour')),
+        ('Maternal Outcomes', 'maternal', _indicator_panel('Maternal Outcomes', 'Mortality rates, complications and MMR signals', buckets.get('mnh-moh-maternal', []), 'mnh-moh-maternal')),
+        ('Newborn', 'newborn', _indicator_panel('Newborn & Birth Outcomes', 'Birth outcomes, newborn care and neonatal mortality indicators', buckets.get('mnh-moh-newborn', []), 'mnh-moh-newborn')),
+        ('Postnatal Care', 'pnc', _indicator_panel('Postnatal Care', 'Follow-up checks, postnatal complications and continuity indicators', buckets.get('mnh-moh-pnc', []), 'mnh-moh-pnc')),
+        ('HIV & PMTCT', 'hiv', _indicator_panel('HIV & PMTCT', 'HIV status, ART and PMTCT cascade indicators', buckets.get('mnh-moh-hiv', []), 'mnh-moh-hiv')),
+        ('Referrals', 'referrals', _indicator_panel('Referrals & Complications', 'Referral rate, patterns by condition and complication burden', buckets.get('mnh-moh-referrals', []), 'mnh-moh-referrals')),
+        ('Signal Functions', 'quality', _indicator_panel('Signal Functions', 'Operational readiness and signal-function proxy indicators', signal_items, 'mnh-moh-quality')),
+        ('Data Quality', 'data-quality', _indicator_panel('Data Quality', 'Documentation quality and completeness signals', data_quality_items, 'mnh-moh-data-quality')),
+    ]
+
     return html.Div(
         className='mnid-moh-dashboard',
         style={'background': BG, 'minHeight': '100vh', 'fontFamily': 'Segoe UI, system-ui, sans-serif', 'color': TEXT},
         children=[
             _topbar(short_period, active_districts, active_facilities),
-            _tabs(),
-            html.Div(
-                id='mnh-moh-overview',
-                style={'padding': '20px 22px 36px', 'scrollMarginTop': '112px'},
-                children=[
-                    _page_title(period_text, active_districts, active_facilities, completeness),
-                    _priority_alert(maternal_deaths, neonatal_deaths, stillbirths, complication_burden, maternal_rate, neonatal_rate, stillbirth_rate),
-                    _section_heading('Country summary - current reporting period'),
-                    html.Div(
-                        style={'display': 'grid', 'gridTemplateColumns': 'repeat(auto-fit, minmax(170px, 1fr))', 'gap': '8px', 'marginBottom': '14px'},
-                        children=[
-                            _kpi_card('Maternity admissions', f'{maternity_admissions:,}', 'ANC, labour & PNC', GREEN),
-                            _kpi_card('NCU admissions', f'{newborn_admissions:,}', 'Newborn care', TEAL),
-                            _kpi_card('Total births', f'{total_births:,}', 'Live births & stillbirths', BLUE),
-                            _kpi_card('Live births', f'{live_births:,}', 'Recorded live outcome', GREEN),
-                            _kpi_card('Stillbirths', f'{stillbirths:,}', 'Current period', PURPLE, 'critical' if stillbirths else None),
-                            _kpi_card('Maternal deaths', f'{maternal_deaths:,}', 'Deaths in scope', RED, 'critical' if maternal_deaths else None),
-                            _kpi_card('Neonatal deaths', f'{neonatal_deaths:,}', 'Deaths in scope', AMBER, 'critical' if neonatal_deaths else None),
-                        ],
-                    ),
-                    _meta_bar(period_text, district_text, facility_text, completeness),
-                    _section_heading('Mortality snapshot - immediate attention required'),
-                    html.Div(
-                        style={'display': 'grid', 'gridTemplateColumns': 'repeat(auto-fit, minmax(300px, 1fr))', 'gap': '12px', 'marginBottom': '6px'},
-                        children=[
-                            _mortality_card('Maternal deaths', maternal_deaths, 'MMR per 100k live births', maternal_rate, 'red'),
-                            _mortality_card('Neonatal deaths', neonatal_deaths, 'NMR per 1,000 live births', neonatal_rate, 'amber'),
-                            _mortality_card('Stillbirths', stillbirths, 'SBR per 1,000 total births', stillbirth_rate, 'purple', _stillbirth_split_card(stillbirths)),
-                        ],
-                    ),
-                    _section_heading('Mortality trends - 12-month run charts'),
-                    html.Div(
-                        style={'display': 'grid', 'gridTemplateColumns': 'repeat(auto-fit, minmax(420px, 1fr))', 'gap': '12px', 'marginBottom': '12px'},
-                        children=[
-                            _chart_card('Total service volume', 'MNH client volume over time', _service_volume_fig(working_df), f'Monthly data - {short_period}'),
-                            _chart_card('Outcome mix', 'Counts in the selected reporting window', _outcome_bar_fig(outcome_values), f'Monthly data - {short_period}'),
-                        ],
-                    ),
-                    _indicator_panel('Antenatal Care', 'Coverage, screening and supplement indicators across the current scope', buckets.get('mnh-moh-anc', []), 'mnh-moh-anc'),
-                    _indicator_panel('Labour & Delivery', 'Delivery activity, outcomes and labour quality indicators', buckets.get('mnh-moh-labour', []), 'mnh-moh-labour'),
-                    _indicator_panel('Maternal Outcomes', 'Mortality rates, complications and MMR signals', buckets.get('mnh-moh-maternal', []), 'mnh-moh-maternal'),
-                    _indicator_panel('Newborn & Birth Outcomes', 'Birth outcomes, newborn care and neonatal mortality indicators', buckets.get('mnh-moh-newborn', []), 'mnh-moh-newborn'),
-                    _indicator_panel('Postnatal Care', 'Follow-up checks, postnatal complications and continuity indicators', buckets.get('mnh-moh-pnc', []), 'mnh-moh-pnc'),
-                    _indicator_panel('HIV & PMTCT', 'HIV status, ART and PMTCT cascade indicators', buckets.get('mnh-moh-hiv', []), 'mnh-moh-hiv'),
-                    _indicator_panel('Referrals & Complications', 'Referral rate, patterns by condition and complication burden', buckets.get('mnh-moh-referrals', []), 'mnh-moh-referrals'),
-                    _indicator_panel('Signal Functions', 'Operational readiness and signal-function proxy indicators', signal_items, 'mnh-moh-quality'),
-                    _indicator_panel('Data Quality', 'Documentation quality and completeness signals', data_quality_items, 'mnh-moh-data-quality'),
-                ],
-            ),
+            _tabs(tab_defs),
         ],
     )
