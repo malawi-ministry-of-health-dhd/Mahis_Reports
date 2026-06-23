@@ -111,8 +111,26 @@ def _load_dashboard_tab_config() -> dict:
     hidden = raw.get('hidden_mnid_tabs')
     if not isinstance(hidden, list):
         hidden = []
+    mnh_tabs = raw.get('mnh_tabs')
+    if not isinstance(mnh_tabs, list):
+        mnh_tabs = []
+    normalized_tabs = []
+    for item in mnh_tabs:
+        if not isinstance(item, dict):
+            continue
+        tab_id = str(item.get('id') or '').strip()
+        label = str(item.get('label') or tab_id).strip()
+        if not tab_id or not label:
+            continue
+        normalized_tabs.append({
+            'id': tab_id,
+            'label': label,
+            'module': str(item.get('module') or '').strip() or None,
+            'placeholder': bool(item.get('placeholder')),
+        })
     return {
-        'hidden_mnid_tabs': {str(item).strip() for item in hidden if str(item).strip()}
+        'hidden_mnid_tabs': {str(item).strip() for item in hidden if str(item).strip()},
+        'mnh_tabs': normalized_tabs,
     }
 
 
