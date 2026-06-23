@@ -269,14 +269,22 @@ def _page_title(period_text: str, active_districts: int, active_facilities: int,
 
 
 def _section_heading(label: str, section_id: str | None = None) -> html.Div:
-    return html.Div(
-        id=section_id,
-        style={'display': 'flex', 'alignItems': 'center', 'gap': '8px', 'margin': '22px 0 11px', 'scrollMarginTop': '112px'},
-        children=[
+    props = {
+        'style': {
+            'display': 'flex',
+            'alignItems': 'center',
+            'gap': '8px',
+            'margin': '22px 0 11px',
+            'scrollMarginTop': '112px',
+        },
+        'children': [
             html.Div(style={'width': '3px', 'height': '18px', 'borderRadius': '2px', 'background': GREEN}),
             html.Div(label.upper(), style={'fontSize': '11px', 'fontWeight': 800, 'letterSpacing': '0.07em', 'color': MUTED}),
         ],
-    )
+    }
+    if section_id:
+        props['id'] = section_id
+    return html.Div(**props)
 
 
 def _priority_alert(maternal_deaths: int, neonatal_deaths: int, stillbirths: int, complication_burden: int,
