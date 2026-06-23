@@ -80,14 +80,6 @@ def _safe_pct(num: int | float, den: int | float, multiplier: int = 100) -> floa
     return round((float(num) / float(den)) * multiplier, 1) if den else 0.0
 
 
-def _compact_scope(names: list[str], fallback: str) -> str:
-    if not names:
-        return fallback
-    if len(names) <= 2:
-        return ', '.join(names)
-    return f"{', '.join(names[:2])} +{len(names) - 2}"
-
-
 def _compute_indicator(
     df: pd.DataFrame,
     indicator: dict,
@@ -258,21 +250,12 @@ def _tabs(tab_defs: list[tuple[str, str, html.Div]]) -> dcc.Tabs:
     )
 
 
-def _page_title(period_text: str, active_districts: int, active_facilities: int, completeness: float) -> html.Div:
+def _page_title() -> html.Div:
     return html.Div(
-        style={'marginBottom': '16px'},
+        style={'marginBottom': '14px'},
         children=[
             html.Div('Maternal & Neonatal Outcomes Dashboard', style={'fontSize': '18px', 'fontWeight': 800, 'color': TEXT, 'marginBottom': '4px'}),
-            html.Div('Malawi national overview - Maternal & Newborn - Evidence for action - Decision support', style={'fontSize': '12px', 'color': FAINT, 'marginBottom': '10px'}),
-            html.Div(
-                style={'display': 'flex', 'gap': '7px', 'flexWrap': 'wrap'},
-                children=[
-                    _badge('Live', GREEN_DARK, GREEN_LIGHT, '#B7DFC8'),
-                    _badge(period_text, MUTED, '#F8FAFC'),
-                    _badge(f'{active_districts} Districts - {active_facilities} Facilities', MUTED, '#F8FAFC'),
-                    _badge(f'Completeness: {completeness:.1f}%', MUTED, '#F8FAFC'),
-                ],
-            ),
+            html.Div('Malawi national overview - Maternal & Newborn - Evidence for action - Decision support', style={'fontSize': '12px', 'color': FAINT}),
         ],
     )
 
@@ -398,37 +381,6 @@ def _status_pill(status: str) -> html.Span:
             'fontSize': '10px',
             'fontWeight': 800,
         },
-    )
-
-
-def _meta_bar(period_text: str, district_text: str, facility_text: str, completeness: float) -> html.Div:
-    items = [
-        ('Period', period_text),
-        ('District', district_text),
-        ('Facility', facility_text),
-        ('Completeness', f'{completeness:.1f}%'),
-    ]
-    return html.Div(
-        style={
-            'display': 'flex',
-            'gap': '20px',
-            'flexWrap': 'wrap',
-            'background': PANEL,
-            'border': f'1px solid {BORDER}',
-            'borderRadius': '8px',
-            'padding': '10px 16px',
-            'marginBottom': '18px',
-        },
-        children=[
-            html.Div(
-                style={'minWidth': '110px'},
-                children=[
-                    html.Div(label.upper(), style={'fontSize': '9px', 'fontWeight': 800, 'letterSpacing': '0.07em', 'color': FAINT}),
-                    html.Div(value, style={'fontSize': '12px', 'fontWeight': 700 if label == 'Completeness' else 500, 'color': GREEN_DARK if label == 'Completeness' else '#374151', 'marginTop': '2px'}),
-                ],
-            )
-            for label, value in items
-        ],
     )
 
 
@@ -753,9 +705,6 @@ def render_mnh_moh_dashboard(
 
     period_text = _period_label(start_date, end_date)
     short_period = _short_period_label(start_date, end_date)
-    district_text = _compact_scope(selected_districts, 'All districts')
-    facility_text = _compact_scope(selected_facilities, 'All reporting facilities')
-
     buckets = defaultdict(list)
     for item in tracked:
         buckets[_indicator_bucket(item)].append(item)
@@ -779,7 +728,7 @@ def render_mnh_moh_dashboard(
         id='mnh-moh-overview',
         style={'scrollMarginTop': '112px'},
         children=[
-            _page_title(period_text, active_districts, active_facilities, completeness),
+            _page_title(),
             _priority_alert(maternal_deaths, neonatal_deaths, stillbirths, complication_burden, maternal_rate, neonatal_rate, stillbirth_rate),
             _section_heading('Country summary - current reporting period'),
             html.Div(
@@ -794,7 +743,6 @@ def render_mnh_moh_dashboard(
                     _kpi_card('Neonatal deaths', f'{neonatal_deaths:,}', 'Deaths in scope', AMBER, 'critical' if neonatal_deaths else None),
                 ],
             ),
-            _meta_bar(period_text, district_text, facility_text, completeness),
             _section_heading('Mortality snapshot - immediate attention required'),
             html.Div(
                 style={'display': 'grid', 'gridTemplateColumns': 'repeat(auto-fit, minmax(300px, 1fr))', 'gap': '12px', 'marginBottom': '6px'},
