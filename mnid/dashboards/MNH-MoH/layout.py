@@ -27,6 +27,7 @@ PURPLE_LIGHT = '#F5F3FF'
 PURPLE_BORDER = '#C4B5FD'
 BLUE = '#2563EB'
 TEAL = '#0891B2'
+BAR_PALETTE = ['#2F855A', '#2B6CB0', '#6B7280', '#805AD5', '#0F766E']
 TEXT = '#111827'
 MUTED = '#6B7280'
 FAINT = '#9CA3AF'
@@ -589,7 +590,6 @@ def _outcome_bar_fig(values: list[tuple[str, int, str]]) -> go.Figure:
 def _indicator_bar_list(indicators: list[dict], max_items: int = 5) -> html.Div:
     items = sorted(indicators, key=lambda item: int(item.get('numerator', 0) or 0), reverse=True)[:max_items]
     max_value = max((int(item.get('numerator', 0) or 0) for item in items), default=0) or 1
-    colors = [RED, AMBER, PURPLE, TEAL, '#374151']
     return html.Div(
         children=[
             html.Div(
@@ -602,7 +602,7 @@ def _indicator_bar_list(indicators: list[dict], max_items: int = 5) -> html.Div:
                             style={
                                 'height': '100%',
                                 'width': f"{(int(item.get('numerator', 0) or 0) / max_value) * 100:.1f}%",
-                                'background': colors[index % len(colors)],
+                                'background': BAR_PALETTE[index % len(BAR_PALETTE)],
                                 'display': 'flex',
                                 'alignItems': 'center',
                                 'paddingLeft': '8px',
