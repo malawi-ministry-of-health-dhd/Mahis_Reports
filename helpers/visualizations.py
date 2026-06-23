@@ -17,7 +17,7 @@ from data_storage import DataStorage
 
 pd.options.mode.chained_assignment = None
 
-from config import PERSON_ID_, ENCOUNTER_ID_, DATE_, CONCEPT_NAME_,DATA_PATH_,FIRST_NAME_, LAST_NAME_
+from config import PERSON_ID_, ENCOUNTER_ID_, DATE_, CONCEPT_NAME_,DATA_PATH_,FIRST_NAME_, LAST_NAME_, VALUE_DATETIME_
 
 
 THEME = {
@@ -392,9 +392,11 @@ def build_filter_query(cols, vals,data_path, unique_column, isSet, start_date, e
             clause = " OR ".join(clause_list)
             return clause
         if col == "defaulter_period":
-            return f"concept_name = 'Appointment date' AND (NOW() - CAST(value_datetime AS TIMESTAMP)) > INTERVAL {val} DAY"
+            return (f"concept_name = 'Drug end date' "
+                    + f"GROUP BY {unique_column} "
+                    + f"HAVING MAX(CAST({VALUE_DATETIME_} AS TIMESTAMP)) < ('{end_date}'::DATE - INTERVAL {val} DAY)")
         if col == "days_before_visit_date":
-            return f"{DATE_} >= ('{start_date}'::DATE - INTERVAL {int(val)} DAY) AND {DATE_} <= ('{start_date}'::DATE - INTERVAL 1 DAY)"
+            return f"{DATE_} >= ('{start_date}'::DATE - INTERVAL {int(val)} DAY) AND {DATE_} <= ('{end_date}'::DATE - INTERVAL 0 DAY)"
         operator, data_value = parse_value(val)
         if operator == "LIKE":
             return f"{col} LIKE '{data_value}'"
@@ -422,6 +424,10 @@ def build_filter_query(cols, vals,data_path, unique_column, isSet, start_date, e
 def create_count(query_fiter,data_path, aggregation='count', unique_column=PERSON_ID_, *filters, start_date=None, end_date=None):
 
     isSet = False
+    unique_column = _normalize_filter_value(unique_column)
+    if isinstance(unique_column, list):
+        unique_column = ", ".join(unique_column)
+    else: unique_column = unique_column
 
     if filters:
         filter_cols = [item for item in filters[:-2][::2] if item is not None]
@@ -438,19 +444,20 @@ def create_count(query_fiter,data_path, aggregation='count', unique_column=PERSO
         query = build_filter_query(col, val,data_path, unique_column, isSet, start_date, end_date)
         queries.append(query)
 
-    joined_query =f"SELECT DISTINCT {unique_column} FROM '{data_path}' WHERE {query_fiter} AND "  + " AND ".join(queries)
+    joined_query =f"SELECT DISTINCT {unique_column}, {DATE_}::DATE FROM '{data_path}' WHERE {query_fiter} AND "  + " AND ".join(queries)
     if not queries:
-        joined_query = f"SELECT DISTINCT {unique_column} FROM '{data_path}' WHERE {query_fiter}"
+        joined_query = f"SELECT DISTINCT {unique_column}, {DATE_}::DATE FROM '{data_path}' WHERE {query_fiter}"
     if aggregation == "time_diff_mins":
         joined_query = (joined_query.replace(unique_column, 
                                             f"({unique_column}), DATEDIFF('minute', MIN({DATE_}), MAX({DATE_})) AS patient_session_minutes")
-                                            + f" GROUP BY {unique_column}")
-    print(joined_query)
+                                            + f" GROUP BY {unique_column}, {DATE_}")
+    
+    # print("Create count",joined_query)
     result = DataStorage.query_duckdb(joined_query)
     if aggregation == 'count':
-        return len(result[unique_column].dropna().unique())
+        return len(result.drop_duplicates())
     elif aggregation == 'nunique':
-        return len(result[unique_column].dropna().unique())
+        return len(result.drop_duplicates())
     elif aggregation == 'list':
         return result[unique_column].dropna().unique().tolist()
     elif aggregation == 'time_diff_mins':
@@ -461,16 +468,24 @@ def create_count(query_fiter,data_path, aggregation='count', unique_column=PERSO
     elif aggregation in ['sum', 'mean', 'min', 'max', 'std', 'var']:
         return int(result[unique_column].agg(aggregation))
     else:
-        return len(result[unique_column].dropna().unique())
+        return len(result.drop_duplicates())
 
 def create_count_sets(
     query_fiter,data_path,aggregation='count',
     unique_column=PERSON_ID_,
     *filters,
     start_date=None,
-    end_date=None
+    end_date=None,
+    same_day=False,
 ):
     isSet = True
+    unique_column = _normalize_filter_value(unique_column)
+    if isinstance(unique_column, list):
+        unique_column = ", ".join(unique_column)
+    else: unique_column = unique_column
+
+    # Scalar ID column: strip any ", Date::DATE" suffix and SQL casts (e.g. "person_id, Date::DATE" → "person_id")
+    pid_col = unique_column.split(",")[0].split("::")[0].strip()
 
     set_filters = []
     non_set_filters = []
@@ -485,7 +500,7 @@ def create_count_sets(
             set_filters.append((col_norm, val_norm))
         else:
             non_set_filters.append((col, val))
-    
+
     start_date = filters[-2] if len(filters) % 2 == 0 else start_date
     end_date = filters[-1] if len(filters) % 2 == 0 else end_date
 
@@ -507,10 +522,25 @@ def create_count_sets(
         query = build_filter_query(cols, vals,data_path, unique_column, isSet, start_date, end_date, query_fiter)
         queries.append(query)
 
-    intersection_query = " INTERSECT ".join(queries)
-    # print(intersection_query)
-    result = DataStorage.query_duckdb(intersection_query)
-    return result[unique_column].nunique()
+    if same_day:
+        # All conditions must be met on the same date row — original INTERSECT behaviour.
+        intersection_query = " INTERSECT ".join(queries)
+        result = DataStorage.query_duckdb(intersection_query)
+        return result[pid_col].nunique()
+
+    # Default: conditions may live on different rows / different dates.
+    outer = f"SELECT DISTINCT {pid_col} FROM '{data_path}' WHERE {query_fiter}"
+    in_clauses = [
+        f"{pid_col} IN (SELECT DISTINCT {pid_col} FROM '{data_path}' WHERE {q.split('WHERE ', 1)[1]})"
+        for q in queries
+    ]
+    if in_clauses:
+        final_query = outer + " AND " + " AND ".join(in_clauses)
+    else:
+        final_query = outer
+    # print("Create countset", final_query)
+    result = DataStorage.query_duckdb(final_query)
+    return result[pid_col].nunique()
 
 def create_sum(query_fiter,data_path, unique_column=PERSON_ID_, num_field='ValueN', *filters, start_date=None, end_date=None):
 
