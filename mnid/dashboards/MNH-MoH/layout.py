@@ -46,6 +46,7 @@ _SECTION_IDS = {
     'HIV and PMTCT': 'mnh-moh-hiv',
     'Referrals and Complications': 'mnh-moh-referrals',
     'Quality of Care / Signal Functions': 'mnh-moh-quality',
+    'Operational Readiness and Signal Functions': 'mnh-moh-quality',
     'Data Quality': 'mnh-moh-data-quality',
 }
 
@@ -129,10 +130,14 @@ def _module_tabs(section_names: list[str]) -> html.Div:
     return html.Div(
         style={
             'display': 'flex',
-            'gap': '8px',
+            'gap': '2px',
             'overflowX': 'auto',
-            'paddingBottom': '4px',
+            'padding': '0 2px',
             'marginBottom': '18px',
+            'background': '#FFFFFF',
+            'border': f'1px solid {BORDER}',
+            'borderRadius': '18px',
+            'boxShadow': '0 10px 24px rgba(15, 23, 42, 0.04)',
         },
         children=[
             html.A(
@@ -141,16 +146,16 @@ def _module_tabs(section_names: list[str]) -> html.Div:
                 style={
                     'display': 'inline-flex',
                     'alignItems': 'center',
-                    'padding': '9px 14px',
-                    'borderRadius': '12px',
-                    'border': f'1px solid {BORDER}',
+                    'padding': '12px 16px',
+                    'borderRadius': '16px',
+                    'border': '1px solid transparent',
                     'background': '#FFFFFF',
-                    'color': '#334155',
+                    'color': '#475569',
                     'fontSize': '12px',
                     'fontWeight': 700,
                     'textDecoration': 'none',
                     'whiteSpace': 'nowrap',
-                    'boxShadow': '0 6px 18px rgba(15, 23, 42, 0.04)',
+                    'margin': '2px 0',
                 },
             )
             for section_name in section_names
@@ -167,22 +172,24 @@ def _meta_bar(period_text: str, active_districts: int, active_facilities: int, c
     ]
     return html.Div(
         style={
-            'display': 'grid',
-            'gridTemplateColumns': 'repeat(auto-fit, minmax(180px, 1fr))',
-            'gap': '10px',
+            'display': 'flex',
+            'gap': '20px',
+            'flexWrap': 'wrap',
             'marginBottom': '18px',
+            'padding': '12px 16px',
+            'background': '#FFFFFF',
+            'border': f'1px solid {BORDER}',
+            'borderRadius': '16px',
+            'boxShadow': '0 10px 24px rgba(15, 23, 42, 0.04)',
         },
         children=[
             html.Div(
                 style={
-                    'padding': '12px 14px',
-                    'borderRadius': '16px',
-                    'background': '#FFFFFF',
-                    'border': f'1px solid {BORDER}',
+                    'minWidth': '150px',
                 },
                 children=[
                     html.Div(label, style={'fontSize': '10px', 'fontWeight': 800, 'letterSpacing': '0.08em', 'textTransform': 'uppercase', 'color': DIM}),
-                    html.Div(value, style={'fontSize': '14px', 'fontWeight': 800, 'color': TEXT, 'marginTop': '6px'}),
+                    html.Div(value, style={'fontSize': '13px', 'fontWeight': 700, 'color': '#334155', 'marginTop': '4px'}),
                 ],
             )
             for label, value in items
@@ -202,28 +209,37 @@ def _priority_alert(maternal_deaths: int, neonatal_deaths: int, stillbirths: int
     tone_border = '#FED7AA' if total_events else '#BBF7D0'
     return html.Div(
         style={
-            'display': 'grid',
-            'gridTemplateColumns': 'repeat(auto-fit, minmax(280px, 1fr))',
-            'gap': '14px',
+            'display': 'flex',
+            'alignItems': 'center',
+            'gap': '16px',
+            'flexWrap': 'wrap',
             'padding': '16px 18px',
-            'borderRadius': '20px',
+            'borderRadius': '18px',
             'background': tone_bg,
             'border': f'1px solid {tone_border}',
             'marginBottom': '18px',
         },
         children=[
+            html.Div(
+                style={'minWidth': '84px', 'textAlign': 'center'},
+                children=[
+                    html.Div(f'{total_events:,}', style={'fontSize': '28px', 'fontWeight': 900, 'lineHeight': '1', 'color': '#B45309' if total_events else '#166534'}),
+                    html.Div('events', style={'fontSize': '10px', 'color': '#92400E' if total_events else '#166534', 'marginTop': '3px'}),
+                ],
+            ),
+            html.Div(style={'width': '1px', 'alignSelf': 'stretch', 'background': tone_border}),
             html.Div([
                 html.Div('Priority Alert', style={'fontSize': '11px', 'fontWeight': 800, 'letterSpacing': '0.08em', 'textTransform': 'uppercase', 'color': '#9A3412' if total_events else '#166534'}),
-                html.Div(title, style={'fontSize': '20px', 'fontWeight': 900, 'color': TEXT, 'marginTop': '8px'}),
-                html.Div(subtitle, style={'fontSize': '13px', 'lineHeight': '1.55', 'color': '#475569', 'marginTop': '6px'}),
-            ]),
+                html.Div(title, style={'fontSize': '18px', 'fontWeight': 900, 'color': TEXT, 'marginTop': '4px'}),
+                html.Div(subtitle, style={'fontSize': '12px', 'lineHeight': '1.55', 'color': '#6B7280', 'marginTop': '4px', 'maxWidth': '520px'}),
+            ], style={'flex': '1 1 280px'}),
             html.Div(
-                style={'display': 'grid', 'gridTemplateColumns': 'repeat(2, minmax(0, 1fr))', 'gap': '10px'},
+                style={'display': 'flex', 'gap': '16px', 'flexWrap': 'wrap', 'marginLeft': 'auto'},
                 children=[
                     html.Div([
                         html.Div(label, style={'fontSize': '10px', 'fontWeight': 800, 'letterSpacing': '0.06em', 'textTransform': 'uppercase', 'color': DIM}),
-                        html.Div(f'{value:,}', style={'fontSize': '24px', 'fontWeight': 900, 'color': color, 'marginTop': '8px'}),
-                    ], style={'padding': '12px', 'borderRadius': '14px', 'background': '#FFFFFFB8', 'border': '1px solid rgba(255,255,255,0.6)'})
+                        html.Div(f'{value:,}', style={'fontSize': '18px', 'fontWeight': 900, 'color': color, 'marginTop': '4px'}),
+                    ], style={'minWidth': '110px'})
                     for label, value, color in [
                         ('Maternal deaths', maternal_deaths, '#E11D48'),
                         ('Neonatal deaths', neonatal_deaths, '#D97706'),
@@ -240,43 +256,47 @@ def _hero_card(title: str, value: str, subtext: str, accent: str) -> html.Div:
     return html.Div(
         style={
             'border': f'1px solid {BORDER}',
-            'borderRadius': '18px',
-            'padding': '18px',
+            'borderTop': f'4px solid {accent}',
+            'borderRadius': '0 0 14px 14px',
+            'padding': '14px 16px',
             'background': '#FFFFFF',
-            'boxShadow': '0 12px 30px rgba(15, 23, 42, 0.05)',
+            'boxShadow': '0 8px 22px rgba(15, 23, 42, 0.04)',
         },
         children=[
             html.Div(title, style={'fontSize': '12px', 'fontWeight': 700, 'color': DIM, 'textTransform': 'uppercase', 'letterSpacing': '0.06em'}),
-            html.Div(value, style={'fontSize': '32px', 'fontWeight': 800, 'color': accent, 'marginTop': '8px'}),
-            html.Div(subtext, style={'fontSize': '12px', 'color': DIM, 'marginTop': '6px'}),
+            html.Div(value, style={'fontSize': '24px', 'fontWeight': 800, 'color': TEXT, 'marginTop': '8px', 'lineHeight': '1.2'}),
+            html.Div(subtext, style={'fontSize': '11px', 'color': DIM, 'marginTop': '6px', 'lineHeight': '1.45'}),
         ],
     )
 
 
 def _indicator_card(indicator: dict) -> html.Div:
     target = indicator.get('target')
+    pct = indicator.get('pct', 0.0)
+    fill_color = '#15803D' if pct >= (target or 0.0) else '#D97706'
     return html.Div(
         style={
             'border': f'1px solid {BORDER}',
-            'borderRadius': '16px',
+            'borderRadius': '14px',
             'padding': '16px',
             'background': '#FFFFFF',
             'display': 'flex',
             'flexDirection': 'column',
             'gap': '10px',
+            'boxShadow': '0 8px 24px rgba(15, 23, 42, 0.04)',
         },
         children=[
             html.Div(
                 style={'display': 'flex', 'justifyContent': 'space-between', 'gap': '12px', 'alignItems': 'flex-start'},
                 children=[
                     html.Div([
-                        html.Div(indicator.get('category', ''), style={'fontSize': '11px', 'fontWeight': 700, 'color': '#475569', 'textTransform': 'uppercase'}),
-                        html.Div(indicator.get('label', ''), style={'fontSize': '14px', 'fontWeight': 700, 'color': TEXT, 'marginTop': '6px'}),
+                        html.Div(indicator.get('category', ''), style={'fontSize': '10px', 'fontWeight': 800, 'color': '#6B7280', 'textTransform': 'uppercase', 'letterSpacing': '0.06em'}),
+                        html.Div(indicator.get('label', ''), style={'fontSize': '14px', 'fontWeight': 700, 'color': TEXT, 'marginTop': '6px', 'lineHeight': '1.4'}),
                     ]),
                     _status_badge(indicator.get('pct', 0.0), target, indicator.get('target_mode')),
                 ],
             ),
-            html.Div(f"{indicator.get('pct', 0.0):.1f}%", style={'fontSize': '28px', 'fontWeight': 800, 'color': '#0F172A'}),
+            html.Div(f"{pct:.1f}%", style={'fontSize': '28px', 'fontWeight': 800, 'color': '#0F172A'}),
             html.Div(
                 [
                     html.Span(f"{indicator.get('numerator', 0):,}", style={'fontWeight': 700, 'color': '#111827'}),
@@ -299,8 +319,8 @@ def _indicator_card(indicator: dict) -> html.Div:
                         children=html.Div(
                             style={
                                 'height': '100%',
-                                'width': f"{max(0.0, min(indicator.get('pct', 0.0), 100.0)):.1f}%",
-                                'background': '#16A34A' if indicator.get('pct', 0.0) >= (target or 0.0) else '#F59E0B',
+                                'width': f"{max(0.0, min(pct, 100.0)):.1f}%",
+                                'background': fill_color,
                             }
                         ),
                     ),
@@ -318,10 +338,16 @@ def _indicator_card(indicator: dict) -> html.Div:
 def _section_shell(title: str, description: str, children: list) -> html.Div:
     return html.Div(
         id=_SECTION_IDS.get(title),
-        style={'marginTop': '28px', 'scrollMarginTop': '84px'},
+        style={'marginTop': '26px', 'scrollMarginTop': '84px'},
         children=[
-            html.Div(title, style={'fontSize': '22px', 'fontWeight': 800, 'color': TEXT}),
-            html.Div(description, style={'fontSize': '13px', 'color': DIM, 'marginTop': '6px', 'marginBottom': '14px'}),
+            html.Div(
+                style={'display': 'flex', 'alignItems': 'center', 'gap': '10px', 'marginBottom': '8px'},
+                children=[
+                    html.Div(style={'width': '4px', 'height': '20px', 'borderRadius': '999px', 'background': '#166534'}),
+                    html.Div(title, style={'fontSize': '12px', 'fontWeight': 800, 'letterSpacing': '0.08em', 'textTransform': 'uppercase', 'color': '#475569'}),
+                ],
+            ),
+            html.Div(description, style={'fontSize': '13px', 'color': DIM, 'marginBottom': '14px'}),
             html.Div(
                 children,
                 style={
@@ -403,13 +429,171 @@ def _chart_block(title: str, figure: go.Figure) -> html.Div:
     return html.Div(
         style={
             'border': f'1px solid {BORDER}',
-            'borderRadius': '18px',
-            'padding': '12px',
+            'borderRadius': '14px',
+            'padding': '14px',
             'background': '#FFFFFF',
+            'boxShadow': '0 10px 24px rgba(15, 23, 42, 0.04)',
         },
         children=[
-            html.Div(title, style={'fontSize': '15px', 'fontWeight': 700, 'color': TEXT, 'padding': '4px 6px 0'}),
+            html.Div(title, style={'fontSize': '14px', 'fontWeight': 700, 'color': TEXT, 'padding': '2px 2px 0'}),
             dcc.Graph(figure=figure, config={'displayModeBar': False, 'responsive': True}, style={'height': '320px'}),
+        ],
+    )
+
+
+def _summary_header(period_text: str, active_districts: int, active_facilities: int, completeness: float) -> html.Div:
+    return html.Div(
+        style={
+            'display': 'flex',
+            'justifyContent': 'space-between',
+            'alignItems': 'center',
+            'gap': '12px',
+            'flexWrap': 'wrap',
+            'padding': '14px 18px',
+            'background': '#FFFFFF',
+            'border': f'1px solid {BORDER}',
+            'borderRadius': '18px',
+            'boxShadow': '0 10px 24px rgba(15, 23, 42, 0.04)',
+            'marginBottom': '16px',
+        },
+        children=[
+            html.Div(
+                style={'display': 'flex', 'alignItems': 'center', 'gap': '10px'},
+                children=[
+                    html.Div('MNH-MOH Dashboard', style={'fontSize': '15px', 'fontWeight': 800, 'color': TEXT}),
+                    _badge('Live', '#166534', '#E8F7EF'),
+                ],
+            ),
+            html.Div(
+                style={'display': 'flex', 'gap': '8px', 'flexWrap': 'wrap'},
+                children=[
+                    _badge(period_text, '#475569', '#F8FAFC'),
+                    _badge(f'{active_districts} Districts', '#475569', '#F8FAFC'),
+                    _badge(f'{active_facilities} Facilities', '#475569', '#F8FAFC'),
+                    _badge(f'Completeness {completeness:.1f}%', '#166534', '#ECFDF5'),
+                ],
+            ),
+        ],
+    )
+
+
+def _mortality_card(title: str, count: int, rate_label: str, rate_value: float, tone: str, subtitle: str) -> html.Div:
+    tones = {
+        'red': {'bg': '#FEF2F2', 'border': '#FCA5A5', 'text': '#B91C1C', 'dot': '#DC2626'},
+        'amber': {'bg': '#FFFBEB', 'border': '#FCD34D', 'text': '#B45309', 'dot': '#D97706'},
+        'purple': {'bg': '#F5F3FF', 'border': '#C4B5FD', 'text': '#6D28D9', 'dot': '#7C3AED'},
+    }
+    palette = tones[tone]
+    return html.Div(
+        style={
+            'background': palette['bg'],
+            'border': f"1px solid {palette['border']}",
+            'borderRadius': '16px',
+            'padding': '18px',
+        },
+        children=[
+            html.Div(
+                style={'display': 'flex', 'alignItems': 'center', 'gap': '8px', 'marginBottom': '10px'},
+                children=[
+                    html.Div(style={'width': '8px', 'height': '8px', 'borderRadius': '999px', 'background': palette['dot']}),
+                    html.Div(title, style={'fontSize': '11px', 'fontWeight': 800, 'letterSpacing': '0.06em', 'textTransform': 'uppercase', 'color': palette['text']}),
+                ],
+            ),
+            html.Div(
+                style={'display': 'flex', 'justifyContent': 'space-between', 'gap': '12px', 'alignItems': 'flex-end'},
+                children=[
+                    html.Div(f'{count:,}', style={'fontSize': '42px', 'fontWeight': 900, 'lineHeight': '1', 'color': palette['text']}),
+                    html.Div(
+                        style={'textAlign': 'right'},
+                        children=[
+                            html.Div('Current period', style={'fontSize': '9px', 'fontWeight': 700, 'letterSpacing': '0.06em', 'textTransform': 'uppercase', 'color': '#9CA3AF'}),
+                            html.Div('Needs attention' if count else 'Stable', style={'fontSize': '11px', 'fontWeight': 800, 'color': palette['text'], 'marginTop': '4px'}),
+                        ],
+                    ),
+                ],
+            ),
+            html.Div(subtitle, style={'fontSize': '11px', 'color': '#6B7280', 'marginTop': '8px'}),
+            html.Div(
+                style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'flex-end', 'marginTop': '12px', 'paddingTop': '10px', 'borderTop': '1px solid rgba(15, 23, 42, 0.08)'},
+                children=[
+                    html.Div(
+                        children=[
+                            html.Div(rate_label, style={'fontSize': '10px', 'color': '#9CA3AF', 'marginBottom': '2px'}),
+                            html.Div(f'{rate_value:,.1f}', style={'fontSize': '14px', 'fontWeight': 800, 'color': '#334155'}),
+                        ]
+                    ),
+                    html.Div(_badge('Observed' if count else 'None recorded', palette['text'], '#FFFFFFB8')),
+                ],
+            ),
+        ],
+    )
+
+
+def _summary_rail(narrative: list[str], selected_districts: list[str], selected_facilities: list[str],
+                  service_clients: dict[str, int], active_facilities: int, active_districts: int) -> html.Div:
+    if selected_facilities:
+        scope_line = f"Facility focus: {', '.join(selected_facilities[:3])}{'...' if len(selected_facilities) > 3 else ''}"
+    elif selected_districts:
+        scope_line = f"District focus: {', '.join(selected_districts[:4])}{'...' if len(selected_districts) > 4 else ''}"
+    else:
+        scope_line = 'National or full accessible scope is currently applied.'
+    stat_rows = [
+        ('ANC', service_clients.get('ANC', 0), '#166534'),
+        ('Labour', service_clients.get('Labour', 0), '#0F766E'),
+        ('PNC', service_clients.get('PNC', 0), '#2563EB'),
+        ('Newborn', service_clients.get('Newborn', 0), '#7C3AED'),
+    ]
+    max_value = max((value for _, value, _ in stat_rows), default=0) or 1
+    return html.Div(
+        style={
+            'background': '#FFFFFF',
+            'border': f'1px solid {BORDER}',
+            'borderRadius': '18px',
+            'padding': '18px',
+            'boxShadow': '0 10px 24px rgba(15, 23, 42, 0.04)',
+            'height': '100%',
+        },
+        children=[
+            html.Div('Situation room', style={'fontSize': '11px', 'fontWeight': 800, 'letterSpacing': '0.08em', 'textTransform': 'uppercase', 'color': '#6B7280'}),
+            html.Div(scope_line, style={'fontSize': '16px', 'fontWeight': 800, 'color': TEXT, 'marginTop': '8px', 'lineHeight': '1.35'}),
+            html.Div(' '.join(narrative), style={'fontSize': '12px', 'color': DIM, 'lineHeight': '1.55', 'marginTop': '8px'}),
+            html.Div(
+                style={'display': 'grid', 'gridTemplateColumns': 'repeat(2, minmax(0, 1fr))', 'gap': '10px', 'marginTop': '16px'},
+                children=[
+                    html.Div([
+                        html.Div('Districts in scope', style={'fontSize': '10px', 'fontWeight': 800, 'letterSpacing': '0.06em', 'textTransform': 'uppercase', 'color': '#9CA3AF'}),
+                        html.Div(f'{active_districts:,}', style={'fontSize': '22px', 'fontWeight': 900, 'color': TEXT, 'marginTop': '4px'}),
+                    ]),
+                    html.Div([
+                        html.Div('Facilities reporting', style={'fontSize': '10px', 'fontWeight': 800, 'letterSpacing': '0.06em', 'textTransform': 'uppercase', 'color': '#9CA3AF'}),
+                        html.Div(f'{active_facilities:,}', style={'fontSize': '22px', 'fontWeight': 900, 'color': TEXT, 'marginTop': '4px'}),
+                    ]),
+                ],
+            ),
+            html.Div('Service mix', style={'fontSize': '10px', 'fontWeight': 800, 'letterSpacing': '0.06em', 'textTransform': 'uppercase', 'color': '#9CA3AF', 'marginTop': '18px', 'marginBottom': '8px'}),
+            html.Div(
+                children=[
+                    html.Div(
+                        style={'marginBottom': '10px'},
+                        children=[
+                            html.Div(
+                                style={'display': 'flex', 'justifyContent': 'space-between', 'fontSize': '11px', 'marginBottom': '4px'},
+                                children=[
+                                    html.Span(label, style={'fontWeight': 700, 'color': '#334155'}),
+                                    html.Span(f'{value:,}', style={'fontWeight': 800, 'color': color}),
+                                ],
+                            ),
+                            html.Div(
+                                style={'height': '8px', 'background': '#E5E7EB', 'borderRadius': '999px', 'overflow': 'hidden'},
+                                children=html.Div(
+                                    style={'height': '100%', 'width': f'{(value / max_value) * 100:.1f}%', 'background': color, 'borderRadius': '999px'}
+                                ),
+                            ),
+                        ],
+                    )
+                    for label, value, color in stat_rows
+                ]
+            ),
         ],
     )
 
@@ -578,45 +762,103 @@ def render_mnh_moh_dashboard(
     maternal_deaths = _find_indicator_value(overview_indicators + tracked_indicators, ('Maternal Deaths',))
     neonatal_deaths = _find_indicator_value(overview_indicators + tracked_indicators, ('Newborn Deaths', 'Neonatal Deaths'))
     stillbirths = _find_indicator_value(overview_indicators + tracked_indicators, ('Stillbirths',))
+    live_births = _find_indicator_value(overview_indicators + tracked_indicators, ('Live Births',))
+    total_births = live_births + stillbirths
     complication_burden = (
         _find_indicator_value(overview_indicators + tracked_indicators, ('ANC Complications',)) +
         _find_indicator_value(overview_indicators + tracked_indicators, ('Labour Complications',)) +
         _find_indicator_value(overview_indicators + tracked_indicators, ('Mother Complications',)) +
         _find_indicator_value(overview_indicators + tracked_indicators, ('Newborn Complications', 'Neonatal Complications at Birth'))
     )
+    maternal_rate = round((maternal_deaths / live_births) * 100000, 1) if live_births else 0.0
+    neonatal_rate = round((neonatal_deaths / live_births) * 1000, 1) if live_births else 0.0
+    stillbirth_rate = round((stillbirths / total_births) * 1000, 1) if total_births else 0.0
     section_names = [name for name, _cats in _SECTION_ORDER if any(_SECTION_IDS.get(name) == node.id for node in section_nodes)]
-    if readiness_cards and 'Quality of Care / Signal Functions' not in section_names:
-        section_names.append('Quality of Care / Signal Functions')
+    if readiness_cards and 'Operational Readiness and Signal Functions' not in section_names:
+        section_names.append('Operational Readiness and Signal Functions')
 
     return html.Div(
         className='mnid-main',
+        style={'padding': '18px', 'background': 'linear-gradient(180deg, #F8FAFC 0%, #F3F7FB 100%)'},
         children=[
+            _summary_header(_period_label(start_date, end_date), active_districts, active_facilities, completeness),
             _meta_bar(_period_label(start_date, end_date), active_districts, active_facilities, completeness),
             html.Div(
                 style={
                     'padding': '24px',
                     'borderRadius': '24px',
-                    'background': 'linear-gradient(135deg, #F8FAFC 0%, #ECFDF5 55%, #EFF6FF 100%)',
+                    'background': 'linear-gradient(135deg, #FFFFFF 0%, #F6FBF8 55%, #F4F8FD 100%)',
                     'border': f'1px solid {BORDER}',
                     'marginBottom': '20px',
+                    'boxShadow': '0 18px 40px rgba(15, 23, 42, 0.05)',
                 },
                 children=[
                     html.Div('MNH-MoH', style={'fontSize': '12px', 'fontWeight': 800, 'letterSpacing': '0.08em', 'textTransform': 'uppercase', 'color': '#166534'}),
-                    html.Div('Unified Maternal and Newborn MoH Dashboard', style={'fontSize': '34px', 'fontWeight': 800, 'color': TEXT, 'marginTop': '8px'}),
-                    html.Div(' '.join(narrative), style={'fontSize': '14px', 'color': DIM, 'marginTop': '8px', 'maxWidth': '980px'}),
+                    html.Div('Maternal and Neonatal Outcomes Dashboard', style={'fontSize': '28px', 'fontWeight': 800, 'color': TEXT, 'marginTop': '8px'}),
+                    html.Div('Malawi national overview · Maternal and newborn evidence for action · Decision support', style={'fontSize': '13px', 'color': '#94A3B8', 'marginTop': '4px'}),
                     html.Div(
-                        hero_cards,
+                        style={'display': 'flex', 'gap': '8px', 'flexWrap': 'wrap', 'marginTop': '12px', 'marginBottom': '18px'},
+                        children=[
+                            _badge('Live', '#166534', '#E8F7EF'),
+                            _badge(_period_label(start_date, end_date), '#475569', '#FFFFFF'),
+                            _badge(f'{active_districts} districts · {active_facilities} facilities', '#475569', '#FFFFFF'),
+                            _badge(f'Completeness {completeness:.1f}%', '#166534', '#ECFDF5'),
+                        ],
+                    ),
+                    _priority_alert(maternal_deaths, neonatal_deaths, stillbirths, complication_burden),
+                    html.Div(
                         style={
                             'display': 'grid',
-                            'gridTemplateColumns': 'repeat(auto-fit, minmax(220px, 1fr))',
-                            'gap': '14px',
-                            'marginTop': '18px',
+                            'gridTemplateColumns': 'minmax(0, 1.35fr) minmax(280px, 0.85fr)',
+                            'gap': '16px',
+                            'alignItems': 'stretch',
                         },
+                        children=[
+                            html.Div(
+                                children=[
+                                    html.Div(
+                                        style={'display': 'flex', 'alignItems': 'center', 'gap': '10px', 'marginBottom': '8px'},
+                                        children=[
+                                            html.Div(style={'width': '4px', 'height': '18px', 'borderRadius': '999px', 'background': '#166534'}),
+                                            html.Div('Country Summary — Current Reporting Period', style={'fontSize': '11px', 'fontWeight': 800, 'letterSpacing': '0.08em', 'textTransform': 'uppercase', 'color': '#6B7280'}),
+                                        ],
+                                    ),
+                                    html.Div(
+                                        hero_cards,
+                                        style={
+                                            'display': 'grid',
+                                            'gridTemplateColumns': 'repeat(auto-fit, minmax(170px, 1fr))',
+                                            'gap': '10px',
+                                        },
+                                    ),
+                                ]
+                            ),
+                            _summary_rail(narrative, selected_districts, selected_facilities, service_clients, active_facilities, active_districts),
+                        ],
                     ),
                 ],
             ),
             _module_tabs(section_names),
-            _priority_alert(maternal_deaths, neonatal_deaths, stillbirths, complication_burden),
+            html.Div(
+                style={'display': 'flex', 'alignItems': 'center', 'gap': '10px', 'marginBottom': '12px'},
+                children=[
+                    html.Div(style={'width': '4px', 'height': '18px', 'borderRadius': '999px', 'background': '#166534'}),
+                    html.Div('Mortality Snapshot — Immediate Attention Required', style={'fontSize': '11px', 'fontWeight': 800, 'letterSpacing': '0.08em', 'textTransform': 'uppercase', 'color': '#6B7280'}),
+                ],
+            ),
+            html.Div(
+                style={
+                    'display': 'grid',
+                    'gridTemplateColumns': 'repeat(auto-fit, minmax(260px, 1fr))',
+                    'gap': '14px',
+                    'marginBottom': '18px',
+                },
+                children=[
+                    _mortality_card('Maternal deaths', maternal_deaths, 'MMR per 100,000 live births', maternal_rate, 'red', 'Recorded in selected reporting period.'),
+                    _mortality_card('Neonatal deaths', neonatal_deaths, 'NMR per 1,000 live births', neonatal_rate, 'amber', 'Recorded in selected reporting period.'),
+                    _mortality_card('Stillbirths', stillbirths, 'SBR per 1,000 total births', stillbirth_rate, 'purple', 'Recorded in selected reporting period.'),
+                ],
+            ),
             html.Div(
                 style={
                     'display': 'grid',
@@ -625,8 +867,8 @@ def render_mnh_moh_dashboard(
                     'marginBottom': '20px',
                 },
                 children=[
-                    _chart_block('Service volume trend', _service_volume_fig(working_df)),
-                    _chart_block('Outcome mix', _outcome_mix_fig(overview_indicators + tracked_indicators)),
+                    _chart_block('Monthly service volumes', _service_volume_fig(working_df)),
+                    _chart_block('Outcome counts in selected window', _outcome_mix_fig(overview_indicators + tracked_indicators)),
                 ],
             ),
             html.Div(
