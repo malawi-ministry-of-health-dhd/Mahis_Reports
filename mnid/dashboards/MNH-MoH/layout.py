@@ -36,6 +36,19 @@ _SECTION_LABEL_RULES = {
     'Quality of Care / Signal Functions': ('partograph', 'blood pressure', 'temperature', 'pulse oximeter', 'bilirubin', 'resuscitation', 'magnesium', 'antibiotic', 'screened'),
 }
 
+_SECTION_IDS = {
+    'Overview': 'mnh-moh-overview',
+    'Antenatal Care': 'mnh-moh-anc',
+    'Labour and Delivery': 'mnh-moh-labour',
+    'Maternal Outcomes': 'mnh-moh-maternal',
+    'Newborn and Birth Outcomes': 'mnh-moh-newborn',
+    'Postnatal Care': 'mnh-moh-pnc',
+    'HIV and PMTCT': 'mnh-moh-hiv',
+    'Referrals and Complications': 'mnh-moh-referrals',
+    'Quality of Care / Signal Functions': 'mnh-moh-quality',
+    'Data Quality': 'mnh-moh-data-quality',
+}
+
 
 def _safe_pct(num: int, den: int) -> float:
     return round((num / den) * 100, 1) if den else 0.0
@@ -47,6 +60,14 @@ def _period_label(start_date, end_date) -> str:
     if pd.isna(start_ts) or pd.isna(end_ts):
         return 'Current reporting window'
     return f"{start_ts.strftime('%d %b %Y')} to {end_ts.strftime('%d %b %Y')}"
+
+
+def _find_indicator_value(indicators: list[dict], labels: tuple[str, ...]) -> int:
+    wanted = {label.lower() for label in labels}
+    for indicator in indicators:
+        if str(indicator.get('label', '')).lower() in wanted:
+            return int(indicator.get('numerator', 0) or 0)
+    return 0
 
 
 def _compute_indicator(df: pd.DataFrame, indicator: dict, agg_df: pd.DataFrame | None,
@@ -102,6 +123,117 @@ def _status_badge(pct: float, target: float | None, target_mode: str | None = No
     else:
         okay = pct >= target
     return _badge('On track' if okay else 'Needs attention', '#166534' if okay else '#991B1B', '#DCFCE7' if okay else '#FEE2E2')
+
+
+def _module_tabs(section_names: list[str]) -> html.Div:
+    return html.Div(
+        style={
+            'display': 'flex',
+            'gap': '8px',
+            'overflowX': 'auto',
+            'paddingBottom': '4px',
+            'marginBottom': '18px',
+        },
+        children=[
+            html.A(
+                section_name,
+                href=f"#{_SECTION_IDS.get(section_name, '')}",
+                style={
+                    'display': 'inline-flex',
+                    'alignItems': 'center',
+                    'padding': '9px 14px',
+                    'borderRadius': '12px',
+                    'border': f'1px solid {BORDER}',
+                    'background': '#FFFFFF',
+                    'color': '#334155',
+                    'fontSize': '12px',
+                    'fontWeight': 700,
+                    'textDecoration': 'none',
+                    'whiteSpace': 'nowrap',
+                    'boxShadow': '0 6px 18px rgba(15, 23, 42, 0.04)',
+                },
+            )
+            for section_name in section_names
+        ],
+    )
+
+
+def _meta_bar(period_text: str, active_districts: int, active_facilities: int, completeness: float) -> html.Div:
+    items = [
+        ('Reporting period', period_text),
+        ('District scope', f'{active_districts} districts'),
+        ('Reporting facilities', f'{active_facilities} facilities'),
+        ('Completeness proxy', f'{completeness:.1f}%'),
+    ]
+    return html.Div(
+        style={
+            'display': 'grid',
+            'gridTemplateColumns': 'repeat(auto-fit, minmax(180px, 1fr))',
+            'gap': '10px',
+            'marginBottom': '18px',
+        },
+        children=[
+            html.Div(
+                style={
+                    'padding': '12px 14px',
+                    'borderRadius': '16px',
+                    'background': '#FFFFFF',
+                    'border': f'1px solid {BORDER}',
+                },
+                children=[
+                    html.Div(label, style={'fontSize': '10px', 'fontWeight': 800, 'letterSpacing': '0.08em', 'textTransform': 'uppercase', 'color': DIM}),
+                    html.Div(value, style={'fontSize': '14px', 'fontWeight': 800, 'color': TEXT, 'marginTop': '6px'}),
+                ],
+            )
+            for label, value in items
+        ],
+    )
+
+
+def _priority_alert(maternal_deaths: int, neonatal_deaths: int, stillbirths: int, complication_burden: int) -> html.Div:
+    total_events = maternal_deaths + neonatal_deaths + stillbirths + complication_burden
+    title = 'Priority outcomes require attention' if total_events else 'No critical mortality alerts recorded'
+    subtitle = (
+        'Maternal deaths, neonatal deaths, stillbirths, and complication burden are summarized here for rapid Ministry-level review.'
+        if total_events else
+        'The selected reporting window has no recorded maternal, neonatal, or stillbirth events in the current scope.'
+    )
+    tone_bg = '#FFF7ED' if total_events else '#F0FDF4'
+    tone_border = '#FED7AA' if total_events else '#BBF7D0'
+    return html.Div(
+        style={
+            'display': 'grid',
+            'gridTemplateColumns': 'repeat(auto-fit, minmax(280px, 1fr))',
+            'gap': '14px',
+            'padding': '16px 18px',
+            'borderRadius': '20px',
+            'background': tone_bg,
+            'border': f'1px solid {tone_border}',
+            'marginBottom': '18px',
+        },
+        children=[
+            html.Div([
+                html.Div('Priority Alert', style={'fontSize': '11px', 'fontWeight': 800, 'letterSpacing': '0.08em', 'textTransform': 'uppercase', 'color': '#9A3412' if total_events else '#166534'}),
+                html.Div(title, style={'fontSize': '20px', 'fontWeight': 900, 'color': TEXT, 'marginTop': '8px'}),
+                html.Div(subtitle, style={'fontSize': '13px', 'lineHeight': '1.55', 'color': '#475569', 'marginTop': '6px'}),
+            ]),
+            html.Div(
+                style={'display': 'grid', 'gridTemplateColumns': 'repeat(2, minmax(0, 1fr))', 'gap': '10px'},
+                children=[
+                    html.Div([
+                        html.Div(label, style={'fontSize': '10px', 'fontWeight': 800, 'letterSpacing': '0.06em', 'textTransform': 'uppercase', 'color': DIM}),
+                        html.Div(f'{value:,}', style={'fontSize': '24px', 'fontWeight': 900, 'color': color, 'marginTop': '8px'}),
+                    ], style={'padding': '12px', 'borderRadius': '14px', 'background': '#FFFFFFB8', 'border': '1px solid rgba(255,255,255,0.6)'})
+                    for label, value, color in [
+                        ('Maternal deaths', maternal_deaths, '#E11D48'),
+                        ('Neonatal deaths', neonatal_deaths, '#D97706'),
+                        ('Stillbirths', stillbirths, '#7C3AED'),
+                        ('Complications', complication_burden, '#0F766E'),
+                    ]
+                ],
+            ),
+        ],
+    )
 
 
 def _hero_card(title: str, value: str, subtext: str, accent: str) -> html.Div:
@@ -185,7 +317,8 @@ def _indicator_card(indicator: dict) -> html.Div:
 
 def _section_shell(title: str, description: str, children: list) -> html.Div:
     return html.Div(
-        style={'marginTop': '28px'},
+        id=_SECTION_IDS.get(title),
+        style={'marginTop': '28px', 'scrollMarginTop': '84px'},
         children=[
             html.Div(title, style={'fontSize': '22px', 'fontWeight': 800, 'color': TEXT}),
             html.Div(description, style={'fontSize': '13px', 'color': DIM, 'marginTop': '6px', 'marginBottom': '14px'}),
@@ -368,6 +501,10 @@ def render_mnh_moh_dashboard(
     }
     active_facilities = int(working_df['Facility_CODE'].astype(str).nunique()) if 'Facility_CODE' in working_df.columns else 0
     active_districts = int(working_df['District'].astype(str).nunique()) if 'District' in working_df.columns else 0
+    completeness = _safe_pct(
+        int(working_df['person_id'].notna().sum()) if 'person_id' in working_df.columns else 0,
+        len(working_df),
+    )
 
     sections = defaultdict(list)
     for indicator in tracked_indicators:
@@ -438,10 +575,23 @@ def render_mnh_moh_dashboard(
         for item in readiness_indicators
         if 'data' not in str(item.get('label', '')).lower() and 'completeness' not in str(item.get('label', '')).lower()
     ]
+    maternal_deaths = _find_indicator_value(overview_indicators + tracked_indicators, ('Maternal Deaths',))
+    neonatal_deaths = _find_indicator_value(overview_indicators + tracked_indicators, ('Newborn Deaths', 'Neonatal Deaths'))
+    stillbirths = _find_indicator_value(overview_indicators + tracked_indicators, ('Stillbirths',))
+    complication_burden = (
+        _find_indicator_value(overview_indicators + tracked_indicators, ('ANC Complications',)) +
+        _find_indicator_value(overview_indicators + tracked_indicators, ('Labour Complications',)) +
+        _find_indicator_value(overview_indicators + tracked_indicators, ('Mother Complications',)) +
+        _find_indicator_value(overview_indicators + tracked_indicators, ('Newborn Complications', 'Neonatal Complications at Birth'))
+    )
+    section_names = [name for name, _cats in _SECTION_ORDER if any(_SECTION_IDS.get(name) == node.id for node in section_nodes)]
+    if readiness_cards and 'Quality of Care / Signal Functions' not in section_names:
+        section_names.append('Quality of Care / Signal Functions')
 
     return html.Div(
         className='mnid-main',
         children=[
+            _meta_bar(_period_label(start_date, end_date), active_districts, active_facilities, completeness),
             html.Div(
                 style={
                     'padding': '24px',
@@ -465,6 +615,8 @@ def render_mnh_moh_dashboard(
                     ),
                 ],
             ),
+            _module_tabs(section_names),
+            _priority_alert(maternal_deaths, neonatal_deaths, stillbirths, complication_burden),
             html.Div(
                 style={
                     'display': 'grid',
@@ -488,8 +640,8 @@ def render_mnh_moh_dashboard(
             ) if chart_items else None,
             *section_nodes,
             _section_shell(
-                'Quality of Care / Signal Functions',
-                'Operational readiness, signal-function proxies, and workforce or commodity indicators already defined in MNID metadata.',
+                'Operational Readiness and Signal Functions',
+                'Workforce, commodity, and signal-function proxies derived from the existing MNID metadata.',
                 readiness_cards,
             ) if readiness_cards else None,
         ],
