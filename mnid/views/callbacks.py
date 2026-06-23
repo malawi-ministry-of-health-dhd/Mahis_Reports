@@ -462,7 +462,7 @@ def register_mnid_callbacks(app) -> None:
         Output('mnid-preload-status', 'data'),
         Input('mnid-background-preload', 'n_intervals'),
         State('mnid-executive-view-store', 'data'),
-        State('mnid-executive-tabs', 'value'),
+        State('mnid-active-tab-store', 'data'),
         prevent_initial_call=False,
     )(_preload_mnid_executive_tabs)
 

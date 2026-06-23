@@ -504,10 +504,13 @@ def render_mnid_dashboard(
     if render_as_mnh_switcher:
         outer_values = [item.get('id') for item in mnh_tab_specs if item.get('id')]
         resolved_view = initial_tab if initial_tab in outer_values else 'mnh-beginnings'
-        initial_view = _render_mnh_dashboard_view(
-            resolved_view,
-            _MNID_EXECUTIVE_DISK_CACHE.get(f'ed:{executive_token}') or {},
-            executive_content,
+        initial_view = (
+            _render_mnh_dashboard_view(
+                resolved_view,
+                _MNID_EXECUTIVE_DISK_CACHE.get(f'ed:{executive_token}') or {},
+                executive_content,
+            )
+            if resolved_view != 'mnh-beginnings' else html.Div()
         )
         _MNID_EXECUTIVE_DISK_CACHE.set(f'ec:{executive_token}', executive_content, expire=_MNID_UI_CACHE_TTL_SECONDS)
         return html.Div(
@@ -527,7 +530,17 @@ def render_mnid_dashboard(
                                 for item in mnh_tab_specs
                             ],
                         ),
-                        html.Div(id='mnid-mnh-view-content', className='mnid-executive-content', children=[initial_view]),
+                        html.Div(
+                            id='mnid-beginnings-panel',
+                            children=[executive_content['beginnings-shell']],
+                            style={} if resolved_view == 'mnh-beginnings' else {'display': 'none'},
+                        ),
+                        html.Div(
+                            id='mnid-mnh-view-content',
+                            className='mnid-executive-content',
+                            children=[initial_view],
+                            style={} if resolved_view != 'mnh-beginnings' else {'display': 'none'},
+                        ),
                     ],
                 ),
                 dcc.Interval(id='mnid-background-preload', interval=3000, n_intervals=0, max_intervals=1),
@@ -575,6 +588,8 @@ def _render_mnid_executive_tab(active_tab, executive_token):
 
 @callback(
     Output('mnid-mnh-view-content', 'children'),
+    Output('mnid-beginnings-panel', 'style'),
+    Output('mnid-mnh-view-content', 'style'),
     Input('mnid-mnh-view-tabs', 'value'),
     State('mnid-executive-view-store', 'data'),
     prevent_initial_call=False,
@@ -588,14 +603,20 @@ def _render_mnh_dashboard_tab(active_tab, executive_token):
     selected = active_tab or 'mnh-beginnings'
 
     try:
+        if selected == 'mnh-beginnings':
+            return html.Div(), {}, {'display': 'none'}
         result = _render_mnh_dashboard_view(selected, state, views)
         _MNID_EXECUTIVE_DISK_CACHE.set(f'ec:{executive_token}', views, expire=_MNID_UI_CACHE_TTL_SECONDS)
-        return result
+        return result, {'display': 'none'}, {}
     except Exception as exc:
         _LOGGER.exception('Failed to render MNH dashboard tab %s: %s', selected, exc)
-        return html.Div(
-            f'Tab failed to load ({selected}): {exc}',
-            style={'padding': '24px', 'color': '#dc2626', 'fontSize': '13px'},
+        return (
+            html.Div(
+                f'Tab failed to load ({selected}): {exc}',
+                style={'padding': '24px', 'color': '#dc2626', 'fontSize': '13px'},
+            ),
+            {'display': 'none'},
+            {},
         )
 
 
@@ -635,7 +656,7 @@ def _update_country_profile_chart_grain(grain, stored_rows, meta):
     Output('mnid-preload-status', 'data'),
     Input('mnid-background-preload', 'n_intervals'),
     State('mnid-executive-view-store', 'data'),
-    State('mnid-executive-tabs', 'value'),
+    State('mnid-active-tab-store', 'data'),
     prevent_initial_call=False,
 )
 def _preload_mnid_executive_tabs(_tick, executive_token, active_tab):

@@ -897,15 +897,19 @@ def update_menu(interval, color):
 @callback(
     Output('mnid-active-tab-store', 'data'),
     Input('mnid-mnh-view-tabs', 'value'),
+    prevent_initial_call=True,
+)
+def _save_mnh_active_tab(mnh_tab_value):
+    return mnh_tab_value or 'mnh-beginnings'
+
+
+@callback(
+    Output('mnid-active-tab-store', 'data', allow_duplicate=True),
     Input('mnid-executive-tabs', 'value'),
     prevent_initial_call=True,
 )
-def _save_mnid_active_tab(mnh_tab_value, executive_tab_value):
-    ctx = callback_context
-    triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else ''
-    if triggered_id == 'mnid-mnh-view-tabs':
-        return mnh_tab_value or 'mnh-beginnings'
-    return executive_tab_value or 'country-profile'
+def _save_mnid_executive_tab(tab_value):
+    return tab_value or 'country-profile'
 
 
 @callback(
