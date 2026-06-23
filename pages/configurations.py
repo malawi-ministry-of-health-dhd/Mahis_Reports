@@ -5197,10 +5197,17 @@ def run_preview_query(n_clicks,urlparams, sql):
     try:
         route = urlparams.get('route', ["default"])[0]
 
-        sql = sql.replace("data", f"'data/{route}/parquet'")
-        if ("LIMIT" or "limit") not in sql:
-            sql = sql  + " LIMIT 100"
-        df = DataStorage.query_duckdb(sql.strip())
+        if f"'data/{route}/parquet'" not in sql:
+            query = (sql.replace("data", f"'data/{route}/parquet'")
+                     .replace("given_name","identifier")
+                     .replace("family_name","identifier")
+                     .replace("User","identifier"))
+        else:
+            query = sql
+        
+        if ("LIMIT" or "limit") not in query:
+            query = query  + " LIMIT 100"
+        df = DataStorage.query_duckdb(query.strip())
         sensitive_columns=["given_name", "family_name","User"]
         df = df.drop(columns=[col for col in sensitive_columns if col in df.columns])
 

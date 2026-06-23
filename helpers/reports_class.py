@@ -173,6 +173,12 @@ class ReportTableBuilder:
                 args.extend([fcol, fval])
             result = create_count_sets(*args,self.start_date, self.end_date)
 
+        elif measure == "count_set_defaulter":
+            args = [filtered_dates,self.data_route, "count", spec["unique_column"]]
+            for fcol, fval in spec["pairs"]:
+                args.extend([fcol, fval])
+            result = create_count_sets(*args,self.start_date, self.end_date)
+
         elif measure == "count":
             args = [filtered_dates,self.data_route, "count", spec["unique_column"]]
             for fcol, fval in spec["pairs"]:

@@ -176,7 +176,7 @@ def _normalize_level(value: str | None) -> str:
     value = str(value or '').strip().lower()
     if value in {'national', 'district', 'facility'}:
         return value
-    return 'national'
+    return 'facility'
 
 
 def _title_level(value: str) -> str:
@@ -728,6 +728,9 @@ def update_dashboard(gen, start_date, end_date, level,
 
         # Level resolution
         requested_level = _normalize_level(level) if level else user_level
+
+        # print(user_row, scope, user_level)
+
         if user_level == 'national':
             effective_level = requested_level if requested_level in {'national', 'district', 'facility'} else 'national'
         elif user_level == 'district':
