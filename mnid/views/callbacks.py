@@ -271,16 +271,21 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
                             ys.append(_display_pct(_pct) if _den > 0 else None)
                             texts.append(f'{_pct:.0f}%' if _den > 0 else 'No data')
 
-            if not xs and _compare_agg is None:
+            # Last resort: scan raw entity df directly. Runs when the aggregate had no
+            # matching rows (e.g. stale aggregate with old indicator IDs) AND the UI
+            # cache was cold. mch_full contains the full scoped dataframe.
+            if not xs:
                 entity_df = get_df(entity)
                 if entity_df.empty:
                     continue
-                for period in periods:
-                    period_df = entity_df[pd.to_datetime(entity_df['Date']).dt.to_period(period_code) == period]
-                    _, den, pct = _cov(period_df, ind['numerator_filters'], ind['denominator_filters'])
-                    xs.append(period_fmt(period))
-                    ys.append(_display_pct(pct) if den > 0 else None)
-                    texts.append(f'{pct:.0f}%' if den > 0 else 'No data')
+                entity_df = entity_df.copy()
+                entity_df['_period'] = pd.to_datetime(entity_df['Date'], errors='coerce').dt.to_period(period_code)
+                for _p in sorted(entity_df['_period'].dropna().unique())[-max_periods:]:
+                    _pf = entity_df[entity_df['_period'] == _p]
+                    _, _den, _pct = _cov(_pf, ind['numerator_filters'], ind['denominator_filters'])
+                    xs.append(period_fmt(_p))
+                    ys.append(_display_pct(_pct) if _den > 0 else None)
+                    texts.append(f'{_pct:.0f}%' if _den > 0 else 'No data')
 
             if not xs:
                 continue
@@ -457,7 +462,7 @@ def register_mnid_callbacks(app) -> None:
         Output('mnid-preload-status', 'data'),
         Input('mnid-background-preload', 'n_intervals'),
         State('mnid-executive-view-store', 'data'),
-        State('mnid-executive-tabs', 'value'),
+        State('mnid-active-tab-store', 'data'),
         prevent_initial_call=False,
     )(_preload_mnid_executive_tabs)
 

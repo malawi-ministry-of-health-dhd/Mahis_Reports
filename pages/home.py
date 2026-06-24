@@ -66,6 +66,7 @@ _DASHBOARD_TAB_CONFIG_DEFAULTS = {
     "visible_reports": [],
     "default_report": None,
     "hidden_mnid_tabs": [],
+    "mnh_tabs": [],
 }
 
 
@@ -343,6 +344,25 @@ def load_dashboard_tab_config():
     if not isinstance(hidden_mnid_tabs, list):
         hidden_mnid_tabs = []
     config["hidden_mnid_tabs"] = [str(item).strip() for item in hidden_mnid_tabs if str(item).strip()]
+
+    mnh_tabs = config.get("mnh_tabs")
+    if not isinstance(mnh_tabs, list):
+        mnh_tabs = []
+    normalized_mnh_tabs = []
+    for item in mnh_tabs:
+        if not isinstance(item, dict):
+            continue
+        tab_id = str(item.get("id") or "").strip()
+        label = str(item.get("label") or tab_id).strip()
+        if not tab_id or not label:
+            continue
+        normalized_mnh_tabs.append({
+            "id": tab_id,
+            "label": label,
+            "module": str(item.get("module") or "").strip() or None,
+            "placeholder": bool(item.get("placeholder")),
+        })
+    config["mnh_tabs"] = normalized_mnh_tabs
     return config
 
 
@@ -876,10 +896,19 @@ def update_menu(interval, color):
 
 @callback(
     Output('mnid-active-tab-store', 'data'),
+    Input('mnid-mnh-view-tabs', 'value'),
+    prevent_initial_call=True,
+)
+def _save_mnh_active_tab(mnh_tab_value):
+    return mnh_tab_value or 'mnh-beginnings'
+
+
+@callback(
+    Output('mnid-active-tab-store', 'data', allow_duplicate=True),
     Input('mnid-executive-tabs', 'value'),
     prevent_initial_call=True,
 )
-def _save_mnid_active_tab(tab_value):
+def _save_mnid_executive_tab(tab_value):
     return tab_value or 'country-profile'
 
 

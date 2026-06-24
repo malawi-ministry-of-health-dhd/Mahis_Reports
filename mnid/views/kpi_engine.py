@@ -579,7 +579,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
                     _indicator_activity('Labour Complications'),
                     _indicator_activity('Live Births'),
                     _indicator_activity('Maternal Deaths'),
-                    _indicator_activity('Newborn Deaths'),
+                    _indicator_activity('Stillbirths'),
                 ]
             elif default_cat == 'Labour':
                 _activity_stats = [
@@ -599,10 +599,9 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
                 ]
             elif default_cat == 'Newborn':
                 _activity_stats = [
-                    _indicator_activity('Stillbirths'),
-                    _indicator_activity('Live Births'),
-                    _indicator_activity('Neonatal Deaths'),
+                    _indicator_activity('Outborn babies'),
                     _indicator_activity('Neonatal Complications at Birth'),
+                    _indicator_activity('Birth asphyxia among newborn admissions'),
                     _indicator_activity('iKMC Initiated'),
                 ]
             else:
@@ -782,6 +781,13 @@ def _resolve_heatmap_store(network_df: pd.DataFrame, all_inds: list,
                     agg_for_heatmap['district'].isin([str(d) for d in selected_districts])
                 ]
             cached_hms = _compute_heatmap_store_from_agg(agg_for_heatmap, tracked, facility_code)
+            # If no indicator IDs matched (stale aggregate with old IDs), fall back to raw df
+            if not any(v.get('x') for v in cached_hms.get('by_facility', {}).values()):
+                _LOGGER.warning(
+                    'Heatmap aggregate returned no matching indicators — falling back to raw df. '
+                    'Rebuild the aggregate with run_aggregation_job() to restore performance.'
+                )
+                cached_hms = _compute_heatmap_store(network_df, tracked, facility_code)
         else:
             cached_hms = _compute_heatmap_store(network_df, tracked, facility_code)
         if selected_districts:

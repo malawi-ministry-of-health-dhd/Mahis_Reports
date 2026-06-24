@@ -97,9 +97,14 @@ def _matrix_monthly(df: pd.DataFrame, inds: list) -> tuple:
 
 def _cov_color(pct):
     if pct is None: return '#E2E8F0'
-    if pct >= 80:   return OK_C
-    if pct >= 65:   return WARN_C
-    return DANGER_C
+    try:
+        v = float(pct)
+    except (TypeError, ValueError):
+        return '#E2E8F0'
+    if v != v: return '#E2E8F0'  # NaN → no-data grey
+    if v >= 80: return OK_C      # green  — on target
+    if v >= 60: return WARN_C    # yellow — 60–79
+    return DANGER_C              # red    — below 60
 
 
 # # MNID vectorized facility coverage computation
@@ -220,8 +225,12 @@ def _compute_heatmap_store(mch_full: pd.DataFrame, tracked: list,
             store['by_district'][ylbl] = {'x': data_districts[:], 'z': z_d, 'tick_angle': -20}
             d_avgs = {}
             for di, dist in enumerate(data_districts):
-                vals = [z_d[ii][di] for ii in range(len(sorted_inds))
-                        if ii < len(z_d) and di < len(z_d[ii]) and z_d[ii][di] is not None]
+                vals = [
+                    z_d[ii][di] for ii in range(len(sorted_inds))
+                    if (ii < len(z_d) and di < len(z_d[ii])
+                        and z_d[ii][di] is not None
+                        and z_d[ii][di] == z_d[ii][di])
+                ]
                 d_avgs[dist] = round(sum(vals) / len(vals), 1) if vals else None
             store['district_avgs'][ylbl] = d_avgs
         else:
@@ -345,16 +354,21 @@ def _compute_heatmap_store_from_agg(
     ind_order = [i['id'] for i in sorted_inds]
 
     def _pct_dict(sub, group_col):
-        """Return {ind_id: {group_key: pct|None}} via vectorised pivot, no .loc loops."""
+        """Return {ind_id: {group_key: float|None}} with NaN explicitly replaced by None."""
         if sub.empty:
             return {}
         g = sub.groupby(['indicator_id', group_col])[['numerator', 'denominator']].sum().reset_index()
         g['pct'] = (g['numerator'] / g['denominator'].where(g['denominator'] > 0) * 100).round(1)
-        return (
-            g.pivot(index='indicator_id', columns=group_col, values='pct')
-             .where(pd.notna, other=None)
-             .to_dict(orient='index')
-        )
+        piv = g.pivot(index='indicator_id', columns=group_col, values='pct')
+        # Convert NaN → None so _cov_color / _display_pct treat them as "no data"
+        result = {}
+        for iid in piv.index:
+            row = {}
+            for col in piv.columns:
+                val = piv.at[iid, col]
+                row[col] = None if (val != val) else float(val)  # NaN != NaN
+            result[iid] = row
+        return result
 
     def _z_matrix(pct_d, keys):
         """Build z[indicator_idx][key_idx] from a pct dict-of-dicts."""
@@ -401,8 +415,12 @@ def _compute_heatmap_store_from_agg(
             z_d = _z_matrix(dp, data_dists)
             d_avgs = {}
             for di, dist in enumerate(data_dists):
-                vals = [z_d[ii][di] for ii in range(len(sorted_inds))
-                        if ii < len(z_d) and di < len(z_d[ii]) and z_d[ii][di] is not None]
+                vals = [
+                    z_d[ii][di] for ii in range(len(sorted_inds))
+                    if (ii < len(z_d) and di < len(z_d[ii])
+                        and z_d[ii][di] is not None
+                        and z_d[ii][di] == z_d[ii][di])  # exclude NaN (NaN != NaN)
+                ]
                 d_avgs[dist] = round(sum(vals) / len(vals), 1) if vals else None
             store['by_district'][ylbl] = {'x': data_dists, 'z': z_d, 'tick_angle': -20}
             store['district_avgs'][ylbl] = d_avgs
@@ -746,7 +764,8 @@ def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
             return None
         ci = store_fac_x.index(key)
         vals = [fac_z[r][ci] for r in rows_idx
-                if r < len(fac_z) and ci < len(fac_z[r]) and fac_z[r][ci] is not None]
+                if r < len(fac_z) and ci < len(fac_z[r])
+                and fac_z[r][ci] is not None and fac_z[r][ci] == fac_z[r][ci]]  # exclude NaN
         return round(sum(vals) / len(vals), 1) if vals else None
 
     selected_dist = district if district not in (None, '', 'All') else None
@@ -939,7 +958,8 @@ def _build_district_treemap(stored: dict, view: str, year: str,
             return None
         ci = fac_x.index(key)
         vals = [fac_z[r][ci] for r in rows_idx
-                if r < len(fac_z) and ci < len(fac_z[r]) and fac_z[r][ci] is not None]
+                if r < len(fac_z) and ci < len(fac_z[r])
+                and fac_z[r][ci] is not None and fac_z[r][ci] == fac_z[r][ci]]  # exclude NaN
         return round(sum(vals) / len(vals), 1) if vals else None
 
     dyn_districts = stored.get('all_districts', [])

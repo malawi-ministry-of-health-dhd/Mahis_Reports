@@ -133,6 +133,7 @@ def _readiness_ring_card(icon: str, name: str, score: float, col: str) -> dmc.Pa
         bg, tc, lbl = "#fef3c7", "#92400e", "Moderate"
     else:
         bg, tc, lbl = "#fee2e2", "#dc2626", "At Risk"
+    accent = _readiness_traffic_color(p)
     return dmc.Paper([
         html.Div(icon, style={"fontSize": "22px", "textAlign": "center", "marginBottom": "8px"}),
         html.Div(name, style={
@@ -141,7 +142,7 @@ def _readiness_ring_card(icon: str, name: str, score: float, col: str) -> dmc.Pa
         }),
         html.Div(style={
             "width": "72px", "height": "72px", "borderRadius": "50%",
-            "background": f"conic-gradient({col} {p:.1f}%, #e2e8f0 0)",
+            "background": f"conic-gradient({accent} {p:.1f}%, #e2e8f0 0)",
             "display": "flex", "alignItems": "center", "justifyContent": "center",
             "margin": "0 auto 10px",
         }, children=[
@@ -151,7 +152,7 @@ def _readiness_ring_card(icon: str, name: str, score: float, col: str) -> dmc.Pa
                 "alignItems": "center", "justifyContent": "center",
             }, children=[
                 html.Span(f"{score:.0f}", style={
-                    "fontSize": "16px", "fontWeight": "800", "color": col,
+                    "fontSize": "16px", "fontWeight": "800", "color": accent,
                 }),
             ]),
         ]),
@@ -468,6 +469,33 @@ def _monthly_multiseries(series_map: dict[str, tuple[pd.Series, str]], df: pd.Da
     return pd.concat(frames, ignore_index=True)
 
 
+def _monthly_rate_series(
+    df: pd.DataFrame,
+    numerator_mask: pd.Series,
+    denominator_mask: pd.Series,
+    unique_col: str = "person_id",
+    scale: float = 100.0,
+) -> pd.DataFrame:
+    if df is None or df.empty or "Date" not in df.columns or unique_col not in df.columns:
+        return pd.DataFrame(columns=["month", "value"])
+    numerator = _monthly_series(df, numerator_mask, unique_col)
+    denominator = _monthly_series(df, denominator_mask, unique_col)
+    if denominator.empty:
+        return pd.DataFrame(columns=["month", "value"])
+    merged = denominator.rename(columns={"value": "denominator"}).merge(
+        numerator.rename(columns={"value": "numerator"}),
+        on="month",
+        how="left",
+    )
+    merged["numerator"] = pd.to_numeric(merged["numerator"], errors="coerce").fillna(0)
+    merged["denominator"] = pd.to_numeric(merged["denominator"], errors="coerce").fillna(0)
+    merged["value"] = merged.apply(
+        lambda row: round((row["numerator"] / row["denominator"]) * scale, 1) if row["denominator"] > 0 else 0.0,
+        axis=1,
+    )
+    return merged[["month", "value"]]
+
+
 def _delta_percent(current: float, previous: float) -> float:
     if previous == 0:
         return 0.0 if current == 0 else 100.0
@@ -525,14 +553,14 @@ def _trend_subtitle(title: str) -> str:
         "Maternal Mortality": "Reported maternal deaths in the selected scope.",
         "Neonatal Mortality": "Reported neonatal deaths in the selected scope.",
         "Stillbirths": "Stillbirth trend, including fresh and macerated cases.",
-        "Pre-eclampsia and Eclampsia": "Reported cases of hypertensive complications.",
-        "Postpartum Haemorrhage": "Reported postpartum haemorrhage cases.",
-        "Maternal Sepsis": "Reported maternal sepsis cases.",
-        "Obstructed or Prolonged Labour": "Reported obstructed or prolonged labour cases.",
-        "Ruptured Uterus": "Reported uterine rupture cases.",
-        "Birth Asphyxia": "Reported birth asphyxia cases.",
-        "Preterm Birth": "Reported preterm birth cases.",
-        "Neonatal Sepsis": "Reported neonatal sepsis cases.",
+        "Pre-eclampsia and Eclampsia": "Monthly hypertensive complication rate as a percent of total births.",
+        "Postpartum Haemorrhage": "Monthly postpartum haemorrhage rate as a percent of total births.",
+        "Maternal Sepsis": "Monthly maternal sepsis rate as a percent of total births.",
+        "Obstructed or Prolonged Labour": "Monthly obstructed or prolonged labour rate as a percent of total births.",
+        "Ruptured Uterus": "Monthly ruptured uterus rate as a percent of total births.",
+        "Birth Asphyxia": "Monthly birth asphyxia rate as a percent of live births.",
+        "Preterm Birth": "Monthly preterm birth rate as a percent of live births.",
+        "Neonatal Sepsis": "Monthly neonatal sepsis rate as a percent of live births.",
     }
     return custom.get(title, "Reported cases in the selected scope.")
 
@@ -812,6 +840,27 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
 
     maternal_death_series = _monthly_series(df, _yn_mask(df, "mnid_pnc_maternal_death"), "person_id")
     neonatal_death_series = _monthly_series(df, _contains_mask(df, "obs_value_coded", ["Died", "Dead", "Death", "Neonatal death"]), "person_id")
+    live_birth_denominator_mask = (
+        _contains_mask(df, "concept_name", ["Outcome of the delivery"])
+        & _contains_mask(df, "obs_value_coded", ["Live birth", "Live births", "Alive"])
+    )
+    total_birth_denominator_mask = (
+        _contains_mask(df, "concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"])
+        & _contains_mask(
+            df,
+            "obs_value_coded",
+            [
+                "Live birth",
+                "Live births",
+                "Alive",
+                "Stillbirth",
+                "Fresh stillbirth",
+                "Macerated stillbirth",
+                "Fresh still birth",
+                "Macerated still birth",
+            ],
+        )
+    )
     total_births_series = _monthly_multiseries({"Total births": (
         _contains_mask(df, "concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"]),
         PRIMARY_GREEN,
@@ -829,26 +878,40 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
         ),
     }, df)
 
-    complication_specs = [
+    maternal_complication_specs = [
         ("Pre-eclampsia and Eclampsia", MORTALITY_ROSE, _yn_mask(df, "mnid_labour_eclampsia") | _contains_mask(df, "obs_value_coded", ["Pre-eclampsia", "Pre eclampsia", "Preeclampsia", "Eclampsia"])),
         ("Postpartum Haemorrhage", WARNING_AMBER, _yn_mask(df, "mnid_labour_pph")),
         ("Maternal Sepsis", "#B91C1C", _yn_mask(df, "mnid_labour_maternal_sepsis")),
         ("Obstructed or Prolonged Labour", "#7C3AED", _yn_mask(df, "mnid_labour_obstructed_labour") | _contains_mask(df, "obs_value_coded", ["Obstructed labour", "Prolonged labour", "Prolonged Labor"])),
         ("Ruptured Uterus", "#475569", _contains_mask(df, "obs_value_coded", ["Ruptured uterus", "Uterine rupture"])),
+    ]
+    neonatal_complication_specs = [
         ("Birth Asphyxia", "#D97706", _yn_mask(df, "mnid_newborn_birth_asphyxia")),
         ("Preterm Birth", PRIMARY_GREEN, _yn_mask(df, "mnid_labour_preterm")),
         ("Neonatal Sepsis", ADMISSIONS_BLUE, _yn_mask(df, "mnid_newborn_sepsis")),
     ]
-    complication_cards = []
-    for title, color, mask in complication_specs:
+    maternal_complication_cards = []
+    for title, color, mask in maternal_complication_specs:
         chart_key = _chart_key_slug(title)
-        complication_cards.append(_trend_chart_payload(
+        maternal_complication_cards.append(_trend_chart_payload(
             chart_key,
             title,
             _trend_subtitle(title),
             color,
-            "Cases",
-            _monthly_series(df, mask, "person_id"),
+            "Rate (%)",
+            _monthly_rate_series(df, mask, total_birth_denominator_mask, "person_id"),
+            multi=False,
+        )["card"])
+    neonatal_complication_cards = []
+    for title, color, mask in neonatal_complication_specs:
+        chart_key = _chart_key_slug(title)
+        neonatal_complication_cards.append(_trend_chart_payload(
+            chart_key,
+            title,
+            _trend_subtitle(title),
+            color,
+            "Rate (%)",
+            _monthly_rate_series(df, mask, live_birth_denominator_mask, "person_id"),
             multi=False,
         )["card"])
 
@@ -980,8 +1043,10 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
                 neonatal_mortality_chart,
                 stillbirths_chart,
             ]),
-            _section_header("Complication Trends"),
-            _two_column_chart_grid(complication_cards),
+            _section_header("Maternal Complications"),
+            _two_column_chart_grid(maternal_complication_cards),
+            _section_header("Neonatal Complications"),
+            _two_column_chart_grid(neonatal_complication_cards),
         ],
     )
 
@@ -999,6 +1064,14 @@ def _readiness_status(value: float) -> tuple[str, str]:
     if value >= 55:
         return "Watch", WARNING_AMBER
     return "Support", MORTALITY_ROSE
+
+
+def _readiness_traffic_color(value: float) -> str:
+    if value >= 75:
+        return SUCCESS_GREEN
+    if value >= 55:
+        return WARNING_AMBER
+    return MORTALITY_ROSE
 
 
 def _readiness_indicator_rows(df: pd.DataFrame, indicators: list[dict]) -> list[dict]:
@@ -1120,11 +1193,13 @@ def render_operational_readiness(
     if not district_df.empty and workforce_rows:
         workforce_chart_inner_height = max(CHART_HEIGHT_MD, len(district_df) * 24 + 60)
         workforce_chart_outer_height = _clamp_chart_height(workforce_chart_inner_height, CHART_HEIGHT_MD, CHART_HEIGHT_LG)
+        workforce_colors = [_readiness_traffic_color(v) for v in district_df["national_score"]]
         workforce_chart.add_trace(go.Bar(
             x=district_df["national_score"].round(1),
             y=district_df["District"],
             orientation="h",
-            marker=dict(color=PRIMARY_GREEN, line=dict(width=0)),
+            marker=dict(color=workforce_colors, line=dict(width=0)),
+            hovertemplate="%{y}<br>Score %{x:.1f}%<extra></extra>",
         ))
         workforce_chart.update_layout(**_EXEC_CHART_LAYOUT, height=workforce_chart_inner_height)
         workforce_chart.update_layout(
@@ -1137,9 +1212,28 @@ def render_operational_readiness(
     assessment_chart = go.Figure()
     if trend_rows:
         trend_df = pd.DataFrame(trend_rows)
-        assessment_chart.add_trace(go.Bar(x=trend_df["month"], y=trend_df["meeting"], name="Readiness score", marker_color="#22c55e", marker_line_width=0))
-        assessment_chart.add_trace(go.Bar(x=trend_df["month"], y=trend_df["support"],  name="Gap to 100%",    marker_color="#fca5a5", marker_line_width=0))
-        assessment_chart.update_layout(**_EXEC_CHART_LAYOUT, barmode="stack", height=CHART_HEIGHT_MD)
+        trend_df["traffic_color"] = trend_df["meeting"].apply(_readiness_traffic_color)
+        trend_df["readiness_status"] = trend_df["meeting"].apply(
+            lambda value: "Ready" if value >= 75 else "Watch" if value >= 55 else "Support"
+        )
+        assessment_chart.add_trace(go.Bar(
+            x=trend_df["month"],
+            y=trend_df["meeting"],
+            name="Readiness score",
+            marker=dict(color=trend_df["traffic_color"], line=dict(width=0)),
+            customdata=trend_df[["readiness_status"]],
+            hovertemplate="%{x}<br>Readiness %{y:.1f}%<br>Status %{customdata[0]}<extra></extra>",
+        ))
+        assessment_chart.add_hline(y=75, line=dict(color=SUCCESS_GREEN, width=1.2, dash="dot"))
+        assessment_chart.add_hline(y=55, line=dict(color=WARNING_AMBER, width=1.2, dash="dot"))
+        assessment_chart.update_layout(**_EXEC_CHART_LAYOUT, height=CHART_HEIGHT_MD)
+        assessment_chart.update_layout(
+            xaxis=dict(showgrid=False, zeroline=False, showline=False,
+                       tickfont=dict(size=10, color="#94a3b8")),
+            yaxis=dict(showgrid=True, gridcolor="#f1f5f9", zeroline=False, showline=False,
+                       tickfont=dict(size=10, color="#94a3b8"), ticksuffix="%", range=[0, 100]),
+            showlegend=False,
+        )
 
     district_rank_chart = go.Figure()
     district_rank_inner_height = CHART_HEIGHT_MD
@@ -1147,12 +1241,13 @@ def render_operational_readiness(
     if not district_df.empty:
         district_rank_inner_height = max(CHART_HEIGHT_MD, len(district_df) * 24 + 60)
         district_rank_outer_height = _clamp_chart_height(district_rank_inner_height, CHART_HEIGHT_MD, CHART_HEIGHT_LG)
-        colors = [PRIMARY_GREEN if v >= 60 else WARNING_AMBER if v >= 45 else MORTALITY_ROSE for v in district_df["national_score"]]
+        colors = [_readiness_traffic_color(v) for v in district_df["national_score"]]
         district_rank_chart.add_trace(go.Bar(
             x=district_df["national_score"].round(1),
             y=district_df["District"],
             orientation="h",
             marker=dict(color=colors, line=dict(width=0)),
+            hovertemplate="%{y}<br>Score %{x:.1f}%<extra></extra>",
         ))
         district_rank_chart.update_layout(**_EXEC_CHART_LAYOUT, height=district_rank_inner_height)
         district_rank_chart.update_layout(
@@ -1241,10 +1336,10 @@ def render_operational_readiness(
 
     # ---------- Domain ring cards ----------
     domain_rings = dmc.SimpleGrid(cols=4, spacing="lg", mb="lg", children=[
-        _readiness_ring_card("👥", "Workforce",     workforce_score, "#15803d"),
-        _readiness_ring_card("💊", "Commodities",   supply_score,    "#d97706"),
-        _readiness_ring_card("🔧", "Equipment",     supply_score,    "#0284c7"),
-        _readiness_ring_card("📊", "Data Quality",  dq_score,        "#7c3aed"),
+        _readiness_ring_card("👥", "Workforce",     workforce_score, SUCCESS_GREEN),
+        _readiness_ring_card("💊", "Commodities",   supply_score,    SUCCESS_GREEN),
+        _readiness_ring_card("🔧", "Equipment",     supply_score,    SUCCESS_GREEN),
+        _readiness_ring_card("📊", "Data Quality",  dq_score,        SUCCESS_GREEN),
     ])
 
     # ---------- Commodity cards ----------
@@ -1259,10 +1354,10 @@ def render_operational_readiness(
 
     # ---------- Workforce domain score bars ----------
     workforce_summary = [
-        ("Workforce score",    workforce_score, "#15803d"),
-        ("Supply score",       supply_score,    "#d97706"),
-        ("Data quality score", dq_score,        "#e11d48"),
-        ("Overall readiness",  national_score,  "#2563eb"),
+        ("Workforce score",    workforce_score, _readiness_traffic_color(workforce_score)),
+        ("Supply score",       supply_score,    _readiness_traffic_color(supply_score)),
+        ("Data quality score", dq_score,        _readiness_traffic_color(dq_score)),
+        ("Overall readiness",  national_score,  _readiness_traffic_color(national_score)),
     ]
 
     # ---------- Procurement rows ----------

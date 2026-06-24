@@ -26,6 +26,7 @@ from mnid.views.kpi_engine import (
     _load_mnid_report_config,
 )
 from mnid.core.data_utils import prepare_mnid_dataframe as _prepare_mnid_dataframe
+from mnid.dashboards import load_dashboard_module
 from mnid.views.executive_views import render_country_profile, render_operational_readiness
 from mnid.components.run_charts import (
     bucket_multi_series, bucket_time_series,
@@ -34,6 +35,23 @@ from mnid.components.run_charts import (
 from mnid.core.constants import BORDER, TEXT
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _render_mnh_placeholder(label: str) -> html.Div:
+    return html.Div(
+        style={
+            'padding': '28px',
+            'border': f'1px dashed {BORDER}',
+            'borderRadius': '20px',
+            'background': '#FFFFFF',
+            'color': '#475569',
+        },
+        children=[
+            html.Div(label, style={'fontSize': '12px', 'fontWeight': 800, 'textTransform': 'uppercase', 'letterSpacing': '0.08em'}),
+            html.Div('This dashboard view is reserved for a future implementation.', style={'fontSize': '24px', 'fontWeight': 800, 'color': TEXT, 'marginTop': '8px'}),
+            html.Div('The current release keeps the slot visible so routing and navigation are ready when MNH-Nest360 is implemented.', style={'fontSize': '13px', 'marginTop': '8px'}),
+        ],
+    )
 
 
 def _mnid_loading_placeholder() -> html.Div:
@@ -278,6 +296,102 @@ def _build_executive_tab_view(
     return views.get('country-profile', html.Div())
 
 
+def _render_beginnings_shell(initial_tab: str, hidden_mnid_tabs: set[str], newborn_config, initial_children=None) -> html.Div:
+    _tab_style = {
+        'padding': '10px 18px',
+        'borderRadius': '12px',
+        'border': f'1px solid {BORDER}',
+        'backgroundColor': '#FFFFFF',
+        'color': TEXT,
+    }
+    _tab_active = {
+        'padding': '10px 18px',
+        'borderRadius': '12px',
+        'border': f'1px solid {BORDER}',
+        'backgroundColor': '#F0FDF4',
+        'color': '#15803D',
+        'fontWeight': 700,
+    }
+    _tab_active2 = dict(_tab_active, backgroundColor='#F8FAFC')
+
+    tab_children = [
+        dcc.Tab(label='Country Profile', value='country-profile', style=_tab_style, selected_style=_tab_active),
+    ]
+    if 'operational-readiness' not in hidden_mnid_tabs:
+        tab_children.append(
+            dcc.Tab(label='Operational Readiness', value='operational-readiness', style=_tab_style, selected_style=_tab_active2)
+        )
+    tab_children.append(
+        dcc.Tab(label='Maternal', value='maternal-dashboard', style=_tab_style, selected_style=_tab_active2)
+    )
+    if newborn_config is not None:
+        tab_children.append(
+            dcc.Tab(label='Newborn', value='newborn-dashboard', style=_tab_style, selected_style=_tab_active2)
+        )
+
+    visible_tab_values = [getattr(tab, 'value', None) for tab in tab_children]
+    resolved_initial_tab = initial_tab if initial_tab in visible_tab_values else (visible_tab_values[0] if visible_tab_values else 'country-profile')
+
+    return html.Div(
+        children=[
+            dcc.Tabs(
+                id='mnid-executive-tabs',
+                value=resolved_initial_tab,
+                style={'marginBottom': '18px'},
+                children=tab_children,
+            ),
+            html.Div(
+                id='mnid-executive-content',
+                className='mnid-executive-content',
+                children=initial_children if initial_children is not None else [_mnid_loading_placeholder()],
+            ),
+        ],
+    )
+
+
+def _render_mnh_dashboard_view(selected_view: str, state: dict, views: dict):
+    if selected_view == 'mnh-beginnings':
+        if views.get('beginnings-shell') is not None:
+            return views['beginnings-shell']
+        hidden_mnid_tabs = _load_dashboard_tab_config().get('hidden_mnid_tabs', set())
+        return _render_beginnings_shell(
+            initial_tab=state.get('beginnings_initial_tab') or 'country-profile',
+            hidden_mnid_tabs=hidden_mnid_tabs,
+            newborn_config=state.get('newborn_config'),
+            initial_children=[_mnid_loading_placeholder()],
+        )
+
+    if selected_view == 'mnh-moh':
+        if selected_view in views:
+            return views[selected_view]
+        network_df = _get_network_df_from_state(state)
+        facility_df = _get_facility_df_from_state(state, network_df=network_df)
+        if network_df is None or facility_df is None:
+            return html.Div('Unable to load the MNH MoH dashboard data.', style={'padding': '24px', 'color': '#DC2626'})
+        try:
+            module = load_dashboard_module('MNH-MoH')
+            rendered = module.render_mnh_moh_dashboard(
+                facility_df=facility_df,
+                network_df=network_df,
+                maternal_config=state.get('config') or {},
+                newborn_config=state.get('newborn_config'),
+                start_date=state.get('start_date'),
+                end_date=state.get('end_date'),
+                scope_meta=state.get('scope_meta'),
+            )
+            views[selected_view] = rendered
+            return rendered
+        except Exception as exc:
+            _LOGGER.exception('Failed to render MNH MoH dashboard: %s', exc)
+            return html.Div(
+                f'MNH-MoH failed to load: {exc}',
+                style={'padding': '24px', 'color': '#DC2626', 'fontSize': '13px'},
+            )
+
+    label_map = {item.get('id'): item.get('label') for item in state.get('mnh_tab_specs') or []}
+    return _render_mnh_placeholder(label_map.get(selected_view, 'MNH-Nest360'))
+
+
 def render_mnid_dashboard(
     data_opd, config, facility_code, start_date, end_date,
     scope_meta: dict | None = None,
@@ -342,6 +456,8 @@ def render_mnid_dashboard(
             'newborn_config':    newborn_config,
             'newborn_scope_meta': newborn_scope_meta,
             'country_label':     country_label,
+            'beginnings_initial_tab': initial_tab if initial_tab not in {'mnh-beginnings', 'mnh-moh', 'mnh-nest360'} else 'country-profile',
+            'mnh_tab_specs':     _load_dashboard_tab_config().get('mnh_tabs', []),
         },
         expire=_MNID_UI_CACHE_TTL_SECONDS,
     )
@@ -359,37 +475,7 @@ def render_mnid_dashboard(
                 pass
         threading.Thread(target=_async_write_ndf, daemon=True).start()
 
-    _tab_style  = {'padding': '10px 18px', 'borderRadius': '12px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#FFFFFF', 'color': TEXT}
-    _tab_active = {'padding': '10px 18px', 'borderRadius': '12px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#F0FDF4', 'color': '#15803D', 'fontWeight': 700}
-    _tab_active2 = dict(_tab_active, backgroundColor='#F8FAFC')
-
-    hidden_mnid_tabs = _load_dashboard_tab_config().get('hidden_mnid_tabs', set())
-    tab_children = [
-        dcc.Tab(label='Country Profile',    value='country-profile',     style=_tab_style, selected_style=_tab_active),
-    ]
-    if 'operational-readiness' not in hidden_mnid_tabs:
-        tab_children.append(
-            dcc.Tab(label='Operational Readiness', value='operational-readiness', style=_tab_style, selected_style=_tab_active2)
-        )
-    tab_children.append(
-        dcc.Tab(label='Maternal', value='maternal-dashboard', style=_tab_style, selected_style=_tab_active2)
-    )
-    if newborn_config is not None:
-        tab_children.append(
-            dcc.Tab(label='Newborn', value='newborn-dashboard', style=_tab_style, selected_style=_tab_active2)
-        )
-
-    visible_tab_values   = [getattr(tab, 'value', None) for tab in tab_children]
-    resolved_initial_tab = initial_tab if initial_tab in visible_tab_values else (visible_tab_values[0] if visible_tab_values else 'country-profile')
-
-    executive_tabs = dcc.Tabs(
-        id='mnid-executive-tabs',
-        value=resolved_initial_tab,
-        style={'marginBottom': '18px'},
-        children=tab_children,
-    )
-
-    _target_tab = resolved_initial_tab
+    _target_tab = initial_tab if initial_tab in {'country-profile', 'operational-readiness', 'maternal-dashboard', 'newborn-dashboard'} else 'country-profile'
     if _target_tab == 'country-profile':
         _cp_disk_key = _dk('cp', _country_profile_cache_key(
             scope_meta, _opd_key, start_date, end_date, config.get('report_name'),
@@ -403,6 +489,64 @@ def render_mnid_dashboard(
     else:
         _initial_ec = [_mnid_loading_placeholder()]
 
+    executive_content['beginnings-shell'] = _render_beginnings_shell(
+        initial_tab=_target_tab,
+        hidden_mnid_tabs=_load_dashboard_tab_config().get('hidden_mnid_tabs', set()),
+        newborn_config=newborn_config,
+        initial_children=_initial_ec,
+    )
+
+    mnh_tab_specs = _load_dashboard_tab_config().get('mnh_tabs', [])
+    render_as_mnh_switcher = config.get('report_name') == 'Maternal Health' and bool(mnh_tab_specs)
+    outer_tab_style = {'padding': '12px 18px', 'borderRadius': '14px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#FFFFFF', 'color': TEXT}
+    outer_active_style = {'padding': '12px 18px', 'borderRadius': '14px', 'border': f'1px solid {BORDER}', 'backgroundColor': '#ECFDF5', 'color': '#166534', 'fontWeight': 700}
+
+    if render_as_mnh_switcher:
+        outer_values = [item.get('id') for item in mnh_tab_specs if item.get('id')]
+        resolved_view = initial_tab if initial_tab in outer_values else 'mnh-beginnings'
+        initial_view = (
+            _render_mnh_dashboard_view(
+                resolved_view,
+                _MNID_EXECUTIVE_DISK_CACHE.get(f'ed:{executive_token}') or {},
+                executive_content,
+            )
+            if resolved_view != 'mnh-beginnings' else html.Div()
+        )
+        _MNID_EXECUTIVE_DISK_CACHE.set(f'ec:{executive_token}', executive_content, expire=_MNID_UI_CACHE_TTL_SECONDS)
+        return html.Div(
+            className=f'mnid-bg{" mnid-theme-newborn" if dashboard_theme == "newborn" else ""}',
+            children=[
+                dcc.Store(id='mnid-executive-view-store', data=executive_token),
+                dcc.Store(id='mnid-preload-status'),
+                html.Div(
+                    className=f'mnid-shell{" mnid-shell-newborn" if dashboard_theme == "newborn" else ""}',
+                    children=[
+                        dcc.Tabs(
+                            id='mnid-mnh-view-tabs',
+                            value=resolved_view,
+                            style={'marginBottom': '18px'},
+                            children=[
+                                dcc.Tab(label=item.get('label'), value=item.get('id'), style=outer_tab_style, selected_style=outer_active_style)
+                                for item in mnh_tab_specs
+                            ],
+                        ),
+                        html.Div(
+                            id='mnid-beginnings-panel',
+                            children=[executive_content['beginnings-shell']],
+                            style={} if resolved_view == 'mnh-beginnings' else {'display': 'none'},
+                        ),
+                        html.Div(
+                            id='mnid-mnh-view-content',
+                            className='mnid-executive-content',
+                            children=[initial_view],
+                            style={} if resolved_view != 'mnh-beginnings' else {'display': 'none'},
+                        ),
+                    ],
+                ),
+                dcc.Interval(id='mnid-background-preload', interval=3000, n_intervals=0, max_intervals=1),
+            ],
+        )
+
     return html.Div(
         className=f'mnid-bg{" mnid-theme-newborn" if dashboard_theme == "newborn" else ""}',
         children=[
@@ -411,8 +555,7 @@ def render_mnid_dashboard(
             html.Div(
                 className=f'mnid-shell{" mnid-shell-newborn" if dashboard_theme == "newborn" else ""}',
                 children=[
-                    executive_tabs,
-                    html.Div(id='mnid-executive-content', className='mnid-executive-content', children=_initial_ec),
+                    executive_content['beginnings-shell'],
                 ],
             ),
             dcc.Interval(id='mnid-background-preload', interval=3000, n_intervals=0, max_intervals=1),
@@ -440,6 +583,40 @@ def _render_mnid_executive_tab(active_tab, executive_token):
         return html.Div(
             f'Tab failed to load ({selected}): {_exc}',
             style={'padding': '24px', 'color': '#dc2626', 'fontSize': '13px'},
+        )
+
+
+@callback(
+    Output('mnid-mnh-view-content', 'children'),
+    Output('mnid-beginnings-panel', 'style'),
+    Output('mnid-mnh-view-content', 'style'),
+    Input('mnid-mnh-view-tabs', 'value'),
+    State('mnid-executive-view-store', 'data'),
+    prevent_initial_call=False,
+)
+def _render_mnh_dashboard_tab(active_tab, executive_token):
+    if not executive_token:
+        raise PreventUpdate
+
+    views = _MNID_EXECUTIVE_DISK_CACHE.get(f'ec:{executive_token}') or {}
+    state = _MNID_EXECUTIVE_DISK_CACHE.get(f'ed:{executive_token}') or {}
+    selected = active_tab or 'mnh-beginnings'
+
+    try:
+        if selected == 'mnh-beginnings':
+            return html.Div(), {}, {'display': 'none'}
+        result = _render_mnh_dashboard_view(selected, state, views)
+        _MNID_EXECUTIVE_DISK_CACHE.set(f'ec:{executive_token}', views, expire=_MNID_UI_CACHE_TTL_SECONDS)
+        return result, {'display': 'none'}, {}
+    except Exception as exc:
+        _LOGGER.exception('Failed to render MNH dashboard tab %s: %s', selected, exc)
+        return (
+            html.Div(
+                f'Tab failed to load ({selected}): {exc}',
+                style={'padding': '24px', 'color': '#dc2626', 'fontSize': '13px'},
+            ),
+            {'display': 'none'},
+            {},
         )
 
 
@@ -479,7 +656,7 @@ def _update_country_profile_chart_grain(grain, stored_rows, meta):
     Output('mnid-preload-status', 'data'),
     Input('mnid-background-preload', 'n_intervals'),
     State('mnid-executive-view-store', 'data'),
-    State('mnid-executive-tabs', 'value'),
+    State('mnid-active-tab-store', 'data'),
     prevent_initial_call=False,
 )
 def _preload_mnid_executive_tabs(_tick, executive_token, active_tab):

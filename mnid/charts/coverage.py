@@ -265,9 +265,9 @@ def _coverage_heatmap_section(
                 ),
                 html.Div(className='mnid-performance-key', children=[
                     html.Div('Performance Color Scale', className='mnid-performance-key-title'),
-                    html.Div(className='mnid-performance-key-row', children=[html.Span('Excellent (>90%)'), html.Div(className='mnid-performance-swatch excellent')]),
-                    html.Div(className='mnid-performance-key-row', children=[html.Span('Moderate (60-80%)'), html.Div(className='mnid-performance-swatch moderate')]),
-                    html.Div(className='mnid-performance-key-row', children=[html.Span('Poor (<50%)'), html.Div(className='mnid-performance-swatch poor')]),
+                    html.Div(className='mnid-performance-key-row', children=[html.Span('On target (>=80%)'), html.Div(className='mnid-performance-swatch excellent')]),
+                    html.Div(className='mnid-performance-key-row', children=[html.Span('Below target (60-79%)'), html.Div(className='mnid-performance-swatch moderate')]),
+                    html.Div(className='mnid-performance-key-row', children=[html.Span('Poor (<60%)'), html.Div(className='mnid-performance-swatch poor')]),
                 ]),
                 html.Div(
                     id='mnid-performance-attention',

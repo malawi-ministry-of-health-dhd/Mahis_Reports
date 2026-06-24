@@ -22,8 +22,8 @@ _LOG = logging.getLogger(__name__)
 _DEFAULT_VIZ_DIR = os.path.join('data', 'visualizations')
 _DEFAULT_OUT_DIR = os.path.join('data', 'mnid_aggregates')
 
-_GRAINS = ['monthly', 'weekly', 'daily']
-_GRAIN_CODES = {'daily': 'D', 'weekly': 'W', 'monthly': 'M'}
+_GRAINS = ['monthly', 'weekly', 'daily', 'quarterly', 'yearly']
+_GRAIN_CODES = {'daily': 'D', 'weekly': 'W', 'monthly': 'M', 'quarterly': 'Q', 'yearly': 'Y'}
 
 
 def _load_all_indicators(viz_dir: str) -> list[dict]:

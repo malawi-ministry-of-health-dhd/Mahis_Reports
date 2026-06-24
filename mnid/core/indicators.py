@@ -202,14 +202,24 @@ def _program_based_priority_indicators(categories: list[str] | None = None) -> l
                 'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_visit_documented', 'value1': 'Yes'},
             },
             {
-                'id': 'mnid_nb_overview_001',
+                'id': 'mnid_lab_overview_005',
                 'label': 'Stillbirths',
-                'category': 'Newborn',
+                'category': 'Labour',
                 'target': 5,
                 'target_mode': 'min',
                 'status': 'overview_only',
                 'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_stillbirth', 'value1': 'Yes'},
                 'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_visit_documented', 'value1': 'Yes'},
+            },
+            {
+                'id': 'mnid_nb_overview_001',
+                'label': 'Outborn babies',
+                'category': 'Newborn',
+                'target': 10,
+                'target_mode': 'min',
+                'status': 'overview_only',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_outborn', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn'},
             },
             {
                 'id': 'mnid_lab_prog_008',
@@ -298,7 +308,10 @@ def _program_based_priority_indicators(categories: list[str] | None = None) -> l
                 'target': 80,
                 'status': 'tracked',
                 'numerator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Place of delivery', 'variable2': 'obs_value_coded', 'value2': ['This facility', 'this facility']},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
+                # Denominator = women who had a delivery outcome recorded, not every Labour visit.
+                # Using all Labour patients inflates the denominator with assessments that did not
+                # result in a delivery at this facility (e.g. early-labour checks, referrals).
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'concept_name', 'value1': 'Outcome of the delivery'},
             },
             {
                 'id': 'mnid_lab_pdf_004',
@@ -475,7 +488,7 @@ def _program_based_priority_indicators(categories: list[str] | None = None) -> l
                 'target': 80,
                 'status': 'overview_only',
                 'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_kmc', 'value1': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_lbw_kmc_eligible', 'value1': 'Yes'},
             },
             {
                 'id': 'mnid_nb_prog_002',
@@ -511,7 +524,11 @@ def _program_based_priority_indicators(categories: list[str] | None = None) -> l
                 'target': 80,
                 'status': 'tracked',
                 'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_kmc', 'value1': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn'},
+                # KMC is indicated for babies ≤ 1999g (very low / low birth weight).
+                # Using all Newborn admissions as denominator artificially deflates coverage
+                # because term babies (~2500g+) are not eligible for KMC.
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_lbw_kmc_eligible', 'value1': 'Yes'},
+                'note': 'Denominator restricted to babies 1000–1999g (eligible for KMC). Babies ≥ 2000g at birth are excluded.',
             },
             {
                 'id': 'mnid_nb_prog_008',
@@ -555,6 +572,16 @@ def _program_based_priority_indicators(categories: list[str] | None = None) -> l
                 'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_pulse_oximeter_admission', 'value1': 'Yes'},
                 'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Newborn'},
                 'note': 'Tracked using pulse oximeter or oxygen saturation documentation captured at neonatal admission.',
+            },
+            {
+                'id': 'mnid_nb_prog_011b',
+                'label': 'Babies between 1500-1999g who receive prophylactic CPAP',
+                'category': 'Newborn',
+                'target': 80,
+                'status': 'tracked',
+                'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_newborn_cpap_1500_1999', 'value1': 'Yes'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_birth_weight_band', 'value1': '1500-1999g'},
+                'note': 'Tracked from birth-weight bands plus newborn CPAP treatment observations already normalized into the parquet. This remains a weight-band proxy because respiratory distress syndrome is not modeled separately.',
             },
             {
                 'id': 'mnid_nb_prog_012',
@@ -1015,6 +1042,7 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
             'note': 'Tracked from birth-weight bands plus newborn CPAP treatment observations already normalized into the parquet.',
         },
         'Eligible babies between 1500 and 1999g who receive CPAP': {
+            'label': 'Babies between 1500-1999g who receive prophylactic CPAP',
             'status': 'tracked',
             'numerator_filters': {
                 'unique': 'person_id',

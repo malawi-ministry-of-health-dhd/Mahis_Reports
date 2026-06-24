@@ -397,6 +397,15 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
         'mnid_labour_facility_birth',
         labour_mask & concept.eq('Place of delivery') & combined_lower.eq('this facility'),
     )
+    # Outborn = delivered OUTSIDE this facility. Must be restricted to labour records
+    # so it fires on the same encounter as mnid_labour_facility_birth, not on ANC/PNC rows.
+    # Note: in systems where mother and baby share a person_id this flag propagates to
+    # the baby's Newborn row; in systems with separate baby person_ids an additional
+    # "admission source" concept in the neonatal record should supplement this flag.
+    _assign_flag(
+        'mnid_newborn_outborn',
+        labour_like_mask & concept.eq('Place of delivery') & ~combined_lower.isin(['', 'this facility']),
+    )
     _assign_flag(
         'mnid_labour_csection',
         labour_mask & concept.eq('Mode of delivery') & combined_lower.eq('caesarean section'),
@@ -764,6 +773,11 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
     person_ctx['mnid_newborn_kmc_eligible'] = (
         _ctx_series('mnid_newborn_kmc').eq('Yes')
         & _ctx_series('mnid_birth_weight_band').isin(['1000-1499g', '1500-1999g'])
+    ).map({True: 'Yes', False: ''})
+    # Babies ≤ 1999g are eligible for KMC regardless of whether they received it.
+    # Used as the denominator for the KMC coverage indicator.
+    person_ctx['mnid_newborn_lbw_kmc_eligible'] = (
+        _ctx_series('mnid_birth_weight_band').isin(['1000-1499g', '1500-1999g'])
     ).map({True: 'Yes', False: ''})
     person_ctx['mnid_newborn_low_birthweight'] = (
         _ctx_series('mnid_birth_weight_band').isin(['1000-1499g', '1500-1999g', '2000-2499g'])
