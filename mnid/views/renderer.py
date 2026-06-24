@@ -388,8 +388,40 @@ def _render_mnh_dashboard_view(selected_view: str, state: dict, views: dict):
                 style={'padding': '24px', 'color': '#DC2626', 'fontSize': '13px'},
             )
 
-    label_map = {item.get('id'): item.get('label') for item in state.get('mnh_tab_specs') or []}
-    return _render_mnh_placeholder(label_map.get(selected_view, 'MNH-Nest360'))
+    # Generic path: load the module declared in mnh_tab_specs for this tab id
+    tab_specs = state.get('mnh_tab_specs') or []
+    spec = next((t for t in tab_specs if t.get('id') == selected_view), None)
+    if spec and spec.get('module') and not spec.get('placeholder'):
+        folder_name = spec['module'].split('/')[-1]  # e.g. "mnid/dashboards/MNH-Nest360" → "MNH-Nest360"
+        if selected_view in views:
+            return views[selected_view]
+        network_df  = _get_network_df_from_state(state)
+        facility_df = _get_facility_df_from_state(state, network_df=network_df)
+        try:
+            module      = load_dashboard_module(folder_name)
+            render_fn   = getattr(module, (module.__all__ or [None])[0], None)
+            if render_fn is None:
+                raise AttributeError(f'No render function declared in __all__ for {folder_name}')
+            rendered = render_fn(
+                facility_df=facility_df,
+                network_df=network_df,
+                maternal_config=state.get('config') or {},
+                newborn_config=state.get('newborn_config'),
+                start_date=state.get('start_date'),
+                end_date=state.get('end_date'),
+                scope_meta=state.get('scope_meta'),
+            )
+            views[selected_view] = rendered
+            return rendered
+        except Exception as exc:
+            _LOGGER.exception('Failed to render %s dashboard: %s', folder_name, exc)
+            return html.Div(
+                f'{folder_name} failed to load: {exc}',
+                style={'padding': '24px', 'color': '#DC2626', 'fontSize': '13px'},
+            )
+
+    label_map = {item.get('id'): item.get('label') for item in tab_specs}
+    return _render_mnh_placeholder(label_map.get(selected_view, selected_view))
 
 
 def render_mnid_dashboard(

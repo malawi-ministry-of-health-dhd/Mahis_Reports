@@ -1,4 +1,7 @@
+"""Nest360 Newborn & Neonatal indicators."""
+
 def get_nest360_indicators():
+
     return [
         {
             'id': 'nest360_glucose_monitored_at_admission',
