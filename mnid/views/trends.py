@@ -541,5 +541,9 @@ def update_trend_chart(n_clicks_list, location, selected_inds, grain, stored_tre
         default_ind_values if cat_changed else selected_inds,
         scope_meta, agg_df=_agg_now, fallback_df=_df_full, grain=grain,
     )
-    classes = ['mnid-filter-btn active' if c == cat else 'mnid-filter-btn' for c in categories]
+    # Truncate to match the number of buttons actually on the page.
+    # On initial page load the maternal tab hasn't rendered yet so n_clicks_list=[]
+    # — returning an empty list avoids the "Expected 0, got N" callback error.
+    all_classes = ['mnid-filter-btn active' if c == cat else 'mnid-filter-btn' for c in categories]
+    classes = all_classes[:len(n_clicks_list)]
     return cards, cat, classes, loc_options, ind_options, ind_value_out
