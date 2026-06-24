@@ -43,3 +43,5 @@ docs/
 data/mnid_aggregates/
 # data/visualizations/dashboard_tabs_config.json
 .mnid_exec_cache/
+/.junie/
+/.idea/
