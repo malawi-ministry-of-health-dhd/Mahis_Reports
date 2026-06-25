@@ -751,6 +751,28 @@ layout = html.Div(
                                                 )
                                             ]
                                         ),
+
+                                        # Facility Level Filter (MOH only)
+                                        html.Div(
+                                            id="dashboard-moh-level-filter-group",
+                                            className="filter-group",
+                                            style={'display': 'none'},
+                                            children=[
+                                                html.Label("Facility Level", className="filter-label"),
+                                                dcc.Dropdown(
+                                                    id='dashboard-moh-level-filter',
+                                                    options=[
+                                                        {'label': 'All', 'value': 'All'},
+                                                        {'label': 'Primary', 'value': 'Primary'},
+                                                        {'label': 'Secondary', 'value': 'Secondary'},
+                                                        {'label': 'Tertiary', 'value': 'Tertiary'},
+                                                    ],
+                                                    value='All',
+                                                    clearable=False,
+                                                    className="modern-dropdown"
+                                                )
+                                            ]
+                                        ),
                                     ]
                                 ),
                                 
@@ -934,7 +956,8 @@ def _save_mnid_executive_tab(tab_value):
         Input('dashboard-overview-filter', 'value'),
         Input('dashboard-category-filter', 'value'),
         Input({"type": "menu-button", "name": ALL}, "n_clicks"),
-        Input('url', 'pathname')
+        Input('url', 'pathname'),
+        Input('dashboard-moh-level-filter', 'value'),
     ],
     [
         State('url-params-store', 'data'),
@@ -945,7 +968,7 @@ def _save_mnid_executive_tab(tab_value):
 )
 def update_dashboard(gen, start_date, end_date, level,
                      districts, facilities, overview, category,
-                     menu_clicks, pathname, urlparams, age, current_active, active_mnid_tab):
+                     menu_clicks, pathname, moh_level, urlparams, age, current_active, active_mnid_tab):
     try:
         ctx = callback_context
         triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else None
@@ -1222,6 +1245,7 @@ def update_dashboard(gen, start_date, end_date, level,
                 'end_dt': end_dt.isoformat(),
                 'initial_mnid_tab': initial_mnid_tab,
                 'mnid_only_request': mnid_only_request,
+                'facility_level': moh_level or 'All',
             },
         )
     except PreventUpdate:
@@ -1400,6 +1424,7 @@ def render_dashboard_content(render_state):
                         'selected_districts': districts,
                         'data_period_note': data_period_note,
                         'dataset_version': dataset_version,
+                        'facility_level': render_state.get('facility_level', 'All'),
                     },
                     url_object=url_object,
                     initial_tab=initial_mnid_tab,
@@ -1514,3 +1539,14 @@ def toggle_age_group_visibility(active_report):
         program_style = {'display': 'none'}
 
     return age_style, program_style
+
+
+@callback(
+    Output('dashboard-moh-level-filter-group', 'style'),
+    Input('active-button-store', 'data'),
+)
+def toggle_moh_level_visibility(active_report):
+    report = str(active_report or '').strip().lower()
+    if report == 'maternal health':
+        return {}
+    return {'display': 'none'}

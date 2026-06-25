@@ -37,25 +37,10 @@ BG = '#F9FAFB'
 GRID = '#F1F5F9'
 
 SECTION_TABS = [
-    ('Overview', 'mnh-moh-overview'),
-    ('Antenatal Care', 'mnh-moh-anc'),
+    ('ANC', 'mnh-moh-anc'),
     ('Labour & Delivery', 'mnh-moh-labour'),
-    ('Maternal Outcomes', 'mnh-moh-maternal'),
-    ('Newborn', 'mnh-moh-newborn'),
     ('Postnatal Care', 'mnh-moh-pnc'),
-    ('HIV & PMTCT', 'mnh-moh-hiv'),
-    ('Referrals', 'mnh-moh-referrals'),
-    ('Signal Functions', 'mnh-moh-quality'),
-    ('Data Quality', 'mnh-moh-data-quality'),
 ]
-
-SECTION_RULES = {
-    'mnh-moh-maternal': ('maternal', 'death', 'caesarean', 'live birth', 'stillbirth'),
-    'mnh-moh-newborn': ('newborn', 'neonatal', 'birth weight', 'vitamin k', 'kmc', 'phototherapy', 'cpap'),
-    'mnh-moh-hiv': ('hiv', 'pmtct', 'syphilis', 'art'),
-    'mnh-moh-referrals': ('referral', 'complication', 'pph', 'eclampsia', 'sepsis', 'obstructed'),
-    'mnh-moh-quality': ('partograph', 'blood pressure', 'temperature', 'pulse oximeter', 'bilirubin', 'resuscitation', 'magnesium', 'antibiotic', 'screened'),
-}
 
 
 def _period_label(start_date, end_date) -> str:
@@ -124,20 +109,14 @@ def _indicator_value(indicators: list[dict], labels: tuple[str, ...], *, contain
 
 
 def _indicator_bucket(indicator: dict) -> str:
-    label = str(indicator.get('label', '')).lower()
     category = str(indicator.get('category', '')).lower()
-    for section_id, tokens in SECTION_RULES.items():
-        if any(token in label for token in tokens):
-            return section_id
     if category == 'anc':
         return 'mnh-moh-anc'
     if category == 'labour':
         return 'mnh-moh-labour'
     if category == 'pnc':
         return 'mnh-moh-pnc'
-    if category == 'newborn':
-        return 'mnh-moh-newborn'
-    return 'mnh-moh-overview'
+    return 'mnh-moh-anc'
 
 
 def _badge(label: str, color: str = MUTED, bg: str = '#F3F4F6', border: str = BORDER) -> html.Span:
@@ -648,6 +627,11 @@ def render_mnh_moh_dashboard(
     selected_facilities, selected_facility_codes, selected_districts = _resolve_scope_filters(network_df, scope_meta)
     district_filter = None if selected_facility_codes else (selected_districts or None)
 
+    # mohupdate: filter by facility level (Primary/Secondary/Tertiary)
+    moh_level = (scope_meta or {}).get('facility_level', 'All')
+    if moh_level != 'All' and 'Facility_Type' in working_df.columns:
+        working_df = working_df[working_df['Facility_Type'] == moh_level]
+
     source_indicators = []
     seen_ids = set()
     for indicator in (maternal_config.get('priority_indicators') or []) + ((newborn_config or {}).get('priority_indicators') or []):
@@ -664,115 +648,127 @@ def render_mnh_moh_dashboard(
     category_order = _resolve_category_order(source_indicators, ['ANC', 'Labour', 'PNC', 'Newborn'])
     agg_df = _get_aggregate()
 
+    # mohupdate: filter out tertiary-only indicators when level is not Tertiary/All
+    def _is_visible(ind: dict) -> bool:
+        ind_level = ind.get('level', '')
+        if ind_level == 'tertiary' and moh_level not in ('All', 'Tertiary'):
+            return False
+        return True
+
     computed = [
         _compute_indicator(working_df, indicator, agg_df, start_date, end_date, selected_facility_codes or None, district_filter)
         for indicator in source_indicators
-        if indicator.get('status') != 'awaiting_baseline'
+        if indicator.get('status') != 'awaiting_baseline' and _is_visible(indicator)
     ]
-    overview = [item for item in computed if item.get('status') == 'overview_only']
     tracked = [item for item in computed if item.get('status') != 'overview_only']
-    all_indicators = overview + tracked
+    overview = [item for item in computed if item.get('status') == 'overview_only']
 
-    readiness = [
-        _compute_indicator(working_df, indicator, agg_df, start_date, end_date, selected_facility_codes or None, district_filter)
-        for indicator in _readiness_indicators(maternal_config, newborn_config)
-    ]
-
-    service_clients = {
-        service: int(working_df.loc[working_df['Service_Area'].eq(service), 'person_id'].astype(str).nunique())
-        for service in category_order
-        if {'Service_Area', 'person_id'}.issubset(working_df.columns)
-    }
     active_facilities = int(working_df['Facility_CODE'].astype(str).nunique()) if 'Facility_CODE' in working_df.columns else 0
     active_districts = int(working_df['District'].astype(str).nunique()) if 'District' in working_df.columns else 0
-    completeness = _safe_pct(int(working_df['person_id'].notna().sum()) if 'person_id' in working_df.columns else 0, len(working_df))
 
-    maternal_deaths = _indicator_value(all_indicators, ('Maternal Deaths',), contains=('maternal', 'death'))
-    neonatal_deaths = _indicator_value(all_indicators, ('Newborn Deaths', 'Neonatal Deaths'), contains=('neonatal', 'death'))
-    stillbirths = _indicator_value(all_indicators, ('Stillbirths',), contains=('stillbirth',))
-    live_births = _indicator_value(all_indicators, ('Live Births',), contains=('live', 'birth'))
-    total_births = live_births + stillbirths
-    maternity_admissions = service_clients.get('ANC', 0) + service_clients.get('Labour', 0) + service_clients.get('PNC', 0)
-    newborn_admissions = service_clients.get('Newborn', 0)
-    complication_burden = sum(
-        int(item.get('numerator', 0) or 0)
-        for item in all_indicators
-        if any(token in str(item.get('label', '')).lower() for token in ('complication', 'pph', 'eclampsia', 'sepsis', 'obstructed'))
-    )
-    maternal_rate = _safe_pct(maternal_deaths, live_births, 100000)
-    neonatal_rate = _safe_pct(neonatal_deaths, live_births, 1000)
-    stillbirth_rate = _safe_pct(stillbirths, total_births, 1000)
-
-    period_text = _period_label(start_date, end_date)
     short_period = _short_period_label(start_date, end_date)
     buckets = defaultdict(list)
     for item in tracked:
         buckets[_indicator_bucket(item)].append(item)
-    data_quality_items = [
-        item for item in readiness
-        if any(token in str(item.get('label', '')).lower() for token in ('data', 'completeness', 'timeliness'))
-    ]
-    signal_items = [
-        item for item in readiness
-        if item not in data_quality_items
-    ]
 
-    outcome_values = [
-        ('Live births', live_births, GREEN),
-        ('Stillbirths', stillbirths, PURPLE),
-        ('Maternal deaths', maternal_deaths, RED),
-        ('Neonatal deaths', neonatal_deaths, AMBER),
-    ]
+    # build custom ANC tab with 3 sub-sections
+    anc_overview = [item for item in overview if str(item.get('category', '')).lower() == 'anc']
+    anc_tracked  = [item for item in tracked  if str(item.get('category', '')).lower() == 'anc']
+    anc_screening = [item for item in anc_tracked if item.get('sub_category') == 'screening']
+    anc_clinical  = [item for item in anc_tracked if item.get('sub_category') == 'clinical']
 
-    overview_tab = html.Div(
-        id='mnh-moh-overview',
-        style={'scrollMarginTop': '112px'},
-        children=[
-            _page_title(),
-            _priority_alert(maternal_deaths, neonatal_deaths, stillbirths, complication_burden, maternal_rate, neonatal_rate, stillbirth_rate),
-            _section_heading('Country summary - current reporting period'),
-            html.Div(
-                style={'display': 'grid', 'gridTemplateColumns': 'repeat(auto-fit, minmax(170px, 1fr))', 'gap': '8px', 'marginBottom': '14px'},
-                children=[
-                    _kpi_card('Maternity admissions', f'{maternity_admissions:,}', 'ANC, labour & PNC', GREEN),
-                    _kpi_card('NCU admissions', f'{newborn_admissions:,}', 'Newborn care', TEAL),
-                    _kpi_card('Total births', f'{total_births:,}', 'Live births & stillbirths', BLUE),
-                    _kpi_card('Live births', f'{live_births:,}', 'Recorded live outcome', GREEN),
-                    _kpi_card('Stillbirths', f'{stillbirths:,}', 'Current period', PURPLE, 'critical' if stillbirths else None),
-                    _kpi_card('Maternal deaths', f'{maternal_deaths:,}', 'Deaths in scope', RED, 'critical' if maternal_deaths else None),
-                    _kpi_card('Neonatal deaths', f'{neonatal_deaths:,}', 'Deaths in scope', AMBER, 'critical' if neonatal_deaths else None),
-                ],
-            ),
-            _section_heading('Mortality snapshot - immediate attention required'),
-            html.Div(
-                style={'display': 'grid', 'gridTemplateColumns': 'repeat(auto-fit, minmax(300px, 1fr))', 'gap': '12px', 'marginBottom': '6px'},
-                children=[
-                    _mortality_card('Maternal deaths', maternal_deaths, 'MMR per 100k live births', maternal_rate, 'red'),
-                    _mortality_card('Neonatal deaths', neonatal_deaths, 'NMR per 1,000 live births', neonatal_rate, 'amber'),
-                    _mortality_card('Stillbirths', stillbirths, 'SBR per 1,000 total births', stillbirth_rate, 'purple', _stillbirth_split_card(stillbirths)),
-                ],
-            ),
-            _section_heading('Mortality trends - 12-month run charts'),
-            html.Div(
-                style={'display': 'grid', 'gridTemplateColumns': 'repeat(auto-fit, minmax(420px, 1fr))', 'gap': '12px', 'marginBottom': '12px'},
-                children=[
-                    _chart_card('Total service volume', 'MNH client volume over time', _service_volume_fig(working_df), f'Monthly data - {short_period}'),
-                    _chart_card('Outcome mix', 'Counts in the selected reporting window', _outcome_bar_fig(outcome_values), f'Monthly data - {short_period}'),
-                ],
-            ),
-        ],
-    )
+    def _overview_val(items: list[dict], label: str) -> int:
+        for item in items:
+            if str(item.get('label', '')).strip().lower() == label.lower():
+                return int(item.get('numerator', 0) or 0)
+        return 0
+
+    sum_total  = _overview_val(anc_overview, 'Clients registered at facility')
+    sum_new    = _overview_val(anc_overview, 'New ANC registrations')
+    sum_cont   = _overview_val(anc_overview, 'Continuing ANC clients')
+
+    anc_tab = html.Div(children=[
+        html.Div(
+            style={'display': 'grid', 'gridTemplateColumns': 'repeat(auto-fit, minmax(200px, 1fr))', 'gap': '10px', 'marginBottom': '18px'},
+            children=[
+                _kpi_card('Clients registered', f'{sum_total:,}', 'Total ANC clients in scope', GREEN),
+                _kpi_card('New registrations', f'{sum_new:,}', 'First-time ANC clients', BLUE),
+                _kpi_card('Continuing clients', f'{sum_cont:,}', 'Returning ANC clients', TEXT),
+            ],
+        ),
+        _indicator_panel('Screening & Testing', 'HIV, syphilis, Hepatitis B, Hb, ultrasound and uterine scar screening rates', anc_screening, 'mnh-moh-anc-screening'),
+        _indicator_panel('Clinical & Preventive', 'First trimester initiation, contact frequency, supplements and ITN coverage', anc_clinical, 'mnh-moh-anc-clinical'),
+    ])
+
+    # build custom Labour tab with sub-sections
+    lab_overview = [item for item in overview if str(item.get('category', '')).lower() == 'labour']
+    lab_tracked  = [item for item in tracked  if str(item.get('category', '')).lower() == 'labour']
+    lab_delivery   = [item for item in lab_tracked if item.get('sub_category') == 'delivery_care']
+    lab_mortality  = [item for item in lab_tracked if item.get('sub_category') in ('mortality', 'complications')]
+    lab_referrals  = [item for item in lab_tracked if item.get('sub_category') == 'referrals']
+    lab_hiv        = [item for item in lab_tracked if item.get('sub_category') == 'hiv_care']
+    lab_outcomes   = [item for item in lab_tracked if item.get('sub_category') == 'outcomes']
+    lab_signal     = [item for item in lab_tracked if item.get('sub_category') == 'signal_functions']
+
+    lab_delivered    = _overview_val(lab_overview, 'Delivered at this facility')
+    lab_home_birth   = _overview_val(lab_overview, 'Delivered at home or in transit')
+    lab_mat_deaths   = _overview_val(lab_overview, 'Institutional maternal deaths')
+    lab_hiv_pos      = _overview_val(lab_overview, 'HIV positive clients in Labour')
+
+    lab_tab = html.Div(children=[
+        html.Div(
+            style={'display': 'grid', 'gridTemplateColumns': 'repeat(auto-fit, minmax(200px, 1fr))', 'gap': '10px', 'marginBottom': '18px'},
+            children=[
+                _kpi_card('Facility deliveries', f'{lab_delivered:,}', 'Delivered at this facility', GREEN),
+                _kpi_card('Home deliveries', f'{lab_home_birth:,}', 'Home or in transit', AMBER),
+                _kpi_card('Maternal deaths', f'{lab_mat_deaths:,}', 'Institutional deaths', RED, 'critical' if lab_mat_deaths else None),
+                _kpi_card('HIV positive', f'{lab_hiv_pos:,}', 'In Labour', PURPLE),
+            ],
+        ),
+        _indicator_panel('Delivery Care', 'Skilled attendance, delivery mode and newborn thermal care', lab_delivery, 'mnh-moh-labour-delivery'),
+        _indicator_panel('Complications & Mortality', 'Obstetric complications and maternal death by cause', lab_mortality, 'mnh-moh-labour-mortality'),
+        _indicator_panel('Referrals', 'Referral rate and referral reasons by condition', lab_referrals, 'mnh-moh-labour-referrals'),
+        _indicator_panel('HIV & Prophylaxis', 'HIV positive on ART and exposed baby ART prophylaxis', lab_hiv, 'mnh-moh-labour-hiv'),
+        _indicator_panel('Birth Outcomes', 'Fresh and macerated stillbirth, live births and neonatal deaths per 1000', lab_outcomes, 'mnh-moh-labour-outcomes'),
+        _indicator_panel('Signal Functions', '9 CEmONC signal functions (tertiary only)', lab_signal, 'mnh-moh-labour-signal'),
+    ])
+
+    # build custom PNC tab with sub-sections
+    pnc_overview = [item for item in overview if str(item.get('category', '')).lower() == 'pnc']
+    pnc_tracked  = [item for item in tracked  if str(item.get('category', '')).lower() == 'pnc']
+    pnc_complications = [item for item in pnc_tracked if item.get('sub_category') == 'complications']
+    pnc_follow_up     = [item for item in pnc_tracked if item.get('sub_category') == 'follow_up']
+    pnc_hiv           = [item for item in pnc_tracked if item.get('sub_category') == 'hiv_care']
+    pnc_immunization  = [item for item in pnc_tracked if item.get('sub_category') == 'immunization']
+    pnc_nutrition     = [item for item in pnc_tracked if item.get('sub_category') == 'nutrition']
+    pnc_fp            = [item for item in pnc_tracked if item.get('sub_category') == 'family_planning']
+
+    pnc_mothers_admitted = _overview_val(pnc_overview, 'Mothers admitted to postnatal ward')
+    pnc_babies_admitted  = _overview_val(pnc_overview, 'Babies admitted to postnatal ward')
+    pnc_hiv_exposed      = _overview_val(pnc_overview, 'HIV exposed babies')
+    pnc_underweight      = _overview_val(pnc_overview, 'Underweight babies')
+
+    pnc_tab = html.Div(children=[
+        html.Div(
+            style={'display': 'grid', 'gridTemplateColumns': 'repeat(auto-fit, minmax(200px, 1fr))', 'gap': '10px', 'marginBottom': '18px'},
+            children=[
+                _kpi_card('Mothers admitted', f'{pnc_mothers_admitted:,}', 'Admitted to postnatal ward', GREEN),
+                _kpi_card('Babies admitted', f'{pnc_babies_admitted:,}', 'Admitted to postnatal ward', BLUE),
+                _kpi_card('HIV exposed babies', f'{pnc_hiv_exposed:,}', 'Babies of HIV+ mothers', PURPLE),
+                _kpi_card('Underweight babies', f'{pnc_underweight:,}', 'LBW babies', AMBER),
+            ],
+        ),
+        _indicator_panel('Follow-up Timing', '7-day and 6-week postnatal checks', pnc_follow_up, 'mnh-moh-pnc-followup'),
+        _indicator_panel('Complications', 'Maternal and newborn postnatal complications', pnc_complications, 'mnh-moh-pnc-complications'),
+        _indicator_panel('HIV & Prophylaxis', 'HIV positive mothers, exposed babies and ART prophylaxis', pnc_hiv, 'mnh-moh-pnc-hiv'),
+        _indicator_panel('Immunization & Nutrition', 'BCG, Polio 0, KMC for LBW, underweight and exclusive breastfeeding', pnc_immunization + pnc_nutrition, 'mnh-moh-pnc-imm-nut'),
+        _indicator_panel('Family Planning', 'Immediate postpartum family planning counselling', pnc_fp, 'mnh-moh-pnc-fp'),
+    ])
+
     tab_defs = [
-        ('Overview', 'overview', overview_tab),
-        ('Antenatal Care', 'anc', _indicator_panel('Antenatal Care', 'Coverage, screening and supplement indicators across the current scope', buckets.get('mnh-moh-anc', []), 'mnh-moh-anc')),
-        ('Labour & Delivery', 'labour', _indicator_panel('Labour & Delivery', 'Delivery activity, outcomes and labour quality indicators', buckets.get('mnh-moh-labour', []), 'mnh-moh-labour')),
-        ('Maternal Outcomes', 'maternal', _indicator_panel('Maternal Outcomes', 'Mortality rates, complications and MMR signals', buckets.get('mnh-moh-maternal', []), 'mnh-moh-maternal')),
-        ('Newborn', 'newborn', _indicator_panel('Newborn & Birth Outcomes', 'Birth outcomes, newborn care and neonatal mortality indicators', buckets.get('mnh-moh-newborn', []), 'mnh-moh-newborn')),
-        ('Postnatal Care', 'pnc', _indicator_panel('Postnatal Care', 'Follow-up checks, postnatal complications and continuity indicators', buckets.get('mnh-moh-pnc', []), 'mnh-moh-pnc')),
-        ('HIV & PMTCT', 'hiv', _indicator_panel('HIV & PMTCT', 'HIV status, ART and PMTCT cascade indicators', buckets.get('mnh-moh-hiv', []), 'mnh-moh-hiv')),
-        ('Referrals', 'referrals', _indicator_panel('Referrals & Complications', 'Referral rate, patterns by condition and complication burden', buckets.get('mnh-moh-referrals', []), 'mnh-moh-referrals')),
-        ('Signal Functions', 'quality', _indicator_panel('Signal Functions', 'Operational readiness and signal-function proxy indicators', signal_items, 'mnh-moh-quality')),
-        ('Data Quality', 'data-quality', _indicator_panel('Data Quality', 'Documentation quality and completeness signals', data_quality_items, 'mnh-moh-data-quality')),
+        ('ANC', 'mnh-moh-anc', anc_tab),
+        ('Labour & Delivery', 'mnh-moh-labour', lab_tab),
+        ('Postnatal Care', 'mnh-moh-pnc', pnc_tab),
     ]
 
     return html.Div(
