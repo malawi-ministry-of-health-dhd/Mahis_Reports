@@ -55,3 +55,16 @@ from mnid.views.renderer import (  # noqa: F401
     _render_mnid_executive_tab, _update_country_profile_chart_grain,
     _preload_mnid_executive_tabs,
 )
+
+# Pre-load dashboard modules whose layout.py files contain @callback decorators.
+# Dash only processes callbacks that are registered BEFORE the server starts.
+# If we loaded these lazily (on first user click), the callbacks would never fire.
+def _preload_dashboard_modules():
+    from mnid.dashboards import load_dashboard_module
+    for folder in ('MNH-Nest360',):
+        try:
+            load_dashboard_module(folder)
+        except Exception:
+            pass
+
+_preload_dashboard_modules()
