@@ -2106,6 +2106,29 @@ def create_html_report_modal():
                              "fontSize": "12px", "fontFamily": "monospace"}),
             html.Button("Apply", id="rpt-apply-font-btn", n_clicks=0, style=btn_style),
             sep,
+            # Text style group
+            html.Span("Text", style={"fontSize": "11px", "color": "#6b7280",
+                                     "fontWeight": "600", "alignSelf": "center"}),
+            html.Button("B", id="rpt-bold-btn", n_clicks=0,
+                        style={**btn_style, "fontWeight": "700", "minWidth": "28px"}),
+            html.Button("I", id="rpt-italic-btn", n_clicks=0,
+                        style={**btn_style, "fontStyle": "italic", "minWidth": "28px"}),
+            sep,
+            # Alignment group
+            html.Span("Align", style={"fontSize": "11px", "color": "#6b7280",
+                                      "fontWeight": "600", "alignSelf": "center"}),
+            html.Button("≡←", id="rpt-align-left-btn",   n_clicks=0, style={**btn_style, "minWidth": "34px"}),
+            html.Button("≡≡", id="rpt-align-center-btn", n_clicks=0, style={**btn_style, "minWidth": "34px"}),
+            html.Button("≡→", id="rpt-align-right-btn",  n_clicks=0, style={**btn_style, "minWidth": "34px"}),
+            sep,
+            # Indent group
+            html.Span("Indent", style={"fontSize": "11px", "color": "#6b7280",
+                                       "fontWeight": "600", "alignSelf": "center"}),
+            html.Button("⇥", id="rpt-indent-btn", n_clicks=0,
+                        style={**btn_style, "minWidth": "32px", "title": "Indent"}),
+            html.Button("⇤", id="rpt-dedent-btn", n_clicks=0,
+                        style={**btn_style, "minWidth": "32px", "title": "Dedent"}),
+            sep,
             # Title & remove
             html.Button("+Title ↑",  id="rpt-title-above-btn",  n_clicks=0, style=btn_style),
             html.Button("+Title ↓",  id="rpt-title-below-btn",  n_clicks=0, style=btn_style),
@@ -2142,8 +2165,15 @@ def create_html_report_modal():
                 style={
                     "flex": "1", "overflowY": "auto", "overflowX": "auto",
                     "position": "relative",
-                    "background": "white radial-gradient(circle, #d1d5db 1px, transparent 1px) 24px 24px",
-                    "backgroundSize": "24px 24px",
+                    "backgroundColor": "#ffffff",
+                    "backgroundImage": (
+                        "linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px),"
+                        "linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px),"
+                        "linear-gradient(rgba(0,0,0,0.08) 1px, transparent 1px),"
+                        "linear-gradient(90deg, rgba(0,0,0,0.08) 1px, transparent 1px)"
+                    ),
+                    "backgroundSize": "8px 8px, 8px 8px, 40px 40px, 40px 40px",
+                    "backgroundPosition": "-1px -1px, -1px -1px, -1px -1px, -1px -1px",
                     "minHeight": "400px",
                 },
                 children=[],

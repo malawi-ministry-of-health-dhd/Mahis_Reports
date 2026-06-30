@@ -541,7 +541,6 @@ class ReportTableBuilder:
 
         rows = []
         for r_idx, row_cells in enumerate(data):
-            is_header_row = (r_idx == 0)
             h = row_heights[r_idx] if r_idx < len(row_heights) else 28
             tds = []
             vis_col = 0
@@ -554,14 +553,18 @@ class ReportTableBuilder:
                              if raw_v and raw_v in self.filters_map
                              else raw_v)
 
-                fill  = cell.get("fill",  "#ffffff")
-                color = cell.get("color", "#000000")
-                cs    = cell.get("cs", 1)
-                rs    = cell.get("rs", 1)
+                fill   = cell.get("fill",   "#ffffff")
+                color  = cell.get("color",  "#000000")
+                cs     = cell.get("cs", 1)
+                rs     = cell.get("rs", 1)
+                bold   = cell.get("bold",   False)
+                italic = cell.get("italic", False)
+                align  = cell.get("align",  "left")
+                indent = cell.get("indent", 0)
 
                 w = col_widths[vis_col] if vis_col < len(col_widths) else 120
+                pl = 8 + indent * 20
 
-                is_name_col = (c_idx == 0)
                 tds.append(html.Td(
                     display_v,
                     colSpan=cs,
@@ -572,11 +575,15 @@ class ReportTableBuilder:
                         "width":         f"{w}px",
                         "minWidth":      f"{w}px",
                         "height":        f"{h}px",
-                        "padding":       "4px 8px",
+                        "paddingTop":    "4px",
+                        "paddingBottom": "4px",
+                        "paddingLeft":   f"{pl}px",
+                        "paddingRight":  "8px",
                         "border":        "1px solid #d1d5db",
                         "fontSize":      "15px",
-                        # "fontWeight":    "700" if (is_header_row or is_name_col) else "200",
-                        "textAlign":     "left" if (is_name_col and not is_header_row) else "left",
+                        "fontWeight":    "bold" if bold else "normal",
+                        "fontStyle":     "italic" if italic else "normal",
+                        "textAlign":     align,
                         "whiteSpace":    "normal",
                         "wordBreak":     "break-word",
                         "boxSizing":     "border-box",

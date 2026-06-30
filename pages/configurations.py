@@ -3953,6 +3953,70 @@ def run_preview_query(n_clicks,urlparams, sql):
 # Report Builder – helper + callbacks
 # =============================================================================
 
+_SHELF_GAP   = 12    # vertical gap between shelf rows (px)
+_TABLE_GAP   = 10    # horizontal gap between tables on the same shelf (px)
+_MARGIN_TOP  = 16    # canvas top margin (px)
+_MARGIN_LEFT = 16    # canvas left margin (px)
+_CANVAS_W    = 1100  # logical canvas width (px) — tables pack within this boundary
+
+
+def _table_pixel_width(table: dict) -> int:
+    cw   = table.get("col_widths", [])
+    data = table.get("data", [])
+    if cw:
+        return max(60, int(sum(cw)))
+    return max(60, len(data[0]) * 120) if (data and data[0]) else 360
+
+
+def _table_pixel_height(table: dict) -> int:
+    rh   = table.get("row_heights", [])
+    data = table.get("data", [])
+    h    = int(sum(rh)) if rh else len(data) * 28
+    if table.get("ta") is not None:
+        h += 30
+    if table.get("tb") is not None:
+        h += 30
+    return max(28, h)
+
+
+def _reflow_shelves(tables: list) -> None:
+    """DHIS2-style shelf packing: sort tables by reading order, fill left-to-right,
+    start a new shelf when the row is full. Modifies pos in-place, no overlaps."""
+    if not tables:
+        return
+
+    # Sort by reading order: primary = y (quantised to 40px rows), secondary = x
+    tables.sort(key=lambda t: (
+        round(t.get("pos", {}).get("y", 0) / 40),
+        t.get("pos", {}).get("x", 0),
+    ))
+
+    available_w = _CANVAS_W - _MARGIN_LEFT * 2
+    # Each shelf: {"y": int, "h": int, "used_w": int}
+    shelves: list = []
+
+    for table in tables:
+        tbl_w = _table_pixel_width(table)
+        tbl_h = _table_pixel_height(table)
+
+        placed = False
+        for shelf in shelves:
+            gap    = _TABLE_GAP if shelf["used_w"] > 0 else 0
+            needed = shelf["used_w"] + gap + tbl_w
+            if needed <= available_w:
+                table["pos"] = {"x": _MARGIN_LEFT + shelf["used_w"] + gap, "y": shelf["y"]}
+                shelf["used_w"] += gap + tbl_w
+                shelf["h"]       = max(shelf["h"], tbl_h)
+                placed = True
+                break
+
+        if not placed:
+            prev_y = (shelves[-1]["y"] + shelves[-1]["h"] + _SHELF_GAP
+                      if shelves else _MARGIN_TOP)
+            shelves.append({"y": prev_y, "h": tbl_h, "used_w": tbl_w})
+            table["pos"] = {"x": _MARGIN_LEFT, "y": prev_y}
+
+
 def _rpt_render_canvas(state, sel, drag_pos, resize_store=None):
     """Return a list of Dash components representing all tables on the canvas."""
     sel = sel or {"tid": None, "cells": []}
@@ -4041,6 +4105,10 @@ def _rpt_render_canvas(state, sel, drag_pos, resize_store=None):
                                     "border": "none", "background": "transparent",
                                     "width": "100%", "color": cell.get("color", "#000000"),
                                     "fontSize": "12px", "boxSizing": "border-box",
+                                    "fontWeight": "bold" if cell.get("bold") else "normal",
+                                    "fontStyle": "italic" if cell.get("italic") else "normal",
+                                    "textAlign": cell.get("align", "left"),
+                                    "paddingLeft": f"{4 + cell.get('indent', 0) * 20}px",
                                 },
                             ),
                             # Column resize handle (right edge)
@@ -4181,7 +4249,8 @@ def _rpt_render(state, sel, drag_pos, resize_store):
 
 
 def _empty_cell():
-    return {"v": "", "fill": "#ffffff", "color": "#000000", "cs": 1, "rs": 1, "hidden": False}
+    return {"v": "", "fill": "#ffffff", "color": "#000000", "cs": 1, "rs": 1, "hidden": False,
+            "bold": False, "italic": False, "align": "left", "indent": 0}
 
 
 def _new_table(tid, x, y, rows=3, cols=3):
@@ -4216,21 +4285,23 @@ def _rpt_add_table(n_new, n_above, n_below, n_left, n_right, state, sel):
     sel_table = next((t for t in tables if t["id"] == selected_tid), None)
 
     if triggered == "rpt-add-table-btn" or sel_table is None:
-        x, y = 20 + n * 30, 20 + n * 30
+        # Place at end: high y so it sorts last
+        x, y = _MARGIN_LEFT, 99999
     else:
         sx, sy = sel_table["pos"]["x"], sel_table["pos"]["y"]
         if triggered == "rpt-add-above-btn":
-            x, y = sx, sy - 160
+            x, y = sx, sy - 1          # just above selected in sort order
         elif triggered == "rpt-add-below-btn":
-            x, y = sx, sy + 120
+            x, y = sx, sy + 1          # just below selected
         elif triggered == "rpt-add-left-btn":
-            x, y = sx - 220, sy
+            x, y = sx - 1, sy          # same shelf, to the left
         elif triggered == "rpt-add-right-btn":
-            x, y = sx + 220, sy
+            x, y = sx + 9999, sy       # same shelf, to the right
         else:
-            x, y = 20 + n * 30, 20 + n * 30
+            x, y = _MARGIN_LEFT, 99999
 
     tables.append(_new_table(tid, x, y))
+    _reflow_shelves(tables)
     return {"tables": tables, "next_id": nid + 1}
 
 
@@ -4382,6 +4453,60 @@ def _rpt_apply_color(n_fill, n_font, state, sel, fill_color, font_color):
     return {"tables": tables, "next_id": state["next_id"]}
 
 
+# 6b. Apply text style (bold, italic, alignment, indent)
+@callback(
+    Output("rpt-state", "data", allow_duplicate=True),
+    Input("rpt-bold-btn",         "n_clicks"),
+    Input("rpt-italic-btn",       "n_clicks"),
+    Input("rpt-align-left-btn",   "n_clicks"),
+    Input("rpt-align-center-btn", "n_clicks"),
+    Input("rpt-align-right-btn",  "n_clicks"),
+    Input("rpt-indent-btn",       "n_clicks"),
+    Input("rpt-dedent-btn",       "n_clicks"),
+    State("rpt-state", "data"),
+    State("rpt-sel",   "data"),
+    prevent_initial_call=True,
+)
+def _rpt_apply_text_style(nb, ni, nal, nac, nar, nind, nded, state, sel):
+    state = state or {"tables": [], "next_id": 1}
+    sel   = sel   or {"tid": None, "cells": []}
+    triggered = ctx.triggered_id
+    if triggered is None:
+        raise PreventUpdate
+
+    tid = sel.get("tid")
+    if not tid:
+        raise PreventUpdate
+
+    tables = state["tables"]
+    idx = next((i for i, t in enumerate(tables) if t["id"] == tid), None)
+    if idx is None:
+        raise PreventUpdate
+
+    data = tables[idx]["data"]
+    for r, c in sel.get("cells", []):
+        if r >= len(data) or c >= len(data[r]):
+            continue
+        cell = data[r][c]
+        if triggered == "rpt-bold-btn":
+            cell["bold"] = not cell.get("bold", False)
+        elif triggered == "rpt-italic-btn":
+            cell["italic"] = not cell.get("italic", False)
+        elif triggered == "rpt-align-left-btn":
+            cell["align"] = "left"
+        elif triggered == "rpt-align-center-btn":
+            cell["align"] = "center"
+        elif triggered == "rpt-align-right-btn":
+            cell["align"] = "right"
+        elif triggered == "rpt-indent-btn":
+            cell["indent"] = min(cell.get("indent", 0) + 1, 1)
+        elif triggered == "rpt-dedent-btn":
+            cell["indent"] = max(cell.get("indent", 0) - 1, 0)
+
+    tables[idx]["data"] = data
+    return {"tables": tables, "next_id": state["next_id"]}
+
+
 # 7. Add title above/below
 @callback(
     Output("rpt-state", "data", allow_duplicate=True),
@@ -4431,6 +4556,7 @@ def _rpt_remove_table(n_clicks, state, sel):
     if not tid:
         raise PreventUpdate
     tables = [t for t in state["tables"] if t["id"] != tid]
+    _reflow_shelves(tables)
     return {"tables": tables, "next_id": state["next_id"]}, {"tid": None, "cells": []}
 
 
@@ -4516,7 +4642,9 @@ dash.clientside_callback(
                 try { return JSON.parse(inp.value || '{}'); } catch(e) { return {}; }
             }
 
-            // ── Table drag ──────────────────────────────────────────────────
+            // ── Table drag (snap to 8px grid) ────────────────────────────────
+            var GRID = 8;
+            function snapGrid(v) { return Math.max(0, Math.round(v / GRID) * GRID); }
             allEls.forEach(function(el) {
                 if (!el.id || !el.id.includes('"type":"rpt-handle"')) return;
                 if (el._dragBound) return;
@@ -4527,8 +4655,8 @@ dash.clientside_callback(
                     var sx = ev.clientX, sy = ev.clientY;
                     var ol = parseInt(wrapper.style.left)||0, ot = parseInt(wrapper.style.top)||0;
                     function mv(e) {
-                        wrapper.style.left = (ol + e.clientX - sx) + 'px';
-                        wrapper.style.top  = (ot + e.clientY - sy) + 'px';
+                        wrapper.style.left = snapGrid(ol + e.clientX - sx) + 'px';
+                        wrapper.style.top  = snapGrid(ot + e.clientY - sy) + 'px';
                     }
                     function up() {
                         document.removeEventListener('mousemove', mv);
@@ -4694,17 +4822,31 @@ dash.clientside_callback(
 )
 
 
-# 12. Drag hidden input → drag pos store
+# 12. Drag hidden input → commit positions into state + reflow
 @callback(
     Output("rpt-drag-pos", "data"),
+    Output("rpt-state", "data", allow_duplicate=True),
     Input("rpt-drag-hidden-input", "value"),
+    State("rpt-state", "data"),
     prevent_initial_call=True,
 )
-def _rpt_sync_drag_pos(raw):
+def _rpt_sync_drag_pos(raw, state):
     try:
-        return json.loads(raw or "{}")
+        drag_pos = json.loads(raw or "{}")
     except Exception:
-        return {}
+        drag_pos = {}
+
+    if not drag_pos or not state:
+        return drag_pos, dash.no_update
+
+    tables = state.get("tables", [])
+    for table in tables:
+        if table["id"] in drag_pos:
+            table["pos"] = drag_pos[table["id"]]
+
+    _reflow_shelves(tables)
+
+    return {}, {"tables": tables, "next_id": state.get("next_id", 1)}
 
 
 # 12b. Resize hidden input → resize store
@@ -5002,15 +5144,17 @@ def _rpt_save_report(n_clicks, state, page_name, drag_pos, resize_store):
         with open(hmis_path, "r", encoding="utf-8") as f:
             data = json.load(f)
         updated = False
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         for report in data.get("reports", []):
             if report.get("page_name") == page_name:
                 report["design"] = state
+                report["date_updated"] = now
                 updated = True
                 break
         if not updated:
             return f"Report '{page_name}' not found in hmis_reports.json."
         with open(hmis_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
-        return "Saved!"
+        return f"Saved! {now}"
     except Exception as e:
         return f"Error: {e}"

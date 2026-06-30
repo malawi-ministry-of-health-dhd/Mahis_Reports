@@ -30,7 +30,8 @@
                   "color": "#374151",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "VALUE",
@@ -38,7 +39,9 @@
                   "color": "#374151",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true,
+                  "align": "center"
                 }
               ],
               [
@@ -56,7 +59,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "center"
                 }
               ],
               [
@@ -74,7 +78,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "center"
                 }
               ],
               [
@@ -92,7 +97,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "center"
                 }
               ],
               [
@@ -110,7 +116,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "center"
                 }
               ],
               [
@@ -128,7 +135,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "center"
                 }
               ],
               [
@@ -146,7 +154,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "center"
                 }
               ]
             ],
@@ -180,7 +189,8 @@
                   "color": "#374151",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "VALUE",
@@ -188,7 +198,9 @@
                   "color": "#374151",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true,
+                  "align": "center"
                 }
               ],
               [
@@ -206,7 +218,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "center"
                 }
               ],
               [
@@ -224,7 +237,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "center"
                 }
               ],
               [
@@ -242,7 +256,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "center"
                 }
               ],
               [
@@ -260,7 +275,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "center"
                 }
               ],
               [
@@ -278,7 +294,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "center"
                 }
               ],
               [
@@ -296,7 +313,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "center"
                 }
               ],
               [
@@ -314,7 +332,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "center"
                 }
               ],
               [
@@ -332,7 +351,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "center"
                 }
               ],
               [
@@ -350,7 +370,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "center"
                 }
               ],
               [
@@ -368,7 +389,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "center"
                 }
               ],
               [
@@ -386,7 +408,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "center"
                 }
               ],
               [
@@ -404,7 +427,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "center"
                 }
               ]
             ],
@@ -445,8 +469,957 @@
       "page_name": "malaria_report",
       "archived": "False",
       "design": {
-        "tables": [],
-        "next_id": 1
+        "tables": [
+          {
+            "id": "t1",
+            "pos": {
+              "x": 20,
+              "y": 20
+            },
+            "ta": "",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "OUTPATIENT DEPARTMENT",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": true
+                },
+                {
+                  "v": "UNDER 5",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": true,
+                  "align": "center"
+                },
+                {
+                  "v": "OVER 5",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": true,
+                  "align": "center"
+                }
+              ],
+              [
+                {
+                  "v": "A: Confirmed (Co) Malaria Cases",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "malaria_confirmed_under5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "malaria_confirmed_over5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                }
+              ],
+              [
+                {
+                  "v": "B: Presumed (Pr) Malaria Cases (Clinically Diagnosed)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "malaria_presumed_under5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "malaria_presumed_over5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                }
+              ],
+              [
+                {
+                  "v": "C: Confirmed malaria in pregnant women (c)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "malaria_pregnant_over5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                }
+              ],
+              [
+                {
+                  "v": "D: Presumed (clinically diagnosed) malaria in pregnant women (d)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "malaria_pregnant_presumed_over5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                }
+              ],
+              [
+                {
+                  "v": "Total OPD Malaria Cases (A+B+C+D)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "malaria_total_under5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "malaria_total_over5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                }
+              ],
+              [
+                {
+                  "v": "F: Total OPD Attendance: All causes (Including malaria cases)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "total_opd_under5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "total_opd_over5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                }
+              ],
+              [
+                {
+                  "v": "G: Confirmed malaria treatment failure (tf)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "malaria_tx_failure_under5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "malaria_tx_failure_over5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                }
+              ],
+              [
+                {
+                  "v": "H: Confirmed cases receiving first-line anti malarial medication (LA)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "confirmed_la_under5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "confirmed_la_over5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                }
+              ],
+              [
+                {
+                  "v": "I: Presumed malaria cases receiving first-line anti malarial medication(LA)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "malaria_presumed_la_under5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "malaria_presumed_la_over5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                }
+              ],
+              [
+                {
+                  "v": "J: Confirmed cases receiving second-line anti malarial medication (ASAQ)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "confirmed_asaq_under5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "confirmed_asaq_over5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                }
+              ],
+              [
+                {
+                  "v": "K: Presumed malaria cases receiving second-line anti malarial medication(ASAQ)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "malaria_presumed_asaq_under5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "malaria_presumed_asaq_over5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                }
+              ],
+              [
+                {
+                  "v": "L: Suspected malaria cases tested (mRDT)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "suspected_mrdt_under5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "suspected_mrdt_over5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                }
+              ],
+              [
+                {
+                  "v": "M: Positive malaria cases (mRDT)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "positive_mrdt_under5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "positive_mrdt_over5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                }
+              ],
+              [
+                {
+                  "v": "N: Suspected malaria cases tested (microscopy)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "suspected_micro_under5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "suspected_micro_over5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                }
+              ],
+              [
+                {
+                  "v": "O: Positive malaria cases (microscopy)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "positive_micro_under5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "positive_micro_over5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                }
+              ],
+              [
+                {
+                  "v": "Total suspected malaria cases (B+D+L+N)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "total_suspected_malaria_under5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "total_suspected_malaria_over5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                }
+              ]
+            ],
+            "col_widths": [
+              644,
+              187,
+              193
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t2",
+            "pos": {
+              "x": 20,
+              "y": 559
+            },
+            "ta": "",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "COMMODITIES USED",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": true
+                },
+                {
+                  "v": "UNIT",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": true,
+                  "align": "center"
+                },
+                {
+                  "v": "VALUE",
+                  "fill": "#f8f9fa",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": true,
+                  "italic": false,
+                  "align": "center",
+                  "indent": 0
+                }
+              ],
+              [
+                {
+                  "v": "LA 1X6",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "tab",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "commodity_la_1x6",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": false,
+                  "italic": false,
+                  "align": "center",
+                  "indent": 0
+                }
+              ],
+              [
+                {
+                  "v": "LA 2X6",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "tab",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "commodity_la_2x6",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": false,
+                  "italic": false,
+                  "align": "center",
+                  "indent": 0
+                }
+              ],
+              [
+                {
+                  "v": "LA 3X6",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "tab",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "commodity_la_3x6",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": false,
+                  "italic": false,
+                  "align": "center",
+                  "indent": 0
+                }
+              ],
+              [
+                {
+                  "v": "LA 4X6",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "tab",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "commodity_la_4x6",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": false,
+                  "italic": false,
+                  "align": "center",
+                  "indent": 0
+                }
+              ],
+              [
+                {
+                  "v": "ITN Distributed to Pregnant women",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "net",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "commodity_itn_pregnant",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": false,
+                  "italic": false,
+                  "align": "center",
+                  "indent": 0
+                }
+              ],
+              [
+                {
+                  "v": "ITN Distributed to Newborn babies",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "net",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "commodity_itn_newborn",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": false,
+                  "italic": false,
+                  "align": "center",
+                  "indent": 0
+                }
+              ],
+              [
+                {
+                  "v": "SP",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "tab",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "commodity_sp",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": false,
+                  "italic": false,
+                  "align": "center",
+                  "indent": 0
+                }
+              ],
+              [
+                {
+                  "v": "RDTs",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "tab",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "commodity_rdt",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": false,
+                  "italic": false,
+                  "align": "center",
+                  "indent": 0
+                }
+              ],
+              [
+                {
+                  "v": "ASAQ 25mg/67.5mg (3 tablets)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "tab",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "commodity_asaq_25mg",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": false,
+                  "italic": false,
+                  "align": "center",
+                  "indent": 0
+                }
+              ],
+              [
+                {
+                  "v": "ASAQ 50mg/135mg (3 tablets)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "tab",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "commodity_asaq_50mg",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": false,
+                  "italic": false,
+                  "align": "center",
+                  "indent": 0
+                }
+              ],
+              [
+                {
+                  "v": "ASAQ 100mg/270mg (3 tablets)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "tab",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "commodity_asaq_100mg_3",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": false,
+                  "italic": false,
+                  "align": "center",
+                  "indent": 0
+                }
+              ],
+              [
+                {
+                  "v": "ASAQ 100mg/270mg (6 tablets)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "tab",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "align": "center"
+                },
+                {
+                  "v": "commodity_asaq_100mg_6",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": false,
+                  "italic": false,
+                  "align": "center",
+                  "indent": 0
+                }
+              ]
+            ],
+            "col_widths": [
+              650,
+              186,
+              190
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          }
+        ],
+        "next_id": 3
       }
     },
     {
@@ -1129,32 +2102,514 @@
       "programs": [
         "HIV PROGRAM"
       ],
-      "date_updated": "2026-06-09",
+      "date_updated": "2026-06-30 20:12:22",
       "updated_by": "admin",
       "page_name": "ahd_screening",
-      "archived": "False"
-    },
-    {
-      "report_id": 19,
-      "report_name": "DHA CONFIRMATORY HTS",
-      "date_created": "2026-05-13",
-      "creator": "admin",
-      "programs": [
-        "HIV PROGRAM"
-      ],
-      "date_updated": "2026-05-13",
-      "updated_by": "admin",
-      "page_name": "dha_confirmatory",
       "archived": "False",
       "design": {
         "tables": [
           {
             "id": "t1",
             "pos": {
-              "x": 20,
-              "y": 20
+              "x": 16,
+              "y": 16
             },
-            "ta": "HIV testing summary (from initial and confirmatory register)",
+            "ta": "",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "SEX",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": true
+                },
+                {
+                  "v": "DATA",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": true
+                }
+              ],
+              [
+                {
+                  "v": "Male",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "VgVMqfoIjzQ",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Female Pregnant",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "EsoRRCQ5WMO",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Breastfeeding",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "mAHO4ZektUJ",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Female non-pregnant",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "sBDsyqHBL3T",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Total screened",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "italic": true
+                },
+                {
+                  "v": "total_sex",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              250,
+              140
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t2",
+            "pos": {
+              "x": 416,
+              "y": 16
+            },
+            "ta": "",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "AGE",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": true
+                },
+                {
+                  "v": "DATA",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "0-4",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Mpf7ZJ69Pqc",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "5-14",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "WkGBr9BY8Dz",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "15+",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "uP1uRr6YICt",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Total screened",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "italic": true
+                },
+                {
+                  "v": "age_total_screened",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              250,
+              140
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t3",
+            "pos": {
+              "x": 16,
+              "y": 226
+            },
+            "ta": "",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "HIV STATUS",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": true
+                },
+                {
+                  "v": "DATA",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "New Positive",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "uhV1Za1CdGM",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Previous Positive",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "FMVmI5BRh8L",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Unknown/ missing",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "pStazn0h6Oj",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Total screened",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "italic": true
+                },
+                {
+                  "v": "hiv_status_total_screened",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              250,
+              140
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t4",
+            "pos": {
+              "x": 416,
+              "y": 226
+            },
+            "ta": "",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "LAST ARV TAKEN",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": true
+                },
+                {
+                  "v": "DATA",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Never",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "TsRzDDCilLU",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "More than 3m ago",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "i1rWz5FYrsK",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Between 1w \u2013 3m",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "QEjHvIHCtlR",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Current",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Kx1ztD4x9XO",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Total screened",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "italic": true
+                },
+                {
+                  "v": "last_taken_arvs_total_screened",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              250,
+              140
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t5",
+            "pos": {
+              "x": 16,
+              "y": 436
+            },
+            "ta": "Seriously Ill",
             "tb": null,
             "data": [
               [
@@ -1165,6 +2620,1935 @@
                   "cs": 1,
                   "rs": 1,
                   "hidden": false
+                },
+                {
+                  "v": "Data",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "No",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "jEcFK12BGCS",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Yes",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "A18eWqMyeuP",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Unknown/ missing",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "IxtSV2ceN59",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Total screened",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "seriously_ill_total_screened",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              250,
+              140
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t6",
+            "pos": {
+              "x": 416,
+              "y": 436
+            },
+            "ta": "AHD Symptoms Screening",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Cough",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Vf8VRgksbud",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Weight loss/ no thrive",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "wxjGJXke1Mo",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Fever/ night sweats",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "LiCppaX3QjB",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Mouth sores",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "w9s7QCs90gx",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Shortness of breath",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "wJ9s8OrJQUd",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "CNS",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "MUZ3WoXnlpU",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Yellow eyes",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "XOZM4OtBJTf",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Vomiting/ abdo pain",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "suzmW2wFqk4",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Diarrhoea",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "E7s1XDeUnPP",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Peripheral neuropathy",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "z7XwXaHCPPK",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Rash arms/ legs/ trunk",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "O6gob2I4ndZ",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Unknown missing",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Sszi6sEg3iC",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Total Symptoms",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "ahd_symptoms_screening_total_symptoms",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              250,
+              140
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              33
+            ]
+          },
+          {
+            "id": "t7",
+            "pos": {
+              "x": 16,
+              "y": 870
+            },
+            "ta": "WHO Clinical Stage",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "WHO 1",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Q6RHKT2OZM6",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "WHO 2",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "rcwB61gQH8w",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "WHO 3",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "zr86ZfnN8du",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "WHO 4",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "iWmZIKYoWWK",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Unknown/ missing",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "r1iipkObaWo",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Total screened",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "who_clinical_stage_total_screened",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              250,
+              140
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t8",
+            "pos": {
+              "x": 416,
+              "y": 870
+            },
+            "ta": "Most Recent VL",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Not done",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "uaqhAhdBwKC",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "<1000 copies/mL",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "o6cW1GC7dDy",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "1000+ copies/mL",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "RgSB3tjhMKS",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Unknown/ missing",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "y9GCLgR0OVS",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Total screened",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "most_recent_vl_total_screened",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              250,
+              140
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t11",
+            "pos": {
+              "x": 16,
+              "y": 1108
+            },
+            "ta": "CSF CrAg",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Not done",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "rBALznFvgQK",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Negative",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "HPcyLasnipu",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Positive",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "aEAiHoIPvyU",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Total screened",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              250,
+              140
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t9",
+            "pos": {
+              "x": 416,
+              "y": 1108
+            },
+            "ta": "CD4 Results",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Not done",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "nA3zZyTttp7",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "<200",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "R5eZffTYIKI",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "200+",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "vPz26A4drtg",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Unknown/ missing",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "GnOng0wVJY0",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Total screened",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "cd4_results_total_screened",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              252,
+              140
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28,
+              35
+            ]
+          },
+          {
+            "id": "t10",
+            "pos": {
+              "x": 16,
+              "y": 1318
+            },
+            "ta": "Serum / Blood CrAg",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Not done",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "XYMNb5ZqlRt",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Negative",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "vvliOeT8fGx",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Positive",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "DvwSWJfdjMP",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Total screened",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              250,
+              140
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t13",
+            "pos": {
+              "x": 416,
+              "y": 1318
+            },
+            "ta": "Gene Xpert",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Not done",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "jojmLVOkVEU",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Negative",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "WJQ2N9u8tBD",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Positive",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "OsrdFtCdZe1",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Total screened",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              250,
+              140
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              31
+            ]
+          },
+          {
+            "id": "t14",
+            "pos": {
+              "x": 16,
+              "y": 1500
+            },
+            "ta": "Chest X-ray",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Not Done",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "fMFCIX3BYOt",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Abnormal",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "EF7BYZ8fOcR",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Normal",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "CGLw4yWQdNu",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Total screened",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              250,
+              140
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t16",
+            "pos": {
+              "x": 416,
+              "y": 1500
+            },
+            "ta": "AHD Criteria Met",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "No",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "XEoie0gVZ2c",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Yes",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "v2MLjlQM3Sc",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Unknown/ missing",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "xPoBrUBHtYD",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Total screened",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              250,
+              140
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t15",
+            "pos": {
+              "x": 16,
+              "y": 1682
+            },
+            "ta": "FASH",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Not done",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "vfQrSO42uKi",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Abnormal",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "wtOPhRfINuh",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Normal",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "SZTQGOAwwln",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Total screened",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              250,
+              140
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              27
+            ]
+          },
+          {
+            "id": "t17",
+            "pos": {
+              "x": 416,
+              "y": 1682
+            },
+            "ta": "Treatment Given",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Tuberculosis",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "mw69CrxG7YX",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Cryptococcal Meningitis",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "i2dDx5SFhfj",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Cryptococcemia",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "C4jB6nBvbdF",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Kaposi Sarcoma",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "pxfntgSujc4",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Other",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "ERiRBaepZIT",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "None/ missing",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "HAWohoNMdZE",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Total AHD cases",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              250,
+              140
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              31
+            ]
+          },
+          {
+            "id": "t12",
+            "pos": {
+              "x": 16,
+              "y": 1948
+            },
+            "ta": "TB Urine LAM",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Not done",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Bb51JJRzhbu",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Negative",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Z6CQwBgBye1",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Positive",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "VvukFhF4vTY",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Total screened",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              250,
+              140
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t18",
+            "pos": {
+              "x": 416,
+              "y": 1948
+            },
+            "ta": "Outcome",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Discharged",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "IbFpiAMozPf",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Transferred Out",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "xeGF9IyDN8p",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Lost to Follow Up",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "bweoOgKUivu",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Died",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "PkWCRNYdWCs",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Unknown/ missing",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "cX2ttyYDcOr",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Total AHD cases",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              250,
+              140
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          }
+        ],
+        "next_id": 19
+      }
+    },
+    {
+      "report_id": 19,
+      "report_name": "DHA CONFIRMATORY HTS",
+      "date_created": "2026-05-13",
+      "creator": "admin",
+      "programs": [
+        "HIV PROGRAM"
+      ],
+      "date_updated": "2026-06-30 20:17:24",
+      "updated_by": "admin",
+      "page_name": "dha_confirmatory",
+      "archived": "False",
+      "design": {
+        "tables": [
+          {
+            "id": "t1",
+            "pos": {
+              "x": 16,
+              "y": 16
+            },
+            "ta": "",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "HIV testing summary (from initial and confirmatory register)",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "MAHIS",
@@ -1211,9 +4595,9 @@
               ]
             ],
             "col_widths": [
-              250,
-              140,
-              140
+              594,
+              205,
+              207
             ],
             "row_heights": [
               28,
@@ -1223,20 +4607,21 @@
           {
             "id": "t2",
             "pos": {
-              "x": 20,
-              "y": 168
+              "x": 16,
+              "y": 114
             },
-            "ta": "HIV test results by sex",
+            "ta": "",
             "tb": null,
             "data": [
               [
                 {
-                  "v": "",
+                  "v": "HIV test results by sex",
                   "fill": "#e5e7eb",
                   "color": "#374151",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "MAHIS",
@@ -1262,7 +4647,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "HEV2UD81703-Tt7fU5lUhAU",
@@ -1288,7 +4674,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "CX5YN57V0S3",
@@ -1309,12 +4696,14 @@
               ],
               [
                 {
-                  "v": "           Male",
+                  "v": "Male",
                   "fill": "#f0fdf4",
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "left",
+                  "indent": 1
                 },
                 {
                   "v": "CX5YN57V0S3-M1qfTDVAM0c",
@@ -1335,12 +4724,14 @@
               ],
               [
                 {
-                  "v": "           Female",
+                  "v": "Female",
                   "fill": "#f0fdf4",
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "left",
+                  "indent": 1
                 },
                 {
                   "v": "CX5YN57V0S3-TjVpn3wCd8z",
@@ -1366,7 +4757,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "VC30RF04J8T",
@@ -1392,7 +4784,9 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "left",
+                  "indent": 1
                 },
                 {
                   "v": "VC30RF04J8T-M1qfTDVAM0c",
@@ -1418,7 +4812,9 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "left",
+                  "indent": 1
                 },
                 {
                   "v": "VC30RF04J8T-TjVpn3wCd8z",
@@ -1444,7 +4840,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "MQL666E253I",
@@ -1470,7 +4867,9 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "align": "left",
+                  "indent": 1
                 },
                 {
                   "v": "MQL666E253I-M1qfTDVAM0c",
@@ -1496,7 +4895,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "indent": 1
                 },
                 {
                   "v": "MQL666E253I-TjVpn3wCd8z",
@@ -1522,7 +4922,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "FI3UWJYP9KY-Tt7fU5lUhAU",
@@ -1548,7 +4949,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "VR1BU2R9R4P-Tt7fU5lUhAU",
@@ -1569,9 +4971,9 @@
               ]
             ],
             "col_widths": [
-              250,
-              140,
-              140
+              593,
+              210,
+              207
             ],
             "row_heights": [
               28,
