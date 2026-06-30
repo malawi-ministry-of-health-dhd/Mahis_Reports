@@ -3953,19 +3953,8 @@ def run_preview_query(n_clicks,urlparams, sql):
 # Report Builder – helper + callbacks
 # =============================================================================
 
-_SHELF_GAP   = 12    # vertical gap between shelf rows (px)
-_TABLE_GAP   = 10    # horizontal gap between tables on the same shelf (px)
-_MARGIN_TOP  = 16    # canvas top margin (px)
-_MARGIN_LEFT = 16    # canvas left margin (px)
-_CANVAS_W    = 1100  # logical canvas width (px) — tables pack within this boundary
-
-
-def _table_pixel_width(table: dict) -> int:
-    cw   = table.get("col_widths", [])
-    data = table.get("data", [])
-    if cw:
-        return max(60, int(sum(cw)))
-    return max(60, len(data[0]) * 120) if (data and data[0]) else 360
+_REFLOW_GAP        = 16   # minimum vertical gap between tables (px)
+_REFLOW_MARGIN_TOP = 20   # minimum Y from canvas top (px)
 
 
 def _table_pixel_height(table: dict) -> int:
@@ -3976,45 +3965,19 @@ def _table_pixel_height(table: dict) -> int:
         h += 30
     if table.get("tb") is not None:
         h += 30
-    return max(28, h)
+    return h
 
 
-def _reflow_shelves(tables: list) -> None:
-    """DHIS2-style shelf packing: sort tables by reading order, fill left-to-right,
-    start a new shelf when the row is full. Modifies pos in-place, no overlaps."""
+def _reflow_tables(tables: list) -> None:
+    """Re-stack tables vertically (sorted by Y) in-place to eliminate gaps and overlaps."""
     if not tables:
         return
-
-    # Sort by reading order: primary = y (quantised to 40px rows), secondary = x
-    tables.sort(key=lambda t: (
-        round(t.get("pos", {}).get("y", 0) / 40),
-        t.get("pos", {}).get("x", 0),
-    ))
-
-    available_w = _CANVAS_W - _MARGIN_LEFT * 2
-    # Each shelf: {"y": int, "h": int, "used_w": int}
-    shelves: list = []
-
-    for table in tables:
-        tbl_w = _table_pixel_width(table)
-        tbl_h = _table_pixel_height(table)
-
-        placed = False
-        for shelf in shelves:
-            gap    = _TABLE_GAP if shelf["used_w"] > 0 else 0
-            needed = shelf["used_w"] + gap + tbl_w
-            if needed <= available_w:
-                table["pos"] = {"x": _MARGIN_LEFT + shelf["used_w"] + gap, "y": shelf["y"]}
-                shelf["used_w"] += gap + tbl_w
-                shelf["h"]       = max(shelf["h"], tbl_h)
-                placed = True
-                break
-
-        if not placed:
-            prev_y = (shelves[-1]["y"] + shelves[-1]["h"] + _SHELF_GAP
-                      if shelves else _MARGIN_TOP)
-            shelves.append({"y": prev_y, "h": tbl_h, "used_w": tbl_w})
-            table["pos"] = {"x": _MARGIN_LEFT, "y": prev_y}
+    tables.sort(key=lambda t: t.get("pos", {}).get("y", 0))
+    cursor_y = _REFLOW_MARGIN_TOP
+    for t in tables:
+        x = t.get("pos", {}).get("x", 20)
+        t["pos"] = {"x": x, "y": cursor_y}
+        cursor_y += _table_pixel_height(t) + _REFLOW_GAP
 
 
 def _rpt_render_canvas(state, sel, drag_pos, resize_store=None):
@@ -4285,23 +4248,22 @@ def _rpt_add_table(n_new, n_above, n_below, n_left, n_right, state, sel):
     sel_table = next((t for t in tables if t["id"] == selected_tid), None)
 
     if triggered == "rpt-add-table-btn" or sel_table is None:
-        # Place at end: high y so it sorts last
-        x, y = _MARGIN_LEFT, 99999
+        x, y = 20 + n * 30, 20 + n * 30
     else:
         sx, sy = sel_table["pos"]["x"], sel_table["pos"]["y"]
         if triggered == "rpt-add-above-btn":
-            x, y = sx, sy - 1          # just above selected in sort order
+            x, y = sx, sy - 160
         elif triggered == "rpt-add-below-btn":
-            x, y = sx, sy + 1          # just below selected
+            x, y = sx, sy + 120
         elif triggered == "rpt-add-left-btn":
-            x, y = sx - 1, sy          # same shelf, to the left
+            x, y = sx - 220, sy
         elif triggered == "rpt-add-right-btn":
-            x, y = sx + 9999, sy       # same shelf, to the right
+            x, y = sx + 220, sy
         else:
-            x, y = _MARGIN_LEFT, 99999
+            x, y = 20 + n * 30, 20 + n * 30
 
     tables.append(_new_table(tid, x, y))
-    _reflow_shelves(tables)
+    _reflow_tables(tables)
     return {"tables": tables, "next_id": nid + 1}
 
 
@@ -4556,7 +4518,7 @@ def _rpt_remove_table(n_clicks, state, sel):
     if not tid:
         raise PreventUpdate
     tables = [t for t in state["tables"] if t["id"] != tid]
-    _reflow_shelves(tables)
+    _reflow_tables(tables)
     return {"tables": tables, "next_id": state["next_id"]}, {"tid": None, "cells": []}
 
 
@@ -4844,7 +4806,7 @@ def _rpt_sync_drag_pos(raw, state):
         if table["id"] in drag_pos:
             table["pos"] = drag_pos[table["id"]]
 
-    _reflow_shelves(tables)
+    _reflow_tables(tables)
 
     return {}, {"tables": tables, "next_id": state.get("next_id", 1)}
 

@@ -1985,10 +1985,2271 @@
       "programs": [
         "OPD Program"
       ],
-      "date_updated": "2026-02-03",
+      "date_updated": "2026-06-30 20:46:40",
       "updated_by": "admin",
       "page_name": "hmis_15",
-      "archived": "False"
+      "archived": "False",
+      "design": {
+        "tables": [
+          {
+            "id": "t1",
+            "pos": {
+              "x": 20,
+              "y": 20
+            },
+            "ta": "Martenal services",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data Value",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "39 Number of pregnant women starting antenatal care during their first trimester",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "40 Total number of new antenatal attendees",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "40 Total antenatal visits",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "41 Number of deliveries attended by skilled health personnel",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "42 Number of women obstetric complications treated at obstretric care facility",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "43 Number of caesarean sections",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "44 Total number of live births",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "44 Number of babies born with weight less than 2500g",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "45 Number of abortion complications treated",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "46 Number of eclampsia cases treated",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "47 Number of postpartum haemorrhage (PPH) cases treated",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "48 Number of sepsis cases treated",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "49 Number of pregnant women treated for severe anaemia",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "51 Number of newborn treated for complications",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "52 Number of postpartum care within 2 weeks of delivery",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              759,
+              334
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t2",
+            "pos": {
+              "x": 24,
+              "y": 514
+            },
+            "ta": "Family Planning",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data Value",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "53a Number of persons reciving 3 months supply of condoms",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "b Number of persons recieving 3 months of oral pills",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "c Number of persons recieving Depo-Provera",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "d Number of persons recieving Norplant",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "e Number of persons recieving IUCD",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "f Number of persons recieving sterilisation method of FP",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              759,
+              330
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t3",
+            "pos": {
+              "x": 24,
+              "y": 756
+            },
+            "ta": "Child Health",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data Value",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "55 Number of fully immunised under 1 children",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "56 Number of under 1 children given BCG",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "56 Number of under 1 children given pentavalent - III",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "56 Number of under 1 children given polio - III",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "56 Number of under 1 children given measles 1st doses at 9M",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "57 Number of Vitamin A doses given to 6 - 59 M population",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "62 Number of under-weight in under fives attending clinic",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              762,
+              328
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t4",
+            "pos": {
+              "x": 24,
+              "y": 1026
+            },
+            "ta": "Attendance",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data Value",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "30 Num of 15 - 49 years recieving volunteer & confidential testing and serostatus",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "31 Number of 15 - 49 age group tested HIV positive",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "32 Number of HIV positive persons recieving ARV treatment",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "34 Number of pregnant women recieving VCT and serostatus results",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "35 Number of pregnant women tested HIV positive",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "36 Number of HIV positive women treated for PMTCT",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "62 Total number of children attending under - five clinic",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "108 Number of OPD attendance",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "opd_attendance",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              762,
+              329
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t5",
+            "pos": {
+              "x": 24,
+              "y": 1324
+            },
+            "ta": "Tuberculosis",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data Value",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "65 Number of confirmed TB new cases",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "66 Num of smear negative and extra-pulmonary cases completed treatment",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "67 Num of new smear sputum positive cases proved smear -ve at the end of treatment",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              762,
+              330
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t6",
+            "pos": {
+              "x": 24,
+              "y": 1482
+            },
+            "ta": "Supplies",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data Value",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "23 Was there any stock outs of SP for more than a week at a time?",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "23 Was there any stock outs of ORS for more than a week at a time?",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "23 Was there any stock outs of contrimaxazole for more than a week at a time?",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "23 Was there any stock outs of SP , ORS and Contrimaxazole for more than a week?",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "24 Number of functioning ambulances",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "76 Number of insecticide treated nets distributed",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              764,
+              328
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t7",
+            "pos": {
+              "x": 24,
+              "y": 1724
+            },
+            "ta": "Community Health Activities",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data Value",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "25 Number of households with access to safe drinking water",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "26 Number of households with atleast a sanplat latrine",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "38 Num of HBC patients follow-up and provided treatment",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              767,
+              326
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t8",
+            "pos": {
+              "x": 24,
+              "y": 1882
+            },
+            "ta": "Physical Facilities",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data Value",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "17 Do you have functioning water supply systems??",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "17 Do you have functioning Communication systems??",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "17 Do you have functioning Electricity??",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "17 Do you have functioning water supply,Electricity and Communication systems??",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              768,
+              325
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t9",
+            "pos": {
+              "x": 24,
+              "y": 2068
+            },
+            "ta": "Management and Supervision",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data Value",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "13 Is the health center committee functional?",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "15 Were you supervised by DHMT members using the intergrated supervision checklist?",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              768,
+              325
+            ],
+            "row_heights": [
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t10",
+            "pos": {
+              "x": 24,
+              "y": 2198
+            },
+            "ta": "New Cases (OPD plus inpatient)",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data Value",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "27 Sexually transmitted infections-new cases",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "sti",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "29 Syphilis in pregnancy",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "syphillis",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "31 HIV confirmed positive (15-49 years) new cases",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "hiv_15_49",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "37 Opportunistic infection - new cases",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "opportunistic_infection",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "58 Acute respiratory infections - new cases (U5)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "ari",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "60 Diarrhoea non - bloody -new cases (under5)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "diarrhea",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "64 Malnutrition - nwe case (under 5)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "malnutrition",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "69 Malaria - new cases (under 5)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "malaria_u5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "70 Malaria - new cases (5 & over)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "malaria_o5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "78 Neonatal tetanus - confirmed new cases",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "tetanus",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "79 Cholera - confirmed new cases",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "cholera",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "81 Measles - confirmed new cases",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "measles",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "82 Acute Flaccid paralysis -confirmed new cases",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "afp",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "83 Ebola - confirmed new cases",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "ebola",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "84 Meningococal meningitis - confimed new cases",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "meningitis",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "85 Plague - confirmed new cases",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "plague",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "86 Rabies - confirmed new cases",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "rabies",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "87 Yellow fever - confirmed new cases",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "yellow_fever",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "88 Dysentery - new cases",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "dysentery",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "90 Eye infections - new cases",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "eye_infection",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "91 Ear infections - new cases",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "ear_infection",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "92 Skin infections - new cases",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "skin_infection",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "93 Oral conditions",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "oral_conditions",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "94 Schistosomiasis - new cases",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "schistosomiasis",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "95 Leprosy - new cases",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "leprosy",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "96 Common injuries and woulds (except RTA)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "common_injuries",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "98 Number of road traffic accidents",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "rta",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              766,
+              328
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t11",
+            "pos": {
+              "x": 24,
+              "y": 3028
+            },
+            "ta": "Admissions",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data Value",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "20a Bed capacity",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "b Total number of admissions (includin maternity)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "c Total number of discharges",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "d Total inpatient days",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              776,
+              318
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t12",
+            "pos": {
+              "x": 24,
+              "y": 3214
+            },
+            "ta": "Inpatient Deaths (Including Maternity)",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Data Value",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "102 Total number of inpatient deaths from all causes (excluding maternity)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "50 Number of direct obstetric deaths in facility",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "59 Acute respiratory infections - inpatient deaths (U5)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "61 Diarrhoea non -bloody (under 5) - inpatient deaths",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "64 Malnutrition - inpatient deaths (under 5)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "68 TB - inpatient deaths",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "69 Malaria - inpatient deaths\u00a0 under 5",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "74 Malaria - inpatient deaths ( 5 & over)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "80 Cholera - inpatients deaths",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "89 Dysentery- inpatients deaths",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "98 No . of road traffic accidents - inpatient deaths",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              778,
+              316
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              27
+            ]
+          }
+        ],
+        "next_id": 13
+      }
     },
     {
       "report_id": 10,
