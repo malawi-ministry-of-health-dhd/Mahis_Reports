@@ -11,7 +11,426 @@
       "date_updated": "2026-05-05",
       "updated_by": "admin",
       "page_name": "ncd_quarterly",
-      "archived": "False"
+      "archived": "False",
+      "design": {
+        "tables": [
+          {
+            "id": "t1",
+            "pos": {
+              "x": 20,
+              "y": 20
+            },
+            "ta": "",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "HYPERTENSION",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "VALUE",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Patients enrolled and active in care",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "fTSvzfYYvpZ",
+                  "fill": "#gggg",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Patients newly registered during reporting period",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "q5uQzv5MGcq",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Patients who have defaulted during the reporting period",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "YCYC8CTgRSJ",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Patients with a visit in last 3 months",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "DMkX7qlkMOs",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Currently enrolled patients that have ever experienced a complication",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "EqWHRzr9AzD",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Patients with a visit in last 3 months (excluding new patients) that have BP below 140/90",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "YqkoVofaBSy",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              530,
+              291
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t5",
+            "pos": {
+              "x": 18,
+              "y": 288
+            },
+            "ta": "",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "DIABETES",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "VALUE",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Currently enrolled patients that have ever experienced a complication",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "dH5VvyfT04w",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Type 1 patients enrolled and active in care",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Db0xjfBUbvG",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Type 1 patients newly registered during reporting period",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "IinstNRAaqq",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Type 1 patients who have defaulted\u00a0during the reporting period",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "IBiZU3pehQS",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Type 2 patients enrolled and active in care",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "u7N6vCN9uCk",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Type 2 patients newly registered during reporting period",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "R92f5T5wSlN",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Type 2 patients who have defaulted\u00a0during the reporting period",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "lvGrhdo1Rgm",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Type 1 patients with visit in last 3 months",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "XlMalidz6Yn",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Type 2 patients with visit in last 3 months",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "IrNV73bIUqN",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Type 1 patients with a visit in the last three months, with FBS (<=7mmol/l or <=126 mg/dL)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "hFUb1lcEPtd",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Type 2 patients with a visit in the last three months, with FBS (<=7mmol/l or <=126 mg/dL)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "bqwbEWerTMk",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Type 2 patients on [long-acting or short-acting] Insulin",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "jWfSeg8d50t",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              533,
+              288
+            ],
+            "row_heights": [
+              28,
+              31,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          }
+        ],
+        "next_id": 7
+      }
     },
     {
       "report_id": 2,
@@ -24,7 +443,11 @@
       "date_updated": "2026-04-21",
       "updated_by": "admin",
       "page_name": "malaria_report",
-      "archived": "False"
+      "archived": "False",
+      "design": {
+        "tables": [],
+        "next_id": 1
+      }
     },
     {
       "report_id": 3,
@@ -50,7 +473,484 @@
       "date_updated": "2026-02-03",
       "updated_by": "admin",
       "page_name": "idsr_monthly",
-      "archived": "False"
+      "archived": "False",
+      "design": {
+        "tables": [
+          {
+            "id": "t1",
+            "pos": {
+              "x": 10,
+              "y": 8
+            },
+            "ta": "Monthly Disease Surveillance Reporting Form",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Out Patient Under 5",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Out Patient Over 5",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "Out Patient Total",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Diarrhoea (Severe, With Dehydration)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "dia_seve_u5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "dia_seve_total",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Food Borne Illness",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "foo_born_u5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "foo_born_o5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "foo_born_total",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "HIV (New Positives)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "hiv_new _u5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "hiv_new _o5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "hiv_new _total",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Injuries (Road Traffic Accidents)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "inj_road_u5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "inj_road_o5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "inj_road_total",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Malaria In Pregnancy",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "mal_in p_o5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "mal_in p_total",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Acute Malnutrition",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "acu_maln_u5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "acu_maln_total",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Chronic Malnutrition",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "chr_maln_u5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "chr_maln_total",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Sexually Transimitted Infections",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "sex_tran_u5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "sex_tran_o5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "sex_tran_total",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Leprosy",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "lep_lepr_u5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "lep-lepr_o5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "lep_lepr_total",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Underweight Newborns < 2500 g",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "und_newb_u5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "und_newb_total",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Viral Hepatitis",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "vir_hepa_u5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "vir_hepa_o5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "vir_hepa_total",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Dog Bites",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "dog_bite_u5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "dog_bite_o5",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "dog_bite_total",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              410,
+              234
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          }
+        ],
+        "next_id": 2
+      }
     },
     {
       "report_id": 5,
@@ -245,7 +1145,453 @@
       "date_updated": "2026-05-13",
       "updated_by": "admin",
       "page_name": "dha_confirmatory",
-      "archived": "False"
+      "archived": "False",
+      "design": {
+        "tables": [
+          {
+            "id": "t1",
+            "pos": {
+              "x": 20,
+              "y": 20
+            },
+            "ta": "HIV testing summary (from initial and confirmatory register)",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "MAHIS",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "DHIS2-SCANFORM",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Total clients tested for HIV",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "PW4U7PNOG9F-Tt7fU5lUhAU",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "PW4U7PNOG9F-Tt7fU5lUhAU",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              250,
+              140,
+              140
+            ],
+            "row_heights": [
+              28,
+              28
+            ]
+          },
+          {
+            "id": "t2",
+            "pos": {
+              "x": 20,
+              "y": 168
+            },
+            "ta": "HIV test results by sex",
+            "tb": null,
+            "data": [
+              [
+                {
+                  "v": "",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "MAHIS",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "DHIS2-SCANFORM",
+                  "fill": "#e5e7eb",
+                  "color": "#374151",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "New negative",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "HEV2UD81703-Tt7fU5lUhAU",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "HEV2UD81703-Tt7fU5lUhAU",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "New positive total",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "CX5YN57V0S3",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "CX5YN57V0S3",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "           Male",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "CX5YN57V0S3-M1qfTDVAM0c",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "CX5YN57V0S3-M1qfTDVAM0c",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "           Female",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "CX5YN57V0S3-TjVpn3wCd8z",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "CX5YN57V0S3-TjVpn3wCd8z",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Positive re-test total (prev. pos. professional test)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "VC30RF04J8T",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "VC30RF04J8T",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Male",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "VC30RF04J8T-M1qfTDVAM0c",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "VC30RF04J8T-M1qfTDVAM0c",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Female",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "VC30RF04J8T-TjVpn3wCd8z",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "VC30RF04J8T-TjVpn3wCd8z",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Inconclusive re-test total (prev. pos. professional test)",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "MQL666E253I",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "MQL666E253I",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Male",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "MQL666E253I-M1qfTDVAM0c",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "MQL666E253I-M1qfTDVAM0c",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "Female",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "MQL666E253I-TjVpn3wCd8z",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "MQL666E253I-TjVpn3wCd8z",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "New exposed infant",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "FI3UWJYP9KY-Tt7fU5lUhAU",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "FI3UWJYP9KY-Tt7fU5lUhAU",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ],
+              [
+                {
+                  "v": "New inconclusive",
+                  "fill": "#f0fdf4",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "VR1BU2R9R4P-Tt7fU5lUhAU",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                },
+                {
+                  "v": "VR1BU2R9R4P-Tt7fU5lUhAU",
+                  "fill": "#ffffff",
+                  "color": "#000000",
+                  "cs": 1,
+                  "rs": 1,
+                  "hidden": false
+                }
+              ]
+            ],
+            "col_widths": [
+              250,
+              140,
+              140
+            ],
+            "row_heights": [
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28
+            ]
+          }
+        ],
+        "next_id": 3
+      }
     }
   ]
 }

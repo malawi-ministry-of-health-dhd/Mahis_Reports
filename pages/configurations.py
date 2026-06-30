@@ -13,9 +13,19 @@ import warnings
 warnings.filterwarnings("ignore")
 from helpers.modal_functions import (validate_excel_file, load_reports_data, save_reports_data,
                         check_existing_report, get_next_report_id, update_or_create_report,load_excel_file,
-                        save_excel_file, update_report_metadata, archive_report, 
+                        save_excel_file, update_report_metadata, archive_report,
                         create_count_item,create_chart_item, create_section,create_chart_fields, create_mnid_indicator_item, validate_dashboard_json,
-                        upload_dashboard_json,validate_prog_reports_json,upload_prog_reports_json,CHART_TEMPLATES,render_filter_rows)
+                        upload_dashboard_json,validate_prog_reports_json,upload_prog_reports_json,CHART_TEMPLATES,render_filter_rows,
+                        build_reports_table, create_editable_table, create_preview_table,
+                        generate_dashboard_items_list, create_edit_modal,
+                        _build_ds_list, _build_users_table, create_html_report_modal)
+from helpers.config_helper import (load_dashboards_from_file, save_dashboards_to_file,
+                        _coerce_list, _normalize_filter_value, _safe_json_loads,
+                        _empty_dashboard_structure, _find_dashboard_index,
+                        _ensure_dashboard_for_edit, _dashboard_selector_options,
+                        _load_datasources, _save_datasources, _list_ssh_keys,
+                        _load_user_csv, _load_user_props, _save_user_props,_ssh_dir,
+                        _load_facilities, _extract_identifiers, dashboards_json_path)
 from config import actual_keys_in_data
 from helpers.navigation_callbacks import DEMO_UUID
 
@@ -24,286 +34,8 @@ dash.register_page(__name__, path="/reports_config", title="Admin Dashboard")
 
 # Load existing dashboards
 path = os.getcwd()
-dashboards_json_path = os.path.join(path, 'data','visualizations', 'validated_dashboard.json')
-
-def load_dashboards_from_file():
-    try:
-        with open(dashboards_json_path, 'r') as f:
-            data = json.load(f)
-            return data if isinstance(data, list) else [data]
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
-
-def save_dashboards_to_file(data):
-    with open(dashboards_json_path, 'w') as f:
-        json.dump(data, f, indent=2)
-
-def _coerce_list(value):
-    if value in (None, "", []):
-        return []
-    if isinstance(value, list):
-        return [v for v in value if v not in (None, "")]
-    return [value]
-
-def _normalize_filter_value(value):
-    if isinstance(value, list):
-        cleaned = [v for v in value if v not in (None, "")]
-        if not cleaned:
-            return []
-        return cleaned
-    if value in (None, ""):
-        return ""
-    return value
-
-def _safe_json_loads(raw_value, default):
-    if raw_value in (None, "", []):
-        return default
-    if isinstance(raw_value, (dict, list)):
-        return raw_value
-    try:
-        return json.loads(raw_value)
-    except (TypeError, json.JSONDecodeError):
-        return default
-
-def _empty_dashboard_structure(report_id, report_name, date_created):
-    return {
-        "report_id": report_id or f"report_{uuid.uuid4().hex[:8]}",
-        "report_name": report_name or "New Dashboard",
-        "date_created": date_created or datetime.now().strftime("%Y-%m-%d"),
-        "visualization_types": {
-            "counts": [],
-            "charts": {
-                "sections": []
-            }
-        }
-    }
-
-def _find_dashboard_index(dashboards_data, selector_value=None, report_id=None):
-    if isinstance(selector_value, int) and 0 <= selector_value < len(dashboards_data):
-        return selector_value
-    if report_id:
-        for idx, dashboard in enumerate(dashboards_data):
-            if dashboard.get("report_id") == report_id:
-                return idx
-    return None
-
-def _ensure_dashboard_for_edit(selector_value, report_id, report_name, date_created):
-    dashboards_data = load_dashboards_from_file()
-    dashboard_index = _find_dashboard_index(dashboards_data, selector_value, report_id)
-
-    if dashboard_index is None:
-        dashboard = _empty_dashboard_structure(report_id, report_name, date_created)
-        dashboards_data.append(dashboard)
-        dashboard_index = len(dashboards_data) - 1
-        save_dashboards_to_file(dashboards_data)
-    else:
-        dashboard = dashboards_data[dashboard_index]
-        dashboard.setdefault("visualization_types", {})
-        dashboard["visualization_types"].setdefault("counts", [])
-        dashboard["visualization_types"].setdefault("charts", {})
-        dashboard["visualization_types"]["charts"].setdefault("sections", [])
-
-    return dashboards_data, dashboards_data[dashboard_index], dashboard_index
-
-def _dashboard_selector_options(dashboards_data):
-    return [{"label": f"📋 {d.get('report_name', 'Unnamed')}", "value": i}
-            for i, d in enumerate(dashboards_data)] + [
-                {"label": "➕ Create New Dashboard", "value": "new"}
-            ]
 dashboards_data = load_dashboards_from_file()
 
-
-def build_reports_table(data, page=1, page_size=10):
-    # Filter active reports
-    active_reports = [item for item in data if item.get("archived", "False") == "False"]
-    
-
-    # Pagination calculations
-    total = len(active_reports)
-    start = (page - 1) * page_size
-    end = start + page_size
-
-    paginated_items = active_reports[start:end]
-
-    # Modern styled header
-    table_header = html.Thead(
-        html.Tr([
-            html.Th("#", className="report-table-header", style={"width": "50px"}),
-            html.Th("Report Name", style={"text-align":"left"}),
-            html.Th("Creator", style={"text-align":"left"}),
-            html.Th("Date Updated", style={"text-align":"left"}),
-            html.Th("Report Type", style={"text-align":"left"}),
-            html.Th("Page Name", style={"text-align":"left"}),
-            html.Th("Actions", style={"text-align":"left"}),
-        ])
-    )
-
-    # Build rows with modern styling
-    start_row_number = (page - 1) * page_size + 1
-    table_rows = []
-    for idx, item in enumerate(paginated_items):
-        row_number = start_row_number + idx
-        table_rows.append(
-            html.Tr(
-                className="report-table-row",
-                children=[
-                    html.Td(row_number, className="report-table-cell", style={"textAlign": "center", "fontWeight": "500"}),
-                    html.Td(item.get("report_name"), className="report-table-cell"),
-                    html.Td(item.get("creator"), className="report-table-cell"),
-                    html.Td(item.get("date_updated"), className="report-table-cell"),
-                    html.Td(item.get("kind","dataset"), className="report-table-cell"),
-                    html.Td(item.get("page_name"), className="report-table-cell"),
-                    html.Td(
-                        className="report-table-actions",
-                        style={"gap":"5px"},
-                        children=[
-                            html.Button(
-                                "✏️",
-                                id={"type": "edit-btn", "index": item.get("report_id")},
-                                className="action-btn edit-btn"
-                            ),
-                            html.Button(
-                                "Archive",
-                                id={"type": "archive-btn", "index": item.get("report_id")},
-                                className="action-btn archive-btn"
-                            ),
-                            html.Button(
-                                "⬇️",
-                                id={"type": "download-btn", "index": item.get("report_id")},
-                                className="action-btn download-btn"
-                            ),
-                        ]
-                    ),
-                ]
-            )
-        )
-
-    table_body = html.Tbody(table_rows)
-
-    return html.Div(
-        className="reports-table-wrapper",
-        children=[
-            html.Div(
-                className="reports-header",
-                children=[
-                    html.H2("MaHIS DataSet Reports", className="reports-title"),
-                    html.P(
-                        "These are HMIS dataset reports. To update, click Edit or upload a report template bearing the same page_name (id)",
-                        className="reports-description"
-                    ),
-                ]
-            ),
-
-            # Table Output
-            html.Table(
-                [table_header, table_body],
-                className="reports-table"
-            ),
-
-            # Pagination controls
-            html.Div(
-                className="pagination-controls",
-                children=[
-                    html.Button(
-                        "Previous", 
-                        id="prev-page", 
-                        n_clicks=0,
-                        className="pagination-btn"
-                    ),
-                    html.Button(
-                        "Next", 
-                        id="next-page", 
-                        n_clicks=0,
-                        className="pagination-btn"
-                    ),
-                    html.Span(
-                        f"Page {page} / { (total // page_size) + (1 if total % page_size else 0) }",
-                        id="page-label",
-                        className="pagination-info"
-                    ),
-                ]
-            ),
-        ]
-    )
-
-
-def create_editable_table(df, sheet_name):
-    """Create an editable Dash DataTable from DataFrame"""
-    columns = [{"name": col, "id": col} for col in df.columns]
-    
-    # Convert DataFrame to dictionary for DataTable
-    data = df.to_dict('records')
-    
-    return html.Div([
-        html.H4(f"Sheet: {sheet_name}", style={'marginBottom': '10px'}),
-        dash_table.DataTable(
-            id={'type': 'editable-table', 'sheet': sheet_name},
-            columns=columns,
-            data=data,
-            editable=True,
-            filter_action="native",
-            sort_action="native",
-            page_action="native",
-            page_current=0,
-            page_size=10,
-            style_table={'overflowX': 'auto'},
-            style_cell={
-                'minWidth': '100px', 'width': '150px', 'maxWidth': '300px',
-                'overflow': 'hidden',
-                'textOverflow': 'ellipsis',
-            },
-            style_header={
-                'backgroundColor': 'rgb(230, 230, 230)',
-                'fontWeight': 'bold'
-            },
-        )
-    ], style={'marginBottom': '20px'})
-
-
-def create_preview_table(df):
-    """Create a Dash DataTable for preview with filters"""
-    columns = [{"name": col, "id": col} for col in df.columns]
-    
-    # Convert DataFrame to dictionary for DataTable
-    data = df.to_dict('records')
-    
-    return dash_table.DataTable(
-        id="preview-data-table-component",
-        columns=columns,
-        data=data,
-        filter_action="native",
-        sort_action="native",
-        page_action="native",
-        page_current=0,
-        page_size=50,
-        style_table={'overflowX': 'auto'},
-        style_cell={
-            'minWidth': '100px', 
-            'width': '150px', 
-            'maxWidth': '300px',
-            'overflow': 'hidden',
-            'textOverflow': 'ellipsis',
-            'textAlign': 'left'
-        },
-        style_header={
-            'backgroundColor': 'rgb(230, 230, 230)',
-            'fontWeight': 'bold',
-            'textAlign': 'left'
-        },
-        style_data={
-            'whiteSpace': 'normal',
-            'height': 'auto',
-        },
-        css=[{
-            'selector': '.dash-spreadsheet td div',
-            'rule': '''
-                line-height: 15px;
-                max-height: 30px; min-height: 30px; height: 30px;
-                display: block;
-                overflow-y: hidden;
-            '''
-        }]
-    )
 
 instructions = html.Div(
     className="instructions-container",
@@ -822,543 +554,6 @@ archive_confirmation_modal = html.Div([
         'zIndex': '1000'
     })
 reports_table = html.Div(id="reports-table-container")
-def generate_dashboard_items_list(dashboard):
-    """Generate the HTML for dashboard items list"""
-    counts = dashboard.get('visualization_types', {}).get('counts', [])
-    sections = dashboard.get('visualization_types', {}).get('charts', {}).get('sections', [])
-    priority_indicators = dashboard.get('priority_indicators', [])
-    
-    if not counts and not sections and not priority_indicators:
-        return html.Div(
-            className="empty-items",
-            children=[
-                html.Div(style={"textAlign": "center", "padding": "40px", "color": "#999"}, children=[
-                    html.I(className="fas fa-chart-line", style={"fontSize": "48px"}),
-                    html.P("No dashboard items yet", style={"marginTop": "16px"}),
-                    html.P("Add counts or sections to get started", style={"fontSize": "12px"})
-                ])
-            ]
-        )
-    
-    items_list = []
-
-    for idx, indicator in enumerate(priority_indicators):
-        items_list.append(
-            html.Div(
-                className="list-item",
-                key=f"mnid-indicator-{idx}",
-                children=[
-                    html.Div(className="list-item-icon", children=[html.I(className="fas fa-bullseye")]),
-                    html.Div(className="list-item-content", children=[
-                        html.Div(className="list-title", children=indicator.get("label", f"MNID Indicator {idx + 1}")),
-                        html.Div(indicator.get("category", "MNID"), style={"fontSize": "12px", "color": "#6b7280"}),
-                    ]),
-                ],
-                style={
-                    "display": "flex",
-                    "alignItems": "center",
-                    "padding": "12px",
-                    "marginBottom": "8px",
-                    "backgroundColor": "#f4f8ff",
-                    "borderRadius": "6px",
-                    "border": "1px solid #dbeafe"
-                }
-            )
-        )
-    
-    # Add counts to the list
-    for idx, count in enumerate(counts):
-        items_list.append(
-            html.Div(
-                className="list-item",
-                key=f"count-{idx}",
-                children=[
-                    html.Div(className="list-item-icon", children=[
-                        html.I(className="fas fa-calculator")
-                    ]),
-                    html.Div(className="list-item-content", children=[
-                        html.Div(className="list-title", children=count.get("name", f"{idx + 1}"))
-                    ]),
-                    html.Div(className="list-item-actions", children=[
-                        html.Button(
-                            "✏️",
-                            id={"type": "count-edit", "index": idx},
-                            n_clicks=0
-                        ),
-                        # html.Button(
-                        #     "🗑",
-                        #     id={"type": "count-delete", "index": idx},
-                        #     n_clicks=0
-                        # )
-                    ])
-                ],
-                style={
-                    "display": "flex",
-                    "alignItems": "center",
-                    "padding": "12px",
-                    "marginBottom": "8px",
-                    "backgroundColor": "#f8f9fa",
-                    "borderRadius": "6px",
-                    "border": "1px solid #e9ecef"
-                }
-            )
-        )
-    
-    # Add sections and their charts to the list
-    for section_idx, section in enumerate(sections):
-        # Add section header
-        items_list.append(
-            html.Div(
-                className="list-item section-item",
-                key=f"section-{section_idx}",
-                children=[
-                    html.Div(className="list-item-icon", children=[
-                        html.I(className="fas fa-folder")
-                    ]),
-                    html.Div(className="list-item-content", children=[
-                        html.Div(className="list-item-name", children=section.get("section_name", f"Section {section_idx + 1}"))
-                    ]),
-                    html.Div(className="list-item-actions", children=[
-                        html.Button(
-                            "✏️",
-                            id={"type": "section-edit", "index": section_idx},
-                            n_clicks=0,
-                        ),
-                        # html.Button(
-                        #     "🗑",
-                        #     id={"type": "section-delete", "index": section_idx},
-                        #     n_clicks=0,
-                        # )
-                    ])
-                ],
-                style={
-                    "display": "flex",
-                    "alignItems": "center",
-                    "padding": "12px",
-                    "marginBottom": "8px",
-                    "backgroundColor": "#e8f4f8",
-                    "borderRadius": "6px",
-                    "border": "1px solid #cce5f0"
-                }
-            )
-        )
-        
-        # Add charts within the section
-        for chart_idx, chart in enumerate(section.get("items", [])):
-            items_list.append(
-                html.Div(
-                    className="list-item chart-item",
-                    key=f"section-{section_idx}-chart-{chart_idx}",
-                    children=[
-                        html.Div(className="list-item-icon", style={"marginLeft": "24px"}, children=[
-                            html.I(className="fas fa-chart-bar")
-                        ]),
-                        html.Div(className="list-item-content", children=[
-                            html.Div(className="list-title", children=chart.get("name", f"Chart {chart_idx + 1}"))
-                        ]),
-                        html.Div(className="list-item-actions", children=[
-                            html.Button(
-                                "✏️",
-                                id={"type": "chart-edit", "section": section_idx, "chart": chart_idx},
-                                n_clicks=0,
-                            ),
-                            # html.Button(
-                            #     "🗑",
-                            #     id={"type": "chart-delete", "section": section_idx, "chart": chart_idx},
-                            #     n_clicks=0,
-                            # )
-                        ])
-                    ],
-                    style={
-                        "display": "flex",
-                        "alignItems": "center",
-                        "padding": "12px",
-                        "marginBottom": "8px",
-                        "marginLeft": "24px",
-                        "backgroundColor": "#ffffff",
-                        "borderRadius": "6px",
-                        "border": "1px solid #e9ecef"
-                    }
-                )
-            )
-    return html.Div(className="list-items", children=items_list)
-# FOR DASHBOARDS
-def create_edit_modal():
-    selected_dashboard_index = 0  # Default index, will be updated by callbacks
-    current_dashboard = None
-    if dashboards_data and len(dashboards_data) > selected_dashboard_index:
-        current_dashboard = dashboards_data[selected_dashboard_index]
-    else:
-        current_dashboard = {"counts": [], "sections": [], "report_name": "", "report_id": "", "date_created": ""}
-    list_items_html = generate_dashboard_items_list(current_dashboard)
-
-    return html.Div([
-        # Modal backdrop
-        html.Div(
-            id="modal-backdrop",
-            className="modal-backdrop",
-            style={"display": "none"}
-        ),
-        # Modal content
-        html.Div(
-            id="modal-content",
-            className="modal-content",
-            style={"display": "none"},
-            children=[
-                # Modal Header with Cancel button
-                html.Div(
-                    className="modal-header",
-                    children=[
-                        html.H3("Dashboard Configuration", className="modal-title"),
-                        html.Button(
-                            "×",
-                            id="cancel-btn",
-                            n_clicks=0,
-                            className="modal-close-btn",
-                            title="Close"
-                        )
-                    ]
-                ),
-                
-                # Modal Body
-                html.Div(
-                    className="modal-body",
-                    children=[
-                        html.Div(
-                            style={
-                                "display": "flex",
-                                "gap": "20px",
-                                "width": "100%",
-                                "height": "100%",
-                            },
-                            children=[
-                                # ── LEFT PANEL: Setup + Items list ──────────────
-                                html.Div(
-                                    style={
-                                        "flex": "0 0 360px",
-                                        "display": "flex",
-                                        "flexDirection": "column",
-                                        "gap": "16px",
-                                        "height": "100%",
-                                        "overflow": "hidden",
-                                    },
-                                    children=[
-                                        # Dashboard Setup Card
-                                        html.Div(className="dashboard-card", style={"flexShrink": "0"}, children=[
-                                            html.Div(className="dashboard-card-header", children=[
-                                                html.H4("Dashboard Setup", className="dashboard-card-title"),
-                                            ]),
-                                            html.Div(className="dashboard-card-body", style={"overflowY": "auto", "maxHeight": "380px"}, children=[
-                                                html.Div(className="form-group", children=[
-                                                    html.Label("Select Dashboard:", className="form-label"),
-                                                    dcc.Dropdown(
-                                                        id="dashboard-selector",
-                                                        options=[{"label": d.get("report_name", "Unnamed"),
-                                                                  "value": i} for i, d in enumerate(dashboards_data)] +
-                                                                 [{"label": "➕ Create New Dashboard", "value": "new"}],
-                                                        value="new" if not dashboards_data else 0,
-                                                        className="modern-dropdown",
-                                                        clearable=False,
-                                                    ),
-                                                ]),
-                                                html.Div(className="form-group", children=[
-                                                    html.Label("Report Name *", className="form-label"),
-                                                    dcc.Input(
-                                                        id="report-name-input",
-                                                        type="text",
-                                                        placeholder="Enter report name...",
-                                                        className="modern-input",
-                                                    ),
-                                                ]),
-                                                html.Div(className="form-row", children=[
-                                                    html.Div(className="form-group", style={"flex": "1"}, children=[
-                                                        html.Label("Report ID:", className="form-label-disabled"),
-                                                        dcc.Input(
-                                                            id="report-id-input",
-                                                            type="text",
-                                                            placeholder="auto-generated",
-                                                            disabled=True,
-                                                            className="modern-input-disabled",
-                                                        ),
-                                                    ]),
-                                                    html.Div(className="form-group", style={"flex": "1"}, children=[
-                                                        html.Label("Date Created:", className="form-label-disabled"),
-                                                        dcc.Input(
-                                                            id="date-created-input",
-                                                            type="text",
-                                                            disabled=True,
-                                                            className="modern-input-disabled",
-                                                        ),
-                                                    ]),
-                                                ]),
-                                                html.Div(style={"display": "flex", "gap": "12px"}, children=[
-                                                    html.Div(className="form-group", style={"flex": "1"}, children=[
-                                                        html.Label("Dashboard Type", className="form-label"),
-                                                        dcc.Dropdown(
-                                                            id="dashboard-type-selector",
-                                                            options=[
-                                                                {"label": "Standard", "value": "standard"},
-                                                                {"label": "MNID Outlook", "value": "mnid"},
-                                                            ],
-                                                            value="standard",
-                                                            clearable=False,
-                                                            className="modern-dropdown",
-                                                        ),
-                                                    ]),
-                                                    html.Div(className="form-group", style={"flex": "0 0 110px"}, children=[
-                                                        html.Label("Counts/Row", className="form-label"),
-                                                        dcc.Input(
-                                                            id="count-items-per-row-input",
-                                                            type="number",
-                                                            min=1, max=8,
-                                                            value=5,
-                                                            placeholder="5",
-                                                            className="modern-input",
-                                                        ),
-                                                    ]),
-                                                ]),
-                                                # MNID fields — hidden unless type == "mnid"
-                                                html.Div(
-                                                    id="mnid-section",
-                                                    style={"display": "none"},
-                                                    children=[
-                                                        html.Div(className="form-group", children=[
-                                                            html.Label("MNID Categories", className="form-label"),
-                                                            dcc.Dropdown(
-                                                                id="mnid-categories-selector",
-                                                                options=[{"label": item, "value": item}
-                                                                         for item in ["ANC", "Labour", "PNC", "Newborn"]],
-                                                                value=[],
-                                                                multi=True,
-                                                                placeholder="Select MNID program areas",
-                                                                className="modern-dropdown",
-                                                            ),
-                                                        ]),
-                                                        html.Div(className="form-group", children=[
-                                                            html.Label("MNID Indicators", className="form-label"),
-                                                            html.Div(
-                                                                style={"display": "flex", "justifyContent": "space-between",
-                                                                       "alignItems": "center", "marginBottom": "8px"},
-                                                                children=[
-                                                                    html.Span("Build indicators, review JSON below.",
-                                                                              style={"fontSize": "12px", "color": "#6b7280"}),
-                                                                    html.Button("➕ Add Indicator",
-                                                                                id="add-mnid-indicator-btn",
-                                                                                n_clicks=0,
-                                                                                className="btn-primary-modern"),
-                                                                ],
-                                                            ),
-                                                            html.Div(
-                                                                id="mnid-indicators-container",
-                                                                className="dashboard-card-body",
-                                                                style={"maxHeight": "260px", "overflowY": "auto",
-                                                                       "marginBottom": "8px", "padding": "8px",
-                                                                       "border": "1px solid #e5e7eb", "borderRadius": "8px",
-                                                                       "background": "#fafafa"},
-                                                            ),
-                                                            dcc.Textarea(
-                                                                id="mnid-indicators-input",
-                                                                value="",
-                                                                placeholder='[{"id":"mnid_x_001","label":"...","category":"ANC",...}]',
-                                                                className="modern-input",
-                                                                style={"minHeight": "100px", "resize": "vertical"},
-                                                            ),
-                                                        ]),
-                                                    ],
-                                                ),
-                                            ]),
-                                        ]),
-
-                                        # Dashboard Items Card (takes remaining height)
-                                        html.Div(
-                                            className="dashboard-card",
-                                            style={"flex": "1", "display": "flex", "flexDirection": "column", "minHeight": "0"},
-                                            children=[
-                                                html.Div(
-                                                    className="dashboard-card-header",
-                                                    style={"display": "flex", "alignItems": "center",
-                                                           "justifyContent": "space-between", "flexShrink": "0"},
-                                                    children=[
-                                                        html.H4("Dashboard Items", className="dashboard-card-title"),
-                                                        html.Div(style={"display": "flex", "gap": "6px"}, children=[
-                                                            html.Button("➕ Metric",
-                                                                        id="add-count-btn",
-                                                                        n_clicks=0,
-                                                                        className="btn-primary-modern btn-small",
-                                                                        title="Add a new metric/count"),
-                                                            html.Button("➕ Section",
-                                                                        id="add-section-btn",
-                                                                        n_clicks=0,
-                                                                        className="btn-primary-modern btn-small",
-                                                                        title="Add a new chart section"),
-                                                        ]),
-                                                    ],
-                                                ),
-                                                html.Div(
-                                                    id="dashboard-items-container",
-                                                    className="dashboard-card-body",
-                                                    style={"overflowY": "auto", "flex": "1"},
-                                                    children=[list_items_html],
-                                                ),
-                                            ],
-                                        ),
-                                    ],
-                                ),
-
-                                # ── RIGHT PANEL: Edit Forms ──────────────────────
-                                html.Div(
-                                    style={
-                                        "flex": "1",
-                                        "display": "flex",
-                                        "flexDirection": "column",
-                                        "gap": "16px",
-                                        "height": "100%",
-                                        "overflow": "hidden",
-                                    },
-                                    children=[
-                                        # Panel header
-                                        html.Div(
-                                            className="dashboard-card",
-                                            style={"flexShrink": "0", "padding": "12px 16px"},
-                                            children=[
-                                                html.Div(style={"display": "flex", "alignItems": "center", "gap": "10px"}, children=[
-                                                    html.Span("✏️", style={"fontSize": "18px"}),
-                                                    html.Div(children=[
-                                                        html.H4("Edit Panel", className="dashboard-card-title",
-                                                                style={"margin": "0"}),
-                                                        html.Span("Click an item on the left to open its form here.",
-                                                                  style={"fontSize": "12px", "color": "#6b7280"}),
-                                                    ]),
-                                                ]),
-                                            ],
-                                        ),
-                                        # Count / metric edit area
-                                        html.Div(
-                                            id="counts-container",
-                                            style={
-                                                "flexShrink": "0",
-                                                "overflowY": "auto",
-                                                "maxHeight": "45%",
-                                            },
-                                        ),
-                                        # Sections / charts edit area (scrollable, vertical)
-                                        html.Div(
-                                            id="sections-container",
-                                            style={
-                                                "flex": "1",
-                                                "overflowY": "auto",
-                                                "display": "flex",
-                                                "flexDirection": "column",
-                                                "gap": "12px",
-                                                "minHeight": "0",
-                                            },
-                                        ),
-                                    ],
-                                ),
-                            ]
-                        )
-                    ]
-                ),
-                
-                # Modal Footer with Action Buttons
-                html.Div(
-                    className="modal-footer",
-                    children=[
-                        html.Button(
-                            "Save Dashboard", 
-                            id="save-btn", 
-                            n_clicks=0, 
-                            className="btn-success-modern"
-                        ),
-                        html.Button(
-                            "Delete Dashboard", 
-                            id="delete-btn", 
-                            n_clicks=0, 
-                            className="btn-danger-modern"
-                        ),
-                    ]
-                ),
-                
-                # Delete Confirmation Modal
-                html.Div(
-                    id="delete-confirmation-modal",
-                    style={"display": "none"},
-                    className="confirmation-modal-overlay",
-                    children=[
-                        html.Div(className="confirmation-modal", children=[
-                            html.Div(className="confirmation-modal-header", children=[
-                                html.H4("Confirm Delete"),
-                                html.Button("×", id="close-confirmation-btn", className="confirmation-close-btn")
-                            ]),
-                            html.Div(className="confirmation-modal-body", children=[
-                                html.P("Are you sure you want to delete this dashboard?"),
-                                html.P("This action cannot be undone.", style={"color": "#dc3545", "fontSize": "14px"})
-                            ]),
-                            html.Div(className="confirmation-modal-footer", children=[
-                                html.Button("Cancel", id="cancel-delete-btn", className="btn-secondary-modern"),
-                                html.Button("Delete", id="confirm-delete-btn", className="btn-danger-modern"),
-                            ])
-                        ])
-                    ]
-                )
-            ]
-        )
-    ])
-
-_ds_config_path = os.path.join(path, 'configurations.json')
-_ssh_dir        = os.path.join(path, 'ssh')
-
-
-def _load_datasources():
-    try:
-        with open(_ds_config_path) as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
-
-
-def _save_datasources(data):
-    with open(_ds_config_path, 'w') as f:
-        json.dump(data, f, indent=2)
-
-
-def _list_ssh_keys():
-    """Return .pem/.cer/.key filenames from the project ssh/ directory."""
-    if not os.path.isdir(_ssh_dir):
-        return []
-    return sorted(
-        f for f in os.listdir(_ssh_dir)
-        if f.endswith(('.pem', '.cer', '.key'))
-    )
-
-
-def _build_ds_list(sources):
-    if not sources:
-        return html.Div("No data sources configured.",
-                        style={"padding": "16px", "color": "#9ca3af",
-                               "fontSize": "13px", "textAlign": "center"})
-    rows = []
-    for i, ds in enumerate(sources):
-        bg = "#f2f9f2" if i % 2 == 0 else "#ffffff"
-        rows.append(html.Div(
-            style={"display": "flex", "alignItems": "center",
-                   "padding": "10px 14px", "background": bg,
-                   "borderBottom": "1px solid #e5e7eb", "gap": "10px"},
-            children=[
-                html.Div(style={"flex": "1"}, children=[
-                    html.Div(ds.get("name", "Unnamed"),
-                             style={"fontWeight": "600", "fontSize": "13px",
-                                    "color": "#006401"}),
-                    html.Div(ds.get("date_updated", ""),
-                             style={"fontSize": "11px", "color": "#9ca3af"}),
-                ]),
-                html.Button("✏️", id={"type": "ds-edit-btn", "index": i},
-                            n_clicks=0, className="btn-secondary btn-small",
-                            title="Edit"),
-            ],
-        ))
-    return html.Div(rows, style={"borderRadius": "8px", "overflow": "hidden"})
-
 
 layout = html.Div(
     style={
@@ -1394,6 +589,12 @@ layout = html.Div(
                         html.Button(
                             "Upload Report Template",
                             id="add-from-template-btn",
+                            n_clicks=0,
+                            className="nav-btn-modern"
+                        ),
+                        html.Button(
+                            "Update Reports (GUI)",
+                            id="create-reports-gui-btn",
                             n_clicks=0,
                             className="nav-btn-modern"
                         ),
@@ -1467,6 +668,7 @@ layout = html.Div(
                 archive_popup_modal,
                 archive_confirmation_modal,
                 create_edit_modal(),
+                create_html_report_modal(),
 
                 # Hidden Components
                 dcc.Interval(id="refresh-interval", interval=10*60*1000, n_intervals=0),
@@ -1488,6 +690,21 @@ layout = html.Div(
                           data={"running": False, "pid": None, "start_time": None}),
                 dcc.Interval(id="ds-refresh-interval", interval=2000,
                              n_intervals=0, disabled=True),
+
+                # ── Report Builder stores ────────────────────────────────────
+                dcc.Store(id="rpt-state", data={"tables": [], "next_id": 1}),
+                dcc.Store(id="rpt-sel",   data={"tid": None, "cells": []}),
+                dcc.Store(id="rpt-drag-pos", data={}),
+                dcc.Store(id="rpt-drag-init-store", data=0),
+                dcc.Input(id="rpt-drag-hidden-input", value="{}",
+                          style={"display": "none"}),
+                dcc.Store(id="rpt-resize-store", data={}),
+                dcc.Input(id="rpt-resize-hidden-input", value="{}",
+                          style={"display": "none"}),
+                dcc.Store(id="rpt-page-name", data=None),
+                dcc.Store(id="rpt-variables-store", data={"all": []}),
+                dcc.Input(id="rpt-var-drop-hidden", value="{}",
+                          style={"display": "none"}),
                 dcc.Interval(
                     id='configurations-interval-update-today',
                     interval=10*60*1000,
@@ -3711,404 +2928,6 @@ def update_chart_fields(chart_type, selector_value, report_id):
     
     return create_chart_fields(chart_type, None, section_index, chart_index)
 
-# @callback(
-#     [Output("dashboard-selector", "options", allow_duplicate=True),
-#      Output("modal-backdrop", "style", allow_duplicate=True),
-#      Output("modal-content", "style", allow_duplicate=True)],
-#     [Input("save-btn", "n_clicks")],
-#     [State("dashboard-selector", "value"),  # Get selected dashboard from dropdown
-#      State("report-name-input", "value"),
-#      State("report-id-input", "value"),
-#      State("date-created-input", "value"),
-#      # Count states
-#      State({"type": "count-id", "index": dash.ALL}, "value"),
-#      State({"type": "count-name", "index": dash.ALL}, "value"),
-#      State({"type": "count-unique", "index": dash.ALL}, "value"),
-#      State({"type": "count-var1", "index": dash.ALL}, "value"),
-#      State({"type": "count-val1", "index": dash.ALL}, "value"),
-#      State({"type": "count-var2", "index": dash.ALL}, "value"),
-#      State({"type": "count-val2", "index": dash.ALL}, "value"),
-#      State({"type": "count-var3", "index": dash.ALL}, "value"),
-#      State({"type": "count-val3", "index": dash.ALL}, "value"),
-#      State({"type": "count-var4", "index": dash.ALL}, "value"),
-#      State({"type": "count-val4", "index": dash.ALL}, "value"),
-
-#      State({"type": "count-var5", "index": dash.ALL}, "value"),
-#      State({"type": "count-val5", "index": dash.ALL}, "value"),
-#      State({"type": "count-var6", "index": dash.ALL}, "value"),
-#      State({"type": "count-val6", "index": dash.ALL}, "value"),
-#      State({"type": "count-var7", "index": dash.ALL}, "value"),
-#      State({"type": "count-val7", "index": dash.ALL}, "value"),
-#      State({"type": "count-var8", "index": dash.ALL}, "value"),
-#      State({"type": "count-val8", "index": dash.ALL}, "value"),
-#      # Section states
-#      State({"type": "section-name", "index": dash.ALL}, "value"),
-#      # Chart states - IMPORTANT: We need to get the actual section and chart indices
-#      State({"type": "chart-id", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-name", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-type", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-title", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      # Chart field states - include the IDs to track which chart they belong to
-#      State({"type": "chart-date_col", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-y_col", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-x_title", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-y_title", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-unique_column", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-legend_title", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-color", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-label_col", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-value_col", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-top_n", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-names_col", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-values_col", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-x_col", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-age_col", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-gender_col", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-bin_size", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-index_col1", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-columns", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-aggfunc", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-duration_default", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-colormap", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-filter_col1", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-filter_val1", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-filter_col2", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-filter_val2", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-filter_col3", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-filter_val3", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-filter_col4", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-filter_val4", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-filter_col5", "section": dash.ALL, "index": dash.ALL}, "value"),
-#      State({"type": "chart-filter_val5", "section": dash.ALL, "index": dash.ALL}, "value")],
-#     prevent_initial_call=True
-# )
-# def save_dashboard(save_clicks, selector_value, report_name, report_id, date_created, 
-#                   count_ids, count_names, count_uniques,
-#                   count_vars1, count_vals1, count_vars2, count_vals2, count_vars3, count_vals3, count_vars4, count_vals4,
-#                   count_vars5, count_vals5, count_vars6, count_vals6, count_vars7, count_vals7, count_vars8, count_vals8,
-#                   section_names,
-#                   chart_ids, chart_names, chart_types, chart_titles,
-#                   chart_date_cols, chart_y_cols, chart_x_titles, chart_y_titles,
-#                   chart_unique_columns, chart_legend_titles, chart_colors,
-#                   chart_label_cols, chart_value_cols, chart_top_ns,
-#                   chart_names_cols, chart_values_cols, chart_x_cols,
-#                   chart_age_cols, chart_gender_cols, chart_bin_sizes,
-#                   chart_index_col1s, chart_columns, chart_aggfuncs,
-#                   chart_duration_defaults, chart_colormaps,
-#                   chart_filter_col1s, chart_filter_val1s, chart_filter_col2s, chart_filter_val2s,
-#                   chart_filter_col3s, chart_filter_val3s, chart_filter_col4s, chart_filter_val4s,
-#                   chart_filter_col5s, chart_filter_val5s):
-    
-#     def load_dashboards_from_file():
-#         try:
-#             with open(dashboards_json_path, 'r') as f:
-#                 data = json.load(f)
-#                 return data if isinstance(data, list) else [data]
-#         except (FileNotFoundError, json.JSONDecodeError):
-#             return []
-#     def save_dashboards_to_file(data):
-#         with open(dashboards_json_path, 'w') as f:
-#             json.dump(data, f, indent=2)
-        
-#     if save_clicks and save_clicks > 0:
-#         if not report_name:
-#             # Show error - you might want to add an error output
-#             return dash.no_update, dash.no_update, dash.no_update
-#         # Load current data from file
-
-
-#         dashboards_data = load_dashboards_from_file()
-        
-#         # 1. Build counts data from UI state
-#         counts_data = []
-#         if count_ids and count_names:
-#             for i, (count_id, count_name) in enumerate(zip(count_ids, count_names)):
-#                 if count_id and count_name:
-#                     count_data = {
-#                         "id": count_id,
-#                         "name": count_name,
-#                         "filters": {
-#                             "measure": "count",
-#                             "unique": count_uniques[i] if i < len(count_uniques) and count_uniques[i] else "person_id"
-#                         }
-#                     }
-                    
-#                     # Add filters if provided
-#                     if i < len(count_vars1) and count_vars1[i]:
-#                         count_data["filters"]["variable1"] = count_vars1[i]
-#                     if i < len(count_vals1) and count_vals1[i]:
-#                         count_data["filters"]["value1"] = count_vals1[i]
-                    
-#                     if i < len(count_vars2) and count_vars2[i]:
-#                         count_data["filters"]["variable2"] = count_vars2[i]
-#                     if i < len(count_vals2) and count_vals2[i]:
-#                         count_data["filters"]["value2"] = count_vals2[i]
-                    
-#                     if i < len(count_vars3) and count_vars3[i]:
-#                         count_data["filters"]["variable3"] = count_vars3[i]
-#                     if i < len(count_vals3) and count_vals3[i]:
-#                         count_data["filters"]["value3"] = count_vals3[i]
-
-#                     if i < len(count_vars4) and count_vars4[i]:
-#                         count_data["filters"]["variable4"] = count_vars4[i]
-#                     if i < len(count_vals4) and count_vals4[i]:
-#                         count_data["filters"]["value4"] = count_vals4[i]
-#                     if i < len(count_vars5) and count_vars5[i]:
-#                         count_data["filters"]["variable5"] = count_vars5[i]
-#                     if i < len(count_vals5) and count_vals5[i]:
-#                         count_data["filters"]["value5"] = count_vals5[i]
-#                     if i < len(count_vars6) and count_vars6[i]:
-#                         count_data["filters"]["variable6"] = count_vars6[i]
-#                     if i < len(count_vals6) and count_vals6[i]:
-#                         count_data["filters"]["value6"] = count_vals6[i]
-#                     if i < len(count_vars7) and count_vars7[i]:
-#                         count_data["filters"]["variable7"] = count_vars7[i]
-#                     if i < len(count_vals7) and count_vals7[i]:
-#                         count_data["filters"]["value7"] = count_vals7[i]
-#                     if i < len(count_vars8) and count_vars8[i]:
-#                         count_data["filters"]["variable8"] = count_vars8[i]
-#                     if i < len(count_vals8) and count_vals8[i]:
-#                         count_data["filters"]["value8"] = count_vals8[i]
-                    
-#                     counts_data.append(count_data)
-        
-#         # 2. Build sections data - FIXED VERSION
-#         sections_data = []
-        
-#         # First, organize charts by their actual section indices
-#         # We need to extract section and chart indices from the pattern IDs
-#         charts_by_section = {}
-        
-#         # Process all charts with their section assignments
-#         for i in range(len(chart_ids)):
-#             # Get the actual section and chart index from the pattern IDs
-#             # This assumes the IDs follow the pattern from create_chart_item
-#             section_idx = None
-#             chart_idx = None
-            
-#             # Try to extract from the chart_id if it contains the info
-#             # Or we need to track this differently - let's use a different approach
-            
-#             # Since we can't easily extract from IDs, we'll use a different strategy
-#             # We'll create charts first, then assign them to sections based on index
-            
-#             if chart_ids[i] and chart_names[i] and chart_types[i]:
-#                 chart_data = {
-#                     "id": chart_ids[i],
-#                     "name": chart_names[i],
-#                     "type": chart_types[i],
-#                     "filters": {
-#                         "measure": "nunique",
-#                         "unique": "any",
-#                         "duration_default": "any"
-#                     }
-#                 }
-                
-#                 # Add title if available
-#                 if i < len(chart_titles) and chart_titles[i]:
-#                     chart_data["filters"]["title"] = chart_titles[i]
-                
-#                 # Add duration_default
-#                 if i < len(chart_duration_defaults) and chart_duration_defaults[i]:
-#                     chart_data["filters"]["duration_default"] = chart_duration_defaults[i]
-                
-#                 # Add chart type specific fields
-#                 chart_type = chart_types[i]
-
-#                 # Access values when list is less than i
-#                 def get_safe_value(lst, default=None, index=i):
-#                     """
-#                     Pop and return the first item from a list.
-#                     If the list is empty or None, return default.
-#                     """
-#                     try:
-#                         if index < len(lst):
-#                             return lst[index]
-#                         else:
-#                             return lst.pop(0)
-#                     except (IndexError, TypeError):
-#                         return default
-
-#                 # Update all chart types with safe access
-#                 if chart_type == "Line":
-#                     chart_data["filters"]["date_col"] = get_safe_value(chart_date_cols, i)
-#                     chart_data["filters"]["y_col"] = get_safe_value(chart_y_cols, i)
-#                     chart_data["filters"]["title"] = get_safe_value(chart_titles, i)
-#                     chart_data["filters"]["x_title"] = get_safe_value(chart_x_titles, i)
-#                     chart_data["filters"]["y_title"] = get_safe_value(chart_y_titles, i)
-#                     chart_data["filters"]["unique_column"] = get_safe_value(chart_unique_columns, i)
-#                     chart_data["filters"]["legend_title"] = get_safe_value(chart_legend_titles, i)
-#                     chart_data["filters"]["color"] = get_safe_value(chart_colors, i)
-#                     chart_data["filters"]["filter_col1"] = get_safe_value(chart_filter_col1s, i)
-#                     chart_data["filters"]["filter_val1"] = get_safe_value(chart_filter_val1s, i)
-#                     chart_data["filters"]["filter_col2"] = get_safe_value(chart_filter_col2s, i)
-#                     chart_data["filters"]["filter_val2"] = get_safe_value(chart_filter_val2s, i)
-#                     chart_data["filters"]["filter_col3"] = get_safe_value(chart_filter_col3s, i)
-#                     chart_data["filters"]["filter_val3"] = get_safe_value(chart_filter_val3s, i)
-#                     chart_data["filters"]["filter_col4"] = get_safe_value(chart_filter_col4s, i)
-#                     chart_data["filters"]["filter_val4"] = get_safe_value(chart_filter_val4s, i)
-#                     chart_data["filters"]["filter_col5"] = get_safe_value(chart_filter_col5s, i)
-#                     chart_data["filters"]["filter_val5"] = get_safe_value(chart_filter_val5s, i)
-
-
-#                 elif chart_type == "Bar":
-#                     chart_data["filters"]["label_col"] = get_safe_value(chart_label_cols, i)
-#                     chart_data["filters"]["value_col"] = get_safe_value(chart_value_cols, i)
-#                     chart_data["filters"]["title"] = get_safe_value(chart_titles, i)
-#                     chart_data["filters"]["x_title"] = get_safe_value(chart_x_titles, i)
-#                     chart_data["filters"]["y_title"] = get_safe_value(chart_y_titles, i)
-#                     chart_data["filters"]["unique_column"] = get_safe_value(chart_unique_columns, i)
-#                     chart_data["filters"]["top_n"] = get_safe_value(chart_top_ns, i)
-#                     chart_data["filters"]["filter_col1"] = get_safe_value(chart_filter_col1s, i)
-#                     chart_data["filters"]["filter_val1"] = get_safe_value(chart_filter_val1s, i)
-#                     chart_data["filters"]["filter_col2"] = get_safe_value(chart_filter_col2s, i)
-#                     chart_data["filters"]["filter_val2"] = get_safe_value(chart_filter_val2s, i)
-#                     chart_data["filters"]["filter_col3"] = get_safe_value(chart_filter_col3s, i)
-#                     chart_data["filters"]["filter_val3"] = get_safe_value(chart_filter_val3s, i)
-#                     chart_data["filters"]["filter_col4"] = get_safe_value(chart_filter_col4s, i)
-#                     chart_data["filters"]["filter_val4"] = get_safe_value(chart_filter_val4s, i)
-#                     chart_data["filters"]["filter_col5"] = get_safe_value(chart_filter_col5s, i)
-#                     chart_data["filters"]["filter_val5"] = get_safe_value(chart_filter_val5s, i)
-
-#                 elif chart_type == "Pie":
-#                     chart_data["filters"]["names_col"] = get_safe_value(chart_names_cols, i)
-#                     chart_data["filters"]["values_col"] = get_safe_value(chart_values_cols, i)
-#                     chart_data["filters"]["title"] = get_safe_value(chart_titles, i)
-#                     chart_data["filters"]["unique_column"] = get_safe_value(chart_unique_columns, i)
-#                     chart_data["filters"]["colormap"] = get_safe_value(chart_colormaps, i)
-#                     chart_data["filters"]["filter_col1"] = get_safe_value(chart_filter_col1s, i)
-#                     chart_data["filters"]["filter_val1"] = get_safe_value(chart_filter_val1s, i)
-#                     chart_data["filters"]["filter_col2"] = get_safe_value(chart_filter_col2s, i)
-#                     chart_data["filters"]["filter_val2"] = get_safe_value(chart_filter_val2s, i)
-#                     chart_data["filters"]["filter_col3"] = get_safe_value(chart_filter_col3s, i)
-#                     chart_data["filters"]["filter_val3"] = get_safe_value(chart_filter_val3s, i)
-#                     chart_data["filters"]["filter_col4"] = get_safe_value(chart_filter_col4s, i)
-#                     chart_data["filters"]["filter_val4"] = get_safe_value(chart_filter_val4s, i)
-#                     chart_data["filters"]["filter_col5"] = get_safe_value(chart_filter_col5s, i)
-#                     chart_data["filters"]["filter_val5"] = get_safe_value(chart_filter_val5s, i)
-
-#                 elif chart_type == "Column":
-#                     chart_data["filters"]["x_col"] = get_safe_value(chart_x_cols, i)
-#                     chart_data["filters"]["y_col"] = get_safe_value(chart_y_cols, i)
-#                     chart_data["filters"]["title"] = get_safe_value(chart_titles, i)
-#                     chart_data["filters"]["x_title"] = get_safe_value(chart_x_titles, i)
-#                     chart_data["filters"]["y_title"] = get_safe_value(chart_y_titles, i)
-#                     chart_data["filters"]["unique_column"] = get_safe_value(chart_unique_columns, i)
-#                     chart_data["filters"]["legend_title"] = get_safe_value(chart_legend_titles, i)
-#                     chart_data["filters"]["color"] = get_safe_value(chart_colors, i)
-#                     chart_data["filters"]["filter_col1"] = get_safe_value(chart_filter_col1s, i)
-#                     chart_data["filters"]["filter_val1"] = get_safe_value(chart_filter_val1s, i)
-#                     chart_data["filters"]["filter_col2"] = get_safe_value(chart_filter_col2s, i)
-#                     chart_data["filters"]["filter_val2"] = get_safe_value(chart_filter_val2s, i)
-#                     chart_data["filters"]["filter_col3"] = get_safe_value(chart_filter_col3s, i)
-#                     chart_data["filters"]["filter_val3"] = get_safe_value(chart_filter_val3s, i)
-#                     chart_data["filters"]["filter_col4"] = get_safe_value(chart_filter_col4s, i)
-#                     chart_data["filters"]["filter_val4"] = get_safe_value(chart_filter_val4s, i)
-#                     chart_data["filters"]["filter_col5"] = get_safe_value(chart_filter_col5s, i)
-#                     chart_data["filters"]["filter_val5"] = get_safe_value(chart_filter_val5s, i)
-
-#                 elif chart_type == "Histogram":
-#                     chart_data["filters"]["age_col"] = get_safe_value(chart_age_cols, i)
-#                     chart_data["filters"]["gender_col"] = get_safe_value(chart_gender_cols, i)
-#                     chart_data["filters"]["title"] = get_safe_value(chart_titles, i)
-#                     chart_data["filters"]["x_title"] = get_safe_value(chart_x_cols, i)
-#                     chart_data["filters"]["y_title"] = get_safe_value(chart_y_cols, i)
-#                     chart_data["filters"]["unique_column"] = get_safe_value(chart_unique_columns, i)
-#                     chart_data["filters"]["bin_size"] = get_safe_value(chart_bin_sizes, i)
-#                     chart_data["filters"]["color"] = get_safe_value(chart_colors, i)
-#                     chart_data["filters"]["filter_col1"] = get_safe_value(chart_filter_col1s, i)
-#                     chart_data["filters"]["filter_val1"] = get_safe_value(chart_filter_val1s, i)
-#                     chart_data["filters"]["filter_col2"] = get_safe_value(chart_filter_col2s, i)
-#                     chart_data["filters"]["filter_val2"] = get_safe_value(chart_filter_val2s, i)
-#                     chart_data["filters"]["filter_col3"] = get_safe_value(chart_filter_col3s, i)
-#                     chart_data["filters"]["filter_val3"] = get_safe_value(chart_filter_val3s, i)
-#                     chart_data["filters"]["filter_col4"] = get_safe_value(chart_filter_col4s, i)
-#                     chart_data["filters"]["filter_val4"] = get_safe_value(chart_filter_val4s, i)
-#                     chart_data["filters"]["filter_col5"] = get_safe_value(chart_filter_col5s, i)
-#                     chart_data["filters"]["filter_val5"] = get_safe_value(chart_filter_val5s, i)
-
-#                 elif chart_type == "PivotTable":
-#                     chart_data["filters"]["index_col1"] = get_safe_value(chart_index_col1s, i)
-#                     chart_data["filters"]["columns"] = get_safe_value(chart_columns, i)
-#                     chart_data["filters"]["title"] = get_safe_value(chart_titles, i)
-#                     chart_data["filters"]["x_title"] = get_safe_value(chart_x_cols, i)
-#                     chart_data["filters"]["y_title"] = get_safe_value(chart_y_cols, i)
-#                     chart_data["filters"]["unique_column"] = get_safe_value(chart_unique_columns, i)
-#                     chart_data["filters"]["values_col"] = get_safe_value(chart_values_cols, i)
-#                     chart_data["filters"]["aggfunc"] = get_safe_value(chart_aggfuncs, i)
-#                     chart_data["filters"]["filter_col1"] = get_safe_value(chart_filter_col1s, i)
-#                     chart_data["filters"]["filter_val1"] = get_safe_value(chart_filter_val1s, i)
-#                     chart_data["filters"]["filter_col2"] = get_safe_value(chart_filter_col2s, i)
-#                     chart_data["filters"]["filter_val2"] = get_safe_value(chart_filter_val2s, i)
-#                     chart_data["filters"]["filter_col3"] = get_safe_value(chart_filter_col3s, i)
-#                     chart_data["filters"]["filter_val3"] = get_safe_value(chart_filter_val3s, i)
-#                     chart_data["filters"]["filter_col4"] = get_safe_value(chart_filter_col4s, i)
-#                     chart_data["filters"]["filter_val4"] = get_safe_value(chart_filter_val4s, i)
-#                     chart_data["filters"]["filter_col5"] = get_safe_value(chart_filter_col5s, i)
-#                     chart_data["filters"]["filter_val5"] = get_safe_value(chart_filter_val5s, i)
-                
-
-#                 total_charts_processed = i
-                
-#                 # Distribute charts to sections based on the number of sections
-#                 if section_names:
-#                     # Simple distribution: assign charts in order to sections
-#                     section_idx = total_charts_processed % len(section_names)
-                    
-#                     if section_idx not in charts_by_section:
-#                         charts_by_section[section_idx] = []
-#                     charts_by_section[section_idx].append(chart_data)
-        
-#         # 3. Create sections with their assigned charts
-#         for section_idx, section_name in enumerate(section_names):
-#             if section_name:
-#                 section_charts = charts_by_section.get(section_idx, [])
-#                 section_data = {
-#                     "section_name": section_name,
-#                     "items": section_charts
-#                 }
-#                 sections_data.append(section_data)
-        
-#         # 4. Create complete dashboard structure
-#         dashboard_structure = {
-#             "report_id": report_id or f"report_{uuid.uuid4().hex[:8]}",
-#             "report_name": report_name,
-#             "date_created": date_created or datetime.now().strftime("%Y-%m-%d"),
-#             "visualization_types": {
-#                 "counts": counts_data,
-#                 "charts": {
-#                     "sections": sections_data
-#                 }
-#             }
-#         }
-        
-#         # 5. Update or add to dashboards data
-#         if selector_value == "new":  # New dashboard
-#             dashboards_data.append(dashboard_structure)
-#         elif isinstance(selector_value, int) and 0 <= selector_value < len(dashboards_data):
-#             # Update existing dashboard
-#             dashboards_data[selector_value] = dashboard_structure
-#         else:  # Invalid selector, add as new
-#             dashboards_data.append(dashboard_structure)
-        
-#         # 6. Save to file
-#         try:
-#             save_dashboards_to_file(dashboards_data)
-#         except Exception as e:
-#             print(f"Error saving dashboard: {e}")
-#             # You might want to show an error message to the user
-        
-#         # 7. Update dropdown options
-#         options = [
-#             {"label": f"{d.get('report_name', 'Unnamed')}", 
-#              "value": idx} 
-#             for idx, d in enumerate(dashboards_data)
-#         ] + [{"label": "➕ Create New Dashboard", "value": "new"}]
-        
-#         # 8. Close modal and return updated options
-#         return options, {"display": "none"}, {"display": "none"}
-    
-#     return dash.no_update, dash.no_update, dash.no_update
 
 @callback(
     [Output("dashboard-selector", "options", allow_duplicate=True),
@@ -4299,39 +3118,6 @@ def toggle_confirmation_modal(show_confirmation):
         return {"display": "block", "position": "fixed", "top": "50%", "left": "50%", "transform": "translate(-50%, -50%)", "zIndex": "1000", "background": "white", "padding": "20px", "borderRadius": "5px", "boxShadow": "0 2px 10px rgba(0,0,0,0.1)"}
     else:
         return {"display": "none"}
-
-
-def _load_user_csv(route):
-    _users_csv_path        = os.path.join(path, f'data/{route}', 'single_tables', 'users_data.csv')
-    if not os.path.exists(_users_csv_path):
-        return pd.DataFrame(columns=['User', 'uuid', 'role'])
-    df = pd.read_csv(_users_csv_path)
-    df = df.dropna(subset=['User']).drop_duplicates(subset=['User'])
-    return df
-
-def _load_user_props(route):
-    _user_props_path       = os.path.join(path, f'data/{route}', 'dcc_dropdown_json', 'user_properties.json')
-    if not os.path.exists(_user_props_path):
-        return {"users": []}
-    try:
-        with open(_user_props_path) as f:
-            return json.load(f)
-    except (json.JSONDecodeError, IOError):
-        return {"users": []}
-
-def _save_user_props(data, route):
-    _user_props_path       = os.path.join(path, f'data/{route}', 'dcc_dropdown_json', 'user_properties.json')
-    os.makedirs(os.path.dirname(_user_props_path), exist_ok=True)
-    with open(_user_props_path, 'w') as f:
-        json.dump(data, f, indent=2)
-
-def _load_facilities(route):
-    _facilities_json_path  = os.path.join(path, f'data/{route}', 'dcc_dropdown_json', 'facilities_dropdowns.json')
-    try:
-        with open(_facilities_json_path) as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
 
 
 # 1. Toggle panel visibility — show user config, hide main content area (and vice-versa)
@@ -4566,66 +3352,6 @@ def refresh_users_table(panel_style, urlparams):
         raise PreventUpdate
     data = _load_user_props(route)
     return _build_users_table(data.get("users", []))
-
-
-def _build_users_table(users):
-    if not users:
-        return html.Div(
-            "No users configured yet.",
-            style={"padding": "16px", "color": "#9ca3af", "fontSize": "13px",
-                   "textAlign": "center"},
-        )
-
-    th_style = {
-        "padding": "10px 14px", "textAlign": "left",
-        "background": "#006401", "color": "#fff",
-        "fontSize": "12px", "fontWeight": "600",
-        "whiteSpace": "nowrap",
-    }
-    header = html.Thead(html.Tr([
-        html.Th("Username",      style=th_style),
-        html.Th("UUID",          style={**th_style, "maxWidth": "160px", "overflow": "hidden",
-                                        "textOverflow": "ellipsis"}),
-        html.Th("Facility Code", style=th_style),
-        html.Th("Role",          style=th_style),
-        html.Th("Level",         style=th_style),
-        html.Th("District(s)",   style=th_style),
-        html.Th("Facility Name(s)", style=th_style),
-    ]))
-
-    body_rows = []
-    for i, u in enumerate(users):
-        p        = u.get("properties", {})
-        bg       = "#f2f9f2" if i % 2 == 0 else "#ffffff"
-        td       = {"padding": "8px 14px", "fontSize": "12px",
-                    "background": bg, "borderBottom": "1px solid #e5e7eb",
-                    "whiteSpace": "nowrap"}
-
-        dist     = p.get("district")      or []
-        fac      = p.get("facility_name") or []
-        dist_str = ", ".join(dist) if isinstance(dist, list) else (dist or "—")
-        fac_str  = ", ".join(fac)  if isinstance(fac,  list) else (fac  or "—")
-        uuid_val = p.get("uuid", "") or ""
-        uuid_short = (uuid_val[:18] + "…") if len(uuid_val) > 20 else uuid_val
-
-        body_rows.append(html.Tr([
-            html.Td(u.get("username", ""),    style={**td, "fontWeight": "500",
-                                                     "color": "#006401"}),
-            html.Td(uuid_short,               style={**td, "fontFamily": "monospace",
-                                                     "fontSize": "11px"},
-                    title=uuid_val),
-            html.Td(p.get("facility_code", "") or "—", style=td),
-            html.Td(p.get("role", "")         or "—", style=td),
-            html.Td(p.get("user_level", "")   or "—", style=td),
-            html.Td(dist_str,                  style=td),
-            html.Td(fac_str,                   style=td),
-        ]))
-
-    return html.Table(
-        [header, html.Tbody(body_rows)],
-        style={"width": "100%", "borderCollapse": "collapse",
-               "fontSize": "13px", "tableLayout": "auto"},
-    )
 
 
 # ── Configure Data Sources callbacks ─────────────────────────────────────────
@@ -5114,29 +3840,8 @@ def toggle_ssh_auth_type(auth_type):
     return {"display": "block"}, {"display": "none"}
 
 
-import re as _re
-
 # All valid column names the user can reference in a query
 _VALID_COLS = set(actual_keys_in_data)
-
-
-def _extract_identifiers(sql: str) -> list[str]:
-    """Return word-like tokens from SQL that could be column names."""
-    # Remove string literals and comments first
-    sql_clean = _re.sub(r"'[^']*'", " ", sql)
-    sql_clean = _re.sub(r'"[^"]*"', " ", sql_clean)
-    sql_clean = _re.sub(r"--[^\n]*", " ", sql_clean)
-    # SQL keywords to skip
-    _KEYWORDS = {
-        "select","from","where","and","or","not","in","is","null","like","data",
-        "limit","offset","group","by","order","having","join","on","as",
-        "distinct","count","sum","avg","min","max","between","case","when",
-        "then","else","end","with","inner","left","right","outer","cross",
-        "union","all","insert","update","delete","create","drop","cast",
-        "timestamp","date","interval","true","false","asc","desc","exists",
-    }
-    tokens = _re.findall(r"\b[A-Za-z_][A-Za-z0-9_]*\b", sql_clean)
-    return [t for t in tokens if t.lower() not in _KEYWORDS]
 
 
 @callback(
@@ -5242,3 +3947,1070 @@ def run_preview_query(n_clicks,urlparams, sql):
     ])
 
     return info, create_preview_table(df), ""
+
+
+# =============================================================================
+# Report Builder – helper + callbacks
+# =============================================================================
+
+def _rpt_render_canvas(state, sel, drag_pos, resize_store=None):
+    """Return a list of Dash components representing all tables on the canvas."""
+    sel = sel or {"tid": None, "cells": []}
+    drag_pos = drag_pos or {}
+    resize_store = resize_store or {}
+    components = []
+
+    _RESIZE_HANDLE_COL = {
+        "position": "absolute", "right": "0", "top": "0",
+        "width": "5px", "height": "100%", "cursor": "col-resize",
+        "zIndex": "10", "background": "transparent", "userSelect": "none",
+    }
+    _RESIZE_HANDLE_ROW = {
+        "position": "absolute", "bottom": "0", "left": "0",
+        "height": "5px", "width": "100%", "cursor": "row-resize",
+        "zIndex": "10", "background": "transparent", "userSelect": "none",
+    }
+
+    for table in state.get("tables", []):
+        tid = table["id"]
+        pos = drag_pos.get(tid, table.get("pos", {"x": 20, "y": 20}))
+        x, y = pos.get("x", 20), pos.get("y", 20)
+        selected_table = sel.get("tid") == tid
+        selected_cells = {(r, c) for r, c in sel.get("cells", [])}
+
+        # Resize dimensions: prefer resize_store over table state
+        tdims = resize_store.get(tid, {})
+        col_widths = tdims.get("col_widths", table.get("col_widths", []))
+        row_heights = tdims.get("row_heights", table.get("row_heights", []))
+
+        inner = []
+
+        # Drag handle
+        inner.append(
+            html.Div(
+                tid,
+                id={"type": "rpt-handle", "tid": tid},
+                n_clicks=0,
+                style={
+                    "padding": "3px 8px", "fontSize": "11px", "cursor": "move",
+                    "background": "#16a34a" if selected_table else "#9ca3af",
+                    "color": "#ffffff", "borderRadius": "4px 4px 0 0",
+                    "userSelect": "none",
+                },
+            )
+        )
+
+        # Title above
+        if table.get("ta") is not None:
+            inner.append(
+                dcc.Input(
+                    id={"type": "rpt-ta", "tid": tid},
+                    value=table["ta"],
+                    debounce=True,
+                    placeholder="Title above…",
+                    style={"width": "100%", "padding": "4px 6px", "fontSize": "13px",
+                           "fontWeight": "600", "border": "1px solid #d1d5db",
+                           "borderRadius": "4px", "marginBottom": "4px",
+                           "boxSizing": "border-box"},
+                )
+            )
+
+        # Table rows
+        rows = []
+        data = table.get("data", [])
+        for r_idx, row in enumerate(data):
+            tds = []
+            vis_col = 0  # visual column counter (skips hidden cells)
+            for c_idx, cell in enumerate(row):
+                if cell.get("hidden", False):
+                    continue
+                is_selected = (r_idx, c_idx) in selected_cells
+
+                # Resolve explicit dimensions for this visual column/row
+                w = col_widths[vis_col] if vis_col < len(col_widths) else 80
+                h = row_heights[r_idx] if r_idx < len(row_heights) else 30
+
+                tds.append(
+                    html.Td(
+                        children=[
+                            dcc.Input(
+                                id={"type": "rpt-ci", "tid": tid, "r": r_idx, "c": c_idx},
+                                value=cell.get("v", ""),
+                                debounce=True,
+                                style={
+                                    "border": "none", "background": "transparent",
+                                    "width": "100%", "color": cell.get("color", "#000000"),
+                                    "fontSize": "12px", "boxSizing": "border-box",
+                                },
+                            ),
+                            # Column resize handle (right edge)
+                            html.Div(
+                                id={"type": "rpt-col-resize", "tid": tid, "col": vis_col},
+                                style=_RESIZE_HANDLE_COL,
+                            ),
+                            # Row resize handle (bottom edge)
+                            html.Div(
+                                id={"type": "rpt-row-resize", "tid": tid, "row": r_idx},
+                                style=_RESIZE_HANDLE_ROW,
+                            ),
+                        ],
+                        id={"type": "rpt-td", "tid": tid, "r": r_idx, "c": c_idx},
+                        n_clicks=0,
+                        colSpan=cell.get("cs", 1),
+                        rowSpan=cell.get("rs", 1),
+                        style={
+                            "position": "relative",
+                            "border": "2px solid #16a34a" if is_selected else "1px solid #d1d5db",
+                            "background": cell.get("fill", "#ffffff"),
+                            "padding": "2px 4px",
+                            "width": f"{w}px",
+                            "minWidth": f"{w}px",
+                            "height": f"{h}px",
+                            "minHeight": f"{h}px",
+                            "overflow": "hidden",
+                        },
+                    )
+                )
+                vis_col += cell.get("cs", 1)
+            rows.append(html.Tr(
+                tds,
+                style={"height": f"{row_heights[r_idx]}px" if r_idx < len(row_heights) else "30px"},
+            ))
+
+        inner.append(
+            html.Table(
+                html.Tbody(rows),
+                style={"borderCollapse": "collapse", "background": "#ffffff",
+                       "fontSize": "12px", "tableLayout": "fixed"},
+            )
+        )
+
+        # Title below
+        if table.get("tb") is not None:
+            inner.append(
+                dcc.Input(
+                    id={"type": "rpt-tb", "tid": tid},
+                    value=table["tb"],
+                    debounce=True,
+                    placeholder="Title below…",
+                    style={"width": "100%", "padding": "4px 6px", "fontSize": "13px",
+                           "fontWeight": "600", "border": "1px solid #d1d5db",
+                           "borderRadius": "4px", "marginTop": "4px",
+                           "boxSizing": "border-box"},
+                )
+            )
+
+        components.append(
+            html.Div(
+                inner,
+                id={"type": "rpt-wrap", "tid": tid},
+                style={
+                    "position": "absolute",
+                    "left": f"{x}px",
+                    "top": f"{y}px",
+                    "border": "2px solid #16a34a" if selected_table else "1px solid #d1d5db",
+                    "borderRadius": "4px",
+                    "boxShadow": "0 2px 8px rgba(0,0,0,0.12)",
+                    "background": "#ffffff",
+                    "minWidth": "120px",
+                },
+            )
+        )
+
+    return components
+
+
+# 1. Toggle modal
+@callback(
+    Output("create-reports-modal", "style"),
+    Input("create-reports-gui-btn", "n_clicks"),
+    Input("close-create-reports-modal", "n_clicks"),
+    State("create-reports-modal", "style"),
+    prevent_initial_call=True,
+)
+def _toggle_create_reports_modal(open_clicks, close_clicks, current_style):
+    triggered = ctx.triggered_id
+    if triggered == "create-reports-gui-btn":
+        return {**current_style, "display": "flex"}
+    return {**current_style, "display": "none"}
+
+
+# 2. Select table / cell
+@callback(
+    Output("rpt-sel", "data"),
+    Input({"type": "rpt-handle", "tid": ALL}, "n_clicks"),
+    Input({"type": "rpt-td", "tid": ALL, "r": ALL, "c": ALL}, "n_clicks"),
+    State("rpt-sel", "data"),
+    prevent_initial_call=True,
+)
+def _rpt_select(handle_clicks, cell_clicks, sel):
+    triggered = ctx.triggered_id
+    if triggered is None:
+        raise PreventUpdate
+    if isinstance(triggered, dict):
+        t = triggered.get("type")
+        if t == "rpt-handle":
+            return {"tid": triggered["tid"], "cells": []}
+        if t == "rpt-td":
+            return {"tid": triggered["tid"], "cells": [[triggered["r"], triggered["c"]]]}
+    raise PreventUpdate
+
+
+# 3. Canvas render
+@callback(
+    Output("html-report-canvas", "children"),
+    Output("html-report-status", "children"),
+    Input("rpt-state", "data"),
+    Input("rpt-sel", "data"),
+    Input("rpt-drag-pos", "data"),
+    State("rpt-resize-store", "data"),
+    prevent_initial_call=False,
+)
+def _rpt_render(state, sel, drag_pos, resize_store):
+    state = state or {"tables": [], "next_id": 1}
+    sel = sel or {"tid": None, "cells": []}
+    drag_pos = drag_pos or {}
+    children = _rpt_render_canvas(state, sel, drag_pos, resize_store)
+    tid = sel.get("tid")
+    ncells = len(sel.get("cells", []))
+    if tid:
+        status = f"Table {tid} selected, {ncells} cell(s)"
+    else:
+        status = "No selection"
+    return children, status
+
+
+def _empty_cell():
+    return {"v": "", "fill": "#ffffff", "color": "#000000", "cs": 1, "rs": 1, "hidden": False}
+
+
+def _new_table(tid, x, y, rows=3, cols=3):
+    data = [[_empty_cell() for _ in range(cols)] for _ in range(rows)]
+    return {"id": tid, "pos": {"x": x, "y": y}, "ta": None, "tb": None, "data": data}
+
+
+# 4. Add table
+@callback(
+    Output("rpt-state", "data", allow_duplicate=True),
+    Input("rpt-add-table-btn", "n_clicks"),
+    Input("rpt-add-above-btn", "n_clicks"),
+    Input("rpt-add-below-btn", "n_clicks"),
+    Input("rpt-add-left-btn", "n_clicks"),
+    Input("rpt-add-right-btn", "n_clicks"),
+    State("rpt-state", "data"),
+    State("rpt-sel", "data"),
+    prevent_initial_call=True,
+)
+def _rpt_add_table(n_new, n_above, n_below, n_left, n_right, state, sel):
+    state = state or {"tables": [], "next_id": 1}
+    triggered = ctx.triggered_id
+    if triggered is None:
+        raise PreventUpdate
+
+    tables = state["tables"]
+    nid = state["next_id"]
+    tid = f"t{nid}"
+    n = len(tables)
+    sel = sel or {"tid": None}
+    selected_tid = sel.get("tid")
+    sel_table = next((t for t in tables if t["id"] == selected_tid), None)
+
+    if triggered == "rpt-add-table-btn" or sel_table is None:
+        x, y = 20 + n * 30, 20 + n * 30
+    else:
+        sx, sy = sel_table["pos"]["x"], sel_table["pos"]["y"]
+        if triggered == "rpt-add-above-btn":
+            x, y = sx, sy - 160
+        elif triggered == "rpt-add-below-btn":
+            x, y = sx, sy + 120
+        elif triggered == "rpt-add-left-btn":
+            x, y = sx - 220, sy
+        elif triggered == "rpt-add-right-btn":
+            x, y = sx + 220, sy
+        else:
+            x, y = 20 + n * 30, 20 + n * 30
+
+    tables.append(_new_table(tid, x, y))
+    return {"tables": tables, "next_id": nid + 1}
+
+
+# 5. Structural operations
+@callback(
+    Output("rpt-state", "data", allow_duplicate=True),
+    Input("rpt-add-row-btn", "n_clicks"),
+    Input("rpt-del-row-btn", "n_clicks"),
+    Input("rpt-add-col-btn", "n_clicks"),
+    Input("rpt-del-col-btn", "n_clicks"),
+    Input("rpt-merge-btn", "n_clicks"),
+    Input("rpt-split-btn", "n_clicks"),
+    Input("rpt-clear-btn", "n_clicks"),
+    State("rpt-state", "data"),
+    State("rpt-sel", "data"),
+    prevent_initial_call=True,
+)
+def _rpt_structural(n_ar, n_dr, n_ac, n_dc, n_mg, n_sp, n_cl, state, sel):
+    state = state or {"tables": [], "next_id": 1}
+    sel = sel or {"tid": None, "cells": []}
+    triggered = ctx.triggered_id
+    if triggered is None:
+        raise PreventUpdate
+
+    tid = sel.get("tid")
+    if not tid:
+        raise PreventUpdate
+
+    tables = state["tables"]
+    idx = next((i for i, t in enumerate(tables) if t["id"] == tid), None)
+    if idx is None:
+        raise PreventUpdate
+
+    table = tables[idx]
+    data = table["data"]
+    selected_cells = sel.get("cells", [])
+
+    if triggered == "rpt-add-row-btn":
+        col_count = max((len(r) for r in data), default=1)
+        data.append([_empty_cell() for _ in range(col_count)])
+
+    elif triggered == "rpt-del-row-btn":
+        if selected_cells:
+            rows_to_del = sorted({r for r, c in selected_cells}, reverse=True)
+            for r in rows_to_del:
+                if 0 <= r < len(data):
+                    data.pop(r)
+        elif data:
+            data.pop()
+
+    elif triggered == "rpt-add-col-btn":
+        for row in data:
+            row.append(_empty_cell())
+
+    elif triggered == "rpt-del-col-btn":
+        if selected_cells:
+            cols_to_del = sorted({c for r, c in selected_cells}, reverse=True)
+            for row in data:
+                for c in cols_to_del:
+                    if 0 <= c < len(row):
+                        row.pop(c)
+        else:
+            for row in data:
+                if row:
+                    row.pop()
+
+    elif triggered == "rpt-merge-btn":
+        if len(selected_cells) < 2:
+            raise PreventUpdate
+        rows = [r for r, c in selected_cells]
+        cols = [c for r, c in selected_cells]
+        min_r, max_r = min(rows), max(rows)
+        min_c, max_c = min(cols), max(cols)
+        rs = max_r - min_r + 1
+        cs = max_c - min_c + 1
+        # set top-left cell span
+        data[min_r][min_c]["rs"] = rs
+        data[min_r][min_c]["cs"] = cs
+        data[min_r][min_c]["hidden"] = False
+        # hide remaining cells in rectangle
+        for r in range(min_r, max_r + 1):
+            for c in range(min_c, max_c + 1):
+                if r == min_r and c == min_c:
+                    continue
+                if r < len(data) and c < len(data[r]):
+                    data[r][c]["hidden"] = True
+
+    elif triggered == "rpt-split-btn":
+        if len(selected_cells) != 1:
+            raise PreventUpdate
+        r, c = selected_cells[0]
+        cell = data[r][c]
+        rs = cell.get("rs", 1)
+        cs_val = cell.get("cs", 1)
+        # restore hidden cells
+        for rr in range(r, r + rs):
+            for cc in range(c, c + cs_val):
+                if rr < len(data) and cc < len(data[rr]):
+                    data[rr][cc]["hidden"] = False
+                    data[rr][cc]["rs"] = 1
+                    data[rr][cc]["cs"] = 1
+
+    elif triggered == "rpt-clear-btn":
+        for r, c in selected_cells:
+            if r < len(data) and c < len(data[r]):
+                data[r][c]["v"] = ""
+
+    table["data"] = data
+    tables[idx] = table
+    return {"tables": tables, "next_id": state["next_id"]}
+
+
+# 6. Apply fill / font color
+@callback(
+    Output("rpt-state", "data", allow_duplicate=True),
+    Input("rpt-apply-fill-btn", "n_clicks"),
+    Input("rpt-apply-font-btn", "n_clicks"),
+    State("rpt-state", "data"),
+    State("rpt-sel", "data"),
+    State("rpt-fill-color", "value"),
+    State("rpt-font-color", "value"),
+    prevent_initial_call=True,
+)
+def _rpt_apply_color(n_fill, n_font, state, sel, fill_color, font_color):
+    state = state or {"tables": [], "next_id": 1}
+    sel = sel or {"tid": None, "cells": []}
+    triggered = ctx.triggered_id
+    if triggered is None:
+        raise PreventUpdate
+
+    tid = sel.get("tid")
+    if not tid:
+        raise PreventUpdate
+
+    tables = state["tables"]
+    idx = next((i for i, t in enumerate(tables) if t["id"] == tid), None)
+    if idx is None:
+        raise PreventUpdate
+
+    data = tables[idx]["data"]
+    for r, c in sel.get("cells", []):
+        if r < len(data) and c < len(data[r]):
+            if triggered == "rpt-apply-fill-btn":
+                data[r][c]["fill"] = fill_color
+            elif triggered == "rpt-apply-font-btn":
+                data[r][c]["color"] = font_color
+
+    tables[idx]["data"] = data
+    return {"tables": tables, "next_id": state["next_id"]}
+
+
+# 7. Add title above/below
+@callback(
+    Output("rpt-state", "data", allow_duplicate=True),
+    Input("rpt-title-above-btn", "n_clicks"),
+    Input("rpt-title-below-btn", "n_clicks"),
+    State("rpt-state", "data"),
+    State("rpt-sel", "data"),
+    prevent_initial_call=True,
+)
+def _rpt_add_title(n_above, n_below, state, sel):
+    state = state or {"tables": [], "next_id": 1}
+    sel = sel or {"tid": None}
+    triggered = ctx.triggered_id
+    if triggered is None:
+        raise PreventUpdate
+
+    tid = sel.get("tid")
+    if not tid:
+        raise PreventUpdate
+
+    tables = state["tables"]
+    idx = next((i for i, t in enumerate(tables) if t["id"] == tid), None)
+    if idx is None:
+        raise PreventUpdate
+
+    if triggered == "rpt-title-above-btn":
+        tables[idx]["ta"] = ""
+    elif triggered == "rpt-title-below-btn":
+        tables[idx]["tb"] = ""
+
+    return {"tables": tables, "next_id": state["next_id"]}
+
+
+# 8. Remove table
+@callback(
+    Output("rpt-state", "data", allow_duplicate=True),
+    Output("rpt-sel", "data", allow_duplicate=True),
+    Input("rpt-remove-table-btn", "n_clicks"),
+    State("rpt-state", "data"),
+    State("rpt-sel", "data"),
+    prevent_initial_call=True,
+)
+def _rpt_remove_table(n_clicks, state, sel):
+    state = state or {"tables": [], "next_id": 1}
+    sel = sel or {"tid": None}
+    tid = sel.get("tid")
+    if not tid:
+        raise PreventUpdate
+    tables = [t for t in state["tables"] if t["id"] != tid]
+    return {"tables": tables, "next_id": state["next_id"]}, {"tid": None, "cells": []}
+
+
+# 9. Update cell value
+@callback(
+    Output("rpt-state", "data", allow_duplicate=True),
+    Input({"type": "rpt-ci", "tid": ALL, "r": ALL, "c": ALL}, "value"),
+    State("rpt-state", "data"),
+    prevent_initial_call=True,
+)
+def _rpt_update_cell(values, state):
+    if not ctx.triggered or not any(v is not None for v in (ctx.triggered or [])):
+        raise PreventUpdate
+    state = state or {"tables": [], "next_id": 1}
+    triggered = ctx.triggered_id
+    if triggered is None or not isinstance(triggered, dict):
+        raise PreventUpdate
+
+    tid = triggered["tid"]
+    r = triggered["r"]
+    c = triggered["c"]
+    val = ctx.triggered[0]["value"]
+
+    tables = state["tables"]
+    idx = next((i for i, t in enumerate(tables) if t["id"] == tid), None)
+    if idx is None:
+        raise PreventUpdate
+
+    if r < len(tables[idx]["data"]) and c < len(tables[idx]["data"][r]):
+        tables[idx]["data"][r][c]["v"] = val if val is not None else ""
+
+    return {"tables": tables, "next_id": state["next_id"]}
+
+
+# 10. Update title above/below
+@callback(
+    Output("rpt-state", "data", allow_duplicate=True),
+    Input({"type": "rpt-ta", "tid": ALL}, "value"),
+    Input({"type": "rpt-tb", "tid": ALL}, "value"),
+    State("rpt-state", "data"),
+    prevent_initial_call=True,
+)
+def _rpt_update_title(ta_values, tb_values, state):
+    state = state or {"tables": [], "next_id": 1}
+    triggered = ctx.triggered_id
+    if triggered is None or not isinstance(triggered, dict):
+        raise PreventUpdate
+
+    tid = triggered["tid"]
+    val = ctx.triggered[0]["value"]
+    tables = state["tables"]
+    idx = next((i for i, t in enumerate(tables) if t["id"] == tid), None)
+    if idx is None:
+        raise PreventUpdate
+
+    t_type = triggered.get("type")
+    if t_type == "rpt-ta":
+        tables[idx]["ta"] = val
+    elif t_type == "rpt-tb":
+        tables[idx]["tb"] = val
+
+    return {"tables": tables, "next_id": state["next_id"]}
+
+
+# 11. Drag position sync (clientside)
+dash.clientside_callback(
+    """
+    function(children) {
+        setTimeout(function() {
+            var allEls = document.querySelectorAll('[id]');
+
+            function writeDashInput(inputId, value) {
+                var inp = document.getElementById(inputId);
+                if (!inp) return;
+                var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                setter.call(inp, value);
+                inp.dispatchEvent(new Event('input', {bubbles: true}));
+            }
+
+            function readJsonInput(inputId) {
+                var inp = document.getElementById(inputId);
+                if (!inp) return {};
+                try { return JSON.parse(inp.value || '{}'); } catch(e) { return {}; }
+            }
+
+            // ── Table drag ──────────────────────────────────────────────────
+            allEls.forEach(function(el) {
+                if (!el.id || !el.id.includes('"type":"rpt-handle"')) return;
+                if (el._dragBound) return;
+                el._dragBound = true;
+                var wrapper = el.parentElement;
+                el.addEventListener('mousedown', function(ev) {
+                    ev.preventDefault();
+                    var sx = ev.clientX, sy = ev.clientY;
+                    var ol = parseInt(wrapper.style.left)||0, ot = parseInt(wrapper.style.top)||0;
+                    function mv(e) {
+                        wrapper.style.left = (ol + e.clientX - sx) + 'px';
+                        wrapper.style.top  = (ot + e.clientY - sy) + 'px';
+                    }
+                    function up() {
+                        document.removeEventListener('mousemove', mv);
+                        document.removeEventListener('mouseup', up);
+                        try {
+                            var parsed = JSON.parse(el.id);
+                            var d = readJsonInput('rpt-drag-hidden-input');
+                            d[parsed.tid] = {x: parseInt(wrapper.style.left)||0, y: parseInt(wrapper.style.top)||0};
+                            writeDashInput('rpt-drag-hidden-input', JSON.stringify(d));
+                        } catch(ex) {}
+                    }
+                    document.addEventListener('mousemove', mv);
+                    document.addEventListener('mouseup', up);
+                });
+            });
+
+            // ── Column resize ───────────────────────────────────────────────
+            allEls.forEach(function(el) {
+                if (!el.id || !el.id.includes('"type":"rpt-col-resize"')) return;
+                if (el._colResizeBound) return;
+                el._colResizeBound = true;
+                el.addEventListener('mousedown', function(ev) {
+                    ev.stopPropagation();
+                    ev.preventDefault();
+                    var td = el.parentElement;
+                    var table = td.closest('table');
+                    var startX = ev.clientX;
+                    var startWidth = td.offsetWidth;
+                    var tr = td.parentElement;
+                    var colIdx = Array.from(tr.querySelectorAll('td')).indexOf(td);
+                    function mv(e) {
+                        var nw = Math.max(30, startWidth + e.clientX - startX);
+                        table.querySelectorAll('tr').forEach(function(row) {
+                            var cells = row.querySelectorAll('td');
+                            if (cells[colIdx]) {
+                                cells[colIdx].style.width = nw + 'px';
+                                cells[colIdx].style.minWidth = nw + 'px';
+                            }
+                        });
+                    }
+                    function up() {
+                        document.removeEventListener('mousemove', mv);
+                        document.removeEventListener('mouseup', up);
+                        var colWidths = [];
+                        var firstRow = table.querySelector('tr');
+                        if (firstRow) {
+                            firstRow.querySelectorAll('td').forEach(function(c) { colWidths.push(c.offsetWidth); });
+                        }
+                        try {
+                            var parsed = JSON.parse(el.id);
+                            var d = readJsonInput('rpt-resize-hidden-input');
+                            if (!d[parsed.tid]) d[parsed.tid] = {};
+                            d[parsed.tid].col_widths = colWidths;
+                            writeDashInput('rpt-resize-hidden-input', JSON.stringify(d));
+                        } catch(ex) {}
+                    }
+                    document.addEventListener('mousemove', mv);
+                    document.addEventListener('mouseup', up);
+                });
+            });
+
+            // ── Row resize ──────────────────────────────────────────────────
+            allEls.forEach(function(el) {
+                if (!el.id || !el.id.includes('"type":"rpt-row-resize"')) return;
+                if (el._rowResizeBound) return;
+                el._rowResizeBound = true;
+                el.addEventListener('mousedown', function(ev) {
+                    ev.stopPropagation();
+                    ev.preventDefault();
+                    var td = el.parentElement;
+                    var tr = td.parentElement;
+                    var table = tr.closest('table');
+                    var startY = ev.clientY;
+                    var startHeight = tr.offsetHeight;
+                    function mv(e) {
+                        var nh = Math.max(20, startHeight + e.clientY - startY);
+                        tr.style.height = nh + 'px';
+                        tr.querySelectorAll('td').forEach(function(c) {
+                            c.style.height = nh + 'px';
+                            c.style.minHeight = nh + 'px';
+                        });
+                    }
+                    function up() {
+                        document.removeEventListener('mousemove', mv);
+                        document.removeEventListener('mouseup', up);
+                        var rowHeights = [];
+                        table.querySelectorAll('tr').forEach(function(row) { rowHeights.push(row.offsetHeight); });
+                        try {
+                            var parsed = JSON.parse(el.id);
+                            var d = readJsonInput('rpt-resize-hidden-input');
+                            if (!d[parsed.tid]) d[parsed.tid] = {};
+                            d[parsed.tid].row_heights = rowHeights;
+                            writeDashInput('rpt-resize-hidden-input', JSON.stringify(d));
+                        } catch(ex) {}
+                    }
+                    document.addEventListener('mousemove', mv);
+                    document.addEventListener('mouseup', up);
+                });
+            });
+
+            // ── Cell drop targets ────────────────────────────────────────────
+            allEls.forEach(function(el) {
+                if (!el.id || !el.id.includes('"type":"rpt-td"')) return;
+                if (el._dropBound) return;
+                el._dropBound = true;
+                el.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    el.style.outline = '2px dashed #16a34a';
+                });
+                el.addEventListener('dragleave', function() {
+                    el.style.outline = '';
+                });
+                el.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    el.style.outline = '';
+                    var varName = e.dataTransfer.getData('text/plain');
+                    if (!varName) return;
+                    try {
+                        var parsed = JSON.parse(el.id);
+                        var payload = JSON.stringify({
+                            action: 'drop',
+                            variable: varName,
+                            tid: parsed.tid,
+                            r: parsed.r,
+                            c: parsed.c
+                        });
+                        writeDashInput('rpt-var-drop-hidden', payload);
+                    } catch(ex) {}
+                });
+            });
+
+        }, 200);
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("rpt-drag-init-store", "data"),
+    Input("html-report-canvas", "children"),
+    prevent_initial_call=True,
+)
+
+# 11b. Variable item drag initialisation (re-binds when panel content changes)
+dash.clientside_callback(
+    """
+    function(children) {
+        setTimeout(function() {
+            document.querySelectorAll('.rpt-var-item').forEach(function(el) {
+                if (el._varDragBound) return;
+                el._varDragBound = true;
+                el.setAttribute('draggable', 'true');
+                el.addEventListener('dragstart', function(e) {
+                    var varName = el.getAttribute('data-var') || el.textContent.trim();
+                    e.dataTransfer.setData('text/plain', varName);
+                    e.dataTransfer.effectAllowed = 'copy';
+                });
+            });
+        }, 100);
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("rpt-drag-init-store", "data", allow_duplicate=True),
+    Input("report-variables-panel-content", "children"),
+    prevent_initial_call=True,
+)
+
+
+# 12. Drag hidden input → drag pos store
+@callback(
+    Output("rpt-drag-pos", "data"),
+    Input("rpt-drag-hidden-input", "value"),
+    prevent_initial_call=True,
+)
+def _rpt_sync_drag_pos(raw):
+    try:
+        return json.loads(raw or "{}")
+    except Exception:
+        return {}
+
+
+# 12b. Resize hidden input → resize store
+@callback(
+    Output("rpt-resize-store", "data"),
+    Input("rpt-resize-hidden-input", "value"),
+    prevent_initial_call=True,
+)
+def _rpt_sync_resize(raw):
+    try:
+        return json.loads(raw or "{}")
+    except Exception:
+        return {}
+
+
+# 12c. Render variables panel
+def _get_used_variables(state, all_vars):
+    all_set = set(all_vars)
+    used = set()
+    for table in (state or {}).get("tables", []):
+        for row in table.get("data", []):
+            for cell in row:
+                v = cell.get("v", "")
+                if v in all_set:
+                    used.add(v)
+    return used
+
+
+@callback(
+    Output("report-variables-panel-content", "children"),
+    Input("rpt-variables-store", "data"),
+    Input("rpt-state", "data"),
+    prevent_initial_call=False,
+)
+def _rpt_render_variables(var_store, state):
+    all_vars   = (var_store or {}).get("all", [])
+    id_to_label = (var_store or {}).get("id_to_label", {})
+    if not all_vars:
+        return html.Div("Select a report to load variables.",
+                        style={"fontSize": "12px", "color": "#9ca3af"})
+    used = _get_used_variables(state, all_vars)
+    items = []
+    for var in all_vars:
+        if var in used:
+            continue
+        label = id_to_label.get(var, var)
+        items.append(
+            html.Div(
+                label,
+                className="rpt-var-item",
+                **{"data-var": var},   # drag payload = raw filter_name ID
+                style={
+                    "padding": "5px 8px",
+                    "marginBottom": "4px",
+                    "background": "#e0f2fe",
+                    "border": "1px solid #38bdf8",
+                    "borderRadius": "5px",
+                    "fontSize": "11px",
+                    "cursor": "grab",
+                    "userSelect": "none",
+                    "color": "#0c4a6e",
+                    "wordBreak": "break-word",
+                },
+            )
+        )
+    if not items:
+        return html.Div("All variables placed.", style={"fontSize": "12px", "color": "#6b7280"})
+    return items
+
+
+# 12d. Apply variable drop to rpt-state
+@callback(
+    Output("rpt-state", "data", allow_duplicate=True),
+    Input("rpt-var-drop-hidden", "value"),
+    State("rpt-state", "data"),
+    prevent_initial_call=True,
+)
+def _rpt_apply_var_drop(raw, state):
+    try:
+        payload = json.loads(raw or "{}")
+    except Exception:
+        raise PreventUpdate
+    if payload.get("action") != "drop":
+        raise PreventUpdate
+    var = payload.get("variable", "")
+    tid = payload.get("tid")
+    r = payload.get("r")
+    c = payload.get("c")
+    if not var or not tid or r is None or c is None:
+        raise PreventUpdate
+    state = state or {"tables": [], "next_id": 1}
+    tables = state["tables"]
+    idx = next((i for i, t in enumerate(tables) if t["id"] == tid), None)
+    if idx is None:
+        raise PreventUpdate
+    data = tables[idx]["data"]
+    if r < len(data) and c < len(data[r]):
+        data[r][c]["v"] = var
+    tables[idx]["data"] = data
+    return {"tables": tables, "next_id": state["next_id"]}
+
+
+# 13a. Populate report dropdown when modal opens
+@callback(
+    Output("html-report-name", "options"),
+    Input("create-reports-modal", "style"),
+    prevent_initial_call=True,
+)
+def _rpt_populate_dropdown(modal_style):
+    if not modal_style or modal_style.get("display") == "none":
+        raise PreventUpdate
+    hmis_path = os.path.join(os.getcwd(), "data", "hmis_reports.json")
+    try:
+        with open(hmis_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        active = [r for r in data.get("reports", []) if r.get("archived", "False") == "False"]
+        return [{"label": r["report_name"], "value": r["page_name"]} for r in active]
+    except Exception:
+        return []
+
+
+# 13b. Build rpt-state tables from VARIABLE_NAMES sheet
+def _build_tables_from_variable_names(vn_df):
+    """One table per 'section' row. Section's value cells = column headers; data rows' value cells = filter_name IDs."""
+    all_vcols = [c for c in vn_df.columns if str(c).startswith("value_1x")]
+
+    sections = []
+    cur_sec, cur_rows = None, []
+    for _, row in vn_df.iterrows():
+        if str(row.get("type", "")).strip().lower() == "section":
+            if cur_sec is not None:
+                sections.append((cur_sec, cur_rows))
+            cur_sec, cur_rows = row, []
+        else:
+            if pd.notna(row.get("name")):
+                cur_rows.append(row)
+    if cur_sec is not None:
+        sections.append((cur_sec, cur_rows))
+
+    def _val(raw):
+        s = str(raw).strip()
+        return "" if (pd.isna(raw) or s in ("nan", "None", "")) else s
+
+    HEADER_FILL = "#e5e7eb"
+    NAME_FILL   = "#f0fdf4"
+    VAL_FILL    = "#ffffff"
+    NAME_W, VAL_W, ROW_H = 250, 140, 28
+
+    tables, nid, y = [], 1, 20
+    for sec_row, data_rows in sections:
+        if not data_rows:
+            continue
+
+        # Active value columns: section header defines it OR at least one data row has a value
+        active_vc = [
+            vc for vc in all_vcols
+            if _val(sec_row.get(vc, "")) or any(_val(r.get(vc)) for r in data_rows)
+        ]
+
+        col_widths  = [NAME_W] + [VAL_W] * len(active_vc)
+        row_heights = [ROW_H] * (1 + len(data_rows))   # header + data
+
+        def mk(v, fill, color="#000000"):
+            return {"v": v, "fill": fill, "color": color, "cs": 1, "rs": 1, "hidden": False}
+
+        # Header row (from section row's value columns)
+        hdr = [mk("", HEADER_FILL, "#374151")]
+        for vc in active_vc:
+            hdr.append(mk(_val(sec_row.get(vc, "")), HEADER_FILL, "#374151"))
+
+        # Data rows
+        tdata = [hdr]
+        for dr in data_rows:
+            cells = [mk(_val(dr.get("name", "")), NAME_FILL)]
+            for vc in active_vc:
+                cells.append(mk(_val(dr.get(vc, "")), VAL_FILL))
+            tdata.append(cells)
+
+        tables.append({
+            "id": f"t{nid}",
+            "pos": {"x": 20, "y": y},
+            "ta": _val(sec_row.get("name", "")),
+            "tb": None,
+            "data": tdata,
+            "col_widths": col_widths,
+            "row_heights": row_heights,
+        })
+        nid += 1
+        y += 24 + 34 + len(tdata) * (ROW_H + 2) + 30
+
+    return {"tables": tables, "next_id": nid}
+
+
+# 13c. Load existing design when a report is selected
+@callback(
+    Output("rpt-state", "data", allow_duplicate=True),
+    Output("rpt-page-name", "data"),
+    Output("rpt-variables-store", "data"),
+    Input("html-report-name", "value"),
+    prevent_initial_call=True,
+)
+def _rpt_load_design(page_name):
+    if not page_name:
+        raise PreventUpdate
+
+    xlsx_path = os.path.join(os.getcwd(), "data", "uploads", f"{page_name}.xlsx")
+
+    # ── 1. FILTERS sheet → variables (raw IDs + display labels) ────────────
+    vars_list   = []   # raw filter_name IDs in sheet order
+    id_to_label = {}   # filter_name → display string
+    try:
+        fl = pd.read_excel(xlsx_path, sheet_name="FILTERS")
+        if "filter_name" in fl.columns:
+            has_desc = "filter_name_desc" in fl.columns
+            for _, row in fl.iterrows():
+                fn = row.get("filter_name")
+                if pd.isna(fn):
+                    continue
+                fn = str(fn).strip()
+                if not fn:
+                    continue
+                vars_list.append(fn)
+                if has_desc:
+                    fd = row.get("filter_name_desc", "")
+                    id_to_label[fn] = (f"{fn}: {fd}" if pd.notna(fd) and str(fd).strip()
+                                       else fn)
+                else:
+                    id_to_label[fn] = fn
+    except Exception:
+        pass
+
+    # ── 2. Saved design in hmis_reports.json (takes priority) ──────────────
+    state = None
+    hmis_path = os.path.join(os.getcwd(), "data", "hmis_reports.json")
+    try:
+        with open(hmis_path, "r", encoding="utf-8") as f:
+            saved_data = json.load(f)
+        for report in saved_data.get("reports", []):
+            if report.get("page_name") == page_name:
+                design = report.get("design") or {}
+                if design and design.get("tables"):
+                    state = design
+                break
+    except Exception:
+        pass
+
+    # ── 3. Fall back to VARIABLE_NAMES sheet → prebuilt tables ─────────────
+    if state is None:
+        try:
+            vn = pd.read_excel(xlsx_path, sheet_name="VARIABLE_NAMES")
+            if not vn.empty and "name" in vn.columns:
+                state = _build_tables_from_variable_names(vn)
+        except Exception:
+            pass
+
+    if state is None:
+        state = {"tables": [], "next_id": 1}
+
+    return state, page_name, {"all": vars_list, "id_to_label": id_to_label}
+
+
+# 13. Save report — writes design back into hmis_reports.json under the matched page_name
+@callback(
+    Output("html-report-save-status", "children"),
+    Input("save-html-report-btn", "n_clicks"),
+    State("rpt-state", "data"),
+    State("rpt-page-name", "data"),
+    State("rpt-drag-pos", "data"),
+    State("rpt-resize-store", "data"),
+    prevent_initial_call=True,
+)
+def _rpt_save_report(n_clicks, state, page_name, drag_pos, resize_store):
+    if not n_clicks:
+        raise PreventUpdate
+    if not page_name:
+        return "Select a report first."
+
+    state = state or {"tables": [], "next_id": 1}
+    drag_pos = drag_pos or {}
+    resize_store = resize_store or {}
+
+    # Merge drag positions and resize dimensions into state
+    for table in state["tables"]:
+        tid = table["id"]
+        if tid in drag_pos:
+            table["pos"] = drag_pos[tid]
+        if tid in resize_store:
+            if "col_widths" in resize_store[tid]:
+                table["col_widths"] = resize_store[tid]["col_widths"]
+            if "row_heights" in resize_store[tid]:
+                table["row_heights"] = resize_store[tid]["row_heights"]
+
+    hmis_path = os.path.join(os.getcwd(), "data", "hmis_reports.json")
+    try:
+        with open(hmis_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        updated = False
+        for report in data.get("reports", []):
+            if report.get("page_name") == page_name:
+                report["design"] = state
+                updated = True
+                break
+        if not updated:
+            return f"Report '{page_name}' not found in hmis_reports.json."
+        with open(hmis_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        return "Saved!"
+    except Exception as e:
+        return f"Error: {e}"

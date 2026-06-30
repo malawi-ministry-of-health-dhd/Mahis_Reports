@@ -13,7 +13,7 @@ from config import (DATE_,CONCEPT_NAME_,
 
 
 class ReportTableBuilder:
-    def __init__(self, excel_path: str,report_start_date, report_end_date,data_route, location:str, dhis2_period: str):
+    def __init__(self, excel_path: str,report_start_date, report_end_date,data_route, location:str, dhis2_period: str, report_design = None):
         self.excel_path = excel_path
         self.dhis_url = f"{DHIS2_URL}/api/dataValueSets.json"
         self.vars_df: pd.DataFrame | None = None
@@ -29,6 +29,7 @@ class ReportTableBuilder:
         self.end_date = report_end_date
         self.location = location
         self.data_route = data_route
+        self.report_design = report_design
 
 
     def load_spec(self) -> None:
@@ -432,6 +433,235 @@ class ReportTableBuilder:
     
     
     def build_dash_components(self) -> List[Any]:
+        if self.report_design and self.report_design.get("tables"):
+            return self._build_from_design()
+        return self._build_from_spec()
+
+    def _build_from_design(self) -> List[Any]:
+        """Render report from GUI-authored rpt-state design JSON, preserving exact positions."""
+        self._precompute_all_filter_values()
+
+        title        = self._title() or "HMIS DATASET REPORT"
+        # page_design  = self._page_design()
+        # is_landscape = page_design == "landscape"
+
+        #Calculate canvas bounding box from all table positions
+        canvas_w = 400
+        canvas_h = 200
+        for tbl in self.report_design.get("tables", []):
+            pos         = tbl.get("pos", {"x": 20, "y": 20})
+            x, y        = pos.get("x", 20), pos.get("y", 20)
+            cw          = tbl.get("col_widths", [])
+            rh          = tbl.get("row_heights", [])
+            data        = tbl.get("data", [])
+            tbl_w       = sum(cw) if cw else (len(data[0]) if data else 3) * 120
+            tbl_h       = sum(rh) if rh else len(data) * 28
+            extra       = (30 if tbl.get("ta") is not None else 0) + \
+                          (30 if tbl.get("tb") is not None else 0)
+            canvas_w    = max(canvas_w, x + tbl_w + 60)
+            canvas_h    = max(canvas_h, y + tbl_h + extra + 60)
+
+        outer_style = {
+            "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+            "maxWidth":   "1600px",
+            "margin":     "0 auto",
+        }
+
+        header = html.Div(
+            style={"textAlign": "center", "marginBottom": "14px",
+                   "paddingBottom": "8px", "borderBottom": "2px solid #006401"},
+            children=[
+                html.H3(title.upper(),
+                        style={"margin": "0", "color": "#000000",
+                               "fontSize": "15px", "fontWeight": "700",
+                               "letterSpacing": "0.5px"}),
+            ],
+        )
+        table_els: List[Any] = []
+        for tbl in self.report_design.get("tables", []):
+            rendered = self._render_design_table(tbl)
+            if rendered is not None:
+                table_els.append(rendered)
+
+        canvas = html.Div(
+            table_els,
+            style={
+                "position":   "relative",
+                "width":      f"{canvas_w}px",
+                "minHeight":  f"{canvas_h}px",
+                "overflowX":  "auto",
+                "overflowY":  "visible",
+                "background": "#FFFFFF",
+                "border":     "1px solid #e5e7eb",
+                "borderRadius": "6px",
+            },
+        )
+
+        canvas_wrapper = html.Div(
+            canvas,
+            style={
+                "display":         "flex",
+                "justifyContent":  "center",
+                "width":           "100%",
+                "overflowX":       "auto",
+            },
+        )
+
+        children: List[Any] = [header, canvas_wrapper]
+
+        if self._errors:
+            children.append(
+                html.Div(
+                    style={"marginTop": "12px", "padding": "10px 14px",
+                           "background": "#fef2f2", "border": "1px solid #fecaca",
+                           "borderRadius": "6px"},
+                    children=[
+                        html.Strong("⚠ Validation Notes", style={"color": "#dc2626"}),
+                        html.Ul([html.Li(e, style={"fontSize": "12px"})
+                                 for e in self._errors]),
+                    ],
+                )
+            )
+
+        return [html.Div(children, style=outer_style)]
+
+    def _render_design_table(self, table: dict) -> Any:
+        """Absolutely-position one rpt-state table using its saved pos/col_widths/row_heights/fill/color."""
+        data        = table.get("data", [])
+        if not data:
+            return None
+
+        pos         = table.get("pos", {"x": 20, "y": 20})
+        x           = pos.get("x", 20)
+        y           = pos.get("y", 20)
+        ta          = table.get("ta")   # None means not present; "" means present but empty
+        tb          = table.get("tb")
+        col_widths  = table.get("col_widths", [])
+        row_heights = table.get("row_heights", [])
+
+        rows = []
+        for r_idx, row_cells in enumerate(data):
+            is_header_row = (r_idx == 0)
+            h = row_heights[r_idx] if r_idx < len(row_heights) else 28
+            tds = []
+            vis_col = 0
+            for c_idx, cell in enumerate(row_cells):
+                if cell.get("hidden", False):
+                    continue
+
+                raw_v = cell.get("v", "")
+                display_v = (self._compute_value_from_filter(raw_v)
+                             if raw_v and raw_v in self.filters_map
+                             else raw_v)
+
+                fill  = cell.get("fill",  "#ffffff")
+                color = cell.get("color", "#000000")
+                cs    = cell.get("cs", 1)
+                rs    = cell.get("rs", 1)
+
+                w = col_widths[vis_col] if vis_col < len(col_widths) else 120
+
+                is_name_col = (c_idx == 0)
+                tds.append(html.Td(
+                    display_v,
+                    colSpan=cs,
+                    rowSpan=rs,
+                    style={
+                        "background":    fill,
+                        "color":         color,
+                        "width":         f"{w}px",
+                        "minWidth":      f"{w}px",
+                        "height":        f"{h}px",
+                        "padding":       "4px 8px",
+                        "border":        "1px solid #d1d5db",
+                        "fontSize":      "15px",
+                        # "fontWeight":    "700" if (is_header_row or is_name_col) else "200",
+                        "textAlign":     "left" if (is_name_col and not is_header_row) else "left",
+                        "whiteSpace":    "normal",
+                        "wordBreak":     "break-word",
+                        "boxSizing":     "border-box",
+                        "verticalAlign": "middle",
+                        "lineHeight":    "1.3",
+                    },
+                ))
+                vis_col += cs
+
+            if tds:
+                rows.append(html.Tr(tds, style={"height": f"{h}px"}))
+
+        if not rows:
+            return None
+
+        # Compute rendered table pixel width from col_widths
+        tbl_w = sum(col_widths) if col_widths else (len(data[0]) if data else 3) * 120
+
+        ta_el = html.Div(
+            str(ta) if ta else "",
+            style={
+                "background":    "#006401",
+                "color":         "#ffffff",
+                "fontSize":      "11px",
+                "fontWeight":    "700",
+                "letterSpacing": "0.5px",
+                "padding":       "5px 10px",
+                "borderRadius":  "4px 4px 0 0",
+                "whiteSpace":    "nowrap",
+                "overflow":      "hidden",
+                "textOverflow":  "ellipsis",
+            },
+        ) if ta is not None and ta != "" else html.Div()
+
+        table_el = html.Table(
+            html.Tbody(rows),
+            style={
+                "borderCollapse": "collapse",
+                "tableLayout":    "fixed",
+                "width":          f"{tbl_w}px",
+                "border":         "1px solid #d1d5db",
+                "borderTop":      "none" if ta is not None else "1px solid #d1d5db",
+                "borderRadius":   ("0" if ta is not None else "4px 4px 0 0")
+                                   + (" 0 0" if tb is not None else " 4px 4px"),
+                "background":     "#ffffff",
+                "fontSize":       "11px",
+            },
+        )
+
+        # print(table_el)
+
+        tb_el = html.Div(
+            str(tb) if tb else "",
+            style={
+                "background":    "#f3f4f6",
+                "color":         "#374151",
+                "fontSize":      "11px",
+                "fontWeight":    "600",
+                "padding":       "4px 10px",
+                "border":        "1px solid #d1d5db",
+                "borderTop":     "none",
+                "borderRadius":  "0 0 4px 4px",
+                "whiteSpace":    "nowrap",
+                "overflow":      "hidden",
+                "textOverflow":  "ellipsis",
+            },
+        ) if tb is not None else None
+
+        block = ([ta_el] if ta_el else []) + [table_el] + ([tb_el] if tb_el else [])
+
+        return html.Div(
+            block,
+            style={
+                "position":    "absolute",
+                "left":        f"{x}px",
+                "top":         f"{y}px",
+                "width":       f"{tbl_w}px",
+                "boxShadow":   "0 1px 4px rgba(0,0,0,0.08)",
+                "background":  "#ffffff",
+                "borderRadius": "4px",
+            },
+        )
+
+
+    def _build_from_spec(self) -> List[Any]:
         title = self._title() or "HMIS DATASET REPORT (UNNAMED)"
         page_design = self._page_design()
         page_columns = self._page_columns() or 1
@@ -447,7 +677,6 @@ class ReportTableBuilder:
             design = str(page_design).lower()
             if design not in ("portrait", "landscape"):
                 design = "portrait"
-            
 
         is_landscape = page_design == "landscape"
         container_style = {
@@ -473,7 +702,6 @@ class ReportTableBuilder:
             ],
         )
 
-        # ── Build section list ─────────────────────────────────────────────────
         section_divs: List[Any] = []
         for section_idx, (subtitle, subdf) in enumerate(sections):
             subdf = self._apply_dhis_mapping(subdf)

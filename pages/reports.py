@@ -320,6 +320,9 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, repo
         return html.Div("Report Not Found"), 0, None
     
     spec_path = f"data/uploads/{report['page_name']}.xlsx"
+
+    report_design = report.get("design", {})
+
     if not os.path.exists(spec_path):
         return html.Div("Report not found on Server. Request Admin to add report"), 0, None
     
@@ -367,7 +370,12 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, repo
 
         dhis2_period = get_dhis2_period(start_date, period_type)
 
-        builder = ReportTableBuilder(spec_path, start_date, end_date, DATA_PATH_, location, dhis2_period)
+        builder = ReportTableBuilder(excel_path=spec_path, 
+                                     report_start_date= start_date, 
+                                     report_end_date= end_date, 
+                                     data_route= DATA_PATH_, 
+                                     location=location, dhis2_period= dhis2_period,
+                                      report_design= report_design )
         builder.load_spec()
         components   = builder.build_dash_components()
         section_data = builder.build_section_tables()
