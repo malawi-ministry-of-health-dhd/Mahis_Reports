@@ -145,7 +145,7 @@ def create_count_from_config(df, data_path, filters):
 
     # Extract variables and values
     variables = [
-        filters.get("variable1", ""),
+        filters.get("variable1", ""), 
         filters.get("variable2", ""),
         filters.get("variable3", ""),
         filters.get("variable4", ""),

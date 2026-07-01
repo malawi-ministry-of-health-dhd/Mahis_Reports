@@ -1,0 +1,308 @@
+{
+  "report_id": "report_example001",
+  "report_name": "Example Program Dashboard",
+  "date_created": "2026-07-01",
+  "count_items_per_row": 5,
+  "visualization_types": {
+    "counts": [
+      {
+        "id": "count_example_full",
+        "name": "All Attendance",
+        "level": "facility",
+        "flag": "ok",
+        "display_average": "True",
+        "href": "program_reports",
+        "drill_down": "True",
+        "filters": {
+          "measure": "nunique",
+          "unique": "person_id",
+          "variable1": "Program",
+          "value1": [],
+          "variable2": "Encounter",
+          "value2": [],
+          "variable3": "concept_name",
+          "value3": [],
+          "variable4": "obs_value_coded",
+          "value4": "",
+          "variable5": "ValueN",
+          "value5": "",
+          "variable6": "Value",
+          "value6": "",
+          "variable7": "Gender",
+          "value7": "",
+          "variable8": "Age_Group",
+          "value8": ""
+        }
+      },
+      {
+        "id": "count_example_calculated",
+        "name": "% HIV Patients Screened",
+        "flag": "ok",
+        "filters": {
+          "measure": "calculated",
+          "expression": "count_ea6f5d0d/count_1f7400bf*100"
+        }
+      }
+    ],
+    "charts": {
+      "sections": [
+        {
+          "section_name": "Example Section – All Chart Types",
+          "chart_items_per_row": 2,
+          "items": [
+            {
+              "id": "chart_example_bar",
+              "name": "Top Diagnoses by Gender",
+              "type": "Bar",
+              "level": "facility",
+              "filters": {
+                "measure": "nunique",
+                "unique": "any",
+                "duration_default": "any",
+                "filter_col1": "Program",
+                "filter_val1": "OPD Program",
+                "filter_col2": "Encounter",
+                "filter_val2": "Diagnosis",
+                "filter_col3": "",
+                "filter_val3": "",
+                "filter_col4": "",
+                "filter_val4": "",
+                "filter_col5": "",
+                "filter_val5": "",
+                "title": "Top Diagnoses by Gender",
+                "label_col": "obs_value_coded",
+                "value_col": "encounter_id",
+                "x_title": "Encounters",
+                "y_title": "Diagnosis",
+                "unique_column": "encounter_id",
+                "top_n": "10",
+                "color": "Gender"
+              }
+            },
+            {
+              "id": "chart_example_column",
+              "name": "Attendance by Program",
+              "type": "Column",
+              "level": "facility",
+              "filters": {
+                "measure": "nunique",
+                "unique": "any",
+                "duration_default": "any",
+                "title": "Patient Attendance by Program",
+                "x_col": "Program",
+                "y_col": "person_id",
+                "x_title": "Program",
+                "y_title": "Number of Patients",
+                "unique_column": "person_id",
+                "legend_title": "Gender",
+                "color": "Gender",
+                "filter_col1": "",
+                "filter_val1": "",
+                "filter_col2": "",
+                "filter_val2": "",
+                "filter_col3": "",
+                "filter_val3": "",
+                "filter_col4": "",
+                "filter_val4": "",
+                "filter_col5": "",
+                "filter_val5": ""
+              }
+            },
+            {
+              "id": "chart_example_line",
+              "name": "Daily Attendance – Last 7 Days",
+              "type": "Line",
+              "level": "facility",
+              "filters": {
+                "measure": "nunique",
+                "unique": "any",
+                "duration_default": "7days",
+                "title": "Daily Patient Attendance – Last 7 Days",
+                "unique_column": "person_id",
+                "filter_col1": [],
+                "filter_val1": "",
+                "filter_col2": [],
+                "filter_val2": "",
+                "filter_col3": [],
+                "filter_val3": "",
+                "filter_col4": [],
+                "filter_val4": "",
+                "filter_col5": [],
+                "filter_val5": "",
+                "date_col": "Date",
+                "y_col": "person_id",
+                "x_title": "Date",
+                "y_title": "Number of Patients",
+                "legend_title": "Legend",
+                "color": "",
+                "custom_fields": "",
+                "query1": "",
+                "query2": "",
+                "query3": "",
+                "query4": "",
+                "query5": ""
+              }
+            },
+            {
+              "id": "chart_example_pie",
+              "name": "Status of HIV Patients During Screening",
+              "type": "Pie",
+              "level": "facility",
+              "filters": {
+                "measure": "nunique",
+                "unique": "any",
+                "duration_default": "any",
+                "title": "Status of HIV Patients During Screening",
+                "unique_column": "person_id",
+                "filter_col1": "concept_name",
+                "filter_val1": "HIV status",
+                "filter_col2": "obs_value_coded",
+                "filter_val2": "!=_",
+                "filter_col3": [],
+                "filter_val3": "",
+                "filter_col4": [],
+                "filter_val4": "",
+                "filter_col5": [],
+                "filter_val5": "",
+                "names_col": "obs_value_coded",
+                "values_col": "person_id",
+                "top_n": 10,
+                "x_title": "",
+                "y_title": "",
+                "colormap": {
+                  "Male": "#006401",
+                  "Female": "#f59e0b"
+                },
+                "replace": {
+                  "obs_value_coded": {
+                    "Reactive": "HIV Positive",
+                    "Positive": "HIV Positive",
+                    "Non-reactive": "HIV Negative",
+                    "HIV negative": "HIV Negative",
+                    "HIV unknown": "HIV Unknown",
+                    "Unknown": "HIV Unknown"
+                  }
+                }
+              }
+            },
+            {
+              "id": "chart_example_histogram",
+              "name": "Age Gender Disaggregation",
+              "type": "Histogram",
+              "level": "facility",
+              "filters": {
+                "measure": "nunique",
+                "unique": "any",
+                "duration_default": "any",
+                "title": "Age Gender Disaggregation",
+                "unique_column": "person_id",
+                "filter_col1": [],
+                "filter_val1": "",
+                "filter_col2": [],
+                "filter_val2": "",
+                "filter_col3": [],
+                "filter_val3": "",
+                "filter_col4": [],
+                "filter_val4": "",
+                "filter_col5": "",
+                "filter_val5": "",
+                "custom_fields": "",
+                "age_col": "Age",
+                "gender_col": "Gender",
+                "bin_size": "10",
+                "color": ""
+              }
+            },
+            {
+              "id": "chart_example_crosstab",
+              "name": "Attendance by Gender and Age Group",
+              "type": "CrossTab",
+              "level": "facility",
+              "filters": {
+                "measure": "nunique",
+                "unique": "any",
+                "duration_default": "any",
+                "filter_col1": "Program",
+                "filter_val1": "OPD Program",
+                "filter_col2": "",
+                "filter_val2": "",
+                "filter_col3": "",
+                "filter_val3": "",
+                "filter_col4": "",
+                "filter_val4": "",
+                "filter_col5": "",
+                "filter_val5": "",
+                "title": "OPD Attendance – Gender × Age Group",
+                "index_col1": "Age_Group",
+                "columns": ["Gender"],
+                "values_col": "person_id",
+                "unique_column": "person_id",
+                "aggfunc": "nunique",
+                "rename": {},
+                "replace": ""
+              }
+            },
+            {
+              "id": "chart_example_pivottable",
+              "name": "Aggregate NCD Drugs Dispensed",
+              "type": "PivotTable",
+              "level": "facility",
+              "filters": {
+                "measure": "nunique",
+                "unique": "any",
+                "duration_default": "any",
+                "filter_col1": "Program",
+                "filter_val1": "NCD PROGRAM",
+                "filter_col2": "Encounter",
+                "filter_val2": "DISPENSING",
+                "filter_col3": "",
+                "filter_val3": "",
+                "filter_col4": "",
+                "filter_val4": "",
+                "filter_col5": "",
+                "filter_val5": "",
+                "title": "Aggregate NCD Drugs Dispensed",
+                "index_col1": "DrugName",
+                "columns": "Program",
+                "values_col": "person_id",
+                "unique_column": "person_id",
+                "aggfunc": "sum",
+                "x_title": "",
+                "y_title": ""
+              }
+            },
+            {
+              "id": "chart_example_newreturningsplit",
+              "name": "New vs Returning – Last 30 Days",
+              "type": "NewReturningSplit",
+              "level": "facility",
+              "filters": {
+                "measure": "nunique",
+                "unique": "any",
+                "duration_default": "30days",
+                "title": "New vs Returning Patients – Last 30 Days",
+                "date_col": "Date",
+                "y_col": "person_id",
+                "x_title": "Date",
+                "y_title": "Number of Patients",
+                "unique_column": "person_id",
+                "legend_title": "Patient Type",
+                "filter_col1": [],
+                "filter_val1": "",
+                "filter_col2": [],
+                "filter_val2": "",
+                "filter_col3": [],
+                "filter_val3": "",
+                "filter_col4": [],
+                "filter_val4": "",
+                "filter_col5": [],
+                "filter_val5": "",
+                "chart_mode": "line"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

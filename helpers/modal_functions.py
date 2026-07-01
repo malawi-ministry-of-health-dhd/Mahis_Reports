@@ -617,6 +617,43 @@ def create_chart_fields(chart_type, chart_data=None, section_index=None, chart_i
     
     return html.Div(className="chart-grid", children=grid_items)
 
+_DROPDOWN_BACKED_VARS = {
+    "Program":         ("programs",   True),
+    "Encounter":       ("encounters", True),
+    "concept_name":    ("concepts",   True),
+    "obs_value_coded": ("concept_answers", True),
+    "Gender":          ("gender",     False),
+    "DrugName":        ("DrugName",   True),
+}
+
+
+def _val_input(count_idx, fi, var, val):
+    """Return a dropdown or text input for the filter value depending on column type."""
+    backed = _DROPDOWN_BACKED_VARS.get(var)
+    if backed:
+        key, is_multi = backed
+        opts = [{"label": v, "value": v} for v in (dcc_json.get(key) or [])]
+        existing = val if isinstance(val, list) else ([val] if val else None)
+        return dcc.Dropdown(
+            id={"type": "count-val", "count": count_idx, "filter": fi},
+            value=existing,
+            options=opts,
+            placeholder="Select value(s)",
+            className="form-input",
+            multi=is_multi,
+            clearable=True,
+            style={"flex": "1"},
+        )
+    return dcc.Input(
+        id={"type": "count-val", "count": count_idx, "filter": fi},
+        value=str(val) if val not in (None, "") else "",
+        placeholder="Value (use * prefix for wildcard)",
+        className="form-input",
+        type="text",
+        style={"flex": "1"},
+    )
+
+
 def render_filter_rows(count_idx, filter_pairs):
     """Render the dynamic variable/value filter rows for a count item."""
     col_options = [{"label": k, "value": k} for k in actual_keys_in_data]
@@ -642,14 +679,7 @@ def render_filter_rows(count_idx, filter_pairs):
                     clearable=True,
                     style={"flex": "1", "minWidth": "140px"},
                 ),
-                dcc.Input(
-                    id={"type": "count-val", "count": count_idx, "filter": fi},
-                    value=str(val) if val not in (None, "") else "",
-                    placeholder="Value (use * prefix for wildcard)",
-                    className="form-input",
-                    type="text",
-                    style={"flex": "1"},
-                ),
+                _val_input(count_idx, fi, var, val),
                 remove_btn,
             ]
         ))
@@ -1914,6 +1944,8 @@ def create_edit_modal():
                 # Modal Footer with Action Buttons
                 html.Div(
                     className="modal-footer",
+                    style={"display": "flex", "alignItems": "center", "gap": "10px",
+                           "flexWrap": "wrap"},
                     children=[
                         html.Button(
                             "Save Dashboard",
@@ -1926,6 +1958,10 @@ def create_edit_modal():
                             id="delete-btn",
                             n_clicks=0,
                             className="btn-danger-modern"
+                        ),
+                        html.Span(
+                            id="dashboard-save-status",
+                            style={"fontSize": "12px", "color": "#6b7280", "marginLeft": "auto"},
                         ),
                     ]
                 ),
