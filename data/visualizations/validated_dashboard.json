@@ -1185,7 +1185,7 @@
               {
                 "id": "chart_opd_diag_gender",
                 "name": "Top Diagnoses by Gender",
-                "type": "Column",
+                "type": "Bar",
                 "level": "facility",
                 "filters": {
                   "measure": "nunique",
@@ -1202,12 +1202,12 @@
                   "filter_col5": "",
                   "filter_val5": "",
                   "title": "Top Diagnoses by Gender",
-                  "x_col": "obs_value_coded",
-                  "y_col": "person_id",
-                  "x_title": "Diagnosis",
-                  "y_title": "Patients",
-                  "unique_column": "person_id",
-                  "legend_title": "Gender",
+                  "label_col": "obs_value_coded",
+                  "value_col": "encounter_id",
+                  "x_title": "Encounters",
+                  "y_title": "Diagnosis",
+                  "unique_column": "encounter_id",
+                  "top_n": "10",
                   "color": "Gender"
                 }
               },
@@ -1498,6 +1498,7 @@
           "id": "count_ncd_2",
           "name": "Attendance Male",
           "level": "facility",
+          "drill_down": "False",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -1511,7 +1512,7 @@
           "id": "count_ncd_3",
           "name": "Attendance Female",
           "level": "facility",
-          "drill_down": "True",
+          "drill_down": "False",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -1526,7 +1527,7 @@
           "name": "New NCD Patients",
           "level": "facility",
           "display_average": "True",
-          "drill_down": "True",
+          "drill_down": "False",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -1541,7 +1542,7 @@
           "name": "Patient transferred in",
           "level": "facility",
           "display_average": "True",
-          "drill_down": "True",
+          "drill_down": "False",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -1554,7 +1555,7 @@
         {
           "id": "count_ncd_6",
           "name": "New Diabetes Cases",
-          "drill_down": "True",
+          "drill_down": "False",
           "level": "facility",
           "filters": {
             "measure": "count_set",
@@ -1570,7 +1571,7 @@
         {
           "id": "count_ncd_7",
           "name": "New Diabetes Type 1 Cases",
-          "drill_down": "True",
+          "drill_down": "False",
           "level": "facility",
           "filters": {
             "measure": "count_set",
@@ -1586,7 +1587,7 @@
         {
           "id": "count_ncd_8",
           "name": "New Diabetes Type 2 Cases",
-          "drill_down": "True",
+          "drill_down": "False",
           "level": "facility",
           "filters": {
             "measure": "count_set",
@@ -1602,7 +1603,7 @@
         {
           "id": "count_ncd_9",
           "name": "New Hypertension Cases",
-          "drill_down": "True",
+          "drill_down": "False",
           "level": "facility",
           "filters": {
             "measure": "count_set",
@@ -1619,7 +1620,7 @@
           "id": "count_ncd_10",
           "name": "Total New Patients",
           "level": "facility",
-          "drill_down": "True",
+          "drill_down": "False",
           "filters": {
             "measure": "count_set",
             "unique": "person_id",
@@ -4461,6 +4462,7 @@
           "id": "count_imm_1",
           "name": "Total Attendance",
           "level": "facility",
+          "drill_down":"True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",

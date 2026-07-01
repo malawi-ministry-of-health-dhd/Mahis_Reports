@@ -10,6 +10,8 @@ from flask import request
 from helpers.helpers import build_charts_section, build_metrics_section
 from mnid_renderer import render_mnid_dashboard
 from dashboard_layouts import build_premium_dashboard
+from dash import ctx
+from helpers.visualizations import create_line_list_basic_modal
 from datetime import datetime
 from datetime import datetime as dt
 from data_storage import DataStorage
@@ -858,12 +860,11 @@ _KPI_PAGE_SIZE = 15
     Input("kpi-patient-modal-backdrop","n_clicks"),
     State({"type": "kpi-patient-ids",  "index": ALL}, "data"),
     State({"type": "kpi-val-click",    "index": ALL}, "id"),
+    State({"type": "kpi-name",  "index": ALL}, "data"),
     State("url-params-store", "data"),
     prevent_initial_call=True,
 )
-def _kpi_patient_modal(n_clicks_list, n_close, n_backdrop, ids_list, id_list, urlparams):
-    from dash import ctx
-    from helpers.visualizations import create_line_list_basic_modal
+def _kpi_patient_modal(n_clicks_list, n_close, n_backdrop, ids_list, id_list,kpi_name, urlparams):
     triggered = ctx.triggered_id
 
     if triggered in ("kpi-patient-modal-close", "kpi-patient-modal-backdrop"):
@@ -875,12 +876,13 @@ def _kpi_patient_modal(n_clicks_list, n_close, n_backdrop, ids_list, id_list, ur
         raise PreventUpdate
 
     clicked_index = triggered["index"]
+    kpi_title = next((item[0] for item in kpi_name if item[1] == clicked_index), None)
+
     store_payload = {}
     for id_obj, payload in zip(id_list, ids_list):
         if id_obj.get("index") == clicked_index:
             store_payload = payload or {}
             break
-
     patient_ids = store_payload.get("ids", [])
     unique_col  = store_payload.get("unique_col", "") or PERSON_ID_
     if not patient_ids:
@@ -890,7 +892,7 @@ def _kpi_patient_modal(n_clicks_list, n_close, n_backdrop, ids_list, id_list, ur
     data_path  = f"data/{data_route}/parquet"
 
     df = create_line_list_basic_modal(unique_col, data_path, patient_ids)
-    title = f"Patient List — ({len(patient_ids):,} Total Records)"
+    title = f"Patient List — {kpi_title} - ({len(patient_ids):,} Total Records)"
 
     modal_data = {
         "rows":  df.to_dict("records"),

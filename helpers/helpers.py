@@ -97,6 +97,10 @@ def build_metrics_section(filtered, filtered_data_range, delta_days, data_path, 
                     id={"type": "kpi-patient-ids", "index": count_id},
                     data=stored_ids,
                 ),
+                dcc.Store(
+                    id={"type": "kpi-name", "index": count_id},
+                    data=(count_config["name"], count_id),
+                ),
                 html.Div(
                     style={"display": "flex", "justifyContent": "space-between",
                            "alignItems": "flex-start", "gap": "6px"},
@@ -508,11 +512,17 @@ def create_bar_chart_from_config(filtered,data_path, filters):
     filter_val3    = parse_filter_value(filters.get('filter_val3'))
     aggregation   = filters.get('measure') or 'count'
     custom_fields = filters.get('custom_fields') or None
+    color = filters.get('color') or None
 
     return create_horizontal_bar_chart(
-        filtered,data_path, label_col, value_col, title, x_title, y_title, top_n,
-        filter_col1, filter_val1, filter_col2, filter_val2, 
-        filter_col3, filter_val3, aggregation,custom_fields
+        query_fiter=filtered,data_path=data_path, 
+        label_col=label_col, value_col=value_col, title=title, 
+        x_title=x_title, y_title=y_title, top_n=10,
+        filter_col1=filter_col1, filter_value1=filter_val1,
+        filter_col2=filter_col2, filter_value2=filter_val2,
+        filter_col3=filter_col3, filter_value3=filter_val3,
+        aggregation='count', custom_fields=None,
+        height=400, responsive=True, show_values=True, color=color
     )
 
 def create_histogram_from_config(filtered,data_path, filters):

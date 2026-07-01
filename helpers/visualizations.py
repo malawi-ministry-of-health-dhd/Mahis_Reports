@@ -75,22 +75,21 @@ def apply_calculated_fields(df, rules_json):
     return df
 
 def _apply_replace(df: pd.DataFrame, replace) -> pd.DataFrame:
-    """Apply value replacements to a DataFrame from a config dict.
-
-    Supports two formats:
-      Column-specific (new): {"column": {"old_value": "new_value", ...}}
-        — replacements are scoped to the named column only.
-      Flat / global (legacy): {"old_value": "new_value", ...}
-        — replacements applied across all columns (pandas default behaviour).
-    """
+    """Apply value replacements to a DataFrame from a config dict."""
     if not replace or not isinstance(replace, dict):
         return df
+    
+    # Check if it's column-specific format
     if all(isinstance(v, dict) for v in replace.values()):
         for col, mapping in replace.items():
             if col in df.columns:
-                df[col] = df[col].str.replace(mapping)
-            else: df = df.replace(replace)
+                # Using str.replace() - need to loop through mapping
+                for old_val, new_val in mapping.items():
+                    df[col] = df[col].str.replace(old_val, new_val, regex=False)
+            else:
+                df = df.replace(replace)
         return df
+    
     return df.replace(replace)
 
 def _normalize_filter_value(val):
@@ -391,7 +390,7 @@ def build_filter_query(cols, vals,data_path, unique_column, isSet, start_date, e
                 operator, data_value = parse_value(item)
                 clause_list.append(f"{col} {operator} '{data_value}'")
             clause = " OR ".join(clause_list)
-            return clause
+            return f"({clause})"
         if col == "defaulter_period":
             return (f"concept_name = 'Drug end date' "
                     + f"GROUP BY {unique_column} "
@@ -882,10 +881,20 @@ def create_time_line_chart(query_fiter,data_path, date_col, y_col, title, x_titl
     if aggregation == "calculated":
         queries = []
         for index, items in enumerate(args[:-1]):
-            query = (
+            if items:
+                query = (
+                        f"SELECT {date_expr} AS date_trunc, {agg_expr} AS query{index+1}"
+                        f" FROM '{data_path}'"
+                        f" {items}" #items will need a where clause
+                        f" AND {query_fiter}"
+                        f" GROUP BY {date_expr}"
+                        f" ORDER BY date_trunc"
+                    )
+            else:
+                query = (
                     f"SELECT {date_expr} AS date_trunc, {agg_expr} AS query{index+1}"
                     f" FROM '{data_path}'"
-                    f" {items}" #items will need a where clause
+                    f" WHERE {query_fiter}"
                     f" GROUP BY {date_expr}"
                     f" ORDER BY date_trunc"
                 )
@@ -905,7 +914,8 @@ def create_time_line_chart(query_fiter,data_path, date_col, y_col, title, x_titl
             joined_query = f"{select_clause} FROM {join_clause} ORDER BY date_trunc"  
         else:
             joined_query = queries[0]
-        
+        # print("Line Chart",query_fiter, joined_query) 
+
     summary = DataStorage.query_duckdb(joined_query)
     summary = apply_calculated_fields(summary, custom_fields)
     summary = summary.rename(columns={'metric_value': 'count'})
@@ -2067,15 +2077,26 @@ def create_horizontal_bar_chart(
     else:
         agg_expr = f"{aggregation}({value_col})"
 
-    joined_query = (
-        f"SELECT {label_col}, {agg_expr} AS data_value"
-        f" FROM '{data_path}'"
-        f" WHERE {where_clause}"
-        f" GROUP BY {label_col}"
-        f" HAVING data_value > 0"
-        f" ORDER BY data_value DESC"
-        f" LIMIT {int(top_n)}"
-    )
+    if color:
+        joined_query = (
+            f"SELECT {label_col}, {agg_expr} AS data_value, {color}"
+            f" FROM '{data_path}'"
+            f" WHERE {where_clause}"
+            f" GROUP BY {label_col}, {color}"
+            f" HAVING data_value > 0"
+            f" ORDER BY data_value DESC"
+            f" LIMIT {int(top_n)}"
+        )
+    else:
+        joined_query = (
+            f"SELECT {label_col}, {agg_expr} AS data_value"
+            f" FROM '{data_path}'"
+            f" WHERE {where_clause}"
+            f" GROUP BY {label_col}"
+            f" HAVING data_value > 0"
+            f" ORDER BY data_value DESC"
+            f" LIMIT {int(top_n)}"
+        )
     df_top = DataStorage.query_duckdb(joined_query)
     df_top = apply_calculated_fields(df_top, custom_fields)
 
@@ -2097,13 +2118,12 @@ def create_horizontal_bar_chart(
 
     # Reverse rows so largest bar sits at the top
     df_top = df_top.iloc[::-1].reset_index(drop=True)
-
     fig = px.bar(
         df_top,
         x='data_value',
         y=label_col,
         text='label' if show_values else None,
-        color=color if color else None,
+        color= color if color else None,
         color_discrete_sequence=THEME["primary"],
         orientation='h',
         title=None
