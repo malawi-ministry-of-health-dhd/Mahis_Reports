@@ -17,7 +17,8 @@ from data_storage import DataStorage
 
 pd.options.mode.chained_assignment = None
 
-from config import PERSON_ID_, ENCOUNTER_ID_, DATE_, CONCEPT_NAME_,DATA_PATH_,FIRST_NAME_, LAST_NAME_, VALUE_DATETIME_
+from config import (PERSON_ID_, ENCOUNTER_ID_, DATE_, CONCEPT_NAME_,DATA_PATH_,FIRST_NAME_, LAST_NAME_, 
+                    VALUE_DATETIME_, AGE_, GENDER_, HOME_DISTRICT_, TA_, VILLAGE_, IDENTIFIER_)
 
 
 THEME = {
@@ -74,22 +75,21 @@ def apply_calculated_fields(df, rules_json):
     return df
 
 def _apply_replace(df: pd.DataFrame, replace) -> pd.DataFrame:
-    """Apply value replacements to a DataFrame from a config dict.
-
-    Supports two formats:
-      Column-specific (new): {"column": {"old_value": "new_value", ...}}
-        — replacements are scoped to the named column only.
-      Flat / global (legacy): {"old_value": "new_value", ...}
-        — replacements applied across all columns (pandas default behaviour).
-    """
+    """Apply value replacements to a DataFrame from a config dict."""
     if not replace or not isinstance(replace, dict):
         return df
+    
+    # Check if it's column-specific format
     if all(isinstance(v, dict) for v in replace.values()):
         for col, mapping in replace.items():
             if col in df.columns:
-                df[col] = df[col].str.replace(mapping)
-            else: df = df.replace(replace)
+                # Using str.replace() - need to loop through mapping
+                for old_val, new_val in mapping.items():
+                    df[col] = df[col].str.replace(old_val, new_val, regex=False)
+            else:
+                df = df.replace(replace)
         return df
+    
     return df.replace(replace)
 
 def _normalize_filter_value(val):
@@ -390,7 +390,7 @@ def build_filter_query(cols, vals,data_path, unique_column, isSet, start_date, e
                 operator, data_value = parse_value(item)
                 clause_list.append(f"{col} {operator} '{data_value}'")
             clause = " OR ".join(clause_list)
-            return clause
+            return f"({clause})"
         if col == "defaulter_period":
             return (f"concept_name = 'Drug end date' "
                     + f"GROUP BY {unique_column} "
@@ -454,21 +454,22 @@ def create_count(query_fiter,data_path, aggregation='count', unique_column=PERSO
     
     # print("Create count",joined_query)
     result = DataStorage.query_duckdb(joined_query)
+    unique_patients = result[unique_column].unique().tolist()
     if aggregation == 'count':
-        return len(result.drop_duplicates())
+        return len(result.drop_duplicates()), unique_patients
     elif aggregation == 'nunique':
-        return len(result.drop_duplicates())
+        return len(result[unique_column].unique().tolist()), unique_patients
     elif aggregation == 'list':
-        return result[unique_column].dropna().unique().tolist()
+        return result[unique_column].dropna().unique().tolist(), unique_patients
     elif aggregation == 'time_diff_mins':
         if result.empty:
-            return 0
+            return 0, unique_patients
         result = result[result["patient_session_minutes"]<=120] #120 minutes is the threshold for a single patient session, we want to exclude outliers that may be caused by data quality issues
-        return int(result["patient_session_minutes"].agg('mean'))
+        return int(result["patient_session_minutes"].agg('mean')), unique_patients
     elif aggregation in ['sum', 'mean', 'min', 'max', 'std', 'var']:
-        return int(result[unique_column].agg(aggregation))
+        return int(result[unique_column].agg(aggregation)), unique_patients
     else:
-        return len(result.drop_duplicates())
+        return len(result.drop_duplicates()), unique_patients
 
 def create_count_sets(
     query_fiter,data_path,aggregation='count',
@@ -526,7 +527,7 @@ def create_count_sets(
         # All conditions must be met on the same date row — original INTERSECT behaviour.
         intersection_query = " INTERSECT ".join(queries)
         result = DataStorage.query_duckdb(intersection_query)
-        return result[pid_col].nunique()
+        return result[pid_col].nunique(), unique_patients
 
     # Default: conditions may live on different rows / different dates.
     outer = f"SELECT DISTINCT {pid_col} FROM '{data_path}' WHERE {query_fiter}"
@@ -540,7 +541,8 @@ def create_count_sets(
         final_query = outer
     # print("Create countset", final_query)
     result = DataStorage.query_duckdb(final_query)
-    return result[pid_col].nunique()
+    unique_patients = result[unique_column].unique().tolist()
+    return result[pid_col].nunique(), unique_patients
 
 def create_sum(query_fiter,data_path, unique_column=PERSON_ID_, num_field='ValueN', *filters, start_date=None, end_date=None):
 
@@ -562,7 +564,8 @@ def create_sum(query_fiter,data_path, unique_column=PERSON_ID_, num_field='Value
     if not queries:
         joined_query =f"SELECT {unique_column}, {num_field} FROM '{data_path}' WHERE {query_fiter}"  
     result = DataStorage.query_duckdb(joined_query)
-    return result[num_field].sum()
+    unique_patients = result[unique_column].unique().tolist()
+    return result[num_field].sum(), unique_patients
 
 
 def create_column_chart(query_fiter,data_path, x_col, y_col, title, x_title, y_title,
@@ -878,10 +881,20 @@ def create_time_line_chart(query_fiter,data_path, date_col, y_col, title, x_titl
     if aggregation == "calculated":
         queries = []
         for index, items in enumerate(args[:-1]):
-            query = (
+            if items:
+                query = (
+                        f"SELECT {date_expr} AS date_trunc, {agg_expr} AS query{index+1}"
+                        f" FROM '{data_path}'"
+                        f" {items}" #items will need a where clause
+                        f" AND {query_fiter}"
+                        f" GROUP BY {date_expr}"
+                        f" ORDER BY date_trunc"
+                    )
+            else:
+                query = (
                     f"SELECT {date_expr} AS date_trunc, {agg_expr} AS query{index+1}"
                     f" FROM '{data_path}'"
-                    f" {items}" #items will need a where clause
+                    f" WHERE {query_fiter}"
                     f" GROUP BY {date_expr}"
                     f" ORDER BY date_trunc"
                 )
@@ -901,7 +914,8 @@ def create_time_line_chart(query_fiter,data_path, date_col, y_col, title, x_titl
             joined_query = f"{select_clause} FROM {join_clause} ORDER BY date_trunc"  
         else:
             joined_query = queries[0]
-        
+        # print("Line Chart",query_fiter, joined_query) 
+
     summary = DataStorage.query_duckdb(joined_query)
     summary = apply_calculated_fields(summary, custom_fields)
     summary = summary.rename(columns={'metric_value': 'count'})
@@ -2063,15 +2077,26 @@ def create_horizontal_bar_chart(
     else:
         agg_expr = f"{aggregation}({value_col})"
 
-    joined_query = (
-        f"SELECT {label_col}, {agg_expr} AS data_value"
-        f" FROM '{data_path}'"
-        f" WHERE {where_clause}"
-        f" GROUP BY {label_col}"
-        f" HAVING data_value > 0"
-        f" ORDER BY data_value DESC"
-        f" LIMIT {int(top_n)}"
-    )
+    if color:
+        joined_query = (
+            f"SELECT {label_col}, {agg_expr} AS data_value, {color}"
+            f" FROM '{data_path}'"
+            f" WHERE {where_clause}"
+            f" GROUP BY {label_col}, {color}"
+            f" HAVING data_value > 0"
+            f" ORDER BY data_value DESC"
+            f" LIMIT {int(top_n)}"
+        )
+    else:
+        joined_query = (
+            f"SELECT {label_col}, {agg_expr} AS data_value"
+            f" FROM '{data_path}'"
+            f" WHERE {where_clause}"
+            f" GROUP BY {label_col}"
+            f" HAVING data_value > 0"
+            f" ORDER BY data_value DESC"
+            f" LIMIT {int(top_n)}"
+        )
     df_top = DataStorage.query_duckdb(joined_query)
     df_top = apply_calculated_fields(df_top, custom_fields)
 
@@ -2093,13 +2118,12 @@ def create_horizontal_bar_chart(
 
     # Reverse rows so largest bar sits at the top
     df_top = df_top.iloc[::-1].reset_index(drop=True)
-
     fig = px.bar(
         df_top,
         x='data_value',
         y=label_col,
         text='label' if show_values else None,
-        color=color if color else None,
+        color= color if color else None,
         color_discrete_sequence=THEME["primary"],
         orientation='h',
         title=None
@@ -2416,6 +2440,39 @@ def create_line_list(
     ])
 
     return table
+
+def create_line_list_basic_modal(
+    unique_column: str,
+    data_path: str,
+    ids_list: List,
+) -> "pd.DataFrame":
+    """Return a DataFrame of patient details for the given ID list."""
+    import pandas as pd
+    if not ids_list:
+        return pd.DataFrame()
+
+    ids_quoted = ", ".join(f"'{str(i)}'" for i in ids_list)
+    query = f"""
+        SELECT DISTINCT
+            {unique_column}                     AS "unique_column",
+            strftime('%Y-%m-%d', {DATE_})               AS "Date of Visit",
+            {IDENTIFIER_}                       AS "Patient ID",
+            {FIRST_NAME_}                       AS "First Name",
+            {LAST_NAME_}                        AS "Last Name",
+            CAST({AGE_} AS INT)                 AS "Age",
+            {GENDER_}                           AS "Gender",
+            {HOME_DISTRICT_}                    AS "Home District",
+            {TA_}                              AS "Traditional Authority",
+            {VILLAGE_}                          AS "Village"
+        FROM '{data_path}'
+        WHERE {unique_column} IN ({ids_quoted})
+        ORDER BY {DATE_}, {LAST_NAME_}, {FIRST_NAME_}
+    """
+    try:
+        result = DataStorage.query_duckdb(query)
+        return result.drop_duplicates(subset='unique_column').drop(columns='unique_column').iloc[:1000]
+    except Exception:
+        return pd.DataFrame()
 
 
 def create_sankey_diagram(df, source_col, target_col, value_col, title,

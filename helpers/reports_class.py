@@ -6,20 +6,21 @@ from helpers.dhis_integrater import get_dhis_data
 import dash
 import duckdb
 from datetime import datetime
-from dash import html, dash_table
+from dash import html, dcc, dash_table
 from config import (DATE_,CONCEPT_NAME_,
                     ENCOUNTER_ID_,PERSON_ID_,VALUE_NUMERIC_,VALUE_DATETIME_,FACILITY_CODE_,
                     DHIS2_URL, actual_keys_in_data)
 
 
 class ReportTableBuilder:
-    def __init__(self, excel_path: str,report_start_date, report_end_date,data_route, location:str, dhis2_period: str):
+    def __init__(self, excel_path: str,report_start_date, report_end_date,data_route, location:str, dhis2_period: str, report_design = None):
         self.excel_path = excel_path
         self.dhis_url = f"{DHIS2_URL}/api/dataValueSets.json"
         self.vars_df: pd.DataFrame | None = None
         self.filters_df: pd.DataFrame | None = None
         self.filters_map: Dict[str, Any] = {}
         self._value_cache: Dict[str, str] = {}
+        self._patient_ids_cache: Dict[str, List] = {}
         self._errors: List[str] = []
         self.report_name: pd.DataFrame | None = None
         self.dhis2_period = dhis2_period
@@ -29,6 +30,7 @@ class ReportTableBuilder:
         self.end_date = report_end_date
         self.location = location
         self.data_route = data_route
+        self.report_design = report_design
 
 
     def load_spec(self) -> None:
@@ -147,67 +149,67 @@ class ReportTableBuilder:
             args = [filtered_dates,self.data_route, PERSON_ID_, spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
-            result = create_sum(*args,self.start_date, self.end_date)
+            result, patient_ids = create_sum(*args,self.start_date, self.end_date)
             
         elif measure == "cohort_sum":
             args = [original_dates,self.data_route, PERSON_ID_, spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
-            result = create_sum(*args,self.start_date, self.end_date)
+            result, patient_ids = create_sum(*args,self.start_date, self.end_date)
 
         elif measure == "count_set":
             args = [filtered_dates,self.data_route, "count", spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
-            result = create_count_sets(*args,self.start_date, self.end_date)
+            result, patient_ids = create_count_sets(*args,self.start_date, self.end_date)
         
         elif measure == "cohort_count_set":
             args = [original_dates,self.data_route, "count", spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
-            result = create_count_sets(*args,self.start_date, self.end_date)
+            result, patient_ids = create_count_sets(*args,self.start_date, self.end_date)
 
         elif measure == "cohort_count_set_defaulter":
             args = [original_dates,self.data_route, "count", spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
-            result = create_count_sets(*args,self.start_date, self.end_date)
+            result, patient_ids = create_count_sets(*args,self.start_date, self.end_date)
 
         elif measure == "count_set_defaulter":
             args = [filtered_dates,self.data_route, "count", spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
-            result = create_count_sets(*args,self.start_date, self.end_date)
+            result, patient_ids = create_count_sets(*args,self.start_date, self.end_date)
 
         elif measure == "count":
             args = [filtered_dates,self.data_route, "count", spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
-            result = create_count(*args,self.start_date, self.end_date)
+            result, patient_ids = create_count(*args,self.start_date, self.end_date)
         
         elif measure == "nunique":
             args = [filtered_dates,self.data_route, "count", spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
-            result = create_count(*args,self.start_date, self.end_date)
+            result, patient_ids = create_count(*args,self.start_date, self.end_date)
 
         elif measure == "cohort_count":
             args = [original_dates,self.data_route, "count", spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
-            result = create_count(*args,self.start_date, self.end_date)
+            result, patient_ids = create_count(*args,self.start_date, self.end_date)
 
         elif measure == "cohort_count_defaulter":
             args = [original_dates,self.data_route, "count", spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
-            result = create_count(*args,self.start_date, self.end_date)
+            result, patient_ids = create_count(*args,self.start_date, self.end_date)
 
         elif measure == "count_defaulter":
             args = [filtered_dates,self.data_route, "count", spec["unique_column"]]
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
-            result = create_count(*args,self.start_date, self.end_date)
+            result, patient_ids = create_count(*args,self.start_date, self.end_date)
 
         elif measure == "calculated":
             # Store the expression for deferred evaluation; resolved after
@@ -216,7 +218,10 @@ class ReportTableBuilder:
             self._value_cache[filter_name] = {"__calculated__": expression}
             return self._value_cache[filter_name]
         else:
-            result = ""
+            result, patient_ids = ("","")
+
+        if patient_ids:
+            self._patient_ids_cache[filter_name] = [str(p) for p in patient_ids]
 
         result_str = "" if result is None else str(result)
         self._value_cache[filter_name] = result_str
@@ -432,6 +437,267 @@ class ReportTableBuilder:
     
     
     def build_dash_components(self) -> List[Any]:
+        if self.report_design and self.report_design.get("tables"):
+            return self._build_from_design()
+        return self._build_from_spec()
+
+    def _build_from_design(self) -> List[Any]:
+        """Render report from GUI-authored rpt-state design JSON, preserving exact positions."""
+        self._precompute_all_filter_values()
+
+        title        = self._title() or "HMIS DATASET REPORT"
+        # page_design  = self._page_design()
+        # is_landscape = page_design == "landscape"
+
+        #Calculate canvas bounding box from all table positions
+        canvas_w = 400
+        canvas_h = 200
+        for tbl in self.report_design.get("tables", []):
+            pos         = tbl.get("pos", {"x": 20, "y": 20})
+            x, y        = pos.get("x", 20), pos.get("y", 20)
+            cw          = tbl.get("col_widths", [])
+            rh          = tbl.get("row_heights", [])
+            data        = tbl.get("data", [])
+            tbl_w       = sum(cw) if cw else (len(data[0]) if data else 3) * 120
+            tbl_h       = sum(rh) if rh else len(data) * 28
+            extra       = (30 if tbl.get("ta") is not None else 0) + \
+                          (30 if tbl.get("tb") is not None else 0)
+            canvas_w    = max(canvas_w, x + tbl_w + 60)
+            canvas_h    = max(canvas_h, y + tbl_h + extra + 60)
+
+        outer_style = {
+            "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+            "maxWidth":   "1600px",
+            "margin":     "0 auto",
+        }
+
+        header = html.Div(
+            style={"textAlign": "center", "marginBottom": "14px",
+                   "paddingBottom": "8px", "borderBottom": "2px solid #006401"},
+            children=[
+                html.H3(title.upper(),
+                        style={"margin": "0", "color": "#000000",
+                               "fontSize": "15px", "fontWeight": "700",
+                               "letterSpacing": "0.5px"}),
+            ],
+        )
+        table_els: List[Any] = []
+        for tbl in self.report_design.get("tables", []):
+            rendered = self._render_design_table(tbl)
+            if rendered is not None:
+                table_els.append(rendered)
+
+        canvas = html.Div(
+            table_els,
+            style={
+                "position":   "relative",
+                "width":      f"{canvas_w}px",
+                "minHeight":  f"{canvas_h}px",
+                "overflowX":  "auto",
+                "overflowY":  "visible",
+                "background": "#FFFFFF",
+                "border":     "1px solid #e5e7eb",
+                "borderRadius": "6px",
+            },
+        )
+
+        canvas_wrapper = html.Div(
+            canvas,
+            style={
+                "display":         "flex",
+                "justifyContent":  "center",
+                "width":           "100%",
+                "overflowX":       "auto",
+            },
+        )
+
+        children: List[Any] = [header, canvas_wrapper]
+
+        if self._errors:
+            children.append(
+                html.Div(
+                    style={"marginTop": "12px", "padding": "10px 14px",
+                           "background": "#fef2f2", "border": "1px solid #fecaca",
+                           "borderRadius": "6px"},
+                    children=[
+                        html.Strong("⚠ Validation Notes", style={"color": "#dc2626"}),
+                        html.Ul([html.Li(e, style={"fontSize": "12px"})
+                                 for e in self._errors]),
+                    ],
+                )
+            )
+
+        return [html.Div(children, style=outer_style)]
+
+    def _render_design_table(self, table: dict) -> Any:
+        """Absolutely-position one rpt-state table using its saved pos/col_widths/row_heights/fill/color."""
+        data        = table.get("data", [])
+        if not data:
+            return None
+
+        pos         = table.get("pos", {"x": 20, "y": 20})
+        x           = pos.get("x", 20)
+        y           = pos.get("y", 20)
+        ta          = table.get("ta")   # None means not present; "" means present but empty
+        tb          = table.get("tb")
+        col_widths  = table.get("col_widths", [])
+        row_heights = table.get("row_heights", [])
+
+        rows = []
+        cell_stores: List[Any] = []
+        seen_store_ids: set = set()
+        for r_idx, row_cells in enumerate(data):
+            h = row_heights[r_idx] if r_idx < len(row_heights) else 28
+            tds = []
+            vis_col = 0
+            for c_idx, cell in enumerate(row_cells):
+                if cell.get("hidden", False):
+                    continue
+
+                raw_v = cell.get("v", "")
+                is_filter = bool(raw_v and raw_v in self.filters_map)
+                display_v = (self._compute_value_from_filter(raw_v) if is_filter else raw_v)
+
+                fill   = cell.get("fill",   "#ffffff")
+                color  = cell.get("color",  "#000000")
+                cs     = cell.get("cs", 1)
+                rs     = cell.get("rs", 1)
+                bold   = cell.get("bold",   False)
+                italic = cell.get("italic", False)
+                align  = cell.get("align",  "left")
+                indent = cell.get("indent", 0)
+
+                w = col_widths[vis_col] if vis_col < len(col_widths) else 120
+                pl = 8 + indent * 20
+
+                if is_filter:
+                    has_ids = bool(self._patient_ids_cache.get(raw_v))
+                    cell_content = html.Span(
+                        display_v,
+                        id={"type": "rpt-val-click", "index": raw_v},
+                        n_clicks=0,
+                        style={
+                            "cursor":    "pointer" if has_ids else "default",
+                            "color":     "#1d4ed8" if has_ids else color,
+                            "textDecoration": "underline" if has_ids else "none",
+                        },
+                    )
+                    if raw_v not in seen_store_ids:
+                        seen_store_ids.add(raw_v)
+                        cell_stores.append(dcc.Store(
+                            id={"type": "rpt-cell-ids", "index": raw_v},
+                            data={
+                                "ids":        self._patient_ids_cache.get(raw_v, []),
+                                "unique_col": PERSON_ID_,
+                            },
+                        ))
+                else:
+                    cell_content = display_v
+
+                tds.append(html.Td(
+                    cell_content,
+                    colSpan=cs,
+                    rowSpan=rs,
+                    style={
+                        "background":    fill,
+                        "color":         color,
+                        "width":         f"{w}px",
+                        "minWidth":      f"{w}px",
+                        "height":        f"{h}px",
+                        "paddingTop":    "4px",
+                        "paddingBottom": "4px",
+                        "paddingLeft":   f"{pl}px",
+                        "paddingRight":  "8px",
+                        "border":        "1px solid #d1d5db",
+                        "fontSize":      "15px",
+                        "fontWeight":    "bold" if bold else "normal",
+                        "fontStyle":     "italic" if italic else "normal",
+                        "textAlign":     align,
+                        "whiteSpace":    "normal",
+                        "wordBreak":     "break-word",
+                        "boxSizing":     "border-box",
+                        "verticalAlign": "middle",
+                        "lineHeight":    "1.3",
+                    },
+                ))
+                vis_col += cs
+
+            if tds:
+                rows.append(html.Tr(tds, style={"height": f"{h}px"}))
+
+        if not rows:
+            return None
+
+        # Compute rendered table pixel width from col_widths
+        tbl_w = sum(col_widths) if col_widths else (len(data[0]) if data else 3) * 120
+
+        ta_el = html.Div(
+            str(ta) if ta else "",
+            style={
+                "background":    "#006401",
+                "color":         "#ffffff",
+                "fontSize":      "11px",
+                "fontWeight":    "700",
+                "letterSpacing": "0.5px",
+                "padding":       "5px 10px",
+                "borderRadius":  "4px 4px 0 0",
+                "whiteSpace":    "nowrap",
+                "overflow":      "hidden",
+                "textOverflow":  "ellipsis",
+            },
+        ) if ta is not None and ta != "" else html.Div()
+
+        table_el = html.Table(
+            html.Tbody(rows),
+            style={
+                "borderCollapse": "collapse",
+                "tableLayout":    "fixed",
+                "width":          f"{tbl_w}px",
+                "border":         "1px solid #d1d5db",
+                "borderTop":      "none" if ta is not None else "1px solid #d1d5db",
+                "borderRadius":   ("0" if ta is not None else "4px 4px 0 0")
+                                   + (" 0 0" if tb is not None else " 4px 4px"),
+                "background":     "#ffffff",
+                "fontSize":       "11px",
+            },
+        )
+
+        # print(table_el)
+
+        tb_el = html.Div(
+            str(tb) if tb else "",
+            style={
+                "background":    "#f3f4f6",
+                "color":         "#374151",
+                "fontSize":      "11px",
+                "fontWeight":    "600",
+                "padding":       "4px 10px",
+                "border":        "1px solid #d1d5db",
+                "borderTop":     "none",
+                "borderRadius":  "0 0 4px 4px",
+                "whiteSpace":    "nowrap",
+                "overflow":      "hidden",
+                "textOverflow":  "ellipsis",
+            },
+        ) if tb is not None else None
+
+        block = ([ta_el] if ta_el else []) + [table_el] + ([tb_el] if tb_el else []) + cell_stores
+
+        return html.Div(
+            block,
+            style={
+                "position":    "absolute",
+                "left":        f"{x}px",
+                "top":         f"{y}px",
+                "width":       f"{tbl_w}px",
+                "boxShadow":   "0 1px 4px rgba(0,0,0,0.08)",
+                "background":  "#ffffff",
+                "borderRadius": "4px",
+            },
+        )
+
+
+    def _build_from_spec(self) -> List[Any]:
         title = self._title() or "HMIS DATASET REPORT (UNNAMED)"
         page_design = self._page_design()
         page_columns = self._page_columns() or 1
@@ -447,7 +713,6 @@ class ReportTableBuilder:
             design = str(page_design).lower()
             if design not in ("portrait", "landscape"):
                 design = "portrait"
-            
 
         is_landscape = page_design == "landscape"
         container_style = {
@@ -473,17 +738,19 @@ class ReportTableBuilder:
             ],
         )
 
-        # ── Build section list ─────────────────────────────────────────────────
+        sections_refs = self.build_section_tables_with_ids()
+
         section_divs: List[Any] = []
         for section_idx, (subtitle, subdf) in enumerate(sections):
             subdf = self._apply_dhis_mapping(subdf)
             if len(subdf.columns) <= 1:
                 continue
+            _, refs_df = sections_refs[section_idx] if section_idx < len(sections_refs) else (subtitle, None)
             section_divs.append(
                 html.Div(
                     style={"breakInside": "avoid", "pageBreakInside": "avoid",
                            "marginBottom": "16px"},
-                    children=[self._create_modern_table(subdf, section_idx, subtitle)],
+                    children=[self._create_modern_table(subdf, section_idx, subtitle, refs_df=refs_df)],
                 )
             )
 
@@ -518,8 +785,9 @@ class ReportTableBuilder:
 
         return [html.Div(children, style=container_style)]
 
-    def _create_modern_table(self, df: pd.DataFrame, section_idx: int, section_title: str) -> html.Div:
-        """Render a report section as a clean, branded table."""
+    def _create_modern_table(self, df: pd.DataFrame, section_idx: int, section_title: str,
+                             refs_df: pd.DataFrame = None) -> html.Div:
+        """Render a report section as a clean, branded table with clickable value cells."""
         df = df.dropna(how="all", axis=0).dropna(how="all", axis=1)
         if df.empty:
             return html.Div(
@@ -530,146 +798,105 @@ class ReportTableBuilder:
 
         value_cols = [c for c in df.columns if c != "Data Element"]
 
-        # ── Dynamic column widths ──────────────────────────────────────────────
         de_width   = min(max(len(str(x)) for x in df["Data Element"].tolist()) * 7 + 30, 340)
         val_widths = {
             col: min(max(len(str(x)) for x in df[col].tolist()) * 7 + 20, 160)
             for col in value_cols
         }
 
-        # ── Section title bar ──────────────────────────────────────────────────
+        # Align refs_df rows to df rows by index (both come from the same section)
+        refs_records: List[Dict] = []
+        if refs_df is not None:
+            refs_records = refs_df.to_dict("records")
+
+        th_base = {
+            "padding": "9px 12px", "border": "1px solid #4b5563",
+            "fontSize": "11px", "fontWeight": "700", "letterSpacing": "0.4px",
+            "backgroundColor": "#374151", "color": "#f9fafb",
+        }
+        header_row = html.Tr([
+            html.Th(
+                section_title.upper() if section_title else "Data Element",
+                style={**th_base, "textAlign": "left", "backgroundColor": "#1f2937",
+                       "width": f"{de_width}px", "minWidth": "180px"},
+            ),
+            *[html.Th(col.upper(), style={**th_base, "textAlign": "center",
+                                          "width": f"{val_widths[col]}px", "minWidth": "80px"})
+              for col in value_cols],
+        ])
+
+        td_de = {
+            "padding": "8px 12px", "border": "1px solid #e5e7eb",
+            "fontSize": "12px", "fontWeight": "600", "color": "#1f2937",
+            "backgroundColor": "#f9fafb", "whiteSpace": "normal", "wordBreak": "break-word",
+            "width": f"{de_width}px", "minWidth": "180px", "verticalAlign": "middle",
+        }
+        td_val_base = {
+            "padding": "8px 12px", "border": "1px solid #e5e7eb",
+            "fontSize": "12px", "textAlign": "center", "color": "#374151",
+            "whiteSpace": "normal", "wordBreak": "break-word",
+            "minWidth": "80px", "verticalAlign": "middle",
+        }
+
+        cell_stores: List[Any] = []
+        seen_store_ids: set = set()
+        data_rows = []
+        for row_idx, (_, row) in enumerate(df.iterrows()):
+            refs_row = refs_records[row_idx] if row_idx < len(refs_records) else {}
+            bg = "#ffffff" if row_idx % 2 == 0 else "#f9fafb"
+            tds = [html.Td(str(row.get("Data Element", "")), style=td_de)]
+            for col in value_cols:
+                val       = str(row.get(col, ""))
+                filter_ref = str(refs_row.get(col, "")).strip() if refs_row else ""
+                has_ids   = bool(filter_ref and self._patient_ids_cache.get(filter_ref))
+                if filter_ref and filter_ref in self.filters_map:
+                    cell_content = html.Span(
+                        val,
+                        id={"type": "rpt-val-click", "index": filter_ref},
+                        n_clicks=0,
+                        style={
+                            "cursor": "pointer" if has_ids else "default",
+                            "color":  "#1d4ed8" if has_ids else "#374151",
+                            "textDecoration": "underline" if has_ids else "none",
+                        },
+                    )
+                    if filter_ref not in seen_store_ids:
+                        seen_store_ids.add(filter_ref)
+                        cell_stores.append(dcc.Store(
+                            id={"type": "rpt-cell-ids", "index": filter_ref},
+                            data={
+                                "ids":        self._patient_ids_cache.get(filter_ref, []),
+                                "unique_col": PERSON_ID_,
+                            },
+                        ))
+                else:
+                    cell_content = val
+                tds.append(html.Td(cell_content, style={**td_val_base,
+                                                         "backgroundColor": bg,
+                                                         "width": f"{val_widths[col]}px"}))
+            data_rows.append(html.Tr(tds))
+
         title_bar = html.Div(
             section_title.upper() if section_title else "",
             style={
-                "background": "#006401",
-                "color": "#ffffff",
-                "fontSize": "11px",
-                "fontWeight": "700",
-                "letterSpacing": "0.6px",
-                "padding": "7px 12px",
+                "background": "#006401", "color": "#ffffff",
+                "fontSize": "11px", "fontWeight": "700",
+                "letterSpacing": "0.6px", "padding": "7px 12px",
                 "borderRadius": "4px 4px 0 0",
             },
         )
 
-        table = dash_table.DataTable(
-            id=f"report-table-{section_idx}",
-            data=df.to_dict("records"),
-            columns=(
-                [{"name": section_title.upper(), "id": "Data Element"}]
-                + [{"name": col.upper(), "id": col} for col in value_cols]
-            ),
-            # ── Table container ─────────────────────────────────────────────
-            style_table={
-                "overflowX": "auto",
-                "overflowY": "visible",
-                "minWidth": "100%",
-                "borderRadius": "0 0 4px 4px",
-                "border": "1px solid #d1d5db",
-                "borderTop": "none",
+        table_el = html.Table(
+            [html.Thead(header_row), html.Tbody(data_rows)],
+            style={
+                "width": "100%", "borderCollapse": "collapse",
+                "fontSize": "12px", "tableLayout": "auto",
+                "border": "1px solid #d1d5db", "borderTop": "none",
+                "borderRadius": "0 0 4px 4px", "overflowX": "auto",
             },
-            # ── Cell base ───────────────────────────────────────────────────
-            style_cell={
-                "fontFamily": "'Segoe UI', Tahoma, sans-serif",
-                "fontSize": "12px",
-                "padding": "8px 12px",
-                "border": "1px solid #e5e7eb",
-                "textAlign": "left",
-                "whiteSpace": "normal",
-                "wordBreak": "break-word",
-                "height": "auto",
-                "minHeight": "28px",
-                "lineHeight": "1.4",
-            },
-            # ── Per-column overrides ─────────────────────────────────────────
-            style_cell_conditional=[
-                {
-                    "if": {"column_id": "Data Element"},
-                    "fontWeight": "600",
-                    "color": "#1f2937",
-                    "backgroundColor": "#f9fafb",
-                    "width": f"{de_width}px",
-                    "minWidth": "180px",
-                    "position": "sticky",
-                    "left": 0,
-                    "zIndex": 1,
-                    "borderRight": "2px solid #d1d5db",
-                },
-                *[
-                    {
-                        "if": {"column_id": col},
-                        "textAlign": "center",
-                        "width": f"{val_widths[col]}px",
-                        "minWidth": "80px",
-                        "color": "#374151",
-                    }
-                    for col in value_cols
-                ],
-            ],
-            # ── Header ──────────────────────────────────────────────────────
-            style_header={
-                "backgroundColor": "#374151",
-                "color": "#f9fafb",
-                "fontWeight": "700",
-                "fontSize": "11px",
-                "textAlign": "center",
-                "padding": "9px 12px",
-                "border": "1px solid #4b5563",
-                "letterSpacing": "0.4px",
-                "position": "sticky",
-                "top": 0,
-                "zIndex": 2,
-            },
-            style_header_conditional=[
-                {
-                    "if": {"column_id": "Data Element"},
-                    "textAlign": "left",
-                    "backgroundColor": "#1f2937",
-                }
-            ],
-            # ── Data rows ───────────────────────────────────────────────────
-            style_data={
-                "whiteSpace": "normal",
-                "height": "auto",
-                "minHeight": "32px",
-            },
-            style_data_conditional=[
-                {"if": {"row_index": "odd"}, "backgroundColor": "#f9fafb"},
-                {"if": {"row_index": "even"}, "backgroundColor": "#ffffff"},
-                *[
-                    {"if": {"filter_query": f"{{{col}}} = ''",
-                             "column_id": col},
-                     "backgroundColor": "#f3f4f6", "color": "#d1d5db"}
-                    for col in value_cols
-                ],
-                {
-                    "if": {"filter_query": "{Data Element} = ''"},
-                    "backgroundColor": "#f3f4f6",
-                },
-            ],
-            css=[{
-                "selector": ".dash-spreadsheet td div",
-                "rule": "line-height: 1.4; max-height: none; "
-                        "overflow: visible; white-space: normal;",
-            }],
-            tooltip_data=[
-                {
-                    col: {"value": str(val), "type": "markdown"}
-                    for col, val in row.items()
-                    if val and len(str(val)) > 50
-                }
-                for row in df.to_dict("records")
-            ],
-            tooltip_duration=None,
-            style_as_list_view=False,
-            filter_action="none",
-            sort_action="native",
-            sort_mode="single",
-            page_action="none",
-            virtualization=False,
-            fixed_rows={"headers": True},
         )
 
         return html.Div(
             style={"marginBottom": "0", "breakInside": "avoid"},
-            children=[table],
+            children=[title_bar, table_el] + cell_stores,
         )

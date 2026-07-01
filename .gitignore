@@ -51,3 +51,4 @@ data/parquet
 # data/visualizations
 configurations.json
 __pycache__/
+CLAUDE.md
