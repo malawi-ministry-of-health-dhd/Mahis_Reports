@@ -727,7 +727,7 @@ class ReportTableBuilder:
                    "borderBottom": "2px solid #006401"},
             children=[
                 html.H3(title.upper(),
-                        style={"margin": "0 0 4px", "color": "#006401",
+                        style={"margin": "0 0 4px", "color": "#000000",
                                "fontSize": "15px", "fontWeight": "700",
                                "letterSpacing": "0.5px"}),
                 html.Span(
@@ -876,16 +876,16 @@ class ReportTableBuilder:
                                                          "width": f"{val_widths[col]}px"}))
             data_rows.append(html.Tr(tds))
 
-        title_bar = html.Div(
-            section_title.upper() if section_title else "",
-            style={
-                "background": "#006401", "color": "#ffffff",
-                "fontSize": "11px", "fontWeight": "700",
-                "letterSpacing": "0.6px", "padding": "7px 12px",
-                "borderRadius": "4px 4px 0 0",
-            },
-        )
-
+        # title_bar = html.Div(
+        #     section_title.upper() if section_title else "",
+        #     style={
+        #         "background": "#006401", "color": "#ffffff",
+        #         "fontSize": "11px", "fontWeight": "700",
+        #         "letterSpacing": "0.6px", "padding": "7px 12px",
+        #         "borderRadius": "4px 4px 0 0",
+        #     },
+        # )
+        title_bar = html.Div()
         table_el = html.Table(
             [html.Thead(header_row), html.Tbody(data_rows)],
             style={
