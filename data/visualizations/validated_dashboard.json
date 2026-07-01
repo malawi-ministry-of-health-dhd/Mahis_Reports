@@ -13,7 +13,7 @@
           "flag": "ok",
           "display_average": "True",
           "href": "program_reports",
-          "href_name": "view patients",
+          "drill_down": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -30,6 +30,7 @@
           "id": "count_62ca9185",
           "name": "Attendance Male",
           "level": "facility",
+          "drill_down": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -48,6 +49,7 @@
           "id": "count_6668a9a4",
           "name": "Attendance Female",
           "level": "facility",
+          "drill_down": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -222,6 +224,7 @@
           "id": "count_cde8771bxy",
           "name": "Returning Patients",
           "level": "facility",
+          "display_average": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -784,7 +787,7 @@
           "name": "All Attendance",
           "level": "facility",
           "flag": "ok",
-          "display_average": "True",
+          "drill_down": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -805,6 +808,7 @@
           "id": "count_fc025099",
           "name": "Attendance Male",
           "level": "facility",
+          "drill_down": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -826,6 +830,7 @@
           "id": "count_3e34fe5b",
           "name": "Attendance Female",
           "level": "facility",
+          "drill_down": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -847,6 +852,7 @@
           "id": "count_23742029",
           "name": "Attendance Under 5",
           "level": "facility",
+          "drill_down": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -868,6 +874,7 @@
           "id": "count_aefd91dc",
           "name": "Attendance Over 5",
           "level": "facility",
+          "drill_down": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -889,6 +896,7 @@
           "id": "count_e730ec0a",
           "name": "Malaria Cases (Confirmed + Unconfirmed)",
           "level": "facility",
+          "drill_down": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -910,6 +918,7 @@
           "id": "count_36b1263c",
           "name": "Malaria in Under 5",
           "level": "facility",
+          "drill_down": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -932,6 +941,7 @@
           "id": "count_d6d78d50",
           "name": "Admissions",
           "level": "facility",
+          "drill_down": "True",
           "flag": "warn",
           "display_average": "True",
           "filters": {
@@ -958,6 +968,7 @@
           "id": "count_39f11f5e",
           "name": "Discharged Home",
           "level": "facility",
+          "drill_down": "True",
           "flag": "ok",
           "display_average": "True",
           "filters": {
@@ -1475,6 +1486,7 @@
           "level": "facility",
           "flag": "ok",
           "display_average": "True",
+          "drill_down": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -1499,6 +1511,7 @@
           "id": "count_ncd_3",
           "name": "Attendance Female",
           "level": "facility",
+          "drill_down": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -1513,6 +1526,7 @@
           "name": "New NCD Patients",
           "level": "facility",
           "display_average": "True",
+          "drill_down": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -1527,6 +1541,7 @@
           "name": "Patient transferred in",
           "level": "facility",
           "display_average": "True",
+          "drill_down": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -1539,6 +1554,7 @@
         {
           "id": "count_ncd_6",
           "name": "New Diabetes Cases",
+          "drill_down": "True",
           "level": "facility",
           "filters": {
             "measure": "count_set",
@@ -1554,6 +1570,7 @@
         {
           "id": "count_ncd_7",
           "name": "New Diabetes Type 1 Cases",
+          "drill_down": "True",
           "level": "facility",
           "filters": {
             "measure": "count_set",
@@ -1569,6 +1586,7 @@
         {
           "id": "count_ncd_8",
           "name": "New Diabetes Type 2 Cases",
+          "drill_down": "True",
           "level": "facility",
           "filters": {
             "measure": "count_set",
@@ -1584,6 +1602,7 @@
         {
           "id": "count_ncd_9",
           "name": "New Hypertension Cases",
+          "drill_down": "True",
           "level": "facility",
           "filters": {
             "measure": "count_set",
@@ -1600,6 +1619,7 @@
           "id": "count_ncd_10",
           "name": "Total New Patients",
           "level": "facility",
+          "drill_down": "True",
           "filters": {
             "measure": "count_set",
             "unique": "person_id",

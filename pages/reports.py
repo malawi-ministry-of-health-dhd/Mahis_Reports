@@ -1,5 +1,5 @@
 import dash
-from dash import html, dcc, Input, Output, State, callback, callback_context
+from dash import html, dcc, Input, Output, State, callback, callback_context, ALL
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
@@ -223,6 +223,108 @@ layout = html.Div(
         # Hidden Components
         dcc.Download(id="download-report-blob"),
         dcc.Store(id="report-data-store"),
+        dcc.Store(id="rpt-modal-page", data=1),
+        dcc.Store(id="rpt-modal-data", data=None),
+
+        # Patient ID modal
+        html.Div(
+            id="rpt-patient-modal",
+            style={"display": "none"},
+            children=[
+                html.Div(
+                    id="rpt-patient-modal-backdrop",
+                    n_clicks=0,
+                    style={
+                        "position": "fixed", "inset": "0",
+                        "background": "rgba(0,0,0,0.45)", "zIndex": "2000",
+                    },
+                ),
+                html.Div(
+                    style={
+                        "position": "fixed", "top": "50%", "left": "50%",
+                        "transform": "translate(-50%,-50%)",
+                        "zIndex": "2100", "background": "#ffffff",
+                        "borderRadius": "8px",
+                        "boxShadow": "0 8px 32px rgba(0,0,0,0.22)",
+                        "width": "1200px", "maxWidth": "92vw",
+                        "maxHeight": "80vh",
+                        "display": "flex", "flexDirection": "column",
+                    },
+                    children=[
+                        # Header
+                        html.Div(
+                            style={
+                                "display": "flex", "alignItems": "center",
+                                "justifyContent": "space-between",
+                                "padding": "12px 16px",
+                                "borderBottom": "1px solid #e5e7eb",
+                                "flexShrink": "0",
+                            },
+                            children=[
+                                html.Span(id="rpt-patient-modal-title",
+                                          style={"fontWeight": "700", "fontSize": "14px",
+                                                 "color": "#111827"}),
+                                html.Button(
+                                    "✕",
+                                    id="rpt-patient-modal-close",
+                                    n_clicks=0,
+                                    style={
+                                        "background": "#dc2626", "color": "#ffffff",
+                                        "border": "none", "borderRadius": "50%",
+                                        "width": "26px", "height": "26px",
+                                        "fontSize": "13px", "fontWeight": "700",
+                                        "cursor": "pointer", "lineHeight": "1",
+                                        "flexShrink": "0",
+                                    },
+                                ),
+                            ],
+                        ),
+                        # Table body
+                        html.Div(
+                            id="rpt-patient-modal-body",
+                            style={"overflowY": "auto", "flex": "1", "padding": "12px 16px"},
+                        ),
+                        # Pagination footer
+                        html.Div(
+                            style={
+                                "display": "flex", "alignItems": "center",
+                                "justifyContent": "space-between",
+                                "padding": "8px 16px",
+                                "borderTop": "1px solid #e5e7eb",
+                                "flexShrink": "0", "background": "#f9fafb",
+                                "borderRadius": "0 0 8px 8px",
+                            },
+                            children=[
+                                html.Button(
+                                    "← Prev",
+                                    id="rpt-modal-prev-btn",
+                                    n_clicks=0,
+                                    style={
+                                        "background": "#3b82f6", "color": "#ffffff",
+                                        "border": "none", "borderRadius": "4px",
+                                        "padding": "4px 14px", "fontSize": "12px",
+                                        "cursor": "pointer",
+                                    },
+                                ),
+                                html.Span(id="rpt-modal-page-info",
+                                          style={"fontSize": "12px", "color": "#6b7280"}),
+                                html.Button(
+                                    "Next →",
+                                    id="rpt-modal-next-btn",
+                                    n_clicks=0,
+                                    style={
+                                        "background": "#3b82f6", "color": "#ffffff",
+                                        "border": "none", "borderRadius": "4px",
+                                        "padding": "4px 14px", "fontSize": "12px",
+                                        "cursor": "pointer",
+                                    },
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        ),
     ]
 )
 
@@ -667,3 +769,134 @@ def get_data(reports_data, xlsx, pdf):
 
     else:
         return dash.no_update
+
+
+_RPT_PAGE_SIZE = 15
+
+
+# Report cell click — open/close modal + fetch patient data
+@callback(
+    Output("rpt-patient-modal",       "style"),
+    Output("rpt-patient-modal-title", "children"),
+    Output("rpt-modal-data",          "data"),
+    Output("rpt-modal-page",          "data"),
+    Input({"type": "rpt-val-click",        "index": ALL}, "n_clicks"),
+    Input("rpt-patient-modal-close",   "n_clicks"),
+    Input("rpt-patient-modal-backdrop","n_clicks"),
+    State({"type": "rpt-cell-ids",         "index": ALL}, "data"),
+    State({"type": "rpt-val-click",        "index": ALL}, "id"),
+    State("url-params-store", "data"),
+    prevent_initial_call=True,
+)
+def _rpt_patient_modal(n_clicks_list, n_close, n_backdrop, ids_list, id_list, urlparams):
+    from dash import ctx
+    from helpers.visualizations import create_line_list_basic_modal
+    triggered = ctx.triggered_id
+
+    if triggered in ("rpt-patient-modal-close", "rpt-patient-modal-backdrop"):
+        return {"display": "none"}, dash.no_update, dash.no_update, dash.no_update
+
+    if not isinstance(triggered, dict) or triggered.get("type") != "rpt-val-click":
+        raise PreventUpdate
+    if not any(n for n in (n_clicks_list or []) if n):
+        raise PreventUpdate
+
+    clicked_index = triggered["index"]
+    store_payload = {}
+    for id_obj, payload in zip(id_list, ids_list):
+        if id_obj.get("index") == clicked_index:
+            store_payload = payload or {}
+            break
+
+    patient_ids = store_payload.get("ids", [])
+    unique_col  = store_payload.get("unique_col", "") or PERSON_ID_
+    if not patient_ids:
+        raise PreventUpdate
+
+    data_route = (urlparams or {}).get("route", ["default"])[0]
+    data_path  = f"data/{data_route}/parquet"
+
+    df = create_line_list_basic_modal(unique_col, data_path, patient_ids)
+    title = f"Patient List — ({len(patient_ids):,} Total Records)"
+
+    modal_data = {
+        "rows":  df.to_dict("records"),
+        "cols":  list(df.columns),
+        "total": len(df),
+    }
+    return {"display": "block"}, title, modal_data, 1
+
+
+# Report modal — render current page
+@callback(
+    Output("rpt-patient-modal-body", "children"),
+    Output("rpt-modal-page-info",    "children"),
+    Input("rpt-modal-page", "data"),
+    Input("rpt-modal-data", "data"),
+    prevent_initial_call=True,
+)
+def _rpt_render_page(page, modal_data):
+    if not modal_data:
+        raise PreventUpdate
+
+    rows_all = modal_data.get("rows", [])
+    cols     = modal_data.get("cols", [])
+    total    = modal_data.get("total", 0)
+
+    if not rows_all:
+        return html.Div("No records found.", style={"fontSize": "13px", "color": "#6b7280"}), ""
+
+    page        = max(1, page or 1)
+    total_pages = max(1, -(-total // _RPT_PAGE_SIZE))
+    page        = min(page, total_pages)
+
+    start     = (page - 1) * _RPT_PAGE_SIZE
+    page_rows = rows_all[start: start + _RPT_PAGE_SIZE]
+
+    th_style  = {"padding": "6px 10px", "background": "#f3f4f6", "fontWeight": "600",
+                 "fontSize": "12px", "border": "1px solid #e5e7eb", "whiteSpace": "nowrap"}
+    td_style  = {"padding": "5px 10px", "fontSize": "12px", "border": "1px solid #e5e7eb"}
+    num_style = {**td_style, "color": "#9ca3af", "textAlign": "center", "width": "40px"}
+
+    header = html.Thead(html.Tr(
+        [html.Th("#", style={**th_style, "width": "40px"})] +
+        [html.Th(col, style=th_style) for col in cols]
+    ))
+    rows = [
+        html.Tr(
+            [html.Td(start + i + 1, style=num_style)] +
+            [html.Td(str(r.get(col, "")) if r.get(col) is not None else "", style=td_style)
+             for col in cols],
+            style={"background": "#ffffff" if i % 2 == 0 else "#f9fafb"},
+        )
+        for i, r in enumerate(page_rows)
+    ]
+    table = html.Table(
+        [header, html.Tbody(rows)],
+        style={"width": "100%", "borderCollapse": "collapse",
+               "fontSize": "12px", "tableLayout": "auto"},
+    )
+    return table, f"Page {page} of {total_pages}  ({total:,} records)"
+
+
+# Report modal — page navigation
+@callback(
+    Output("rpt-modal-page", "data", allow_duplicate=True),
+    Input("rpt-modal-prev-btn", "n_clicks"),
+    Input("rpt-modal-next-btn", "n_clicks"),
+    State("rpt-modal-page",    "data"),
+    State("rpt-modal-data",    "data"),
+    prevent_initial_call=True,
+)
+def _rpt_modal_nav(n_prev, n_next, page, modal_data):
+    from dash import ctx
+    if not modal_data:
+        raise PreventUpdate
+    total       = modal_data.get("total", 0)
+    total_pages = max(1, -(-total // _RPT_PAGE_SIZE))
+    page        = max(1, page or 1)
+    if ctx.triggered_id == "rpt-modal-prev-btn":
+        page = max(1, page - 1)
+    else:
+        page = min(total_pages, page + 1)
+    return page

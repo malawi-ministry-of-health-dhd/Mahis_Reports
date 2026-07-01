@@ -17,7 +17,8 @@ from data_storage import DataStorage
 
 pd.options.mode.chained_assignment = None
 
-from config import PERSON_ID_, ENCOUNTER_ID_, DATE_, CONCEPT_NAME_,DATA_PATH_,FIRST_NAME_, LAST_NAME_, VALUE_DATETIME_
+from config import (PERSON_ID_, ENCOUNTER_ID_, DATE_, CONCEPT_NAME_,DATA_PATH_,FIRST_NAME_, LAST_NAME_, 
+                    VALUE_DATETIME_, AGE_, GENDER_, HOME_DISTRICT_, TA_, VILLAGE_, IDENTIFIER_)
 
 
 THEME = {
@@ -454,21 +455,22 @@ def create_count(query_fiter,data_path, aggregation='count', unique_column=PERSO
     
     # print("Create count",joined_query)
     result = DataStorage.query_duckdb(joined_query)
+    unique_patients = result[unique_column].unique().tolist()
     if aggregation == 'count':
-        return len(result.drop_duplicates())
+        return len(result.drop_duplicates()), unique_patients
     elif aggregation == 'nunique':
-        return len(result.drop_duplicates())
+        return len(result[unique_column].unique().tolist()), unique_patients
     elif aggregation == 'list':
-        return result[unique_column].dropna().unique().tolist()
+        return result[unique_column].dropna().unique().tolist(), unique_patients
     elif aggregation == 'time_diff_mins':
         if result.empty:
-            return 0
+            return 0, unique_patients
         result = result[result["patient_session_minutes"]<=120] #120 minutes is the threshold for a single patient session, we want to exclude outliers that may be caused by data quality issues
-        return int(result["patient_session_minutes"].agg('mean'))
+        return int(result["patient_session_minutes"].agg('mean')), unique_patients
     elif aggregation in ['sum', 'mean', 'min', 'max', 'std', 'var']:
-        return int(result[unique_column].agg(aggregation))
+        return int(result[unique_column].agg(aggregation)), unique_patients
     else:
-        return len(result.drop_duplicates())
+        return len(result.drop_duplicates()), unique_patients
 
 def create_count_sets(
     query_fiter,data_path,aggregation='count',
@@ -526,7 +528,7 @@ def create_count_sets(
         # All conditions must be met on the same date row — original INTERSECT behaviour.
         intersection_query = " INTERSECT ".join(queries)
         result = DataStorage.query_duckdb(intersection_query)
-        return result[pid_col].nunique()
+        return result[pid_col].nunique(), unique_patients
 
     # Default: conditions may live on different rows / different dates.
     outer = f"SELECT DISTINCT {pid_col} FROM '{data_path}' WHERE {query_fiter}"
@@ -540,7 +542,8 @@ def create_count_sets(
         final_query = outer
     # print("Create countset", final_query)
     result = DataStorage.query_duckdb(final_query)
-    return result[pid_col].nunique()
+    unique_patients = result[unique_column].unique().tolist()
+    return result[pid_col].nunique(), unique_patients
 
 def create_sum(query_fiter,data_path, unique_column=PERSON_ID_, num_field='ValueN', *filters, start_date=None, end_date=None):
 
@@ -562,7 +565,8 @@ def create_sum(query_fiter,data_path, unique_column=PERSON_ID_, num_field='Value
     if not queries:
         joined_query =f"SELECT {unique_column}, {num_field} FROM '{data_path}' WHERE {query_fiter}"  
     result = DataStorage.query_duckdb(joined_query)
-    return result[num_field].sum()
+    unique_patients = result[unique_column].unique().tolist()
+    return result[num_field].sum(), unique_patients
 
 
 def create_column_chart(query_fiter,data_path, x_col, y_col, title, x_title, y_title,
@@ -2416,6 +2420,39 @@ def create_line_list(
     ])
 
     return table
+
+def create_line_list_basic_modal(
+    unique_column: str,
+    data_path: str,
+    ids_list: List,
+) -> "pd.DataFrame":
+    """Return a DataFrame of patient details for the given ID list."""
+    import pandas as pd
+    if not ids_list:
+        return pd.DataFrame()
+
+    ids_quoted = ", ".join(f"'{str(i)}'" for i in ids_list)
+    query = f"""
+        SELECT DISTINCT
+            {unique_column}                     AS "unique_column",
+            strftime('%Y-%m-%d', {DATE_})               AS "Date of Visit",
+            {IDENTIFIER_}                       AS "Patient ID",
+            {FIRST_NAME_}                       AS "First Name",
+            {LAST_NAME_}                        AS "Last Name",
+            CAST({AGE_} AS INT)                 AS "Age",
+            {GENDER_}                           AS "Gender",
+            {HOME_DISTRICT_}                    AS "Home District",
+            {TA_}                              AS "Traditional Authority",
+            {VILLAGE_}                          AS "Village"
+        FROM '{data_path}'
+        WHERE {unique_column} IN ({ids_quoted})
+        ORDER BY {DATE_}, {LAST_NAME_}, {FIRST_NAME_}
+    """
+    try:
+        result = DataStorage.query_duckdb(query)
+        return result.drop_duplicates(subset='unique_column').drop(columns='unique_column').iloc[:1000]
+    except Exception:
+        return pd.DataFrame()
 
 
 def create_sankey_diagram(df, source_col, target_col, value_col, title,

@@ -353,208 +353,258 @@ layout = html.Div(
     children=[
         dcc.Location(id='url', refresh=False),
         dcc.Store(id='active-button-store', data='General Summary'),
-        
-        # Left Sidebar
+        dcc.Store(id='filter-drawer-open', data=False),
+        dcc.Store(id='scroll-watcher', data=0),
+        dcc.Store(id='kpi-modal-page', data=1),
+        dcc.Store(id='kpi-modal-data', data=None),
+
+        #Floating filter button (appears on scroll-up)
         html.Div(
-            className="dashboard-sidebar",
+            id="filter-float-btn-wrapper",
+            style={
+                "position":   "fixed",
+                "top":        "56px",
+                "left":       "12px",
+                "zIndex":     "900",
+                "opacity":    "0",
+                "transform":  "translateY(-8px)",
+                "transition": "opacity 0.22s ease, transform 0.22s ease",
+                "pointerEvents": "none",
+            },
             children=[
-                
-                # Filters Section
-                html.Div(
-                    className="sidebar-filters-section",
-                    children=[
-                        html.Div(
-                            className="filters-card",
-                            children=[
-                                html.H3("Filter Data", className="filters-title"),
-                                
-                                html.Div(
-                                    className="filters-container",
-                                    children=[
-                                        # Level Filter
-                                        html.Div(
-                                            className="filter-group",
-                                            children=[
-                                                html.Label("Level", className="filter-label"),
-                                                dcc.Dropdown(
-                                                    id='dashboard-level-filter',
-                                                    options=[
-                                                        {'label': 'National', 'value': 'National'},
-                                                        {'label': 'District', 'value': 'District'},
-                                                        {'label': 'Facility', 'value': 'Facility'},
-                                                    ],
-                                                    value=None,
-                                                    clearable=True,
-                                                    className="modern-dropdown",
-                                                    placeholder="Select level"
-                                                )
-                                            ]
-                                        ),
-
-                                        # District Filter
-                                        html.Div(
-                                            id="dashboard-district-filter-group",
-                                            className="filter-group",
-                                            children=[
-                                                html.Label("District", className="filter-label"),
-                                                dcc.Dropdown(
-                                                    id='dashboard-district-filter',
-                                                    options=[],
-                                                    value=[],
-                                                    multi=True,
-                                                    clearable=True,
-                                                    className="modern-dropdown",
-                                                    placeholder="Select district(s)"
-                                                ),
-                                                html.Div(
-                                                    id="dashboard-district-note",
-                                                    className="filter-note",
-                                                    style={"fontSize": "12px", "color": "#64748b", "marginTop": "6px"}
-                                                )
-                                            ]
-                                        ),
-
-                                        # Facility Filter
-                                        html.Div(
-                                            className="filter-group",
-                                            children=[
-                                                html.Label("Health Facility", className="filter-label"),
-                                                dcc.Dropdown(
-                                                    id='dashboard-facility-filter',
-                                                    options=[],
-                                                    value=[],
-                                                    multi=True,
-                                                    clearable=True,
-                                                    className="modern-dropdown",
-                                                    placeholder="Select facility(ies)"
-                                                )
-                                            ]
-                                        ),
-
-                                        # Relative Period Filter
-                                        html.Div(
-                                            className="filter-group",
-                                            children=[
-                                                html.Label("Relative Period", className="filter-label"),
-                                                dcc.Dropdown(
-                                                    id='dashboard-period-type-filter',
-                                                    options=[
-                                                        {'label': item, 'value': item}
-                                                        for item in RELATIVE_PERIOD_LIST
-                                                    ],
-                                                    value=DEFAULT_RELATIVE_PERIOD,
-                                                    clearable=True,
-                                                    className="modern-dropdown"
-                                                )
-                                            ]
-                                        ),
-                                        
-                                        # Custom Date Range
-                                        html.Div(
-                                            className="filter-group",
-                                            children=[
-                                                html.Label("Custom Date Range", className="filter-label"),
-                                                dcc.DatePickerRange(
-                                                    id='dashboard-date-range-picker',
-                                                    min_date_allowed="2023-01-01",
-                                                    max_date_allowed="2050-01-01",
-                                                    initial_visible_month=datetime.now(),
-                                                    start_date=_default_date_window()[0],
-                                                    end_date=_default_date_window()[1],
-                                                    display_format='YYYY-MM-DD',
-                                                    className="modern-datepicker"
-                                                )
-                                            ]
-                                        ),
-
-                                        html.Div(
-                                            style={"display": "none"},
-                                            children=[
-                                                dcc.Dropdown(
-                                                    id='dashboard-overview-filter',
-                                                    options=[
-                                                        {"label": name, "value": name}
-                                                        for name in get_dashboard_names()
-                                                    ],
-                                                    value=[],
-                                                    multi=True,
-                                                    clearable=True,
-                                                    className="modern-dropdown",
-                                                )
-                                            ]
-                                        ),
-
-                                        # Program Category Filter (MNID)
-                                        html.Div(
-                                            id="dashboard-category-filter-group",
-                                            className="filter-group",
-                                            children=[
-                                                html.Label("Program Category", className="filter-label"),
-                                                dcc.Dropdown(
-                                                    id='dashboard-category-filter',
-                                                    options=[
-                                                        {"label": "All", "value": "All"},
-                                                        {"label": "ANC", "value": "ANC"},
-                                                        {"label": "Labour & Delivery", "value": "Labour"},
-                                                        {"label": "PNC", "value": "PNC"},
-                                                    ],
-                                                    value="All",
-                                                    clearable=False,
-                                                    className="modern-dropdown",
-                                                )
-                                            ]
-                                        ),
-                                        
-                                        # Age Group Filter
-                                        html.Div(
-                                            id="dashboard-age-filter-group",
-                                            className="filter-group",
-                                            children=[
-                                                html.Label("Age Group", className="filter-label"),
-                                                dcc.Dropdown(
-                                                    id='dashboard-age-filter',
-                                                    options=[
-                                                        {'label': age, 'value': age}
-                                                        for age in ['Over 5', 'Under 5']
-                                                    ],
-                                                    value=None,
-                                                    clearable=True,
-                                                    className="modern-dropdown"
-                                                )
-                                            ]
-                                        ),
-                                    ]
-                                ),
-                                
-                                # Action Buttons
-                                html.Div(
-                                    className="filter-actions",
-                                    children=[
-                                        html.Button(
-                                            "Apply Filters", 
-                                            id="dashboard-btn-generate", 
-                                            n_clicks=0, 
-                                            className="btn-apply-modern"
-                                        ),
-                                        html.Button(
-                                            "Reset Filters", 
-                                            id="dashboard-btn-reset", 
-                                            n_clicks=0, 
-                                            className="btn-reset-modern"
-                                        ),
-                                    ]
-                                )
-                            ]
-                        )
-                    ]
+                html.Button(
+                    "⊞",
+                    id="filter-float-btn",
+                    n_clicks=0,
+                    title="Open filters",
+                    style={
+                        "background":    "#9ca3af",
+                        "color":         "#ffffff",
+                        "border":        "none",
+                        "borderRadius":  "50%",
+                        "width":         "38px",
+                        "height":        "38px",
+                        "fontSize":      "17px",
+                        "cursor":        "pointer",
+                        "boxShadow":     "0 2px 8px rgba(0,0,0,0.22)",
+                        "lineHeight":    "1",
+                    },
                 ),
-            ]
+            ],
         ),
-        
-        # Right Content Area
+
+        #Backdrop (closes drawer on click)
+        html.Div(
+            id="filter-drawer-backdrop",
+            n_clicks=0,
+            style={
+                "display":    "none",
+                "position":   "fixed",
+                "inset":      "0",
+                "background": "rgba(0,0,0,0.35)",
+                "zIndex":     "1100",
+            },
+        ),
+        html.Div(
+            id="filter-drawer",
+            style={
+                "position":        "fixed",
+                "top":             "0",
+                "left":            "0",
+                "bottom":          "0",
+                "width":           "280px",
+                "background":      "#ffffff",
+                "boxShadow":       "4px 0 16px rgba(0,0,0,0.15)",
+                "zIndex":          "1200",
+                "overflowY":       "auto",
+                "transform":       "translateX(-100%)",
+                "transition":      "transform 0.25s ease",
+                "display":         "flex",
+                "flexDirection":   "column",
+            },
+            children=[
+                # Drawer header
+                html.Div(
+                    style={
+                        "display":       "flex", "alignItems": "center",
+                        "justifyContent": "space-between",
+                        "padding":       "14px 16px 10px",
+                        "borderBottom":  "1px solid #e5e7eb",
+                        "background":    "#f9fafb",
+                        "flexShrink":    "0",
+                    },
+                    children=[
+                        html.Span("Filters", style={"fontWeight": "700", "fontSize": "15px",
+                                                     "color": "#111827"}),
+                        html.Button(
+                            "✕",
+                            id="filter-drawer-close-btn",
+                            n_clicks=0,
+                            style={
+                                "background": "none", "border": "none",
+                                "fontSize": "16px", "cursor": "pointer",
+                                "color": "#6b7280", "lineHeight": "1",
+                                "padding": "2px 6px",
+                            },
+                        ),
+                    ],
+                ),
+
+                # Filters body
+                html.Div(
+                    style={"padding": "12px 14px", "flex": "1", "overflowY": "auto"},
+                    children=[
+                        # Level Filter
+                        html.Div(className="filter-group", children=[
+                            html.Label("Level", className="filter-label"),
+                            dcc.Dropdown(
+                                id='dashboard-level-filter',
+                                options=[
+                                    {'label': 'National', 'value': 'National'},
+                                    {'label': 'District',  'value': 'District'},
+                                    {'label': 'Facility',  'value': 'Facility'},
+                                ],
+                                value=None, clearable=True,
+                                className="modern-dropdown", placeholder="Select level",
+                            ),
+                        ]),
+                        # District Filter
+                        html.Div(id="dashboard-district-filter-group", className="filter-group", children=[
+                            html.Label("District", className="filter-label"),
+                            dcc.Dropdown(
+                                id='dashboard-district-filter',
+                                options=[], value=[], multi=True, clearable=True,
+                                className="modern-dropdown", placeholder="Select district(s)",
+                            ),
+                            html.Div(id="dashboard-district-note", className="filter-note",
+                                     style={"fontSize": "12px", "color": "#64748b", "marginTop": "6px"}),
+                        ]),
+                        # Facility Filter
+                        html.Div(className="filter-group", children=[
+                            html.Label("Health Facility", className="filter-label"),
+                            dcc.Dropdown(
+                                id='dashboard-facility-filter',
+                                options=[], value=[], multi=True, clearable=True,
+                                className="modern-dropdown", placeholder="Select facility(ies)",
+                            ),
+                        ]),
+                        # Relative Period Filter
+                        html.Div(className="filter-group", children=[
+                            html.Label("Relative Period", className="filter-label"),
+                            dcc.Dropdown(
+                                id='dashboard-period-type-filter',
+                                options=[{'label': item, 'value': item} for item in RELATIVE_PERIOD_LIST],
+                                value=DEFAULT_RELATIVE_PERIOD, clearable=True,
+                                className="modern-dropdown",
+                            ),
+                        ]),
+                        # Custom Date Range
+                        html.Div(className="filter-group", children=[
+                            html.Label("Custom Date Range", className="filter-label"),
+                            dcc.DatePickerRange(
+                                id='dashboard-date-range-picker',
+                                min_date_allowed="2023-01-01",
+                                max_date_allowed="2050-01-01",
+                                initial_visible_month=datetime.now(),
+                                start_date=_default_date_window()[0],
+                                end_date=_default_date_window()[1],
+                                display_format='YYYY-MM-DD',
+                                className="modern-datepicker",
+                            ),
+                        ]),
+                        # Hidden overview filter (kept for callbacks)
+                        html.Div(style={"display": "none"}, children=[
+                            dcc.Dropdown(
+                                id='dashboard-overview-filter',
+                                options=[{"label": name, "value": name}
+                                         for name in get_dashboard_names()],
+                                value=[], multi=True, clearable=True,
+                                className="modern-dropdown",
+                            ),
+                        ]),
+                        # Program Category Filter
+                        html.Div(id="dashboard-category-filter-group", className="filter-group", children=[
+                            html.Label("Program Category", className="filter-label"),
+                            dcc.Dropdown(
+                                id='dashboard-category-filter',
+                                options=[
+                                    {"label": "All",               "value": "All"},
+                                    {"label": "ANC",               "value": "ANC"},
+                                    {"label": "Labour & Delivery", "value": "Labour"},
+                                    {"label": "PNC",               "value": "PNC"},
+                                ],
+                                value="All", clearable=False, className="modern-dropdown",
+                            ),
+                        ]),
+                        # Age Group Filter
+                        html.Div(id="dashboard-age-filter-group", className="filter-group", children=[
+                            html.Label("Age Group", className="filter-label"),
+                            dcc.Dropdown(
+                                id='dashboard-age-filter',
+                                options=[{'label': age, 'value': age} for age in ['Over 5', 'Under 5']],
+                                value=None, clearable=True, className="modern-dropdown",
+                            ),
+                        ]),
+                    ],
+                ),
+
+                # Action buttons pinned to bottom of drawer
+                html.Div(
+                    className="filter-actions",
+                    style={
+                        "padding":    "10px 14px",
+                        "borderTop":  "1px solid #e5e7eb",
+                        "background": "#f9fafb",
+                        "flexShrink": "0",
+                        "display":    "flex",
+                        "gap":        "8px",
+                    },
+                    children=[
+                        html.Button("Apply Filters", id="dashboard-btn-generate", n_clicks=0,
+                                    className="btn-apply-modern", style={"flex": "1"}),
+                        html.Button("Reset Filters", id="dashboard-btn-reset", n_clicks=0,
+                                    className="btn-reset-modern", style={"flex": "1"}),
+                    ],
+                ),
+            ],
+        ),
+
+        # Main Content (full width)
         html.Div(
             className="dashboard-main",
+            style={"width": "100%"},
             children=[
+                # Filter toggle button
+                html.Div(
+                    style={
+                        "padding":       "6px 10px",
+                        "borderBottom":  "1px solid #e5e7eb",
+                        "background":    "#f9fafb",
+                        "display":       "flex",
+                        "alignItems":    "center",
+                        "gap":           "8px",
+                    },
+                    children=[
+                        html.Button(
+                            "⊞ Filters",
+                            id="filter-drawer-toggle-btn",
+                            n_clicks=0,
+                            style={
+                                "display":       "flex",
+                                "alignItems":    "center",
+                                "gap":           "5px",
+                                "padding":       "5px 12px",
+                                "fontSize":      "12px",
+                                "fontWeight":    "600",
+                                "border":        "1px solid #d1d5db",
+                                "borderRadius":  "4px",
+                                "background":    "#ffffff",
+                                "color":         "#374151",
+                                "cursor":        "pointer",
+                            },
+                        ),
+                    ],
+                ),
                 # Menu Section
                 html.Div(
                     className="sidebar-menu-section",
@@ -628,8 +678,338 @@ layout = html.Div(
             interval=10*60*1000,  # 10 minutes
             n_intervals=0
         ),
+
+        #Patient ID modal
+        html.Div(
+            id="kpi-patient-modal",
+            style={"display": "none"},
+            children=[
+                # Backdrop
+                html.Div(
+                    id="kpi-patient-modal-backdrop",
+                    n_clicks=0,
+                    style={
+                        "position": "fixed", "inset": "0",
+                        "background": "rgba(0,0,0,0.45)", "zIndex": "2000",
+                    },
+                ),
+                # Dialog
+                html.Div(
+                    style={
+                        "position":      "fixed",
+                        "top":           "50%",
+                        "left":          "50%",
+                        "transform":     "translate(-50%, -50%)",
+                        "zIndex":        "2100",
+                        "background":    "#ffffff",
+                        "borderRadius":  "8px",
+                        "boxShadow":     "0 8px 32px rgba(0,0,0,0.22)",
+                        "width":         "1200px",
+                        "maxWidth":      "92vw",
+                        "maxHeight":     "80vh",
+                        "display":       "flex",
+                        "flexDirection": "column",
+                    },
+                    children=[
+                        # Header
+                        html.Div(
+                            style={
+                                "display":       "flex",
+                                "alignItems":    "center",
+                                "justifyContent": "space-between",
+                                "padding":       "12px 16px",
+                                "borderBottom":  "1px solid #e5e7eb",
+                                "flexShrink":    "0",
+                            },
+                            children=[
+                                html.Span(id="kpi-patient-modal-title",
+                                          style={"fontWeight": "700", "fontSize": "14px",
+                                                 "color": "#111827"}),
+                                html.Button(
+                                    "✕",
+                                    id="kpi-patient-modal-close",
+                                    n_clicks=0,
+                                    style={
+                                        "background":   "#dc2626",
+                                        "color":        "#ffffff",
+                                        "border":       "none",
+                                        "borderRadius": "50%",
+                                        "width":        "26px",
+                                        "height":       "26px",
+                                        "fontSize":     "13px",
+                                        "fontWeight":   "700",
+                                        "cursor":       "pointer",
+                                        "lineHeight":   "1",
+                                        "flexShrink":   "0",
+                                    },
+                                ),
+                            ],
+                        ),
+                        # Table body (scrollable)
+                        html.Div(
+                            id="kpi-patient-modal-body",
+                            style={
+                                "overflowY": "auto",
+                                "flex":      "1",
+                                "padding":   "12px 16px",
+                            },
+                        ),
+                        # Pagination footer
+                        html.Div(
+                            style={
+                                "display":         "flex",
+                                "alignItems":      "center",
+                                "justifyContent":  "space-between",
+                                "padding":         "8px 16px",
+                                "borderTop":       "1px solid #e5e7eb",
+                                "flexShrink":      "0",
+                                "background":      "#f9fafb",
+                                "borderRadius":    "0 0 8px 8px",
+                            },
+                            children=[
+                                html.Button(
+                                    "← Prev",
+                                    id="kpi-modal-prev-btn",
+                                    n_clicks=0,
+                                    style={
+                                        "background": "#525E52", "color": "#ffffff",
+                                        "border": "none", "borderRadius": "4px",
+                                        "padding": "4px 14px", "fontSize": "12px",
+                                        "cursor": "pointer",
+                                    },
+                                ),
+                                html.Span(
+                                    id="kpi-modal-page-info",
+                                    style={"fontSize": "12px", "color": "#6b7280"},
+                                ),
+                                html.Button(
+                                    "Next →",
+                                    id="kpi-modal-next-btn",
+                                    n_clicks=0,
+                                    style={
+                                        "background": "#525E52", "color": "#ffffff",
+                                        "border": "none", "borderRadius": "4px",
+                                        "padding": "4px 14px", "fontSize": "12px",
+                                        "cursor": "pointer",
+                                    },
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        ),
     ]
 )
+
+@callback(
+    Output("filter-drawer", "style"),
+    Output("filter-drawer-backdrop", "style"),
+    Input("filter-drawer-toggle-btn", "n_clicks"),
+    Input("filter-drawer-close-btn",  "n_clicks"),
+    Input("filter-drawer-backdrop",   "n_clicks"),
+    Input("filter-float-btn",         "n_clicks"),
+    State("filter-drawer-open", "data"),
+    prevent_initial_call=True,
+)
+def _toggle_filter_drawer(n_toggle, n_close, n_backdrop, _n_float, is_open):
+    new_open = not is_open
+    drawer_style = {
+        "position": "fixed", "top": "0", "left": "0", "bottom": "0",
+        "width": "280px", "background": "#ffffff",
+        "boxShadow": "4px 0 16px rgba(0,0,0,0.15)", "zIndex": "1200",
+        "overflowY": "auto", "display": "flex", "flexDirection": "column",
+        "transform": "translateX(0)" if new_open else "translateX(-100%)",
+        "transition": "transform 0.25s ease",
+    }
+    backdrop_style = {
+        "display": "block" if new_open else "none",
+        "position": "fixed", "inset": "0",
+        "background": "rgba(0,0,0,0.35)", "zIndex": "1100",
+    }
+    return drawer_style, backdrop_style
+
+
+@callback(
+    Output("filter-drawer-open", "data"),
+    Input("filter-drawer-toggle-btn", "n_clicks"),
+    Input("filter-drawer-close-btn",  "n_clicks"),
+    Input("filter-drawer-backdrop",   "n_clicks"),
+    Input("filter-float-btn",         "n_clicks"),
+    State("filter-drawer-open", "data"),
+    prevent_initial_call=True,
+)
+def _sync_drawer_state(n_toggle, n_close, n_backdrop, _n_float, is_open):
+    del n_toggle, n_close, n_backdrop, _n_float  # inputs drive trigger; only state matters
+    return not is_open
+
+
+_KPI_PAGE_SIZE = 15
+
+
+# KPI modal — open/close + data fetch
+@callback(
+    Output("kpi-patient-modal",  "style"),
+    Output("kpi-patient-modal-title", "children"),
+    Output("kpi-modal-data",     "data"),
+    Output("kpi-modal-page",     "data"),
+    Input({"type": "kpi-val-click",     "index": ALL}, "n_clicks"),
+    Input("kpi-patient-modal-close",   "n_clicks"),
+    Input("kpi-patient-modal-backdrop","n_clicks"),
+    State({"type": "kpi-patient-ids",  "index": ALL}, "data"),
+    State({"type": "kpi-val-click",    "index": ALL}, "id"),
+    State("url-params-store", "data"),
+    prevent_initial_call=True,
+)
+def _kpi_patient_modal(n_clicks_list, n_close, n_backdrop, ids_list, id_list, urlparams):
+    from dash import ctx
+    from helpers.visualizations import create_line_list_basic_modal
+    triggered = ctx.triggered_id
+
+    if triggered in ("kpi-patient-modal-close", "kpi-patient-modal-backdrop"):
+        return {"display": "none"}, dash.no_update, dash.no_update, dash.no_update
+
+    if not isinstance(triggered, dict) or triggered.get("type") != "kpi-val-click":
+        raise PreventUpdate
+    if not any(n for n in (n_clicks_list or []) if n):
+        raise PreventUpdate
+
+    clicked_index = triggered["index"]
+    store_payload = {}
+    for id_obj, payload in zip(id_list, ids_list):
+        if id_obj.get("index") == clicked_index:
+            store_payload = payload or {}
+            break
+
+    patient_ids = store_payload.get("ids", [])
+    unique_col  = store_payload.get("unique_col", "") or PERSON_ID_
+    if not patient_ids:
+        raise PreventUpdate
+
+    data_route = (urlparams or {}).get("route", ["default"])[0]
+    data_path  = f"data/{data_route}/parquet"
+
+    df = create_line_list_basic_modal(unique_col, data_path, patient_ids)
+    title = f"Patient List — ({len(patient_ids):,} Total Records)"
+
+    modal_data = {
+        "rows":  df.to_dict("records"),
+        "cols":  list(df.columns),
+        "total": len(df),
+    }
+    return {"display": "block"}, title, modal_data, 1
+
+
+# KPI modal — render current page
+@callback(
+    Output("kpi-patient-modal-body", "children"),
+    Output("kpi-modal-page-info",    "children"),
+    Input("kpi-modal-page", "data"),
+    Input("kpi-modal-data", "data"),
+    prevent_initial_call=True,
+)
+def _kpi_render_page(page, modal_data):
+    if not modal_data:
+        raise PreventUpdate
+
+    rows_all = modal_data.get("rows", [])
+    cols     = modal_data.get("cols", [])
+    total    = modal_data.get("total", 0)
+
+    if not rows_all:
+        body = html.Div("No records found.", style={"fontSize": "13px", "color": "#6b7280"})
+        return body, ""
+
+    page = max(1, page or 1)
+    total_pages = max(1, -(-total // _KPI_PAGE_SIZE))  # ceiling division
+    page = min(page, total_pages)
+
+    start = (page - 1) * _KPI_PAGE_SIZE
+    end   = start + _KPI_PAGE_SIZE
+    page_rows = rows_all[start:end]
+
+    th_style  = {"padding": "6px 10px", "background": "#f3f4f6", "fontWeight": "600",
+                 "fontSize": "12px", "border": "1px solid #e5e7eb", "whiteSpace": "nowrap"}
+    td_style  = {"padding": "5px 10px", "fontSize": "12px", "border": "1px solid #e5e7eb"}
+    num_style = {**td_style, "color": "#9ca3af", "textAlign": "center", "width": "40px"}
+
+    header = html.Thead(html.Tr(
+        [html.Th("#", style={**th_style, "width": "40px"})] +
+        [html.Th(col, style=th_style) for col in cols]
+    ))
+    rows = [
+        html.Tr(
+            [html.Td(start + i + 1, style=num_style)] +
+            [html.Td(str(r.get(col, "")) if r.get(col) is not None else "", style=td_style)
+             for col in cols],
+            style={"background": "#ffffff" if i % 2 == 0 else "#f9fafb"},
+        )
+        for i, r in enumerate(page_rows)
+    ]
+    table = html.Table(
+        [header, html.Tbody(rows)],
+        style={"width": "100%", "borderCollapse": "collapse",
+               "fontSize": "12px", "tableLayout": "auto"},
+    )
+    page_info = f"Page {page} of {total_pages}  ({total:,} records)"
+    return table, page_info
+
+
+# KPI modal — page navigation
+@callback(
+    Output("kpi-modal-page", "data", allow_duplicate=True),
+    Input("kpi-modal-prev-btn", "n_clicks"),
+    Input("kpi-modal-next-btn", "n_clicks"),
+    State("kpi-modal-page",    "data"),
+    State("kpi-modal-data",    "data"),
+    prevent_initial_call=True,
+)
+def _kpi_modal_nav(n_prev, n_next, page, modal_data):
+    from dash import ctx
+    if not modal_data:
+        raise PreventUpdate
+    total       = modal_data.get("total", 0)
+    total_pages = max(1, -(-total // _KPI_PAGE_SIZE))
+    page        = max(1, page or 1)
+    if ctx.triggered_id == "kpi-modal-prev-btn":
+        page = max(1, page - 1)
+    else:
+        page = min(total_pages, page + 1)
+    return page
+
+
+# Bind scroll listener once on page load; manipulate float-btn wrapper directly via DOM
+dash.clientside_callback(
+    """
+    function(_) {
+        var lastY = 0;
+        var bound = false;
+        function bindScroll() {
+            var wrapper = document.getElementById('filter-float-btn-wrapper');
+            if (!wrapper) { setTimeout(bindScroll, 300); return; }
+            window.addEventListener('scroll', function() {
+                var currentY = window.scrollY || document.documentElement.scrollTop;
+                if (currentY < lastY && currentY > 60) {
+                    wrapper.style.opacity = '1';
+                    wrapper.style.transform = 'translateY(0)';
+                    wrapper.style.pointerEvents = 'auto';
+                } else {
+                    wrapper.style.opacity = '0';
+                    wrapper.style.transform = 'translateY(-8px)';
+                    wrapper.style.pointerEvents = 'none';
+                }
+                lastY = currentY;
+            }, { passive: true });
+        }
+        bindScroll();
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("scroll-watcher", "data"),
+    Input("scroll-watcher", "data"),
+    prevent_initial_call=False,
+)
+
 
 @callback(
         Output('scrolling-menu', 'children'),

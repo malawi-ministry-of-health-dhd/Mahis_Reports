@@ -33,64 +33,89 @@ from config import (actual_keys_in_data,
                     DRUG_NAME_,
                     VALUE_NAME_, VALUE_DATETIME_)
 
-def build_metrics_section(filtered,filtered_data_range,delta_days, data_path, counts_config, url_object=None):
-    """Build metric cards from counts configuration"""
+def build_metrics_section(filtered, filtered_data_range, delta_days, data_path, counts_config, url_object=None):
+    """Build metric cards from counts configuration."""
 
-    # generate_ a dict for chart id and value for further statistical computations
-    all_count_metrics = {}
+    all_count_metrics: dict = {}
+    _patient_ids_map: dict = {}
     for count_config in counts_config:
-        measure = count_config.get("filters").get("measure","count")
+        measure = count_config.get("filters", {}).get("measure", "count")
         if measure == "calculated":
-            continue #lets not store these
-        count_id = count_config.get("id")
-        count_value = create_count_from_config(filtered,data_path, count_config["filters"])
+            continue
+        count_id     = count_config.get("id")
+        unique_col   = count_config.get("filters", {}).get("unique", "")
+        count_value, patient_ids = create_count_from_config(filtered, data_path, count_config["filters"])
         all_count_metrics[count_id] = count_value
+        try:
+            _patient_ids_map[count_id] = {
+                "ids":        [str(p) for p in patient_ids] if patient_ids else [],
+                "unique_col": unique_col,
+            }
+        except Exception:
+            _patient_ids_map[count_id] = {"ids": [], "unique_col": unique_col}
 
     metrics = []
     for count_config in counts_config:
-        href = count_config.get("href", "") +"?"+ url_object if url_object else ""
-        flag = count_config.get("flag", "")
-        display_average = count_config.get("display_average", False)
-        measure = count_config.get("filters").get("measure","count")
-        if not display_average:
-            display = "none"
-        else:
-            display = "block"
-        
+        count_id  = count_config.get("id")
+        drill_down      = count_config.get("drill_down", False)
+        flag      = count_config.get("flag", "")
+        measure   = count_config.get("filters", {}).get("measure", "count")
+
         if measure == "calculated":
             try:
-                value = round(eval(count_config.get("filters").get('expression'), {"__builtins__":{}}, all_count_metrics), 1)
+                display_value = round(
+                    eval(count_config["filters"].get("expression", "0"),
+                         {"__builtins__": {}}, all_count_metrics), 1)
             except ZeroDivisionError:
-                value = 0
+                display_value = 0
             except Exception as e:
-                value = "Error"
+                display_value = "Error"
                 print(e)
-            metric = html.Div(className=f'mnid-kpi {flag}', children=[ 
-                html.Div(style={'display': 'flex', 'justifyContent': 'space-between',
-                                'alignItems': 'flex-start', 'gap': '6px'}, children=[
-                    html.Div([
-                        html.Div(count_config["name"], className='kpi-lbl'),
-                        html.Div(value, className='kpi-val'),
-                        html.Div(html.A(count_config.get("href_name") or "", href=href),className='kpi-sub'),
-                    ])
-                ]),
-                html.Div()])
-        
+            stored_ids = []
         else:
-            metric = html.Div(className=f'mnid-kpi {flag}', children=[ 
-                    html.Div(style={'display': 'flex', 'justifyContent': 'space-between',
-                                    'alignItems': 'flex-start', 'gap': '6px'}, children=[
-                        html.Div([
-                            html.Div(count_config["name"], className='kpi-lbl'),
-                            html.Div(create_count_from_config(filtered,data_path, count_config["filters"]), className='kpi-val'),
-                            html.Div(html.A(count_config.get("href_name") or "", href=href),className='kpi-sub'),
-                        ]),
-                        html.Div(f"(Avg: {int(create_count_from_config(filtered_data_range,data_path, count_config['filters'])/delta_days)})",style={"marginTop":"15px","fontFamily": "Arial", "fontSize": "12px","fontWeight": "bold","color":"#15803D", "display": display}),
-                    ]),
-                    html.Div()])
+            display_value = all_count_metrics.get(count_id, 0)
+            stored_ids    = _patient_ids_map.get(count_id, {"ids": [], "unique_col": ""})
 
-        metrics.append(metric) 
-    
+        if drill_down:
+            val_div = html.Div(
+                display_value,
+                id={"type": "kpi-val-click", "index": count_id},
+                n_clicks=0,
+                className="kpi-val",
+                style={"cursor": "pointer" if stored_ids.get("ids") else "default"},
+            )
+        else:
+            val_div = html.Div(
+                display_value,
+                className="kpi-val",
+            )
+
+        metric = html.Div(
+            className=f"mnid-kpi {flag}",
+            children=[
+                dcc.Store(
+                    id={"type": "kpi-patient-ids", "index": count_id},
+                    data=stored_ids,
+                ),
+                html.Div(
+                    style={"display": "flex", "justifyContent": "space-between",
+                           "alignItems": "flex-start", "gap": "6px"},
+                    children=[
+                        html.Div([
+                            html.Div(count_config["name"], className="kpi-lbl"),
+                            val_div,
+                            # html.Div(
+                            #     html.A(count_config.get("href_name") or "", href=href),
+                            #     className="kpi-sub",
+                            # ),
+                        ]),
+                    ],
+                ),
+                html.Div(),
+            ],
+        )
+        metrics.append(metric)
+
     return metrics
 
 def parse_filter_value(filter_val):
