@@ -11,8 +11,10 @@ import pandas as pd
 
 
 SEED = 20260530
-SOURCE_DIR = os.path.join("data", "parquet")
-OUTPUT_DIR = "demo_parquet"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(SCRIPT_DIR)
+SOURCE_DIR = os.path.join(BASE_DIR, "data", "parquet")
+OUTPUT_DIR = os.path.join(BASE_DIR, "demo_parquet")
 START_DATE = "2026-04-15"
 END_DATE = "2026-05-30"
 

@@ -6,7 +6,9 @@ from pathlib import Path
 import pandas as pd
 
 
-TARGET_FILE = Path("demo_parquet") / "data_202606.parquet"
+SCRIPT_DIR = Path(__file__).parent.absolute()
+BASE_DIR = SCRIPT_DIR.parent
+TARGET_FILE = BASE_DIR / "demo_parquet" / "data_202606.parquet"
 
 
 @dataclass
