@@ -22,8 +22,8 @@ _LOG = logging.getLogger(__name__)
 _DEFAULT_VIZ_DIR = os.path.join('data', 'visualizations')
 _DEFAULT_OUT_DIR = os.path.join('data', 'mnid_aggregates')
 
-_GRAINS = ['monthly', 'weekly', 'daily']
-_GRAIN_CODES = {'daily': 'D', 'weekly': 'W', 'monthly': 'M'}
+_GRAINS = ['monthly', 'weekly', 'daily', 'quarterly', 'yearly']
+_GRAIN_CODES = {'daily': 'D', 'weekly': 'W', 'monthly': 'M', 'quarterly': 'Q', 'yearly': 'Y'}
 
 
 def _load_all_indicators(viz_dir: str) -> list[dict]:
@@ -63,7 +63,7 @@ def _load_all_indicators(viz_dir: str) -> list[dict]:
     # Add program-based indicators (ANC, Labour, PNC, Newborn) defined in
     # mnid/indicators.py — these are Python-only and have no JSON counterpart.
     try:
-        from mnid.indicators import (
+        from mnid.core.indicators import (
             _program_based_priority_indicators,
             _program_based_overlay_fallbacks,
         )
@@ -91,7 +91,7 @@ def _aggregate_grain(prepared_df: pd.DataFrame, indicators: list[dict], grain: s
     cell) and groups by (facility, period) in a single pass, instead of calling _cov
     once for every facility/period/indicator combination.
     """
-    from mnid.chart_helpers import _grouped_filter_counts
+    from mnid.charts.chart_helpers import _grouped_filter_counts
 
     if prepared_df.empty or 'Date' not in prepared_df.columns:
         return pd.DataFrame()
@@ -164,7 +164,7 @@ def run_aggregation(
     Loads data from the same source as the live app (DATA_FILE_NAME_ in config).
     Typically called overnight after data_storage.py refreshes the parquet files.
     """
-    from mnid.data_utils import prepare_mnid_dataframe as _prepare
+    from mnid.core.data_utils import prepare_mnid_dataframe as _prepare
     from config import DATA_FILE_NAME_
     from data_storage import DataStorage
 

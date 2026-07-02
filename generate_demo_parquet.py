@@ -109,6 +109,16 @@ def _sample_n(population: list, rate: float) -> set:
     return set(random.sample(population, min(n, len(population))))
 
 
+# mohupdate: map facility names to level (Primary/Secondary/Tertiary)
+def _infer_level(facility: str) -> str:
+    name = facility.strip()
+    if 'Central Hospital' in name:
+        return 'Tertiary'
+    if 'District Hospital' in name:
+        return 'Secondary'
+    return 'Primary'
+
+
 def _make_row(
     pid, enc_id, date_str, program, service_area, facility, fac_code,
     district, encounter, new_revisit, age, gender,
@@ -123,6 +133,7 @@ def _make_row(
         "Facility": facility,
         "Facility_CODE": fac_code,
         "District": district,
+        "Facility_Type": _infer_level(facility),
         "Encounter": encounter,
         "new_revisit": new_revisit,
         "Age": age,
@@ -170,6 +181,7 @@ def _obs(template: dict, concept: str, obs_coded=None, value_n=None, encounter: 
 # indicator converge on ~28-31%). Each facility gets a small jitter applied uniformly
 # across all of these, so the *ranking* of indicators stays stable per facility while
 # the absolute numbers still vary facility-to-facility.
+# mohupdate: per-indicator coverage rates — ANC new concepts added for MOH dashboard
 RATES = {
     "anemia": 0.82, "hiv_test": 0.55, "bp": 0.42, "syphilis": 0.24, "urine": 0.91,
     "ga": 0.68, "tetanus": 0.50, "preg_planned": 0.36, "danger_signs": 0.78,
@@ -179,6 +191,11 @@ RATES = {
     "bcg": 0.70, "hiv_pos": 0.18, "lbw": 0.32,
     "nb_core": 0.80, "ikmc": 0.62, "resus": 0.40, "thermal_ok": 0.86,
     "vitk_nb": 0.90, "eligible_resus_given": 0.48,
+    # mohupdate: ANC MOH dashboard rates
+    "hepatitis_b": 0.45, "sp_3plus": 0.35, "mms_180": 0.25,
+    "fefo_120": 0.55, "itn": 0.50, "uterine_scar": 0.08,
+    "first_trimester": 0.40, "hiv_positive_rate": 0.12, "hiv_art_coverage": 0.85,
+    "tdv_2plus": 0.55,
 }
 
 
@@ -282,6 +299,9 @@ for district, facilities in DISTRICTS.items():
             anc_sets = {key: _sample_n(anc_pids, _r(key, fac_jitter)) for key in [
                 "anemia", "hiv_test", "bp", "syphilis", "urine", "ga", "tetanus",
                 "preg_planned", "danger_signs",
+                # mohupdate: new MOH dashboard ANC concepts
+                "hepatitis_b", "sp_3plus", "mms_180", "fefo_120", "itn",
+                "uterine_scar", "first_trimester", "tdv_2plus",
             ]}
 
             for pid in anc_pids:
@@ -299,8 +319,7 @@ for district, facilities in DISTRICTS.items():
 
                 if pid in anc_sets["anemia"]:
                     _obs(tmpl, "Anemia screening", "Yes")
-                if pid in anc_sets["hiv_test"]:
-                    _obs(tmpl, "HIV Test", "Negative")
+                # mohupdate: HIV Test now generated below with positive/negative split
                 if pid in anc_sets["bp"]:
                     _obs(tmpl, "Systolic blood pressure", value_n=float(random.randint(100, 140)))
                     _obs(tmpl, "Diastolic blood pressure", value_n=float(random.randint(60, 90)))
@@ -316,6 +335,32 @@ for district, facilities in DISTRICTS.items():
                     _obs(tmpl, "Pregnancy planned", "Yes")
                 if pid in anc_sets["danger_signs"]:
                     _obs(tmpl, "Danger signs present", "Yes")
+
+                # mohupdate: new ANC MOH dashboard concept observations
+                if pid in anc_sets["hepatitis_b"]:
+                    _obs(tmpl, "Hepatitis B Status", "Negative")
+                if pid in anc_sets["sp_3plus"]:
+                    _obs(tmpl, "SP doses", "3 doses")
+                if pid in anc_sets["mms_180"]:
+                    _obs(tmpl, "MMS tablets", value_n=180.0)
+                if pid in anc_sets["fefo_120"]:
+                    _obs(tmpl, "FeFo tablets", value_n=130.0)
+                if pid in anc_sets["itn"]:
+                    _obs(tmpl, "ITN given", "Yes")
+                if pid in anc_sets["uterine_scar"]:
+                    _obs(tmpl, "Previous uterine scars", "Yes")
+                if pid in anc_sets["tdv_2plus"]:
+                    _obs(tmpl, "Number of tetanus doses", "two doses")
+                # mohupdate: assign HIV+ status and ART to a subset of HIV-tested clients
+                if pid in anc_sets["hiv_test"]:
+                    hiv_positive = random.random() < _r("hiv_positive_rate", fac_jitter)
+                    _obs(tmpl, "HIV Test", "Positive" if hiv_positive else "Negative")
+                    if hiv_positive:
+                        on_art = random.random() < _r("hiv_art_coverage", fac_jitter)
+                        _obs(tmpl, "ART started", "Yes" if on_art else "No")
+                # mohupdate: assign first-trimester timing to a subset
+                if pid in anc_sets["first_trimester"]:
+                    _obs(tmpl, "Gestation in weeks", value_n=float(random.randint(6, 12)))
 
             # ── Labour ───────────────────────────────────────────────────────
             lab_pids = [_next_id() for _ in range(_scaled_count(10, 18, scenario["labour_volume"]))]
@@ -369,7 +414,13 @@ for district, facilities in DISTRICTS.items():
                     k=1,
                 )[0]
 
-                _obs(tmpl, "Place of delivery", "This facility")
+                # ~12% of deliveries are outborn (born outside this facility)
+                _delivery_location = (
+                    "This facility"
+                    if random.random() > 0.12
+                    else random.choice(["Home", "Referral facility", "Community"])
+                )
+                _obs(tmpl, "Place of delivery", _delivery_location)
                 _obs(tmpl, "Outcome of the delivery", outcome)
                 _obs(tmpl, "Obstetric complications", obstetric_comp)
                 _obs(tmpl, "Newborn baby complications", newborn_comp)
@@ -404,6 +455,37 @@ for district, facilities in DISTRICTS.items():
                         "Caesarean section" if pid in caesarean_num else "Normal vaginal delivery",
                     )
 
+                # mohupdate: Labour MOH dashboard demo observations
+                _obs(tmpl, "Skilled birth attendant", "Yes" if random.random() < 0.88 else "No")
+                if random.random() < 0.35:
+                    hiv_pos = random.random() < 0.10
+                    _obs(tmpl, "HIV Test", "Positive" if hiv_pos else "Negative")
+                    if hiv_pos:
+                        _obs(tmpl, "ART started", "Yes" if random.random() < 0.85 else "No")
+                if random.random() < 0.15:
+                    _obs(tmpl, "Referred to another facility", "Yes")
+                    _obs(tmpl, "Referral reason", random.choice(["PPH", "Eclampsia", "Obstructed labour", "Sepsis"]))
+                if random.random() < scenario["maternal_death"]:
+                    _obs(tmpl, "Maternal death", "Yes")
+                    _obs(tmpl, "Maternal death cause", random.choice(["PPH", "Sepsis", "Eclampsia", "Obstructed labour"]))
+                if pid in num_lab and random.random() < 0.60:
+                    _obs(tmpl, "ARV prophylaxis given to baby", "Yes" if random.random() < 0.30 else "No")
+
+                # mohupdate: CEmONC signal function demo observations
+                if random.random() < 0.75:
+                    _obs(tmpl, "Parenteral antibiotics given", "Yes")
+                if random.random() < 0.05:
+                    _obs(tmpl, "Manual removal of placenta", "Yes")
+                if random.random() < 0.03:
+                    _obs(tmpl, "Manual vacuum aspiration", "Yes")
+                if pid in mod_denom and random.random() < 0.04:
+                    if random.random() < 0.50:
+                        _obs(tmpl, "Mode of delivery", "Assisted vaginal delivery")
+                if random.random() < 0.50:
+                    _obs(tmpl, "Neonatal resuscitation provided", "Yes")
+                if random.random() < 0.04:
+                    _obs(tmpl, "Blood transfusion given", "Yes")
+
                 if pid in mgmt_denom:
                     _obs(
                         tmpl, "Management given to newborn",
@@ -428,6 +510,12 @@ for district, facilities in DISTRICTS.items():
             hiv_pos = _sample_n(list(hiv_denom), _r("hiv_pos", fac_jitter))
             prematurity_denom = _sample_n(pnc_pids, 0.50)
             lbw_num = _sample_n(list(prematurity_denom), _r("lbw", fac_jitter))
+            fp_denom = _sample_n(pnc_pids, 0.50)
+            fp_num = _sample_n(list(fp_denom), 0.35)
+            check_7days_num = _sample_n(pnc_pids, 0.40)
+            check_6weeks_num = _sample_n(pnc_pids, 0.20)
+            ebf_num = _sample_n(pnc_pids, 0.55)
+            admitted_denom = _sample_n(pnc_pids, 0.70)
 
             for pid in pnc_pids:
                 enc_id = _next_id()
@@ -449,11 +537,36 @@ for district, facilities in DISTRICTS.items():
                 if pid in baby_denom:
                     _obs(tmpl, "Status of baby", "Alive" if pid in baby_alive else "Deceased")
                 if pid in immun_denom:
-                    _obs(tmpl, "Immunisation given", "BCG" if pid in bcg_num else "OPV")
+                    imm_val = "BCG" if pid in bcg_num else random.choice(["OPV", "Polio 0"])
+                    _obs(tmpl, "Immunisation given", imm_val)
                 if pid in hiv_denom:
                     _obs(tmpl, "Mother HIV Status", "Positive" if pid in hiv_pos else "Negative")
                 if pid in prematurity_denom:
-                    _obs(tmpl, "Prematurity/Kangaroo", "Low birth weight" if pid in lbw_num else "Normal weight")
+                    is_lbw = pid in lbw_num
+                    _obs(tmpl, "Prematurity/Kangaroo", "Low birth weight" if is_lbw else "Normal weight")
+                    if is_lbw and random.random() < 0.30:
+                        _obs(tmpl, "Management given to newborn", "KMC")
+
+                # mohupdate: PNC MOH demo observations
+                if pid in admitted_denom:
+                    _obs(tmpl, "Admission status", "Admitted")
+                    _obs(tmpl, "Baby admission", "Admitted")
+                if pid in num_pnc and random.random() < 0.12:
+                    _obs(tmpl, "Postnatal complications", random.choice(["PPH", "Infection", "Wound sepsis"]))
+                if pid in num_pnc and random.random() < 0.08:
+                    _obs(tmpl, "Newborn baby complications", random.choice(["Sepsis", "Jaundice", "Birth asphyxia"]))
+                if pid in hiv_pos and random.random() < 0.50:
+                    _obs(tmpl, "HIV exposed baby", "Yes")
+                    if random.random() < 0.80:
+                        _obs(tmpl, "ARV prophylaxis given to baby", "Yes")
+                if pid in check_7days_num:
+                    _obs(tmpl, "Postnatal check period", "Within 7 days")
+                if pid in check_6weeks_num:
+                    _obs(tmpl, "Postnatal check period", "At 6 weeks")
+                if pid in fp_num:
+                    _obs(tmpl, "Family planning counselling", "Yes")
+                if pid in ebf_num:
+                    _obs(tmpl, "Exclusive breastfeeding counselling", "Yes")
 
             # ── Newborn ───────────────────────────────────────────────────────
             nb_pids = [_next_id() for _ in range(_scaled_count(5, 11, scenario["newborn_volume"]))]
@@ -543,7 +656,7 @@ df["Date"] = pd.to_datetime(df["Date"])
 # Force string columns so parquet stores them as utf-8, not Int32/null
 STR_COLS = [
     "person_id", "encounter_id", "Program", "Service_Area", "Facility",
-    "Facility_CODE", "District", "Encounter", "new_revisit", "Gender",
+    "Facility_CODE", "District", "Facility_Type", "Encounter", "new_revisit", "Gender",
     "Home_district", "TA", "Village", "concept_name", "obs_value_coded",
     "Value", "DrugName", "Value_name", "Order_Name", "person_id_key",
     "months", "User", "Reporting_Program", "Source_Program", "",

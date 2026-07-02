@@ -13,7 +13,7 @@ from dash import html, dcc
 from helpers.helpers import create_count_from_config
 from helpers.visualizations import _apply_filter
 from config import DATE_ as _DATE_COL
-from mnid.constants import (
+from mnid.core.constants import (
     OK_C, WARN_C, DANGER_C, INFO_C, MUTED, GRID_C, BG, BORDER, TEXT, DIM, FONT,
     CAT_PALETTES, FACILITY_NAMES as _FACILITY_NAMES,
 )
@@ -227,7 +227,13 @@ _CLR = {'ok': OK_C, 'warn': WARN_C, 'danger': DANGER_C, 'info': INFO_C}
 def _display_pct(pct):
     if pct is None:
         return None
-    return max(0.0, min(float(pct), 100.0))
+    try:
+        v = float(pct)
+    except (TypeError, ValueError):
+        return None
+    if v != v:  # NaN check (NaN != NaN is True)
+        return None
+    return max(0.0, min(v, 100.0))
 
 
 def _axis_wrap(label: str, width: int = 14, max_lines: int = 3) -> str:
