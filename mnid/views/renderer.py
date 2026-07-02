@@ -562,6 +562,7 @@ def render_mnid_dashboard(
                                 for item in mnh_tab_specs
                             ],
                         ),
+
                         html.Div(
                             id='mnid-beginnings-panel',
                             children=[executive_content['beginnings-shell']],
@@ -650,6 +651,9 @@ def _render_mnh_dashboard_tab(active_tab, executive_token):
             {'display': 'none'},
             {},
         )
+
+
+
 
 
 @callback(

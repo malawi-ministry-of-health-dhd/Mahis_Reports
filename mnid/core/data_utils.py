@@ -685,6 +685,156 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
         _ctx_series('mnid_labour_vit_k').eq('Yes')
         | _ctx_series('mnid_newborn_vit_k').eq('Yes')
     ).map({True: 'Yes', False: ''})
+    # mohupdate: new ANC MOH dashboard flags
+    _assign_flag(
+        'mnid_anc_hiv_positive',
+        anc_mask & _cp_hiv & combined_lower.isin(['positive', 'reactive']),
+    )
+    _assign_flag(
+        'mnid_anc_hiv_on_art',
+        anc_mask & concept_lower.str.contains('art started', na=False) & combined_lower.eq('yes'),
+    )
+    _assign_flag(
+        'mnid_anc_hepatitis_b_tested',
+        anc_mask & concept_lower.str.contains('hepatitis b', na=False) & ~combined_lower.isin(['', 'not done']),
+    )
+    _assign_flag(
+        'mnid_anc_previous_uterine_scar',
+        anc_mask & concept_lower.str.contains('previous uterine scar', na=False) & combined_lower.eq('yes'),
+    )
+    _assign_flag(
+        'mnid_anc_sp_3plus',
+        anc_mask & concept_lower.str.contains('sp doses', na=False) & combined_lower.str.contains(r'3|4|5|\+', na=False),
+    )
+    _assign_flag(
+        'mnid_anc_mms_180plus',
+        anc_mask & concept_lower.str.contains('mms', na=False) & (value_n >= 180),
+    )
+    _assign_flag(
+        'mnid_anc_fefo_120plus',
+        anc_mask & concept_lower.str.contains('fefo|fe fo|iron', na=False) & (value_n >= 120),
+    )
+    _assign_flag(
+        'mnid_anc_itn_given',
+        anc_mask & concept_lower.str.contains('itn|bed net', na=False) & combined_lower.eq('yes'),
+    )
+    _assign_flag(
+        'mnid_anc_first_trimester',
+        anc_mask & concept_lower.str.contains('gestation in weeks', na=False) & (value_n <= 12),
+    )
+    _assign_flag(
+        'mnid_anc_tdv_2plus',
+        anc_mask & concept_lower.str.contains('number of tetanus doses', na=False) & combined_lower.str.contains(r'two|three|four|2|3|4', na=False),
+    )
+
+    # mohupdate: Labour MOH dashboard flags
+    _assign_flag(
+        'mnid_labour_home_birth',
+        labour_mask & concept.eq('Place of delivery') & combined_lower.isin(['home', 'community', 'referral facility']),
+    )
+    _assign_flag(
+        'mnid_labour_facility_birth',
+        labour_mask & concept.eq('Place of delivery') & combined_lower.eq('this facility'),
+    )
+    _assign_flag(
+        'mnid_labour_fresh_stillbirth',
+        labour_mask & concept.eq('Outcome of the delivery') & combined_lower.eq('fresh still birth'),
+    )
+    _assign_flag(
+        'mnid_labour_macerated_stillbirth',
+        labour_mask & concept.eq('Outcome of the delivery') & combined_lower.eq('macerated still birth'),
+    )
+    _assign_flag(
+        'mnid_labour_live_birth',
+        labour_mask & concept.eq('Outcome of the delivery') & combined_lower.eq('live birth'),
+    )
+    _assign_flag(
+        'mnid_labour_normal_delivery',
+        labour_mask & concept.eq('Mode of delivery') & combined_lower.eq('normal vaginal delivery'),
+    )
+    _assign_flag(
+        'mnid_labour_maternal_death',
+        labour_mask & concept.eq('Maternal death') & combined_lower.eq('yes'),
+    )
+    _assign_flag(
+        'mnid_labour_maternal_death_pph',
+        labour_mask & concept.eq('Maternal death cause') & combined_lower.eq('pph'),
+    )
+    _assign_flag(
+        'mnid_labour_maternal_death_sepsis',
+        labour_mask & concept.eq('Maternal death cause') & combined_lower.eq('sepsis'),
+    )
+    _assign_flag(
+        'mnid_labour_maternal_death_eclampsia',
+        labour_mask & concept.eq('Maternal death cause') & combined_lower.eq('eclampsia'),
+    )
+    _assign_flag(
+        'mnid_labour_maternal_death_obstructed',
+        labour_mask & concept.eq('Maternal death cause') & combined_lower.eq('obstructed labour'),
+    )
+    _assign_flag(
+        'mnid_labour_hiv_positive',
+        labour_mask & concept.eq('HIV Test') & combined_lower.isin(['positive', 'reactive']),
+    )
+    _assign_flag(
+        'mnid_labour_hiv_on_art',
+        labour_mask & concept_lower.str.contains('art started', na=False) & combined_lower.eq('yes'),
+    )
+    _assign_flag(
+        'mnid_newborn_arv_prophylaxis',
+        labour_like_mask & concept_lower.str.contains('arv prophylaxis given', na=False) & combined_lower.eq('yes'),
+    )
+    _assign_flag(
+        'mnid_labour_referred_out',
+        labour_mask & concept.eq('Referred to another facility') & combined_lower.eq('yes'),
+    )
+    _assign_flag(
+        'mnid_labour_referral_pph',
+        labour_mask & concept.eq('Referral reason') & combined_lower.eq('pph'),
+    )
+    _assign_flag(
+        'mnid_labour_referral_eclampsia',
+        labour_mask & concept.eq('Referral reason') & combined_lower.eq('eclampsia'),
+    )
+    _assign_flag(
+        'mnid_labour_referral_obstructed',
+        labour_mask & concept.eq('Referral reason') & combined_lower.eq('obstructed labour'),
+    )
+    _assign_flag(
+        'mnid_labour_referral_sepsis',
+        labour_mask & concept.eq('Referral reason') & combined_lower.eq('sepsis'),
+    )
+    _assign_flag(
+        'mnid_labour_skilled_attendant',
+        labour_mask & concept.eq('Skilled birth attendant') & combined_lower.eq('yes'),
+    )
+
+    # mohupdate: CEmONC signal function flags
+    _assign_flag(
+        'mnid_labour_signal_antibiotics',
+        labour_like_mask & concept.eq('Parenteral antibiotics given') & combined_lower.eq('yes'),
+    )
+    _assign_flag(
+        'mnid_labour_signal_manual_placenta',
+        labour_mask & concept.eq('Manual removal of placenta') & combined_lower.eq('yes'),
+    )
+    _assign_flag(
+        'mnid_labour_signal_mva',
+        labour_mask & concept.eq('Manual vacuum aspiration') & combined_lower.eq('yes'),
+    )
+    _assign_flag(
+        'mnid_labour_signal_assisted_delivery',
+        labour_mask & concept.eq('Mode of delivery') & combined_lower.eq('assisted vaginal delivery'),
+    )
+    _assign_flag(
+        'mnid_labour_signal_resuscitation',
+        labour_like_mask & concept.eq('Neonatal resuscitation provided') & combined_lower.isin(['yes', 'bag and mask', 'stimulation only', 'suctioning', 'oxygen']),
+    )
+    _assign_flag(
+        'mnid_labour_signal_blood_transfusion',
+        labour_mask & concept.eq('Blood transfusion given') & combined_lower.eq('yes'),
+    )
+
     _assign_flag(
         'mnid_anc_complication',
         anc_mask & _cp_obs_complications & ~combined_lower.isin(['', 'no', 'none', 'negative', 'unknown']),
@@ -702,6 +852,58 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
     _assign_flag(
         'mnid_pnc_newborn_death',
         pnc_mask & concept.eq('Status of baby') & combined_lower.isin(['death', 'died', 'dead', 'deceased']),
+    )
+    # mohupdate: PNC MOH dashboard flags
+    _assign_flag(
+        'mnid_pnc_mother_admitted',
+        pnc_mask & concept.eq('Admission status') & combined_lower.eq('admitted'),
+    )
+    _assign_flag(
+        'mnid_pnc_baby_admitted',
+        pnc_mask & concept.eq('Baby admission') & combined_lower.eq('admitted'),
+    )
+    _assign_flag(
+        'mnid_pnc_check_7days',
+        pnc_mask & concept.eq('Postnatal check period') & combined_lower.eq('within 7 days'),
+    )
+    _assign_flag(
+        'mnid_pnc_check_6weeks',
+        pnc_mask & concept.eq('Postnatal check period') & combined_lower.eq('at 6 weeks'),
+    )
+    _assign_flag(
+        'mnid_pnc_family_planning',
+        pnc_mask & concept_lower.str.contains('family planning', na=False) & combined_lower.eq('yes'),
+    )
+    _assign_flag(
+        'mnid_pnc_hiv_exposed_baby',
+        pnc_mask & concept.eq('HIV exposed baby') & combined_lower.eq('yes'),
+    )
+    _assign_flag(
+        'mnid_pnc_art_prophylaxis_baby',
+        pnc_mask & concept_lower.str.contains('arv prophylaxis', na=False) & combined_lower.eq('yes'),
+    )
+    _assign_flag(
+        'mnid_pnc_bcg',
+        pnc_mask & concept.eq('Immunisation given') & combined_lower.eq('bcg'),
+    )
+    _assign_flag(
+        'mnid_pnc_polio_0',
+        pnc_mask & (concept.eq('Immunisation given') & combined_lower.isin(['polio 0', 'opv'])),
+    )
+    _assign_flag(
+        'mnid_pnc_exclusive_breastfeeding',
+        pnc_mask & concept_lower.str.contains('exclusive breastfeeding', na=False) & combined_lower.eq('yes'),
+    )
+    _assign_flag(
+        'mnid_pnc_underweight',
+        pnc_mask & concept.eq('Prematurity/Kangaroo') & combined_lower.eq('low birth weight'),
+    )
+    _assign_flag(
+        'mnid_pnc_kmc',
+        pnc_mask & (
+            (concept.eq('Management given to newborn') & combined_lower.isin(['kmc', 'kangaroo mother care']))
+            | (concept.eq('Prematurity/Kangaroo') & combined_lower.isin(['kmc', 'kangaroo mother care']))
+        ),
     )
     _assign_flag('mnid_newborn_status_recorded', newborn_mask & concept.eq('Status of baby'))
     _assign_flag(
@@ -729,6 +931,10 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
         _ctx_series('mnid_newborn_birth_asphyxia').eq('Yes')
         | _ctx_series('mnid_newborn_sepsis').eq('Yes')
         | _ctx_series('mnid_newborn_jaundice').eq('Yes')
+    ).map({True: 'Yes', False: ''})
+    person_ctx['mnid_pnc_kmc_for_lbw'] = (
+        _ctx_series('mnid_pnc_underweight').eq('Yes')
+        & (_ctx_series('mnid_newborn_kmc').eq('Yes') | _ctx_series('mnid_pnc_kmc').eq('Yes'))
     ).map({True: 'Yes', False: ''})
 
     # Pulls birth weight in one vectorized pass instead of looping row by row and
@@ -930,6 +1136,13 @@ def _normalize_mnid_semantics(df: pd.DataFrame) -> pd.DataFrame:
         mapped_enc = out['Service_Area'].map(_ENCOUNTER_LABEL_MAP)
         out['Encounter'] = mapped_enc.where(mapped_enc.notna(), out['Encounter'])
 
+    # mohupdate: derive Facility_Type from facility name if column is missing
+    if 'Facility_Type' not in out.columns and 'Facility' in out.columns:
+        fac_upper = out['Facility'].fillna('').astype(str).str.upper()
+        out['Facility_Type'] = 'Primary'
+        out.loc[fac_upper.str.contains('CENTRAL HOSPITAL', na=False), 'Facility_Type'] = 'Tertiary'
+        out.loc[fac_upper.str.contains('DISTRICT HOSPITAL', na=False), 'Facility_Type'] = 'Secondary'
+
     return _derive_person_level_context(out)
 
 
@@ -980,7 +1193,7 @@ _MCH_PROGRAMS = frozenset([
 ])
 _MNID_COLUMNS = [
     'person_id', 'encounter_id', 'Date', 'Program', 'Reporting_Program',
-    'Service_Area', 'Facility', 'Facility_CODE', 'District', 'Encounter',
+    'Service_Area', 'Facility', 'Facility_CODE', 'Facility_Type', 'District', 'Encounter',
     'obs_value_coded', 'concept_name', 'Value', 'ValueN', 'new_revisit',
     'Home_district', 'TA', 'Village', 'Age', 'Age_Group', 'Gender',
     'Source_Program',
