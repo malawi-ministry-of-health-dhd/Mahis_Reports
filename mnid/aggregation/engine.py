@@ -23,6 +23,7 @@ _DEFAULT_VIZ_DIR = os.path.join('data', 'visualizations')
 _DEFAULT_OUT_DIR = os.path.join('data', 'mnid_aggregates')
 
 _GRAINS = ['monthly', 'weekly', 'daily', 'quarterly', 'yearly']
+_DEMO_GRAINS = ['monthly', 'weekly', 'quarterly', 'yearly']
 _GRAIN_CODES = {'daily': 'D', 'weekly': 'W', 'monthly': 'M', 'quarterly': 'Q', 'yearly': 'Y'}
 
 
@@ -235,7 +236,10 @@ def run_aggregation(
     if not indicators:
         _LOG.warning('No indicators found in %s, nothing to aggregate', viz_dir)
         return False
-    active_grains = grains if grains is not None else _GRAINS
+    if grains is not None:
+        active_grains = grains
+    else:
+        active_grains = _DEMO_GRAINS if DATA_FILE_NAME_ == 'demo_parquet' else _GRAINS
     _LOG.info('Aggregating %d indicators across grains: %s', len(indicators), active_grains)
 
     parts = []
@@ -256,7 +260,7 @@ def run_aggregation(
         'elapsed_sec':     round(elapsed, 1),
         'rows':            len(agg_df),
         'indicators':      len(indicators),
-        'grains':          _GRAINS,
+        'grains':          active_grains,
         'data_source':     DATA_FILE_NAME_,
         'use_demo_data':   bool(DATA_FILE_NAME_ == 'demo_parquet'),
         'last_run_status': 'ok',
