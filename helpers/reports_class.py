@@ -5,11 +5,13 @@ from helpers.visualizations import create_sum, create_count, create_count_sets
 from helpers.dhis_integrater import get_dhis_data
 import dash
 import duckdb
+import os
 from datetime import datetime
 from dash import html, dcc, dash_table
 from config import (DATE_,CONCEPT_NAME_,
                     ENCOUNTER_ID_,PERSON_ID_,VALUE_NUMERIC_,VALUE_DATETIME_,FACILITY_CODE_,
                     DHIS2_URL, actual_keys_in_data)
+
 
 
 class ReportTableBuilder:
@@ -31,6 +33,7 @@ class ReportTableBuilder:
         self.location = location
         self.data_route = data_route
         self.report_design = report_design
+        self.facilities_path = os.path.join(os.getcwd(), data_route.replace("/parquet",""),'single_tables', 'locations_data.csv')
 
 
     def load_spec(self) -> None:
@@ -43,6 +46,8 @@ class ReportTableBuilder:
         self.filters_df = self.filters_df.fillna("")
         self.report_name = pd.read_excel(xls, sheet_name="REPORT_NAME", engine="openpyxl")
         self.report_name.columns = [str(c).strip() for c in self.report_name.columns]
+        self.facilities = pd.read_csv(self.facilities_path)
+        self.location_name = self.facilities.set_index('location_id')['name'].to_dict().get(int(self.location), "")
         self._build_filters_map()
 
     def _build_filters_map(self) -> None:
@@ -479,6 +484,8 @@ class ReportTableBuilder:
                         style={"margin": "0", "color": "#000000",
                                "fontSize": "15px", "fontWeight": "700",
                                "letterSpacing": "0.5px"}),
+                html.Div(f"{self.location_name}", style={"textAlign":"center"}),
+                html.Div(f"{self.start_date} to {self.end_date}", style={"textAlign":"center"})
             ],
         )
         table_els: List[Any] = []
@@ -730,11 +737,13 @@ class ReportTableBuilder:
                         style={"margin": "0 0 4px", "color": "#000000",
                                "fontSize": "15px", "fontWeight": "700",
                                "letterSpacing": "0.5px"}),
-                html.Span(
-                    f"{'Landscape' if is_landscape else 'Portrait'}  ·  "
-                    f"{num_page_columns}-column layout",
-                    style={"fontSize": "11px", "color": "#6b7280"}
-                ),
+                html.Div(f"{self.location_name}", style={"textAlign":"center"}),
+                html.Div(f"{self.start_date} to {self.end_date}", style={"textAlign":"center"})
+                # html.Span(
+                #     f"{'Landscape' if is_landscape else 'Portrait'}  ·  "
+                #     f"{num_page_columns}-column layout",
+                #     style={"fontSize": "11px", "color": "#6b7280"}
+                # ),
             ],
         )
 

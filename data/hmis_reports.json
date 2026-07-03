@@ -464,962 +464,13 @@
       "programs": [
         "OPD Program"
       ],
-      "date_updated": "2026-04-21",
+      "date_updated": "2026-07-03 16:48:06",
       "updated_by": "admin",
       "page_name": "malaria_report",
       "archived": "False",
       "design": {
-        "tables": [
-          {
-            "id": "t1",
-            "pos": {
-              "x": 20,
-              "y": 20
-            },
-            "ta": "",
-            "tb": null,
-            "data": [
-              [
-                {
-                  "v": "OUTPATIENT DEPARTMENT",
-                  "fill": "#e5e7eb",
-                  "color": "#374151",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": true
-                },
-                {
-                  "v": "UNDER 5",
-                  "fill": "#e5e7eb",
-                  "color": "#374151",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": true,
-                  "align": "center"
-                },
-                {
-                  "v": "OVER 5",
-                  "fill": "#e5e7eb",
-                  "color": "#374151",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": true,
-                  "align": "center"
-                }
-              ],
-              [
-                {
-                  "v": "A: Confirmed (Co) Malaria Cases",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "malaria_confirmed_under5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "malaria_confirmed_over5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                }
-              ],
-              [
-                {
-                  "v": "B: Presumed (Pr) Malaria Cases (Clinically Diagnosed)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "malaria_presumed_under5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "malaria_presumed_over5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                }
-              ],
-              [
-                {
-                  "v": "C: Confirmed malaria in pregnant women (c)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "malaria_pregnant_over5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                }
-              ],
-              [
-                {
-                  "v": "D: Presumed (clinically diagnosed) malaria in pregnant women (d)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "malaria_pregnant_presumed_over5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                }
-              ],
-              [
-                {
-                  "v": "Total OPD Malaria Cases (A+B+C+D)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "malaria_total_under5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "malaria_total_over5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                }
-              ],
-              [
-                {
-                  "v": "F: Total OPD Attendance: All causes (Including malaria cases)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "total_opd_under5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "total_opd_over5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                }
-              ],
-              [
-                {
-                  "v": "G: Confirmed malaria treatment failure (tf)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "malaria_tx_failure_under5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "malaria_tx_failure_over5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                }
-              ],
-              [
-                {
-                  "v": "H: Confirmed cases receiving first-line anti malarial medication (LA)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "confirmed_la_under5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "confirmed_la_over5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                }
-              ],
-              [
-                {
-                  "v": "I: Presumed malaria cases receiving first-line anti malarial medication(LA)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "malaria_presumed_la_under5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "malaria_presumed_la_over5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                }
-              ],
-              [
-                {
-                  "v": "J: Confirmed cases receiving second-line anti malarial medication (ASAQ)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "confirmed_asaq_under5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "confirmed_asaq_over5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                }
-              ],
-              [
-                {
-                  "v": "K: Presumed malaria cases receiving second-line anti malarial medication(ASAQ)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "malaria_presumed_asaq_under5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "malaria_presumed_asaq_over5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                }
-              ],
-              [
-                {
-                  "v": "L: Suspected malaria cases tested (mRDT)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "suspected_mrdt_under5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "suspected_mrdt_over5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                }
-              ],
-              [
-                {
-                  "v": "M: Positive malaria cases (mRDT)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "positive_mrdt_under5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "positive_mrdt_over5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                }
-              ],
-              [
-                {
-                  "v": "N: Suspected malaria cases tested (microscopy)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "suspected_micro_under5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "suspected_micro_over5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                }
-              ],
-              [
-                {
-                  "v": "O: Positive malaria cases (microscopy)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "positive_micro_under5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "positive_micro_over5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                }
-              ],
-              [
-                {
-                  "v": "Total suspected malaria cases (B+D+L+N)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "total_suspected_malaria_under5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "total_suspected_malaria_over5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                }
-              ]
-            ],
-            "col_widths": [
-              644,
-              187,
-              193
-            ],
-            "row_heights": [
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28
-            ]
-          },
-          {
-            "id": "t2",
-            "pos": {
-              "x": 20,
-              "y": 559
-            },
-            "ta": "",
-            "tb": null,
-            "data": [
-              [
-                {
-                  "v": "COMMODITIES USED",
-                  "fill": "#e5e7eb",
-                  "color": "#374151",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": true
-                },
-                {
-                  "v": "UNIT",
-                  "fill": "#e5e7eb",
-                  "color": "#374151",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": true,
-                  "align": "center"
-                },
-                {
-                  "v": "VALUE",
-                  "fill": "#f8f9fa",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": true,
-                  "italic": false,
-                  "align": "center",
-                  "indent": 0
-                }
-              ],
-              [
-                {
-                  "v": "LA 1X6",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "tab",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "commodity_la_1x6",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": false,
-                  "italic": false,
-                  "align": "center",
-                  "indent": 0
-                }
-              ],
-              [
-                {
-                  "v": "LA 2X6",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "tab",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "commodity_la_2x6",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": false,
-                  "italic": false,
-                  "align": "center",
-                  "indent": 0
-                }
-              ],
-              [
-                {
-                  "v": "LA 3X6",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "tab",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "commodity_la_3x6",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": false,
-                  "italic": false,
-                  "align": "center",
-                  "indent": 0
-                }
-              ],
-              [
-                {
-                  "v": "LA 4X6",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "tab",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "commodity_la_4x6",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": false,
-                  "italic": false,
-                  "align": "center",
-                  "indent": 0
-                }
-              ],
-              [
-                {
-                  "v": "ITN Distributed to Pregnant women",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "net",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "commodity_itn_pregnant",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": false,
-                  "italic": false,
-                  "align": "center",
-                  "indent": 0
-                }
-              ],
-              [
-                {
-                  "v": "ITN Distributed to Newborn babies",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "net",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "commodity_itn_newborn",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": false,
-                  "italic": false,
-                  "align": "center",
-                  "indent": 0
-                }
-              ],
-              [
-                {
-                  "v": "SP",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "tab",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "commodity_sp",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": false,
-                  "italic": false,
-                  "align": "center",
-                  "indent": 0
-                }
-              ],
-              [
-                {
-                  "v": "RDTs",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "tab",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "commodity_rdt",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": false,
-                  "italic": false,
-                  "align": "center",
-                  "indent": 0
-                }
-              ],
-              [
-                {
-                  "v": "ASAQ 25mg/67.5mg (3 tablets)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "tab",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "commodity_asaq_25mg",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": false,
-                  "italic": false,
-                  "align": "center",
-                  "indent": 0
-                }
-              ],
-              [
-                {
-                  "v": "ASAQ 50mg/135mg (3 tablets)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "tab",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "commodity_asaq_50mg",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": false,
-                  "italic": false,
-                  "align": "center",
-                  "indent": 0
-                }
-              ],
-              [
-                {
-                  "v": "ASAQ 100mg/270mg (3 tablets)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "tab",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "commodity_asaq_100mg_3",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": false,
-                  "italic": false,
-                  "align": "center",
-                  "indent": 0
-                }
-              ],
-              [
-                {
-                  "v": "ASAQ 100mg/270mg (6 tablets)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "tab",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "center"
-                },
-                {
-                  "v": "commodity_asaq_100mg_6",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": false,
-                  "italic": false,
-                  "align": "center",
-                  "indent": 0
-                }
-              ]
-            ],
-            "col_widths": [
-              650,
-              186,
-              190
-            ],
-            "row_heights": [
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28
-            ]
-          }
-        ],
-        "next_id": 3
+        "tables": [],
+        "next_id": 6
       }
     },
     {
@@ -1443,485 +494,12 @@
       "programs": [
         "OPD Program"
       ],
-      "date_updated": "2026-02-03",
+      "date_updated": "2026-07-02 12:41:25",
       "updated_by": "admin",
       "page_name": "idsr_monthly",
       "archived": "False",
       "design": {
-        "tables": [
-          {
-            "id": "t1",
-            "pos": {
-              "x": 10,
-              "y": 8
-            },
-            "ta": "Monthly Disease Surveillance Reporting Form",
-            "tb": null,
-            "data": [
-              [
-                {
-                  "v": "",
-                  "fill": "#e5e7eb",
-                  "color": "#374151",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "Out Patient Under 5",
-                  "fill": "#e5e7eb",
-                  "color": "#374151",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "Out Patient Over 5",
-                  "fill": "#e5e7eb",
-                  "color": "#374151",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "Out Patient Total",
-                  "fill": "#e5e7eb",
-                  "color": "#374151",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "Diarrhoea (Severe, With Dehydration)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "dia_seve_u5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "dia_seve_total",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "Food Borne Illness",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "foo_born_u5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "foo_born_o5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "foo_born_total",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "HIV (New Positives)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "hiv_new _u5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "hiv_new _o5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "hiv_new _total",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "Injuries (Road Traffic Accidents)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "inj_road_u5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "inj_road_o5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "inj_road_total",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "Malaria In Pregnancy",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "mal_in p_o5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "mal_in p_total",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "Acute Malnutrition",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "acu_maln_u5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "acu_maln_total",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "Chronic Malnutrition",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "chr_maln_u5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "chr_maln_total",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "Sexually Transimitted Infections",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "sex_tran_u5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "sex_tran_o5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "sex_tran_total",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "Leprosy",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "lep_lepr_u5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "lep-lepr_o5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "lep_lepr_total",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "Underweight Newborns < 2500 g",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "und_newb_u5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "und_newb_total",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "Viral Hepatitis",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "vir_hepa_u5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "vir_hepa_o5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "vir_hepa_total",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "Dog Bites",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "dog_bite_u5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "dog_bite_o5",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "dog_bite_total",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ]
-            ],
-            "col_widths": [
-              410,
-              234
-            ],
-            "row_heights": [
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28
-            ]
-          }
-        ],
+        "tables": [],
         "next_id": 2
       }
     },
@@ -1936,7 +514,7 @@
       "date_updated": "2025-12-18",
       "updated_by": "admin",
       "page_name": "skin_monthly_report",
-      "archived": "False"
+      "archived": "True"
     },
     {
       "report_id": 6,
@@ -1949,7 +527,7 @@
       "date_updated": "2025-12-18",
       "updated_by": "admin",
       "page_name": "eye_incomplete",
-      "archived": "False"
+      "archived": "True"
     },
     {
       "report_id": 7,
@@ -1962,7 +540,7 @@
       "date_updated": "2025-12-18",
       "updated_by": "admin",
       "page_name": "mental_health",
-      "archived": "False"
+      "archived": "True"
     },
     {
       "report_id": 8,
@@ -1979,13 +557,13 @@
     },
     {
       "report_id": 9,
-      "report_name": "HMIS 15 Monthly Report",
+      "report_name": "HMIS 15 MONTHLY HEALTH FACILITY REPORT",
       "date_created": "2026-02-03",
       "creator": "admin",
       "programs": [
         "OPD Program"
       ],
-      "date_updated": "2026-06-30 20:46:40",
+      "date_updated": "2026-07-02 17:57:40",
       "updated_by": "admin",
       "page_name": "hmis_15",
       "archived": "False",
@@ -2028,7 +606,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "maternal_trimester_one",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2046,7 +624,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "maternal_new_attendees",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2064,7 +642,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "maternal_anc_visits",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2082,7 +660,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "maternal_deliveries_ska",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2100,7 +678,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "maternal_obstetric_complications",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2118,7 +696,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "maternal_casarian",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2136,7 +714,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "maternal_livebirths",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2154,7 +732,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "maternal_birth_weight",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2172,7 +750,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "maternal_abortion_complication_treated",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2190,7 +768,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "maternal_eclampsia",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2208,7 +786,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "maternal_pph",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2226,7 +804,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "maternal_sepsis",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2244,7 +822,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "maternal_severe_ananaemia",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2262,7 +840,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "maternal_newborn_complications",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2280,7 +858,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "maternal_postpartum_2_weeks",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2309,14 +887,14 @@
               28,
               28,
               28,
-              28
+              30
             ]
           },
           {
             "id": "t2",
             "pos": {
               "x": 24,
-              "y": 514
+              "y": 516
             },
             "ta": "Family Planning",
             "tb": null,
@@ -2466,7 +1044,7 @@
             "id": "t3",
             "pos": {
               "x": 24,
-              "y": 756
+              "y": 758
             },
             "ta": "Child Health",
             "tb": null,
@@ -2499,7 +1077,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "child_health_fully_immuized_u1",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2517,7 +1095,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "child_health_BCG_u1",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2535,7 +1113,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "child_health_Penta3_u1",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2553,7 +1131,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "child_health_Polio_u1",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2571,7 +1149,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "child_health_Measles_u1",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2589,7 +1167,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "child_health_VitA_u5",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2607,7 +1185,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "child_health_underweight_u5",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2635,7 +1213,7 @@
             "id": "t4",
             "pos": {
               "x": 24,
-              "y": 1026
+              "y": 1028
             },
             "ta": "Attendance",
             "tb": null,
@@ -2668,7 +1246,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "attendance_hct",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2686,7 +1264,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "attendance_tested_Positive",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2704,7 +1282,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "attendance_ART_treatment",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2722,7 +1300,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "attendance_pregnant_women_HCT",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2740,7 +1318,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "attendance_pregnant_tested_Positive",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2758,7 +1336,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "attendance_PMTCT",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2776,7 +1354,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "attendance_underfive_clinic",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -2823,7 +1401,7 @@
             "id": "t5",
             "pos": {
               "x": 24,
-              "y": 1324
+              "y": 1326
             },
             "ta": "Tuberculosis",
             "tb": null,
@@ -2916,7 +1494,7 @@
             "id": "t6",
             "pos": {
               "x": 24,
-              "y": 1482
+              "y": 1484
             },
             "ta": "Supplies",
             "tb": null,
@@ -3066,7 +1644,7 @@
             "id": "t7",
             "pos": {
               "x": 24,
-              "y": 1724
+              "y": 1726
             },
             "ta": "Community Health Activities",
             "tb": null,
@@ -3159,7 +1737,7 @@
             "id": "t8",
             "pos": {
               "x": 24,
-              "y": 1882
+              "y": 1884
             },
             "ta": "Physical Facilities",
             "tb": null,
@@ -3271,7 +1849,7 @@
             "id": "t9",
             "pos": {
               "x": 24,
-              "y": 2068
+              "y": 2070
             },
             "ta": "Management and Supervision",
             "tb": null,
@@ -3345,7 +1923,7 @@
             "id": "t10",
             "pos": {
               "x": 24,
-              "y": 2198
+              "y": 2200
             },
             "ta": "New Cases (OPD plus inpatient)",
             "tb": null,
@@ -3894,7 +2472,7 @@
             "id": "t11",
             "pos": {
               "x": 24,
-              "y": 3028
+              "y": 3030
             },
             "ta": "Admissions",
             "tb": null,
@@ -4006,7 +2584,7 @@
             "id": "t12",
             "pos": {
               "x": 24,
-              "y": 3214
+              "y": 3216
             },
             "ta": "Inpatient Deaths (Including Maternity)",
             "tb": null,
@@ -4285,7 +2863,7 @@
       "date_updated": "2026-03-20",
       "updated_by": "admin",
       "page_name": "labour_and_delivery_fixed_v2",
-      "archived": "False",
+      "archived": "True",
       "programs": [
         "LABOUR AND DELIVERY PROGRAM"
       ]
@@ -4298,7 +2876,7 @@
       "date_updated": "2026-04-21",
       "updated_by": "admin",
       "page_name": "pnc_fixed_v2",
-      "archived": "False",
+      "archived": "True",
       "programs": [
         "PNC PROGRAM"
       ]
@@ -4311,7 +2889,7 @@
       "date_updated": "2026-03-20",
       "updated_by": "admin",
       "page_name": "anc_fixed",
-      "archived": "False",
+      "archived": "True",
       "programs": [
         "ANC PROGRAM"
       ]
@@ -4327,7 +2905,7 @@
       "date_updated": "2026-03-19",
       "updated_by": "admin",
       "page_name": "pnc",
-      "archived": "False"
+      "archived": "True"
     },
     {
       "report_id": 16,
@@ -4363,7 +2941,7 @@
       "programs": [
         "HIV PROGRAM"
       ],
-      "date_updated": "2026-06-30 20:12:22",
+      "date_updated": "2026-07-03 18:06:39",
       "updated_by": "admin",
       "page_name": "ahd_screening",
       "archived": "False",
@@ -4389,13 +2967,13 @@
                   "bold": true
                 },
                 {
-                  "v": "DATA",
+                  "v": "Data",
                   "fill": "#e5e7eb",
                   "color": "#374151",
                   "cs": 1,
                   "rs": 1,
                   "hidden": false,
-                  "bold": true
+                  "bold": false
                 }
               ],
               [
@@ -4523,7 +3101,7 @@
                   "bold": true
                 },
                 {
-                  "v": "DATA",
+                  "v": "Data",
                   "fill": "#e5e7eb",
                   "color": "#374151",
                   "cs": 1,
@@ -4637,7 +3215,7 @@
                   "bold": true
                 },
                 {
-                  "v": "DATA",
+                  "v": "Data",
                   "fill": "#e5e7eb",
                   "color": "#374151",
                   "cs": 1,
@@ -4652,7 +3230,8 @@
                   "color": "#000000",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "italic": true
                 },
                 {
                   "v": "uhV1Za1CdGM",
@@ -4751,7 +3330,7 @@
                   "bold": true
                 },
                 {
-                  "v": "DATA",
+                  "v": "Data",
                   "fill": "#e5e7eb",
                   "color": "#374151",
                   "cs": 1,
@@ -4870,17 +3449,18 @@
               "x": 16,
               "y": 436
             },
-            "ta": "Seriously Ill",
+            "ta": "",
             "tb": null,
             "data": [
               [
                 {
-                  "v": "",
+                  "v": "SERIOUSLY ILL",
                   "fill": "#e5e7eb",
                   "color": "#374151",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "Data",
@@ -4982,17 +3562,18 @@
               "x": 416,
               "y": 436
             },
-            "ta": "AHD Symptoms Screening",
+            "ta": "",
             "tb": null,
             "data": [
               [
                 {
-                  "v": "",
+                  "v": "ADH SYMPTOMS SCREENING",
                   "fill": "#e5e7eb",
                   "color": "#374151",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "Data",
@@ -5265,17 +3846,18 @@
               "x": 16,
               "y": 870
             },
-            "ta": "WHO Clinical Stage",
+            "ta": "",
             "tb": null,
             "data": [
               [
                 {
-                  "v": "",
+                  "v": "WHO CLINICAL STAGE",
                   "fill": "#e5e7eb",
                   "color": "#374151",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "Data",
@@ -5415,17 +3997,18 @@
               "x": 416,
               "y": 870
             },
-            "ta": "Most Recent VL",
+            "ta": "",
             "tb": null,
             "data": [
               [
                 {
-                  "v": "",
+                  "v": "MOST RECENT VL",
                   "fill": "#e5e7eb",
                   "color": "#374151",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "Data",
@@ -5546,17 +4129,18 @@
               "x": 16,
               "y": 1108
             },
-            "ta": "CSF CrAg",
+            "ta": "",
             "tb": null,
             "data": [
               [
                 {
-                  "v": "",
+                  "v": "CSF CrAg",
                   "fill": "#e5e7eb",
                   "color": "#374151",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "Data",
@@ -5631,7 +4215,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "total_screened",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -5658,17 +4242,18 @@
               "x": 416,
               "y": 1108
             },
-            "ta": "CD4 Results",
+            "ta": "",
             "tb": null,
             "data": [
               [
                 {
-                  "v": "",
+                  "v": "CD4 RESULTS",
                   "fill": "#e5e7eb",
                   "color": "#374151",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "Data",
@@ -5789,17 +4374,18 @@
               "x": 16,
               "y": 1318
             },
-            "ta": "Serum / Blood CrAg",
+            "ta": "",
             "tb": null,
             "data": [
               [
                 {
-                  "v": "",
+                  "v": "SERUM / BLOOD CrAg",
                   "fill": "#e5e7eb",
                   "color": "#374151",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "Data",
@@ -5874,7 +4460,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "total_screened",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -5901,17 +4487,18 @@
               "x": 416,
               "y": 1318
             },
-            "ta": "Gene Xpert",
+            "ta": "",
             "tb": null,
             "data": [
               [
                 {
-                  "v": "",
+                  "v": "GENE Xpert",
                   "fill": "#e5e7eb",
                   "color": "#374151",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "Data",
@@ -5986,7 +4573,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "total_screened",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -6013,17 +4600,18 @@
               "x": 16,
               "y": 1500
             },
-            "ta": "Chest X-ray",
+            "ta": "",
             "tb": null,
             "data": [
               [
                 {
-                  "v": "",
+                  "v": "CHEST X-ray",
                   "fill": "#e5e7eb",
                   "color": "#374151",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "Data",
@@ -6044,7 +4632,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "fMFCIX3BYOt",
+                  "v": "",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -6062,7 +4650,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "EF7BYZ8fOcR",
+                  "v": "",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -6080,7 +4668,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "CGLw4yWQdNu",
+                  "v": "",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -6098,7 +4686,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "total_screened",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -6125,17 +4713,18 @@
               "x": 416,
               "y": 1500
             },
-            "ta": "AHD Criteria Met",
+            "ta": "",
             "tb": null,
             "data": [
               [
                 {
-                  "v": "",
+                  "v": "AHD CRITERIA MET",
                   "fill": "#e5e7eb",
                   "color": "#374151",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "Data",
@@ -6210,7 +4799,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "total_screened",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -6228,26 +4817,27 @@
               28,
               28,
               28,
-              28
+              27
             ]
           },
           {
             "id": "t15",
             "pos": {
               "x": 16,
-              "y": 1682
+              "y": 1728
             },
-            "ta": "FASH",
+            "ta": "",
             "tb": null,
             "data": [
               [
                 {
-                  "v": "",
+                  "v": "FASH",
                   "fill": "#e5e7eb",
                   "color": "#374151",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "Data",
@@ -6322,7 +4912,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "total_screened",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -6347,19 +4937,20 @@
             "id": "t17",
             "pos": {
               "x": 416,
-              "y": 1682
+              "y": 1728
             },
-            "ta": "Treatment Given",
+            "ta": "",
             "tb": null,
             "data": [
               [
                 {
-                  "v": "",
+                  "v": "TREATMENT GIVEN",
                   "fill": "#e5e7eb",
                   "color": "#374151",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "Data",
@@ -6516,19 +5107,20 @@
             "id": "t12",
             "pos": {
               "x": 16,
-              "y": 1948
+              "y": 2024
             },
-            "ta": "TB Urine LAM",
+            "ta": "",
             "tb": null,
             "data": [
               [
                 {
-                  "v": "",
+                  "v": "TB URINE LAM",
                   "fill": "#e5e7eb",
                   "color": "#374151",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "Data",
@@ -6603,7 +5195,7 @@
                   "hidden": false
                 },
                 {
-                  "v": "",
+                  "v": "total_screened",
                   "fill": "#ffffff",
                   "color": "#000000",
                   "cs": 1,
@@ -6628,19 +5220,20 @@
             "id": "t18",
             "pos": {
               "x": 416,
-              "y": 1948
+              "y": 2024
             },
-            "ta": "Outcome",
+            "ta": "",
             "tb": null,
             "data": [
               [
                 {
-                  "v": "",
+                  "v": "OUTCOME",
                   "fill": "#e5e7eb",
                   "color": "#374151",
                   "cs": 1,
                   "rs": 1,
-                  "hidden": false
+                  "hidden": false,
+                  "bold": true
                 },
                 {
                   "v": "Data",

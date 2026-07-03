@@ -46,6 +46,7 @@ data/batches
 data/local
 data/mahistest
 data/mahisdev
+data/mahis
 data/mahisuat
 data/parquet
 # data/visualizations

@@ -539,7 +539,7 @@ def create_count_sets(
         final_query = outer + " AND " + " AND ".join(in_clauses)
     else:
         final_query = outer
-    # print("Create countset", final_query)
+    # print("Create countset", final_query, "\n\n")
     result = DataStorage.query_duckdb(final_query)
     unique_patients = result[unique_column].unique().tolist()
     return result[pid_col].nunique(), unique_patients
@@ -2452,10 +2452,11 @@ def create_line_list_basic_modal(
         return pd.DataFrame()
 
     ids_quoted = ", ".join(f"'{str(i)}'" for i in ids_list)
+
+    # with date strftime('%Y-%m-%d', {DATE_})               AS "Date of Visit",
     query = f"""
         SELECT DISTINCT
             {unique_column}                     AS "unique_column",
-            strftime('%Y-%m-%d', {DATE_})               AS "Date of Visit",
             {IDENTIFIER_}                       AS "Patient ID",
             {FIRST_NAME_}                       AS "First Name",
             {LAST_NAME_}                        AS "Last Name",
