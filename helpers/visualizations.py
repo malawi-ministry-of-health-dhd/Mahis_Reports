@@ -365,20 +365,34 @@ def build_filter_query(cols, vals,data_path, unique_column, isSet, start_date, e
     def parse_value(val_str):
         """Parse a single data_value for operators, wildcards, or numeric types."""
         val_str = str(val_str).strip()
+        
+        # Special case: "_" means IS NULL
+        if val_str == "_":
+            return "IS", None
+        
         # Handle wildcard/LIKE patterns
         if val_str.startswith(("*", "%")):
             return "LIKE", f"%{val_str[1:]}%"
+        
         # Handle operators (>=, <=, !=, =, >, <)
         if match := re.match(r'^(>=|<=|!=|=|>|<)?\s*(.*)$', val_str):
             operator, value_str = match.groups()
             operator = operator or "="
             value_str = value_str.strip()
             
-            # Parse data_value
-            data_value = "" if value_str == "_" else (
-                float(value_str) if "." in value_str else int(value_str)
-            ) if value_str.replace(".", "", 1).isdigit() else value_str
+            if value_str == "_":
+                if operator == "=":
+                    return "IS", None
+                elif operator =="!=":
+                    return "IS NOT", None
+                return "IS", None
+            elif value_str.replace(".", "", 1).isdigit():
+                data_value = float(value_str) if "." in value_str else int(value_str)
+            else:
+                data_value = value_str
+            
             return operator, data_value
+        
         return "=", val_str
     
     def build_single_condition(col, val):
@@ -388,6 +402,8 @@ def build_filter_query(cols, vals,data_path, unique_column, isSet, start_date, e
             clause_list = []
             for item in val:
                 operator, data_value = parse_value(item)
+                if data_value == None:
+                    data_value = 'NULL'
                 clause_list.append(f"{col} {operator} '{data_value}'")
             clause = " OR ".join(clause_list)
             return f"({clause})"
@@ -398,6 +414,9 @@ def build_filter_query(cols, vals,data_path, unique_column, isSet, start_date, e
         if col == "days_before_visit_date":
             return f"{DATE_} >= ('{start_date}'::DATE - INTERVAL {int(val)} DAY) AND {DATE_} <= ('{end_date}'::DATE - INTERVAL 0 DAY)"
         operator, data_value = parse_value(val)
+        if data_value == None:
+            data_value = 'NULL'
+            return f"{col} {operator} {data_value}"
         if operator == "LIKE":
             return f"{col} LIKE '{data_value}'"
         if (isinstance(data_value, int) or isinstance(data_value, float)):
@@ -539,7 +558,7 @@ def create_count_sets(
         final_query = outer + " AND " + " AND ".join(in_clauses)
     else:
         final_query = outer
-    # print("Create countset", final_query, "\n\n")
+    print("Create countset", final_query, "\n\n")
     result = DataStorage.query_duckdb(final_query)
     unique_patients = result[unique_column].unique().tolist()
     return result[pid_col].nunique(), unique_patients
