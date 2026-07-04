@@ -2361,8 +2361,7 @@ def manage_counts(add_clicks, save_clicks, remove_clicks,
             if updated["name"] !="":
                 counts.append(updated)
 
-        dashboard["visualization_types"]["counts"] = counts
-        dashboard["date_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        dashboard["visualization_types"]["counts"] = counts 
         dashboards_data[dashboard_index] = dashboard
         save_dashboards_to_file(dashboards_data)
         return [create_count_item(c, i) for i, c in enumerate(counts)]
@@ -2385,7 +2384,6 @@ def manage_counts(add_clicks, save_clicks, remove_clicks,
             counts = [c for i, c in enumerate(counts) if i != ui_index]
 
         dashboard["visualization_types"]["counts"] = counts
-        dashboard["date_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         dashboards_data[dashboard_index] = dashboard
         save_dashboards_to_file(dashboards_data)
 
@@ -2940,8 +2938,7 @@ def update_chart_fields(chart_type, selector_value, report_id):
      Output("dashboard-selector", "value", allow_duplicate=True),
      Output("current-dashboard-index", "data", allow_duplicate=True),
      Output("modal-backdrop", "style", allow_duplicate=True),
-     Output("modal-content", "style", allow_duplicate=True),
-     Output("dashboard-save-status", "children", allow_duplicate=True)],
+     Output("modal-content", "style", allow_duplicate=True)],
     Input("save-btn", "n_clicks"),
     [State("dashboard-selector", "value"),
      State("report-id-input", "value"),
@@ -3067,8 +3064,6 @@ def save_dashboard_config(save_clicks, selector_value, report_id, report_name, d
         dashboard.pop("mnid_categories", None)
         dashboard.pop("priority_indicators", None)
 
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    dashboard["date_updated"] = now
     dashboards_data[dashboard_index] = dashboard
     save_dashboards_to_file(dashboards_data)
 
@@ -3078,14 +3073,12 @@ def save_dashboard_config(save_clicks, selector_value, report_id, report_name, d
         dashboard_index,
         {"display": "none"},
         {"display": "none"},
-        f"Saved  {now}",
     )
 
 @callback(
     [Output("dashboard-selector", "options", allow_duplicate=True),
      Output("modal-backdrop", "style", allow_duplicate=True),
-     Output("modal-content", "style", allow_duplicate=True),
-     Output("dashboard-save-status", "children", allow_duplicate=True)],
+     Output("modal-content", "style", allow_duplicate=True)],
     [Input("delete-btn", "n_clicks")],
     [State("current-dashboard-index", "data"),
      State("dashboard-selector", "value"),
@@ -3095,21 +3088,30 @@ def save_dashboard_config(save_clicks, selector_value, report_id, report_name, d
 def delete_dashboard(delete_clicks, current_index, selector_value, report_id):
     dashboards_data = load_dashboards_from_file()
     if delete_clicks and delete_clicks > 0:
+        # Check if we have a valid dashboard to delete
         if current_index is not None and current_index >= 0 and current_index < len(dashboards_data):
+            # Remove the dashboard from the data
             dashboards_data.pop(current_index)
+            
+            # Save the updated data to file
             try:
                 with open(dashboards_json_path, 'w') as f:
                     json.dump(dashboards_data, f, indent=2)
             except Exception as e:
                 print(f"Error saving after deletion: {e}")
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            options = [{"label": f"📋 {d.get('report_name', 'Unnamed')} (ID: {d.get('report_id', '?')})",
+            
+            # Update dropdown options
+            options = [{"label": f"📋 {d.get('report_name', 'Unnamed')} (ID: {d.get('report_id', '?')})", 
                        "value": i} for i, d in enumerate(dashboards_data)] + \
                       [{"label": "➕ Create New Dashboard", "value": "new"}]
-            return options, {"display": "none"}, {"display": "none"}, f"Deleted  {now}"
+            
+            return options, {"display": "none"}, {"display": "none"}
+        
         else:
-            return dash.no_update, {"display": "none"}, {"display": "none"}, dash.no_update
-    return dash.no_update, dash.no_update, dash.no_update, dash.no_update
+            # If no valid dashboard is selected, just close the modal
+            return dash.no_update, {"display": "none"}, {"display": "none"}
+    
+    return dash.no_update, dash.no_update, dash.no_update
 
 @callback(
     Output("delete-confirmation-modal", "style"),
@@ -4265,7 +4267,6 @@ def _rpt_add_table(n_new, n_above, n_below, n_left, n_right, state, sel):
             x, y = 20 + n * 30, 20 + n * 30
 
     tables.append(_new_table(tid, x, y))
-    _reflow_tables(tables)
     return {"tables": tables, "next_id": nid + 1}
 
 
@@ -4520,7 +4521,6 @@ def _rpt_remove_table(n_clicks, state, sel):
     if not tid:
         raise PreventUpdate
     tables = [t for t in state["tables"] if t["id"] != tid]
-    _reflow_tables(tables)
     return {"tables": tables, "next_id": state["next_id"]}, {"tid": None, "cells": []}
 
 
@@ -4807,8 +4807,6 @@ def _rpt_sync_drag_pos(raw, state):
     for table in tables:
         if table["id"] in drag_pos:
             table["pos"] = drag_pos[table["id"]]
-
-    _reflow_tables(tables)
 
     return {}, {"tables": tables, "next_id": state.get("next_id", 1)}
 

@@ -300,7 +300,7 @@ layout = html.Div(
                                     id="rpt-modal-prev-btn",
                                     n_clicks=0,
                                     style={
-                                        "background": "#3b82f6", "color": "#ffffff",
+                                        "background": "#525E52", "color": "#ffffff",
                                         "border": "none", "borderRadius": "4px",
                                         "padding": "4px 14px", "fontSize": "12px",
                                         "cursor": "pointer",
@@ -313,7 +313,7 @@ layout = html.Div(
                                     id="rpt-modal-next-btn",
                                     n_clicks=0,
                                     style={
-                                        "background": "#3b82f6", "color": "#ffffff",
+                                        "background": "#525E52", "color": "#ffffff",
                                         "border": "none", "borderRadius": "4px",
                                         "padding": "4px 14px", "fontSize": "12px",
                                         "cursor": "pointer",

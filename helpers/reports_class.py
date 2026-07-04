@@ -5,11 +5,13 @@ from helpers.visualizations import create_sum, create_count, create_count_sets
 from helpers.dhis_integrater import get_dhis_data
 import dash
 import duckdb
+import os
 from datetime import datetime
 from dash import html, dcc, dash_table
 from config import (DATE_,CONCEPT_NAME_,
                     ENCOUNTER_ID_,PERSON_ID_,VALUE_NUMERIC_,VALUE_DATETIME_,FACILITY_CODE_,
                     DHIS2_URL, actual_keys_in_data)
+
 
 
 class ReportTableBuilder:
@@ -31,6 +33,7 @@ class ReportTableBuilder:
         self.location = location
         self.data_route = data_route
         self.report_design = report_design
+        self.facilities_path = os.path.join(os.getcwd(), data_route.replace("/parquet",""),'single_tables', 'locations_data.csv')
 
 
     def load_spec(self) -> None:
@@ -43,6 +46,8 @@ class ReportTableBuilder:
         self.filters_df = self.filters_df.fillna("")
         self.report_name = pd.read_excel(xls, sheet_name="REPORT_NAME", engine="openpyxl")
         self.report_name.columns = [str(c).strip() for c in self.report_name.columns]
+        self.facilities = pd.read_csv(self.facilities_path)
+        self.location_name = self.facilities.set_index('location_id')['name'].to_dict().get(int(self.location), "")
         self._build_filters_map()
 
     def _build_filters_map(self) -> None:
@@ -212,11 +217,35 @@ class ReportTableBuilder:
             result, patient_ids = create_count(*args,self.start_date, self.end_date)
 
         elif measure == "calculated":
-            # Store the expression for deferred evaluation; resolved after
-            # all other filter values are pre-computed in _precompute_all_filter_values.
+            # Deferred arithmetic expression — resolved in Pass 2 of _precompute_all_filter_values.
             expression = str(spec.get("unique_column", "")).strip()
             self._value_cache[filter_name] = {"__calculated__": expression}
             return self._value_cache[filter_name]
+
+        elif measure == "calculated_intersection":
+            # Deferred set-intersection of patient_ids from {ref} tokens in unique_column.
+            expression = str(spec.get("unique_column", "")).strip()
+            self._value_cache[filter_name] = {"__calculated_intersection__": expression}
+            return self._value_cache[filter_name]
+
+        elif measure == "calculated_union":
+            # Deferred set-union of patient_ids from {ref} tokens in unique_column.
+            expression = str(spec.get("unique_column", "")).strip()
+            self._value_cache[filter_name] = {"__calculated_union__": expression}
+            return self._value_cache[filter_name]
+
+        elif measure == "calculated_max":
+            # Deferred: max of resolved numeric values from {ref} tokens in unique_column.
+            expression = str(spec.get("unique_column", "")).strip()
+            self._value_cache[filter_name] = {"__calculated_max__": expression}
+            return self._value_cache[filter_name]
+
+        elif measure == "calculated_min":
+            # Deferred: min of resolved numeric values from {ref} tokens in unique_column.
+            expression = str(spec.get("unique_column", "")).strip()
+            self._value_cache[filter_name] = {"__calculated_min__": expression}
+            return self._value_cache[filter_name]
+
         else:
             result, patient_ids = ("","")
 
@@ -282,31 +311,67 @@ class ReportTableBuilder:
         df["DHIS2-SCANFORM"] = mapped
         return df
 
-    def _precompute_all_filter_values(self) -> None:
-        """Pre-compute every filter value so that 'calculated' expressions can
-        reference filters from any section.  Two-pass approach:
-          Pass 1 – compute all non-calculated filters (populates _value_cache).
-          Pass 2 – resolve all calculated filters using the fully-populated cache.
-        """
-        import re
+    _DEFERRED_MEASURES = frozenset({
+        "calculated",
+        "calculated_intersection",
+        "calculated_union",
+        "calculated_max",
+        "calculated_min",
+    })
 
-        # Pass 1: non-calculated filters
+    def _precompute_all_filter_values(self) -> None:
+        """Pre-compute every filter value so that deferred measures can reference
+        other filters.  Two-pass approach:
+          Pass 1 – compute all non-deferred filters (populates _value_cache and
+                   _patient_ids_cache so set-operation measures can use them).
+          Pass 2 – resolve all deferred filters in dependency order.
+        """
+        # Pass 1: all non-deferred filters
         for fname, spec in self.filters_map.items():
-            if spec["measure"] != "calculated":
+            if spec["measure"] not in self._DEFERRED_MEASURES:
                 self._compute_value_from_filter(fname)
 
-        # Pass 2: calculated filters (expression evaluation)
+        # Pass 2: deferred filters
+        _SENTINEL_KEY = {
+            "calculated":              "__calculated__",
+            "calculated_intersection": "__calculated_intersection__",
+            "calculated_union":        "__calculated_union__",
+            "calculated_max":          "__calculated_max__",
+            "calculated_min":          "__calculated_min__",
+        }
         for fname, spec in self.filters_map.items():
-            if spec["measure"] == "calculated":
-                # Ensure the sentinel dict is in cache (handles first-call case)
-                cached = self._value_cache.get(fname)
-                if not isinstance(cached, dict) or "__calculated__" not in cached:
-                    self._compute_value_from_filter(fname)
-                    cached = self._value_cache.get(fname)
+            measure = spec["measure"]
+            if measure not in self._DEFERRED_MEASURES:
+                continue
 
-                if isinstance(cached, dict) and "__calculated__" in cached:
-                    resolved = self._resolve_calculated(cached["__calculated__"], fname)
-                    self._value_cache[fname] = resolved
+            # Ensure sentinel is in cache
+            cached = self._value_cache.get(fname)
+            sentinel_key = _SENTINEL_KEY[measure]
+            if not isinstance(cached, dict) or sentinel_key not in cached:
+                self._compute_value_from_filter(fname)
+                cached = self._value_cache.get(fname)
+
+            if not isinstance(cached, dict):
+                continue
+
+            if "__calculated__" in cached:
+                resolved = self._resolve_calculated(cached["__calculated__"], fname)
+            elif "__calculated_intersection__" in cached:
+                resolved = self._resolve_set_operation(
+                    cached["__calculated_intersection__"], fname, "intersection"
+                )
+            elif "__calculated_union__" in cached:
+                resolved = self._resolve_set_operation(
+                    cached["__calculated_union__"], fname, "union"
+                )
+            elif "__calculated_max__" in cached:
+                resolved = self._resolve_minmax(cached["__calculated_max__"], fname, "max")
+            elif "__calculated_min__" in cached:
+                resolved = self._resolve_minmax(cached["__calculated_min__"], fname, "min")
+            else:
+                resolved = "N/A"
+
+            self._value_cache[fname] = resolved
 
     def _resolve_calculated(self, expression: str, filter_name: str) -> str:
         import re
@@ -347,6 +412,70 @@ class ReportTableBuilder:
             result_str = "N/A"
 
         return result_str
+
+    def _resolve_set_operation(self, expression: str, filter_name: str, operation: str) -> str:
+        """Compute intersection or union count of patient_ids for {ref} tokens in expression."""
+        import re
+        ref_names = [m.group(1).strip() for m in re.finditer(r"\{([^}]+)\}", expression)]
+        if not ref_names:
+            return "0"
+
+        sets: List[set] = []
+        for ref in ref_names:
+            ids = self._patient_ids_cache.get(ref)
+            # print(ids)
+            if ids is None:
+                continue
+                # self._errors.append(
+                #     f"calculated_{operation} filter '{filter_name}': "
+                #     f"no patient IDs cached for '{ref}' — run its filter first."
+                # )
+                # ids = []
+            sets.append(set(str(i) for i in ids))
+        if not sets:
+            return "0"
+
+        if operation == "intersection":
+            result_set = sets[0]
+            for s in sets[1:]:
+                result_set = result_set & s
+        else:  # union
+            result_set: set = set()
+            for s in sets:
+                result_set = result_set | s
+
+        self._patient_ids_cache[filter_name] = list(result_set)
+        return str(len(result_set))
+
+    def _resolve_minmax(self, expression: str, filter_name: str, operation: str) -> str:
+        """Return max or min of resolved numeric values for {ref} tokens in expression."""
+        import re
+        ref_names = [m.group(1).strip() for m in re.finditer(r"\{([^}]+)\}", expression)]
+        if not ref_names:
+            return "N/A"
+
+        values: List[float] = []
+        for ref in ref_names:
+            cached = self._value_cache.get(ref)
+            if isinstance(cached, dict):
+                self._errors.append(
+                    f"calculated_{operation} filter '{filter_name}': "
+                    f"dependency '{ref}' is not yet resolved."
+                )
+                continue
+            try:
+                values.append(float(str(cached or "0").replace("%", "").strip()))
+            except ValueError:
+                self._errors.append(
+                    f"calculated_{operation} filter '{filter_name}': "
+                    f"'{ref}' value '{cached}' is not numeric — skipped."
+                )
+
+        if not values:
+            return "N/A"
+
+        result = max(values) if operation == "max" else min(values)
+        return str(int(result)) if result == int(result) else f"{result:g}"
 
     def build_section_tables(self) -> List[Tuple[str, pd.DataFrame]]:
         self._precompute_all_filter_values()
@@ -479,6 +608,8 @@ class ReportTableBuilder:
                         style={"margin": "0", "color": "#000000",
                                "fontSize": "15px", "fontWeight": "700",
                                "letterSpacing": "0.5px"}),
+                html.Div(f"{self.location_name}", style={"textAlign":"center"}),
+                html.Div(f"{self.start_date} to {self.end_date}", style={"textAlign":"center"})
             ],
         )
         table_els: List[Any] = []
@@ -730,11 +861,13 @@ class ReportTableBuilder:
                         style={"margin": "0 0 4px", "color": "#000000",
                                "fontSize": "15px", "fontWeight": "700",
                                "letterSpacing": "0.5px"}),
-                html.Span(
-                    f"{'Landscape' if is_landscape else 'Portrait'}  ·  "
-                    f"{num_page_columns}-column layout",
-                    style={"fontSize": "11px", "color": "#6b7280"}
-                ),
+                html.Div(f"{self.location_name}", style={"textAlign":"center"}),
+                html.Div(f"{self.start_date} to {self.end_date}", style={"textAlign":"center"})
+                # html.Span(
+                #     f"{'Landscape' if is_landscape else 'Portrait'}  ·  "
+                #     f"{num_page_columns}-column layout",
+                #     style={"fontSize": "11px", "color": "#6b7280"}
+                # ),
             ],
         )
 
