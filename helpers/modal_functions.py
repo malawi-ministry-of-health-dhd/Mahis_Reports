@@ -2272,7 +2272,7 @@ def create_html_report_modal():
                                           "display": "block", "marginBottom": "4px",
                                           "color": "#374151"}),
                         dcc.Input(id="rpt-flt-filter-name-desc", value="", debounce=True,
-                                  placeholder="Display name…",
+                                  placeholder="Display name…",disabled=True,
                                   style={"width": "100%", "padding": "6px 8px",
                                          "fontSize": "13px", "border": "1px solid #d1d5db",
                                          "borderRadius": "4px", "boxSizing": "border-box"}),
