@@ -425,6 +425,8 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, repo
 
     report_design = report.get("design", {})
 
+    report_filters = report.get("filters", {})
+
     if not os.path.exists(spec_path):
         return html.Div("Report not found on Server. Request Admin to add report"), 0, None
     
@@ -477,7 +479,8 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, repo
                                      report_end_date= end_date, 
                                      data_route= DATA_PATH_, 
                                      location=location, dhis2_period= dhis2_period,
-                                      report_design= report_design )
+                                      report_design= report_design,
+                                       report_filters = report_filters )
         builder.load_spec()
         components   = builder.build_dash_components()
         section_data = builder.build_section_tables()

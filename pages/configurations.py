@@ -1,5 +1,5 @@
 import dash
-from dash import html, dcc, dash_table, Input, Output, State, callback, ctx, MATCH, ALL
+from dash import html, dcc, dash_table, Input, Output, State, callback, ctx, MATCH, ALL, no_update
 from dash.exceptions import PreventUpdate
 import json
 import os
@@ -10,6 +10,7 @@ from data_storage import DataStorage
 import base64
 import io
 import warnings
+import duckdb
 warnings.filterwarnings("ignore")
 from helpers.modal_functions import (validate_excel_file, load_reports_data, save_reports_data,
                         check_existing_report, get_next_report_id, update_or_create_report,load_excel_file,
@@ -705,6 +706,9 @@ layout = html.Div(
                 dcc.Store(id="rpt-variables-store", data={"all": []}),
                 dcc.Input(id="rpt-var-drop-hidden", value="{}",
                           style={"display": "none"}),
+                dcc.Store(id="rpt-filter-edit-var", data=None),
+                dcc.Store(id="rpt-right-mode", data="table"),
+                dcc.Store(id="rpt-filter-row-store", data=[]),
                 dcc.Interval(
                     id='configurations-interval-update-today',
                     interval=10*60*1000,
@@ -4852,12 +4856,14 @@ def _rpt_render_variables(var_store, state):
     used = _get_used_variables(state, all_vars)
     items = []
     for var in all_vars:
-        if var in used:
-            continue
+        # if var in used:
+        #     continue
         label = id_to_label.get(var, var)
         items.append(
             html.Div(
                 label,
+                id={"type": "rpt-var-click", "index": var},
+                n_clicks=0,
                 className="rpt-var-item",
                 **{"data-var": var},   # drag payload = raw filter_name ID
                 style={
@@ -4877,6 +4883,468 @@ def _rpt_render_variables(var_store, state):
     if not items:
         return html.Div("All variables placed.", style={"fontSize": "12px", "color": "#6b7280"})
     return items
+
+
+# 12e. Variable click → open filter editor
+@callback(
+    Output("rpt-filter-edit-var", "data"),
+    Output("rpt-right-mode", "data"),
+    Input({"type": "rpt-var-click", "index": ALL}, "n_clicks"),
+    prevent_initial_call=True,
+)
+def _rpt_var_click(n_clicks_list):
+    if not any(n or 0 for n in (n_clicks_list or [])):
+        raise PreventUpdate
+    triggered = ctx.triggered_id
+    if not isinstance(triggered, dict):
+        raise PreventUpdate
+    return triggered["index"], "filter"
+
+
+# 12f. Toggle right pane between table editor and filter editor
+@callback(
+    Output("rpt-table-editor", "style"),
+    Output("rpt-filter-editor", "style"),
+    Input("rpt-right-mode", "data"),
+    prevent_initial_call=False,
+)
+def _rpt_toggle_right_mode(mode):
+    show = {"display": "flex", "flexDirection": "column", "flex": "1", "minHeight": "0"}
+    hide = {"display": "none", "flex": "1", "flexDirection": "column", "minHeight": "0"}
+    if mode == "filter":
+        return hide, show
+    return show, hide
+
+
+def _safe_flt_str(val):
+    """Return stripped string or None for NaN/None/empty."""
+    if val is None:
+        return None
+    try:
+        if pd.isna(val):
+            return None
+    except (TypeError, ValueError):
+        pass
+    s = str(val).strip()
+    return s if s else None
+
+
+def _build_unique_col_component(measure, current_val):
+    """Return dcc.Input for calculated measures, dcc.Dropdown otherwise."""
+    is_calc = bool(measure and "calculated" in str(measure).lower())
+    if is_calc:
+        return dcc.Input(
+            id="rpt-flt-unique-col",
+            value=current_val or "",
+            placeholder="Expression e.g. {filter_a}/{filter_b}*100 or {a},{b}",
+            debounce=True,
+            style={"width": "100%", "padding": "6px 8px", "fontSize": "13px",
+                   "border": "1px solid #38bdf8", "borderRadius": "4px",
+                   "boxSizing": "border-box", "background": "#f0f9ff"},
+        )
+    key_opts = [{"label": k, "value": k} for k in actual_keys_in_data]
+    return dcc.Dropdown(
+        id="rpt-flt-unique-col",
+        options=key_opts,
+        value=current_val,
+        placeholder="Select column…",
+        clearable=True,
+        style={"fontSize": "13px"},
+    )
+
+
+# 12g. Load filter form from Excel / saved JSON when a variable is selected
+@callback(
+    Output("rpt-flt-title", "children"),
+    Output("rpt-flt-filter-name-desc", "value"),
+    Output("rpt-flt-measure", "value"),
+    Output("rpt-flt-unique-col-wrap", "children"),
+    Output("rpt-filter-row-store", "data"),
+    Output("rpt-flt-status", "children"),
+    Input("rpt-filter-edit-var", "data"),
+    State("rpt-page-name", "data"),
+    prevent_initial_call=True,
+)
+def _rpt_load_filter_form(filter_name, page_name):
+    if not filter_name:
+        raise PreventUpdate
+
+    existing_row = {}
+
+    # Priority 1: saved filters in hmis_reports.json
+    if page_name:
+        hmis_path = os.path.join(os.getcwd(), "data", "hmis_reports.json")
+        try:
+            with open(hmis_path, "r", encoding="utf-8") as f:
+                rpt_data = json.load(f)
+            for r in rpt_data.get("reports", []):
+                if r.get("page_name") == page_name:
+                    saved = r.get("filters", {}).get(filter_name)
+                    if saved:
+                        existing_row = saved
+                    break
+        except Exception:
+            pass
+
+    # Priority 2: Excel FILTERS sheet
+    if not existing_row and page_name:
+        xlsx_path = os.path.join(os.getcwd(), "data", "uploads", f"{page_name}.xlsx")
+        try:
+            fl = pd.read_excel(xlsx_path, sheet_name="FILTERS")
+            matched = fl[fl["filter_name"].astype(str).str.strip() == filter_name]
+            if not matched.empty:
+                row = matched.iloc[0]
+                existing_row = {
+                    col: (None if pd.isna(val) else val)
+                    for col, val in row.items()
+                }
+        except Exception:
+            pass
+
+    measure_val = _safe_flt_str(existing_row.get("measure"))
+    unique_col_val = _safe_flt_str(existing_row.get("unique_column"))
+    desc_val = _safe_flt_str(existing_row.get("filter_name_desc")) or filter_name
+
+    rows = []
+    for i in range(1, 11):
+        var_val = _safe_flt_str(existing_row.get(f"variable{i}"))
+        if not var_val:
+            continue
+        val_raw = existing_row.get(f"value{i}")
+        if isinstance(val_raw, list):
+            val_list = [str(v) for v in val_raw if v is not None]
+        else:
+            s = _safe_flt_str(val_raw)
+            val_list = _normalize_filter_value(val_raw)
+        # Infer input type: list → Multi, single numeric string → Integer, else Text
+        if isinstance(val_raw, list) and len(val_raw) != 1:
+            inferred_type = "Multi"
+        elif val_list and val_list[0].lstrip("-").replace(".", "", 1).isdigit():
+            inferred_type = "Integer"
+        elif len(val_list) > 1:
+            inferred_type = "Multi"
+        else:
+            inferred_type = "Text"
+        rows.append({"variable": var_val, "operator": "=",
+                     "input_type": inferred_type, "value": val_list})
+
+    if not rows:
+        rows = [{"variable": None, "operator": "=", "input_type": "Multi", "value": []}]
+
+    unique_col_component = _build_unique_col_component(measure_val, unique_col_val)
+    return filter_name, desc_val, measure_val, unique_col_component, rows, ""
+
+
+# 12g-bis. Swap unique-col widget when measure type changes
+@callback(
+    Output("rpt-flt-unique-col-wrap", "children", allow_duplicate=True),
+    Input("rpt-flt-measure", "value"),
+    State("rpt-flt-unique-col", "value"),
+    prevent_initial_call=True,
+)
+def _rpt_update_unique_col_type(measure, current_val):
+    return _build_unique_col_component(measure, current_val)
+
+
+def _load_val_opts(data_route, input_value):
+    """Flatten all dropdown values from dropdowns.json (ignoring keys)."""
+    try:
+        with open(os.path.join(os.getcwd(), "data", data_route,
+                               "dcc_dropdown_json", "dropdowns.json")) as f:
+            data = json.load(f)
+        all_vals = []
+        for v in data.values():
+            if isinstance(v, list):
+                all_vals.extend(str(x) for x in v)
+
+        return [{"label": v, "value": v} for v in all_vals if input_value.lower() in v.lower()]
+    except Exception:
+        return []
+
+
+def _build_val_component(data_route, idx, value_type, current_value):
+    """
+    Return the appropriate value input component for a filter row.
+    
+    Determines value_type based on current_value if not explicitly provided:
+    - If current_value is str -> value_type should be "Text" or "Single" (default "Text")
+    - If current_value is list -> value_type should be "Multi"
+    """
+    # Determine value_type from current_value if not specified or if it should be overridden
+    if isinstance(current_value, list):
+        value_type = "Multi"
+    elif isinstance(current_value, str):
+        # Default to "Text" for strings, but allow "Single" if explicitly requested
+        if value_type not in ["Single"]:
+            value_type = "Text"
+    
+    # val_opts = _load_val_opts(data_route, current_value)
+    val_opts = []
+    base_style = {"flex": "3", "fontSize": "12px", "minWidth": "140px", "width": "100%"}
+    comp_id = {"type": "rpt-fv-val", "index": idx}
+
+    if value_type == "Text":
+        val = current_value
+        if isinstance(val, list):
+            val = val[0] if val else ""
+        return dcc.Input(
+            id=comp_id, type="text", value=val or "",
+            placeholder="Value…", debounce=True,
+            style={**base_style, "height": "36px", "padding": "4px 8px",
+                   "border": "1px solid #d1d5db", "borderRadius": "4px",
+                   "boxSizing": "border-box"},
+        )
+
+    if value_type == "Integer":
+        val = current_value
+        if isinstance(val, list):
+            val = val[0] if val else None
+        try:
+            val = int(val) if val not in (None, "") else None
+        except (TypeError, ValueError):
+            val = None
+        return dcc.Input(
+            id=comp_id, type="number", value=val,
+            placeholder="Number…", debounce=True,
+            style={**base_style, "height": "36px", "padding": "4px 8px",
+                   "border": "1px solid #d1d5db", "borderRadius": "4px",
+                   "boxSizing": "border-box"},
+        )
+
+    if value_type == "Single":
+        val = current_value
+        if isinstance(val, list):
+            val = val[0] if val else None
+        return dcc.Dropdown(
+            id=comp_id, options=val_opts, value=val,
+            multi=False, placeholder="Value…", clearable=True, style=base_style,
+        )
+
+    # Multi (default)
+    val = current_value if isinstance(current_value, list) else (
+        [current_value] if current_value not in (None, "", []) else []
+    )
+    return dcc.Dropdown(
+        id=comp_id, options=val_opts, value=val,
+        multi=True, placeholder="Value(s)…", clearable=True, style=base_style,
+    )
+
+
+# 12h. Render filter variable-operator-value rows from store
+@callback(
+    Output("rpt-filter-rows-container", "children"),
+    Input("rpt-filter-row-store", "data"),
+    Input('url-params-store', 'data'),
+    prevent_initial_call=False,
+)
+def _rpt_render_filter_rows(rows, urlparams):
+    data_route = urlparams.get('route', ["default"])[0]
+    rows = rows or []
+
+    key_opts   = [{"label": k, "value": k} for k in actual_keys_in_data]
+    op_opts    = [{"label": op, "value": op} for op in ["=", "!=", ">", "<", ">=", "<="]]
+    type_opts  = [{"label": t, "value": t} for t in ["Multi", "Single", "Text", "Integer"]]
+
+    if not rows:
+        return [html.Div("No rows — click '+ Add Row'.",
+                         style={"fontSize": "12px", "color": "#9ca3af", "padding": "8px 0"})]
+
+
+    components = []
+    for i, row in enumerate(rows):
+        import ast
+        value_type = row.get("input_type") or "Multi"
+        var_value = _normalize_filter_value(row.get("variable"))
+        val_value = _normalize_filter_value(row.get("value"))
+        
+        if isinstance(var_value, str):
+            stripped = var_value.strip()
+            if stripped.startswith("[") and stripped.endswith("]"):
+                try:
+                    parsed = ast.literal_eval(stripped)
+                    if isinstance(parsed, list):
+                        var_value = parsed
+                except (ValueError, SyntaxError):
+                    pass
+        components.append(
+            html.Div(
+                style={"display": "flex", "gap": "6px", "alignItems": "center",
+                       "marginBottom": "6px"},
+                children=[
+                    dcc.Dropdown(
+                        id={"type": "rpt-fv-var", "index": i},
+                        options=key_opts,
+                        value=var_value,
+                        placeholder="Column…",
+                        multi=True,
+                        clearable=True,
+                        style={"flex": "2", "fontSize": "12px", "minWidth": "120px"},
+                    ),
+                    dcc.Dropdown(
+                        id={"type": "rpt-fv-op", "index": i},
+                        options=op_opts,
+                        value=row.get("operator", "="),
+                        clearable=False,
+                        style={"flex": "0 0 80px", "fontSize": "12px"},
+                    ),
+                    dcc.Dropdown(
+                        id={"type": "rpt-fv-input", "index": i},
+                        options=type_opts,
+                        value=value_type,
+                        clearable=False,
+                        style={"flex": "0 0 80px", "fontSize": "12px"},
+                    ),
+                    dcc.Input(
+                        id={"type": "rpt-fv-val", "index": i} ,
+                        type="text", 
+                        value=row.get("value"),
+                        placeholder="Value…", debounce=True,
+                        style={"flex": "3", "fontSize": "12px", "minWidth": "140px", "width": "100%", "height": "36px", "padding": "4px 8px",
+                            "border": "1px solid #d1d5db", "borderRadius": "4px",
+                            "boxSizing": "border-box"},
+                    ),
+                    html.Button(
+                        "✕",
+                        id={"type": "rpt-fv-del", "index": i},
+                        n_clicks=0,
+                        style={"padding": "2px 8px", "height": "36px",
+                               "background": "#fee2e2", "border": "1px solid #fca5a5",
+                               "borderRadius": "4px", "cursor": "pointer",
+                               "color": "#dc2626", "fontSize": "14px",
+                               "flexShrink": "0", "lineHeight": "1"},
+                    ),
+                ],
+            )
+        )
+    return components
+
+
+# 12h-MATCH. Re-render value input when the type selector changes
+@callback(
+    Output({"type": "rpt-fv-val-container", "index": MATCH}, "children"),
+    Input({"type": "rpt-fv-input", "index": MATCH}, "value"),
+    State('url-params-store', 'data'),
+    prevent_initial_call=True,
+)
+def _rpt_update_val_input(input_type, urlparams):
+    data_route = (urlparams or {}).get('route', ["default"])[0]
+    triggered = ctx.triggered_id
+    idx = triggered["index"] if isinstance(triggered, dict) else 0
+    return [_build_val_component(data_route, idx, input_type or "Text", None)]
+
+
+# 12i. Add a new blank filter row
+@callback(
+    Output("rpt-filter-row-store", "data", allow_duplicate=True),
+    Input("rpt-flt-add-row-btn", "n_clicks"),
+    State("rpt-filter-row-store", "data"),
+    prevent_initial_call=True,
+)
+def _rpt_add_filter_row(n_clicks, rows):
+    rows = list(rows or [])
+    rows.append({"variable": None, "operator": "=", "input_type": "Text", "value": ""})
+    return rows
+
+
+# 12j. Delete a filter row by index
+@callback(
+    Output("rpt-filter-row-store", "data", allow_duplicate=True),
+    Input({"type": "rpt-fv-del", "index": ALL}, "n_clicks"),
+    State("rpt-filter-row-store", "data"),
+    prevent_initial_call=True,
+)
+def _rpt_del_filter_row(n_clicks_list, rows):
+    if not any(n or 0 for n in (n_clicks_list or [])):
+        raise PreventUpdate
+    triggered = ctx.triggered_id
+    if not isinstance(triggered, dict):
+        raise PreventUpdate
+    idx = triggered["index"]
+    rows = list(rows or [])
+    if 0 <= idx < len(rows):
+        rows.pop(idx)
+    return rows
+
+
+# 12k. Save filter payload to hmis_reports.json
+@callback(
+    Output("rpt-flt-status", "children", allow_duplicate=True),
+    Output("rpt-right-mode", "data", allow_duplicate=True),
+    Input("rpt-flt-save-btn", "n_clicks"),
+    State("rpt-filter-edit-var", "data"),
+    State("rpt-page-name", "data"),
+    State("rpt-flt-filter-name-desc", "value"),
+    State("rpt-flt-measure", "value"),
+    State("rpt-flt-unique-col", "value"),
+    State({"type": "rpt-fv-var", "index": ALL}, "value"),
+    State({"type": "rpt-fv-op",  "index": ALL}, "value"),
+    State({"type": "rpt-fv-val", "index": ALL}, "value"),
+    prevent_initial_call=True,
+)
+def _rpt_save_filter(n_clicks, filter_name, page_name, desc, measure, unique_col,
+                     vars_list, ops_list, vals_list):
+    if not n_clicks:
+        raise PreventUpdate
+    if not filter_name or not page_name:
+        return "Select a report and variable first.", no_update
+
+    payload = {
+        "filter_name":      filter_name,
+        "filter_name_desc": str(desc or filter_name).strip(),
+        "measure":          measure or "",
+        "unique_column":    unique_col or "",
+    }
+
+    pair_idx = 1
+    for var, op, val in zip(vars_list or [], ops_list or [], vals_list or []):
+        # Normalise variable (multi-select returns list; collapse single-item to string)
+        var_list = var if isinstance(var, list) else ([var] if var else [])
+        var_list = [v for v in var_list if v]
+        if not var_list:
+            continue
+        var_out = var_list[0] if len(var_list) == 1 else var_list
+
+        op = op or "="
+        val_list = val if isinstance(val, list) else ([val] if val else [])
+        # Prefix operator onto each value when it isn't plain "="
+        if op != "=":
+            val_list = [f"{op}{v}" for v in val_list] if val_list else [f"{op}"]
+        # Single → string, multiple → list
+        val_out = val_list[0] if len(val_list) == 1 else val_list
+        payload[f"variable{pair_idx}"] = var_out
+        payload[f"value{pair_idx}"]    = val_out
+        pair_idx += 1
+
+    hmis_path = os.path.join(os.getcwd(), "data", "hmis_reports.json")
+    try:
+        with open(hmis_path, "r", encoding="utf-8") as f:
+            rpt_data = json.load(f)
+        found = False
+        for r in rpt_data.get("reports", []):
+            if r.get("page_name") == page_name:
+                r.setdefault("filters", {})[filter_name] = payload
+                r["date_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                found = True
+                break
+        if not found:
+            return f"Report '{page_name}' not found.", no_update
+        with open(hmis_path, "w", encoding="utf-8") as f:
+            json.dump(rpt_data, f, indent=2)
+        return f"Saved {datetime.now().strftime('%H:%M:%S')}", "table"
+    except Exception as e:
+        return f"Error: {e}", no_update
+
+
+# 12l. Close filter editor → return to table editor
+@callback(
+    Output("rpt-right-mode", "data", allow_duplicate=True),
+    Input("rpt-flt-close-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+def _rpt_close_filter(n_clicks):
+    if not n_clicks:
+        raise PreventUpdate
+    return "table"
 
 
 # 12d. Apply variable drop to rpt-state

@@ -15,7 +15,9 @@ from config import (DATE_,CONCEPT_NAME_,
 
 
 class ReportTableBuilder:
-    def __init__(self, excel_path: str,report_start_date, report_end_date,data_route, location:str, dhis2_period: str, report_design = None):
+    def __init__(self, excel_path: str,report_start_date, 
+                 report_end_date,data_route, location:str, 
+                 dhis2_period: str, report_design = None, report_filters=None):
         self.excel_path = excel_path
         self.dhis_url = f"{DHIS2_URL}/api/dataValueSets.json"
         self.vars_df: pd.DataFrame | None = None
@@ -33,6 +35,7 @@ class ReportTableBuilder:
         self.location = location
         self.data_route = data_route
         self.report_design = report_design
+        self.report_filters = report_filters
         self.facilities_path = os.path.join(os.getcwd(), data_route.replace("/parquet",""),'single_tables', 'locations_data.csv')
 
 
@@ -60,7 +63,7 @@ class ReportTableBuilder:
             num_field = str(row.get("num_field", VALUE_NUMERIC_)).strip()
             unique_column = str(row.get("unique_column", PERSON_ID_)).strip()
             pairs: List[Tuple[str, Any]] = []
-            for i in range(1, 10):
+            for i in range(1, 11):
                 fcol = str(row.get(f"variable{i}", "")).strip()
                 if not fcol:
                     continue
@@ -124,8 +127,25 @@ class ReportTableBuilder:
             self._errors.append(f"FILTERS row not found: '{filter_name}'")
             self._value_cache[filter_name] = "N/A"
             return "N/A"
+        
+        # When filters are updated in config, let them be used first as updated spec
+        updated_spec = self.report_filters.get(filter_name, {})
 
-        spec = self.filters_map[filter_name]
+        updated_pairs = []
+        for i in range(1,11):
+            col = updated_spec.get(f"variable{i}", "")
+            val = updated_spec.get(f"value{i}", "")
+            if not col:
+                continue
+            parsed_col = self._parse_col_value(col)
+            parsed_val = self._parse_col_value(val)
+            updated_pairs.append((parsed_col, parsed_val))
+        
+        if updated_spec:
+            updated_spec['pairs'] = updated_pairs 
+        # updated_spec = self.report_filters.get(filter_name, {})
+        spec = updated_spec if updated_spec else  self.filters_map[filter_name]
+
         measure = spec["measure"]
         if measure == "literal":
             result_str = "" if spec["literal_value"] is None else str(spec["literal_value"])

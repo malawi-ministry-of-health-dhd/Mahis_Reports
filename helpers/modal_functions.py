@@ -2191,11 +2191,12 @@ def create_html_report_modal():
         ],
     )
 
-    right_panel = html.Div(
-        style={"flex": "1", "display": "flex", "flexDirection": "column", "minWidth": "0"},
+    # --- Table editor sub-panel (default view) ---
+    table_editor = html.Div(
+        id="rpt-table-editor",
+        style={"display": "flex", "flexDirection": "column", "flex": "1", "minHeight": "0"},
         children=[
             toolbar,
-            # Canvas
             html.Div(
                 id="html-report-canvas",
                 style={
@@ -2214,7 +2215,6 @@ def create_html_report_modal():
                 },
                 children=[],
             ),
-            # Status bar
             html.Div(
                 id="html-report-status",
                 style={
@@ -2225,6 +2225,134 @@ def create_html_report_modal():
                 children="No selection",
             ),
         ],
+    )
+
+    # --- Filter editor sub-panel (shown when a variable is clicked) ---
+    _measure_opts = [{"label": m, "value": m} for m in [
+        "count", "nunique", "sum", "count_set", "cohort_count", "cohort_count_set",
+        "cohort_sum", "cohort_count_defaulter", "count_defaulter", "count_set_defaulter",
+        "cohort_count_set_defaulter", "calculated", "calculated_intersection",
+        "calculated_union", "calculated_max", "calculated_min",
+    ]]
+    _actual_keys_opts = [{"label": k, "value": k} for k in actual_keys_in_data]
+
+    filter_editor = html.Div(
+        id="rpt-filter-editor",
+        style={"display": "none", "flex": "1", "flexDirection": "column", "minHeight": "0"},
+        children=[
+            # Header bar
+            html.Div(
+                style={
+                    "display": "flex", "alignItems": "center", "gap": "8px",
+                    "padding": "8px 12px", "background": "#f0fdf4",
+                    "borderBottom": "1px solid #d1fae5", "flexShrink": "0",
+                },
+                children=[
+                    html.Button("← Back", id="rpt-flt-close-btn", n_clicks=0,
+                                style={"padding": "4px 10px", "fontSize": "12px",
+                                       "cursor": "pointer", "background": "#e5e7eb",
+                                       "border": "1px solid #d1d5db", "borderRadius": "4px",
+                                       "color": "#374151"}),
+                    html.Span(id="rpt-flt-title", children="Edit Filter",
+                              style={"fontWeight": "700", "fontSize": "14px",
+                                     "color": "#065f46", "flex": "1"}),
+                    html.Span(id="rpt-flt-status", children="",
+                              style={"fontSize": "12px", "color": "#16a34a",
+                                     "fontStyle": "italic"}),
+                ],
+            ),
+            # Scrollable body
+            html.Div(
+                style={"flex": "1", "overflowY": "auto", "padding": "16px"},
+                children=[
+                    # Display name
+                    html.Div(style={"marginBottom": "12px"}, children=[
+                        html.Label("Display Name",
+                                   style={"fontSize": "12px", "fontWeight": "600",
+                                          "display": "block", "marginBottom": "4px",
+                                          "color": "#374151"}),
+                        dcc.Input(id="rpt-flt-filter-name-desc", value="", debounce=True,
+                                  placeholder="Display name…",disabled=True,
+                                  style={"width": "100%", "padding": "6px 8px",
+                                         "fontSize": "13px", "border": "1px solid #d1d5db",
+                                         "borderRadius": "4px", "boxSizing": "border-box"}),
+                    ]),
+                    # Measure
+                    html.Div(style={"marginBottom": "12px"}, children=[
+                        html.Label("Measure",
+                                   style={"fontSize": "12px", "fontWeight": "600",
+                                          "display": "block", "marginBottom": "4px",
+                                          "color": "#374151"}),
+                        dcc.Dropdown(id="rpt-flt-measure", options=_measure_opts, value=None,
+                                     placeholder="Select measure…", clearable=True,
+                                     style={"fontSize": "13px"}),
+                    ]),
+                    # Unique column (container swapped by callback: dropdown ↔ input)
+                    html.Div(style={"marginBottom": "12px"}, children=[
+                        html.Label("Unique Column",
+                                   style={"fontSize": "12px", "fontWeight": "600",
+                                          "display": "block", "marginBottom": "4px",
+                                          "color": "#374151"}),
+                        html.Div(
+                            id="rpt-flt-unique-col-wrap",
+                            children=[
+                                dcc.Dropdown(id="rpt-flt-unique-col",
+                                             options=_actual_keys_opts, value=None,
+                                             placeholder="Select column…", clearable=True,
+                                             style={"fontSize": "13px"}),
+                            ],
+                        ),
+                    ]),
+                    html.Hr(style={"margin": "16px 0", "borderColor": "#e5e7eb"}),
+                    # Filter rows header
+                    html.Div(
+                        style={"display": "flex", "alignItems": "center", "marginBottom": "6px"},
+                        children=[
+                            html.Span("Variable Filters",
+                                      style={"fontWeight": "600", "fontSize": "13px",
+                                             "color": "#374151", "flex": "1"}),
+                            html.Button("+ Add Row", id="rpt-flt-add-row-btn", n_clicks=0,
+                                        style={"padding": "3px 10px", "fontSize": "12px",
+                                               "cursor": "pointer", "background": "#e0f2fe",
+                                               "border": "1px solid #38bdf8",
+                                               "borderRadius": "4px", "color": "#0c4a6e"}),
+                        ],
+                    ),
+                    # Column labels for rows
+                    html.Div(
+                        style={"display": "flex", "gap": "6px", "marginBottom": "4px",
+                               "fontSize": "11px", "color": "#6b7280", "fontWeight": "600"},
+                        children=[
+                            html.Span("Column",  style={"flex": "2", "minWidth": "120px"}),
+                            html.Span("Op",      style={"flex": "0 0 80px"}),
+                            html.Span("Type",    style={"flex": "0 0 80px"}),
+                            html.Span("Value(s)", style={"flex": "3", "minWidth": "140px"}),
+                            html.Span("",        style={"flex": "0 0 34px"}),
+                        ],
+                    ),
+                    # Dynamic filter rows
+                    html.Div(id="rpt-filter-rows-container", children=[]),
+                ],
+            ),
+            # Footer
+            html.Div(
+                style={"flexShrink": "0", "padding": "8px 16px", "background": "#f9fafb",
+                       "borderTop": "1px solid #e5e7eb", "display": "flex", "gap": "8px",
+                       "alignItems": "center"},
+                children=[
+                    html.Button("💾 Save Filter", id="rpt-flt-save-btn", n_clicks=0,
+                                style={"padding": "6px 18px", "background": "#16a34a",
+                                       "color": "#fff", "border": "none", "borderRadius": "5px",
+                                       "cursor": "pointer", "fontSize": "13px",
+                                       "fontWeight": "600"}),
+                ],
+            ),
+        ],
+    )
+
+    right_panel = html.Div(
+        style={"flex": "1", "display": "flex", "flexDirection": "column", "minWidth": "0"},
+        children=[table_editor, filter_editor],
     )
 
     # --- Modal ---
