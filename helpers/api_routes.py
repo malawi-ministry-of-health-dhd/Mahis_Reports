@@ -173,6 +173,9 @@ def register_api_routes(server):
                 ),
                 None,
             )
+
+            report_filters = report.get("filters", {})
+            
             if not report:
                 return jsonify({"error": "Report not found"}), 404
 
@@ -183,7 +186,7 @@ def register_api_routes(server):
 
             builder = ReportTableBuilder(
                 spec_path, start_date, end_date, DATA_PATH_,
-                facility_id, dhis2_period=None,
+                facility_id, dhis2_period=None,report_filters=report_filters
             )
             builder.load_spec()
             sections    = builder.build_section_tables()
