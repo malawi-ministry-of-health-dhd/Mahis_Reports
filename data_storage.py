@@ -192,8 +192,7 @@ class DataStorage:
 
                 dropdown_json = {"programs":sorted(user_programs.name.dropna().unique().tolist()), 
                             "encounters":sorted(encounter_types.name.dropna().unique().tolist()),
-                            "concepts":sorted(df.concept_name.dropna().unique().tolist()),
-                            "concept_answers":sorted(df.obs_value_coded.dropna().unique().tolist()),
+                            "concepts":sorted(concepts.name.dropna().unique().tolist()),
                             "gender":sorted(df.Gender.dropna().unique().tolist()),
                             #  "age_group":sorted(df.Age_Group.dropna().unique().tolist()),
                             "DrugName":sorted(drugs.name.dropna().unique().tolist()),

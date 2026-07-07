@@ -97,19 +97,25 @@ def _normalize_filter_value(val):
     if val is None:
         return None
 
-    # Convert pipe-delimited ("A | B")
-    if isinstance(val, str) and "|" in val:
-        return [v.strip() for v in val.split("|")]
+    if isinstance(val, list):
+        return val
 
-    # Convert stringified lists ("['A','B']")
-    if isinstance(val, str) and val.strip().startswith("[") and val.strip().endswith("]"):
-        try:
-            parsed = ast.literal_eval(val)
+    if isinstance(val, str):
+        stripped = val.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            parsed = None
+            try:
+                parsed = ast.literal_eval(stripped)
+            except (ValueError, SyntaxError):
+                try:
+                    parsed = json.loads(stripped)
+                except (ValueError, json.JSONDecodeError):
+                    parsed = None
+
             if isinstance(parsed, list):
                 return parsed
-        except:
-            pass  # fall back to string
-
+        if "|" in stripped:
+            return [v.strip() for v in stripped.split("|")]
     return val
 
 
@@ -558,7 +564,7 @@ def create_count_sets(
         final_query = outer + " AND " + " AND ".join(in_clauses)
     else:
         final_query = outer
-    print("Create countset", final_query, "\n\n")
+    # print("Create countset", final_query, "\n\n")
     result = DataStorage.query_duckdb(final_query)
     unique_patients = result[unique_column].unique().tolist()
     return result[pid_col].nunique(), unique_patients
@@ -582,6 +588,8 @@ def create_sum(query_fiter,data_path, unique_column=PERSON_ID_, num_field='Value
     joined_query =f"SELECT {unique_column}, {num_field} FROM '{data_path}' WHERE {query_fiter} AND "  + " AND ".join(queries)
     if not queries:
         joined_query =f"SELECT {unique_column}, {num_field} FROM '{data_path}' WHERE {query_fiter}"  
+    
+    # print("create sum", joined_query)
     result = DataStorage.query_duckdb(joined_query)
     unique_patients = result[unique_column].unique().tolist()
     return result[num_field].sum(), unique_patients

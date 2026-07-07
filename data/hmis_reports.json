@@ -464,13 +464,77 @@
       "programs": [
         "OPD Program"
       ],
-      "date_updated": "2026-07-03 16:48:06",
+      "date_updated": "2026-07-07 08:55:56",
       "updated_by": "admin",
       "page_name": "malaria_report",
       "archived": "False",
       "design": {
         "tables": [],
         "next_id": 6
+      },
+      "filters": {
+        "malaria_confirmed_under5": {
+          "filter_name": "malaria_confirmed_under5",
+          "filter_name_desc": "malaria_confirmed_under5",
+          "measure": "count_set",
+          "unique_column": "person_id",
+          "variable1": "Program",
+          "value1": "OPD Program",
+          "variable2": [
+            "concept_name",
+            "Value"
+          ],
+          "value2": "Malaria Rapid Diagonostic Test | Positive",
+          "variable3": "Age_Group",
+          "value3": "Under 5",
+          "variable4": [
+            "concept_name",
+            "obs_value_coded"
+          ],
+          "value4": "*diagnosis |*Malaria",
+          "variable5": "Encounter",
+          "value5": "Diagnosis"
+        },
+        "malaria_confirmed_over5": {
+          "filter_name": "malaria_confirmed_over5",
+          "filter_name_desc": "malaria_confirmed_over5",
+          "measure": "count_set",
+          "unique_column": "person_id",
+          "variable1": "Program",
+          "value1": "OPD Program",
+          "variable2": [
+            "concept_name",
+            "Value"
+          ],
+          "value2": "Malaria Rapid Diagonostic Test | Positive",
+          "variable3": "Age_Group",
+          "value3": "Over 5",
+          "variable4": [
+            "concept_name",
+            "obs_value_coded"
+          ],
+          "value4": "*diagnosis |*Malaria",
+          "variable5": "Encounter",
+          "value5": "Diagnosis"
+        },
+        "malaria_presumed_under5": {
+          "filter_name": "malaria_presumed_under5",
+          "filter_name_desc": "malaria_presumed_under5",
+          "measure": "calculated",
+          "unique_column": "{total_malaria_cases_u5}-{malaria_confirmed_under5}"
+        },
+        "commodity_la_1x6": {
+          "filter_name": "commodity_la_1x6",
+          "filter_name_desc": "commodity_la_1x6",
+          "measure": "sum",
+          "unique_column": "ValueN",
+          "variable1": "Program",
+          "value1": "OPD Program",
+          "variable2": "Encounter",
+          "value2": "Dispensing",
+          "variable3": "DrugName",
+          "value3": "*Lumefantrine + Arthemether 1 x 6"
+        }
       }
     },
     {
@@ -563,7 +627,7 @@
       "programs": [
         "OPD Program"
       ],
-      "date_updated": "2026-07-02 17:57:40",
+      "date_updated": "2026-07-07 09:12:22",
       "updated_by": "admin",
       "page_name": "hmis_15",
       "archived": "False",
@@ -2827,6 +2891,20 @@
           }
         ],
         "next_id": 13
+      },
+      "filters": {
+        "attendance_ART_treatment": {
+          "filter_name": "attendance_ART_treatment",
+          "filter_name_desc": "attendance_ART_treatment",
+          "measure": "count_set",
+          "unique_column": "person_id",
+          "variable1": "concept_name",
+          "value1": "Is the client on ART?",
+          "variable2": "Value",
+          "value2": "Yes",
+          "variable3": "Program",
+          "value3": "OPD Program"
+        }
       }
     },
     {
@@ -5379,473 +5457,12 @@
       "programs": [
         "HIV PROGRAM"
       ],
-      "date_updated": "2026-06-30 20:17:24",
+      "date_updated": "2026-07-04 20:35:58",
       "updated_by": "admin",
       "page_name": "dha_confirmatory",
       "archived": "False",
       "design": {
-        "tables": [
-          {
-            "id": "t1",
-            "pos": {
-              "x": 16,
-              "y": 16
-            },
-            "ta": "",
-            "tb": null,
-            "data": [
-              [
-                {
-                  "v": "HIV testing summary (from initial and confirmatory register)",
-                  "fill": "#e5e7eb",
-                  "color": "#374151",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": true
-                },
-                {
-                  "v": "MAHIS",
-                  "fill": "#e5e7eb",
-                  "color": "#374151",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "DHIS2-SCANFORM",
-                  "fill": "#e5e7eb",
-                  "color": "#374151",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "Total clients tested for HIV",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "PW4U7PNOG9F-Tt7fU5lUhAU",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "PW4U7PNOG9F-Tt7fU5lUhAU",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ]
-            ],
-            "col_widths": [
-              594,
-              205,
-              207
-            ],
-            "row_heights": [
-              28,
-              28
-            ]
-          },
-          {
-            "id": "t2",
-            "pos": {
-              "x": 16,
-              "y": 114
-            },
-            "ta": "",
-            "tb": null,
-            "data": [
-              [
-                {
-                  "v": "HIV test results by sex",
-                  "fill": "#e5e7eb",
-                  "color": "#374151",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": true
-                },
-                {
-                  "v": "MAHIS",
-                  "fill": "#e5e7eb",
-                  "color": "#374151",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "DHIS2-SCANFORM",
-                  "fill": "#e5e7eb",
-                  "color": "#374151",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "New negative",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": true
-                },
-                {
-                  "v": "HEV2UD81703-Tt7fU5lUhAU",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "HEV2UD81703-Tt7fU5lUhAU",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "New positive total",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": true
-                },
-                {
-                  "v": "CX5YN57V0S3",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "CX5YN57V0S3",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "Male",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "left",
-                  "indent": 1
-                },
-                {
-                  "v": "CX5YN57V0S3-M1qfTDVAM0c",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "CX5YN57V0S3-M1qfTDVAM0c",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "Female",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "left",
-                  "indent": 1
-                },
-                {
-                  "v": "CX5YN57V0S3-TjVpn3wCd8z",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "CX5YN57V0S3-TjVpn3wCd8z",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "Positive re-test total (prev. pos. professional test)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": true
-                },
-                {
-                  "v": "VC30RF04J8T",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "VC30RF04J8T",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "Male",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "left",
-                  "indent": 1
-                },
-                {
-                  "v": "VC30RF04J8T-M1qfTDVAM0c",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "VC30RF04J8T-M1qfTDVAM0c",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "Female",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "left",
-                  "indent": 1
-                },
-                {
-                  "v": "VC30RF04J8T-TjVpn3wCd8z",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "VC30RF04J8T-TjVpn3wCd8z",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "Inconclusive re-test total (prev. pos. professional test)",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": true
-                },
-                {
-                  "v": "MQL666E253I",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "MQL666E253I",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "Male",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "align": "left",
-                  "indent": 1
-                },
-                {
-                  "v": "MQL666E253I-M1qfTDVAM0c",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "MQL666E253I-M1qfTDVAM0c",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "Female",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "indent": 1
-                },
-                {
-                  "v": "MQL666E253I-TjVpn3wCd8z",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "MQL666E253I-TjVpn3wCd8z",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "New exposed infant",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": true
-                },
-                {
-                  "v": "FI3UWJYP9KY-Tt7fU5lUhAU",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "FI3UWJYP9KY-Tt7fU5lUhAU",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ],
-              [
-                {
-                  "v": "New inconclusive",
-                  "fill": "#f0fdf4",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false,
-                  "bold": true
-                },
-                {
-                  "v": "VR1BU2R9R4P-Tt7fU5lUhAU",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                },
-                {
-                  "v": "VR1BU2R9R4P-Tt7fU5lUhAU",
-                  "fill": "#ffffff",
-                  "color": "#000000",
-                  "cs": 1,
-                  "rs": 1,
-                  "hidden": false
-                }
-              ]
-            ],
-            "col_widths": [
-              593,
-              210,
-              207
-            ],
-            "row_heights": [
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28,
-              28
-            ]
-          }
-        ],
+        "tables": [],
         "next_id": 3
       }
     }
