@@ -475,9 +475,9 @@ def create_count(query_fiter,data_path, aggregation='count', unique_column=PERSO
     if aggregation == "time_diff_mins":
         joined_query = (joined_query.replace(unique_column, 
                                             f"({unique_column}), DATEDIFF('minute', MIN({DATE_}), MAX({DATE_})) AS patient_session_minutes")
-                                            + f" GROUP BY {unique_column}, {DATE_}")
+                                            + f" GROUP BY {unique_column}, CAST({DATE_} AS DATE)")
     
-    # print("Create count",joined_query)
+    print("Create count",joined_query)
     result = DataStorage.query_duckdb(joined_query)
     unique_patients = result[unique_column].unique().tolist()
     if aggregation == 'count':

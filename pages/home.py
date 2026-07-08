@@ -605,6 +605,12 @@ layout = html.Div(
                                 "cursor":        "pointer",
                             },
                         ),
+                        html.Div(
+                            id="filter-period-text",
+                            style={"fontWeight":"400",
+                                   "color":"black",
+                                   "fontSize":"12px"}
+                            )
                     ],
                 ),
                 # Menu Section
@@ -1043,6 +1049,7 @@ def update_menu(interval, color):
      Output('dashboard-district-note', 'children'),
      Output('dashboard-facility-filter', 'options'),
      Output('dashboard-facility-filter', 'value'),
+     Output('filter-period-text', 'children'),
      Output('active-button-store', 'data')],
     [
         Input('dashboard-btn-generate', 'n_clicks'),
@@ -1248,6 +1255,7 @@ def update_dashboard(gen, start_date, end_date, level,
             district_note,
             [{'label': f, 'value': f} for f in all_facilities],
             facilities,
+            f"{start_dt} - {end_dt}",
             clicked_name
         )
     except PreventUpdate:
@@ -1261,6 +1269,7 @@ def update_dashboard(gen, start_date, end_date, level,
                 html.P(f"{type(e).__name__}", style={"color": "#64748b", "fontSize": "12px", "fontWeight": "600"}),
                 html.P(str(e), style={"color": "#94A3B8", "fontSize": "12px"}),
             ]),
+            dash.no_update,
             dash.no_update,
             dash.no_update,
             dash.no_update,
