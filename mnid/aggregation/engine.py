@@ -23,6 +23,7 @@ _DEFAULT_VIZ_DIR = os.path.join('data', 'visualizations')
 _DEFAULT_OUT_DIR = os.path.join('data', 'mnid_aggregates')
 
 _GRAINS = ['monthly', 'weekly', 'daily', 'quarterly', 'yearly']
+_DEMO_GRAINS = ['monthly', 'weekly', 'quarterly', 'yearly']
 _GRAIN_CODES = {'daily': 'D', 'weekly': 'W', 'monthly': 'M', 'quarterly': 'Q', 'yearly': 'Y'}
 
 
@@ -79,6 +80,36 @@ def _load_all_indicators(viz_dir: str) -> list[dict]:
         _LOG.info('Loaded %d program-based indicators', sum(1 for i in indicators if str(i.get('id', '')).startswith('mnid_')))
     except Exception as exc:
         _LOG.warning('Could not load program-based indicators: %s', exc)
+
+    # Add Nest360 indicators from the MNH-Nest360 dashboard module.
+    # Only include 'tracked' status so awaiting_baseline entries are skipped.
+    # Uses load_dashboard_module because the folder name contains a hyphen.
+    try:
+        from mnid.dashboards import load_dashboard_module as _ldm
+        _nest_module = _ldm('MNH-Nest360')
+        get_nest360_indicators = _nest_module.__dict__.get('get_nest360_indicators')
+        if get_nest360_indicators is None:
+            # Load the indicators sub-module directly
+            import importlib.util as _ilu
+            from pathlib import Path as _P
+            _ipath = _P(__file__).resolve().parents[1] / 'dashboards' / 'MNH-Nest360' / 'indicators.py'
+            _spec = _ilu.spec_from_file_location('mnid.dashboards.mnh_nest360_indicators', str(_ipath))
+            _imod = _ilu.module_from_spec(_spec)
+            _spec.loader.exec_module(_imod)
+            get_nest360_indicators = _imod.get_nest360_indicators
+        for ind in get_nest360_indicators():
+            iid = ind.get('id')
+            if (
+                iid and iid not in seen
+                and ind.get('status') == 'tracked'
+                and ind.get('numerator_filters')
+                and ind.get('denominator_filters')
+            ):
+                seen.add(iid)
+                indicators.append(ind)
+        _LOG.info('Loaded %d Nest360 indicators', sum(1 for i in indicators if str(i.get('id', '')).startswith('nest360_')))
+    except Exception as exc:
+        _LOG.warning('Could not load Nest360 indicators: %s', exc)
 
     return indicators
 
@@ -205,7 +236,10 @@ def run_aggregation(
     if not indicators:
         _LOG.warning('No indicators found in %s, nothing to aggregate', viz_dir)
         return False
-    active_grains = grains if grains is not None else _GRAINS
+    if grains is not None:
+        active_grains = grains
+    else:
+        active_grains = _DEMO_GRAINS if DATA_FILE_NAME_ == 'demo_parquet' else _GRAINS
     _LOG.info('Aggregating %d indicators across grains: %s', len(indicators), active_grains)
 
     parts = []
@@ -226,7 +260,7 @@ def run_aggregation(
         'elapsed_sec':     round(elapsed, 1),
         'rows':            len(agg_df),
         'indicators':      len(indicators),
-        'grains':          _GRAINS,
+        'grains':          active_grains,
         'data_source':     DATA_FILE_NAME_,
         'use_demo_data':   bool(DATA_FILE_NAME_ == 'demo_parquet'),
         'last_run_status': 'ok',

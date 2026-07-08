@@ -16,7 +16,7 @@
     {
       "id": "mnh-nest360",
       "label": "MNH-Nest360",
-      "placeholder": true
+      "module": "mnid/dashboards/MNH-Nest360"
     }
   ]
 }

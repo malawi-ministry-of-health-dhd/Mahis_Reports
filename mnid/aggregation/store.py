@@ -93,11 +93,13 @@ def invalidate_cache() -> None:
 
 # query helpers
 
-_GRAIN_PERIOD_CODE = {'daily': 'D', 'weekly': 'W', 'monthly': 'M'}
+_GRAIN_PERIOD_CODE = {'daily': 'D', 'weekly': 'W', 'monthly': 'M', 'quarterly': 'Q', 'yearly': 'Y'}
 _GRAIN_FALLBACKS = {
     'daily': ['daily', 'weekly', 'monthly'],
     'weekly': ['weekly', 'monthly'],
     'monthly': ['monthly'],
+    'quarterly': ['quarterly', 'monthly'],
+    'yearly': ['yearly', 'quarterly', 'monthly'],
 }
 
 

@@ -191,6 +191,8 @@ RATES = {
     "bcg": 0.70, "hiv_pos": 0.18, "lbw": 0.32,
     "nb_core": 0.80, "ikmc": 0.62, "resus": 0.40, "thermal_ok": 0.86,
     "vitk_nb": 0.90, "eligible_resus_given": 0.48,
+    # Nest360 additions
+    "pulse_ox": 0.72, "phototherapy": 0.65,
     # mohupdate: ANC MOH dashboard rates
     "hepatitis_b": 0.45, "sp_3plus": 0.35, "mms_180": 0.25,
     "fefo_120": 0.55, "itn": 0.50, "uterine_scar": 0.08,
@@ -586,6 +588,15 @@ for district, facilities in DISTRICTS.items():
             cpap_1000_pids = _sample_n(nb_pids, 0.12)
             cpap_1500_pids = _sample_n(nb_pids, 0.15)
 
+            # Nest360 additional scenario pools
+            pulse_ox_denom  = _sample_n(nb_pids, 0.75)   # 75% have pulse ox measured
+            pulse_ox_num    = _sample_n(list(pulse_ox_denom), _r("pulse_ox", fac_jitter))
+            jaundice_pids   = _sample_n(nb_pids, 0.15)   # 15% have clinical jaundice
+            bili_denom      = _sample_n(list(jaundice_pids), 0.80)   # 80% of jaundice get bilirubin
+            photo_denom     = _sample_n(list(jaundice_pids), _r("phototherapy", fac_jitter))
+            glucose_denom   = _sample_n(nb_pids, 0.60)   # 60% have glucose monitored
+            sepsis_pids     = set()  # tracked to ensure antibiotics co-occur
+
             for pid in nb_pids:
                 enc_id = _next_id()
                 dt = _rand_date(year, month, days)
@@ -613,6 +624,25 @@ for district, facilities in DISTRICTS.items():
                         _obs(tmpl, "Birth asphyxia suspected", "Yes")
                     if random.random() < scenario["neonatal_sepsis"]:
                         _obs(tmpl, "Neonatal Sepsis - Early Onset", "Yes")
+                        sepsis_pids.add(pid)
+
+                # Pulse oximeter (Nest360 vital sign)
+                if pid in pulse_ox_denom:
+                    _obs(tmpl, "Pulse oximeter used at admission",
+                         "Yes" if pid in pulse_ox_num else "No")
+
+                # Jaundice + bilirubin + phototherapy (Nest360 jaundice pathway)
+                if pid in jaundice_pids:
+                    _obs(tmpl, "Clinical jaundice", "Yes")
+                    if pid in bili_denom:
+                        _bili = round(random.uniform(8, 22), 1)
+                        _obs(tmpl, "Total Serum Bilirubin", str(_bili), value_n=_bili)
+                    if pid in photo_denom:
+                        _obs(tmpl, "Phototherapy given", "Yes")
+
+                # Blood glucose monitoring (Nest360 vital sign)
+                if pid in glucose_denom:
+                    _obs(tmpl, "Blood glucose", value_n=round(random.uniform(2.2, 6.5), 1))
 
                 if pid in ikmc_denom:
                     _obs(tmpl, "iKMC initiated", "Yes" if pid in ikmc_num else "No")
@@ -627,7 +657,8 @@ for district, facilities in DISTRICTS.items():
                     _obs(tmpl, "Eligible for neonatal resuscitation", "Yes")
                     _obs(tmpl, "Neonatal resuscitation provided",
                          "Yes" if pid in eligible_resus else "No")
-                if random.random() < scenario["neonatal_sepsis"]:
+                # Antibiotics co-occur with sepsis so the sepsis_antibiotics flag fires correctly
+                if pid in sepsis_pids or random.random() < scenario["neonatal_sepsis"] * 0.3:
                     _obs(tmpl, "Parenteral antibiotics given", "Yes")
 
             # ── Operational readiness (facility-level, once per month) ─────────
