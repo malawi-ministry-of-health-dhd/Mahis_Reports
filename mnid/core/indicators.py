@@ -1468,7 +1468,7 @@ def _program_based_overlay_fallbacks(categories: list[str] | None = None) -> lis
     return indicators
 
 
-def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str] | None = None) -> list[dict]:
+def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str] | None = None, include_moh: bool = False) -> list[dict]:
     wanted = set(categories or _CAT_ORDER)
     overlays = {
         'ANC screened for anaemia': {
@@ -1882,6 +1882,8 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
 
     # Keep source-of-truth indicators from JSON, but append calculable operational priorities if they are missing.
     for fallback in _program_based_priority_indicators(categories):
+        if not include_moh and '_moh_' in str(fallback.get('id', '')):
+            continue
         if fallback.get('label') in seen_labels:
             continue
         if wanted and fallback.get('category') not in wanted:
@@ -1904,5 +1906,5 @@ def _enrich_program_based_mnid_indicators(indicators: list, categories: list[str
 # indicators work in both demo (MATERNAL AND CHILD HEALTH) and production schemas.
 # Previously skipped program-based indicators for demo data because
 # _uses_program_based_mnid_schema() returned False.
-def _resolve_runtime_mnid_indicators(indicators: list, df: pd.DataFrame, categories: list[str] | None = None) -> list:
-    return _enrich_program_based_mnid_indicators(indicators, categories)
+def _resolve_runtime_mnid_indicators(indicators: list, df: pd.DataFrame, categories: list[str] | None = None, include_moh: bool = False) -> list:
+    return _enrich_program_based_mnid_indicators(indicators, categories, include_moh=include_moh)

@@ -644,6 +644,7 @@ def render_mnh_moh_dashboard(
         source_indicators,
         working_df,
         categories=['ANC', 'Labour', 'PNC', 'Newborn'],
+        include_moh=True,
     )
     category_order = _resolve_category_order(source_indicators, ['ANC', 'Labour', 'PNC', 'Newborn'])
     agg_df = _get_aggregate()
