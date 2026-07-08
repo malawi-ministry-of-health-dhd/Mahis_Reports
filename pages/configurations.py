@@ -19,7 +19,8 @@ from helpers.modal_functions import (validate_excel_file, load_reports_data, sav
                         upload_dashboard_json,validate_prog_reports_json,upload_prog_reports_json,CHART_TEMPLATES,render_filter_rows,
                         build_reports_table, create_editable_table, create_preview_table,
                         generate_dashboard_items_list, create_edit_modal,
-                        _build_ds_list, _build_users_table, create_html_report_modal)
+                        _build_ds_list, _build_users_table, create_html_report_modal,
+                        create_prog_report_modal)
 from helpers.config_helper import (load_dashboards_from_file, save_dashboards_to_file,
                         _coerce_list, _normalize_filter_value, _safe_json_loads,
                         _empty_dashboard_structure, _find_dashboard_index,
@@ -29,8 +30,12 @@ from helpers.config_helper import (load_dashboards_from_file, save_dashboards_to
                         _load_facilities, _extract_identifiers, dashboards_json_path)
 from config import actual_keys_in_data
 from helpers.navigation_callbacks import DEMO_UUID
+from dash_iconify import DashIconify
 
 dash.register_page(__name__, path="/reports_config", title="Admin Dashboard")
+
+def nav_icon(icon_name):
+    return DashIconify(icon=icon_name, className="nav-icon")
 
 
 # Load existing dashboards
@@ -554,7 +559,29 @@ archive_confirmation_modal = html.Div([
         'alignItems': 'center',
         'zIndex': '1000'
     })
-reports_table = html.Div(id="reports-table-container")
+reports_table = html.Div(
+    id="reports-table-wrapper",
+    style={"display": "none"},
+    children=[
+        html.Div(
+            style={"display": "flex", "justifyContent": "space-between",
+                   "alignItems": "center", "padding": "8px 0 12px"},
+            children=[
+                html.Span("Dataset Reports",
+                          style={"fontWeight": "600", "fontSize": "16px", "color": "#1e293b"}),
+                html.Button(
+                    "✕ Close",
+                    id="reports-table-close-btn",
+                    n_clicks=0,
+                    style={"padding": "4px 12px", "fontSize": "12px", "cursor": "pointer",
+                           "background": "#fee2e2", "border": "1px solid #fca5a5",
+                           "borderRadius": "4px", "color": "#dc2626"},
+                ),
+            ],
+        ),
+        html.Div(id="reports-table-container"),
+    ],
+)
 
 layout = html.Div(
     style={
@@ -565,7 +592,7 @@ layout = html.Div(
     },
     children=[
         dcc.Location(id='url', refresh=False),
-        # ---------- LEFT SIDEBAR ----------
+        #LEFT SIDEBAR
         html.Div(
             id="sidebar",
             className="sidebar-modern",
@@ -577,73 +604,90 @@ layout = html.Div(
                         html.P("Manage Reports & Dashboards", className="sidebar-subtitle")
                     ]
                 ),
-                
+
                 html.Div(
                     className="sidebar-nav",
                     children=[
-                        html.Button(
-                            "DataSet Reports",
-                            id="dataset-reports-btn",
-                            n_clicks=0,
-                            className="nav-btn-modern success"
+
+                        # --- Reports ---
+                        html.Div(
+                            className="nav-group",
+                            children=[
+                                html.P("Reports", className="nav-section-title"),
+                                html.Button(
+                                    [nav_icon("lucide:bar-chart-3"), "DataSet Reports"],
+                                    id="dataset-reports-btn", n_clicks=0, className="nav-btn-modern"
+                                ),
+                                html.Button(
+                                    [nav_icon("lucide:upload"), "Upload Report Template"],
+                                    id="add-from-template-btn", n_clicks=0, className="nav-btn-modern"
+                                ),
+                                html.Button(
+                                    [nav_icon("lucide:pencil-line"), "Create Reports (GUI)"],
+                                    id="create-reports-gui-btn", n_clicks=0, className="nav-btn-modern"
+                                ),
+                                html.Button(
+                                    [nav_icon("lucide:file-json"), "Upload Program Report Template (JSON)"],
+                                    id="add-prog-report-temp-btn", n_clicks=0, className="nav-btn-modern"
+                                ),
+                                html.Button(
+                                    [nav_icon("lucide:file-json"), "Create Program Reports (GUI)"],
+                                    id="create-report-gui-btn", n_clicks=0, className="nav-btn-modern"
+                                ),
+                                html.Button(
+                                    [nav_icon("lucide:file-down"), "Download XLSX Template"],
+                                    id="download-sample", n_clicks=0, className="nav-btn-modern"
+                                ),
+                            ]
                         ),
-                        html.Button(
-                            "Upload Report Template",
-                            id="add-from-template-btn",
-                            n_clicks=0,
-                            className="nav-btn-modern"
+
+                        # --- Dashboards ---
+                        html.Div(
+                            className="nav-group",
+                            children=[
+                                html.P("Dashboards", className="nav-section-title"),
+                                html.Button(
+                                    [nav_icon("lucide:layout-dashboard"), "Create Dashboards (GUI)"],
+                                    id="add-dashboard", n_clicks=0, className="nav-btn-modern"
+                                ),
+                                html.Button(
+                                    [nav_icon("lucide:upload-cloud"), "Upload Dashboard Template (JSON)"],
+                                    id="add-dashboard-temp-btn", n_clicks=0, className="nav-btn-modern"
+                                ),
+                            ]
                         ),
-                        html.Button(
-                            "Update Reports (GUI)",
-                            id="create-reports-gui-btn",
-                            n_clicks=0,
-                            className="nav-btn-modern"
+
+                        # --- Data ---
+                        html.Div(
+                            className="nav-group",
+                            children=[
+                                html.P("Data", className="nav-section-title"),
+                                html.Button(
+                                    [nav_icon("lucide:eye"), "Preview Data"],
+                                    id="preview-data", n_clicks=0, className="nav-btn-modern"
+                                ),
+                            ]
                         ),
-                        html.Button(
-                            "Upload Dashboard Template (JSON)",
-                            id="add-dashboard-temp-btn",
-                            n_clicks=0,
-                            className="nav-btn-modern"
+
+                        # --- Administration ---
+                        html.Div(
+                            className="nav-group",
+                            children=[
+                                html.P("Administration", className="nav-section-title"),
+                                html.Button(
+                                    [nav_icon("lucide:users"), "Configure Users"],
+                                    id="configure-users-btn", n_clicks=0, className="nav-btn-modern"
+                                ),
+                                html.Button(
+                                    [nav_icon("lucide:plug-zap"), "Configure Data Sources"],
+                                    id="configure-datasources-btn", n_clicks=0, className="nav-btn-modern"
+                                ),
+                            ]
                         ),
-                        html.Button(
-                            "Upload Program Report Template (JSON)",
-                            id="add-prog-report-temp-btn",
-                            n_clicks=0,
-                            className="nav-btn-modern"
-                        ),
-                        html.Button(
-                            "Create Dashboards (GUI)",
-                            id="add-dashboard",
-                            n_clicks=0,
-                            className="nav-btn-modern"
-                        ),
-                        html.Button(
-                            "Download XLSX Template",
-                            id="download-sample",
-                            n_clicks=0,
-                            className="nav-btn-modern"
-                        ),
-                        html.Button(
-                            "Preview Data",
-                            id="preview-data",
-                            n_clicks=0,
-                            className="nav-btn-modern"
-                        ),
-                        html.Button(
-                            "Configure Users",
-                            id="configure-users-btn",
-                            n_clicks=0,
-                            className="nav-btn-modern"
-                        ),
-                        html.Button(
-                            "Configure Data Sources",
-                            id="configure-datasources-btn",
-                            n_clicks=0,
-                            className="nav-btn-modern"
-                        ),
+
                     ]
                 ),
-                
+
                 html.Div(
                     className="sidebar-footer",
                     children=[
@@ -670,6 +714,7 @@ layout = html.Div(
                 archive_confirmation_modal,
                 create_edit_modal(),
                 create_html_report_modal(),
+                create_prog_report_modal(),
 
                 # Hidden Components
                 dcc.Interval(id="refresh-interval", interval=10*60*1000, n_intervals=0),
@@ -706,6 +751,7 @@ layout = html.Div(
                 dcc.Store(id="rpt-variables-store", data={"all": []}),
                 dcc.Input(id="rpt-var-drop-hidden", value="{}",
                           style={"display": "none"}),
+                dcc.Store(id="prog-rpt-groups-store", data=[]),
                 dcc.Store(id="rpt-filter-edit-var", data=None),
                 dcc.Store(id="rpt-right-mode", data="table"),
                 dcc.Store(id="rpt-filter-row-store", data=[]),
@@ -1294,6 +1340,32 @@ def validate_admin_access(urlparams):
 def download_template(clicks):
     if clicks:
         return dcc.send_file("data/report_template.xlsx")
+
+# Toggle reports table wrapper when "DataSet Reports" button is clicked
+@callback(
+    Output("reports-table-wrapper", "style", allow_duplicate=True),
+    Input("dataset-reports-btn", "n_clicks"),
+    State("reports-table-wrapper", "style"),
+    prevent_initial_call=True,
+)
+def toggle_reports_table(n_clicks, current_style):
+    if not n_clicks:
+        raise PreventUpdate
+    if (current_style or {}).get("display") == "none":
+        return {"display": "block"}
+    return {"display": "none"}
+
+
+@callback(
+    Output("reports-table-wrapper", "style", allow_duplicate=True),
+    Input("reports-table-close-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+def close_reports_table(n_clicks):
+    if not n_clicks:
+        raise PreventUpdate
+    return {"display": "none"}
+
 
 # reports
 @callback(
@@ -2019,7 +2091,7 @@ def confirm_archive(n_clicks, current_report, current_n_clicks):
     
 @callback(
     [Output("preview-popup", "style"),
-     Output("reports-table-container", "style", allow_duplicate=True)],
+     Output("reports-table-wrapper", "style", allow_duplicate=True)],
     [Input("preview-data", "n_clicks"),
      Input("close-preview-btn", "n_clicks")],
     prevent_initial_call=True,
@@ -2027,7 +2099,7 @@ def confirm_archive(n_clicks, current_report, current_n_clicks):
 def toggle_preview_popup(preview_clicks, close_clicks):
     trigger_id = ctx.triggered_id
     if trigger_id == "close-preview-btn":
-        return {"display": "none"}, {}
+        return {"display": "none"}, dash.no_update
     if trigger_id == "preview-data" and preview_clicks:
         return {"display": "flex"}, {"display": "none"}
     return dash.no_update, dash.no_update
@@ -3131,7 +3203,7 @@ def toggle_confirmation_modal(show_confirmation):
 # 1. Toggle panel visibility — show user config, hide main content area (and vice-versa)
 @callback(
     [Output("user-config-panel",  "style"),
-     Output("reports-table-container", "style", allow_duplicate=True)],
+     Output("reports-table-wrapper", "style", allow_duplicate=True)],
     [Input("configure-users-btn",  "n_clicks"),
      Input("close-user-config-btn","n_clicks")],
     prevent_initial_call=True,
@@ -3139,7 +3211,7 @@ def toggle_confirmation_modal(show_confirmation):
 def toggle_user_config_panel(open_clicks, close_clicks):
     if ctx.triggered_id == "configure-users-btn":
         return {"display": "block"}, {"display": "none"}
-    return {"display": "none"}, {"display": "block"}
+    return {"display": "none"}, dash.no_update
 
 
 # 2. Populate user search dropdown when panel opens
@@ -3368,7 +3440,7 @@ def refresh_users_table(panel_style, urlparams):
 @callback(
     [Output("datasource-panel",  "style"),
      Output("user-config-panel", "style", allow_duplicate=True),
-     Output("reports-table-container", "style", allow_duplicate=True)],
+     Output("reports-table-wrapper", "style", allow_duplicate=True)],
     [Input("configure-datasources-btn", "n_clicks"),
      Input("close-datasource-btn",      "n_clicks")],
     prevent_initial_call=True,
@@ -3376,7 +3448,7 @@ def refresh_users_table(panel_style, urlparams):
 def toggle_datasource_panel(open_clicks, close_clicks):
     if ctx.triggered_id == "configure-datasources-btn":
         return {"display": "block"}, {"display": "none"}, {"display": "none"}
-    return {"display": "none"}, {"display": "none"}, {"display": "block"}
+    return {"display": "none"}, {"display": "none"}, dash.no_update
 
 
 # 2. Populate SSH key dropdown and datasource list when panel opens
@@ -5588,3 +5660,502 @@ def _rpt_save_report(n_clicks, state, page_name, drag_pos, resize_store):
         return f"Saved! {now}"
     except Exception as e:
         return f"Error: {e}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 13: Program Report GUI  (prog-report-modal)
+# ═══════════════════════════════════════════════════════════════════════════
+
+_PROG_REPORTS_PATH = os.path.join(os.getcwd(), "data", "visualizations",
+                                  "validated_prog_reports.json")
+
+
+def _load_prog_reports():
+    if not os.path.exists(_PROG_REPORTS_PATH):
+        return []
+    try:
+        with open(_PROG_REPORTS_PATH) as f:
+            return json.load(f).get("reports", [])
+    except Exception:
+        return []
+
+
+def _save_prog_reports(reports):
+    with open(_PROG_REPORTS_PATH, "w") as f:
+        json.dump({"reports": reports}, f, indent=2)
+
+
+# 13a. Toggle modal
+@callback(
+    Output("prog-report-modal", "style"),
+    Input("create-report-gui-btn", "n_clicks"),
+    Input("prog-rpt-close-btn", "n_clicks"),
+    State("prog-report-modal", "style"),
+    prevent_initial_call=True,
+)
+def _prog_rpt_toggle_modal(open_clicks, close_clicks, style):
+    if ctx.triggered_id == "create-report-gui-btn":
+        return {**style, "display": "flex"}
+    return {**style, "display": "none"}
+
+
+# 13b. Populate selector when modal opens
+@callback(
+    Output("prog-rpt-selector", "options"),
+    Input("prog-report-modal", "style"),
+    prevent_initial_call=True,
+)
+def _prog_rpt_load_options(modal_style):
+    if (modal_style or {}).get("display") == "none":
+        raise PreventUpdate
+    return [{"label": r.get("report_name", r.get("id", "?")),
+             "value": r.get("report_name")}
+            for r in _load_prog_reports() if r.get("report_name")]
+
+
+# 13c. New button — clear selector (triggers 13d which resets form)
+@callback(
+    Output("prog-rpt-selector", "value"),
+    Input("prog-rpt-new-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+def _prog_rpt_new(_):
+    return None
+
+
+# 13d. Load all form fields from selected report (or clear for new)
+@callback(
+    Output("prog-rpt-id",              "value"),
+    Output("prog-rpt-name",            "value"),
+    Output("prog-rpt-program",         "value"),
+    Output("prog-rpt-type",            "value"),
+    Output("prog-rpt-unique-col",      "value"),
+    Output("prog-rpt-auth-user",       "value"),
+    Output("prog-rpt-message",         "value"),
+    Output("prog-rpt-groups-store",    "data"),
+    Output("prog-rpt-cols-order",      "value"),
+    Output("prog-rpt-merge-methods",   "value"),
+    Output("prog-rpt-rename",          "value"),
+    Output("prog-rpt-index-col",       "value"),
+    Output("prog-rpt-columns-col",     "value"),
+    Output("prog-rpt-values-col",      "value"),
+    Output("prog-rpt-aggfunc",         "value"),
+    Output("prog-rpt-pivot-unique-col","value"),
+    Output("prog-rpt-normalize",       "value"),
+    Output("prog-rpt-filter-col1",     "value"),
+    Output("prog-rpt-filter-val1",     "value"),
+    Output("prog-rpt-filter-col2",     "value"),
+    Output("prog-rpt-filter-val2",     "value"),
+    Output("prog-rpt-filter-col3",     "value"),
+    Output("prog-rpt-filter-val3",     "value"),
+    Output("prog-rpt-tabular-rename",  "value"),
+    Output("prog-rpt-tabular-replace", "value"),
+    Input("prog-rpt-selector", "value"),
+    prevent_initial_call=True,
+)
+def _prog_rpt_load_form(report_name):
+    _blank = (None,) * 25
+    if not report_name:
+        return _blank
+
+    rpt = next((r for r in _load_prog_reports()
+                if r.get("report_name") == report_name), None)
+    if not rpt:
+        return _blank
+
+    rpt_type = rpt.get("type")
+    auth = rpt.get("authorized_user")
+    if isinstance(auth, str):
+        auth = [auth]
+
+    if rpt_type == "LineList":
+        groups = []
+        for i in range(1, 31):
+            cols = rpt.get(f"group_cols{i}")
+            if not cols:
+                break
+            aggr_dict = rpt.get(f"group{i}_aggr") or {}
+            aggr_val  = next(iter(aggr_dict.values()), None) if aggr_dict else None
+            groups.append({
+                "group_cols":        cols if isinstance(cols, list) else [cols],
+                "group_filters_str": json.dumps(rpt.get(f"group{i}_filters") or {}),
+                "group_aggr":        aggr_val,
+                "group_rename_str":  json.dumps(rpt.get(f"group{i}_rename") or {}),
+            })
+        return (
+            rpt.get("id", ""),
+            rpt.get("report_name", ""),
+            rpt.get("program"),
+            rpt_type,
+            rpt.get("unique_col"),
+            auth,
+            rpt.get("message", ""),
+            groups,
+            rpt.get("cols_order") or [],
+            rpt.get("merge_methods") or [],
+            json.dumps(rpt.get("rename") or {}),
+            None, None, None, None, None, None,
+            None, None, None, None, None, None,
+            None, None,
+        )
+
+    # PivotTable / CrossTab
+    f = rpt.get("filters") or {}
+    norm = f.get("normalize")
+    if norm is True:
+        norm = "all"
+    return (
+        rpt.get("id", ""),
+        rpt.get("report_name", ""),
+        rpt.get("program"),
+        rpt_type,
+        rpt.get("unique_col"),
+        auth,
+        rpt.get("message", ""),
+        [],
+        [], [], "",
+        f.get("index_col1") or f.get("index"),
+        f.get("columns"),
+        f.get("values_col"),
+        f.get("aggfunc"),
+        f.get("unique_column"),
+        str(norm) if norm else None,
+        f.get("filter_col1"), f.get("filter_val1"),
+        f.get("filter_col2"), f.get("filter_val2"),
+        f.get("filter_col3"), f.get("filter_val3"),
+        json.dumps(f.get("rename") or {}),
+        json.dumps(f.get("replace") or {}),
+    )
+
+
+# 13e. Toggle right panels when type changes
+@callback(
+    Output("prog-rpt-linelist-panel", "style"),
+    Output("prog-rpt-pivot-panel",    "style"),
+    Output("prog-rpt-normalize-wrap", "style"),
+    Input("prog-rpt-type", "value"),
+    prevent_initial_call=False,
+)
+def _prog_rpt_toggle_panels(chart_type):
+    _ll  = {"flexDirection": "column", "gap": "8px",  "height": "100%",
+            "overflowY": "auto", "padding": "14px"}
+    _piv = {"flexDirection": "column", "gap": "10px", "height": "100%",
+            "overflowY": "auto", "padding": "14px"}
+    if chart_type == "LineList":
+        return ({**_ll,  "display": "flex"},
+                {**_piv, "display": "none"},
+                {"display": "none"})
+    if chart_type in ("PivotTable", "CrossTab"):
+        norm = {"display": "block"} if chart_type == "CrossTab" else {"display": "none"}
+        return ({**_ll,  "display": "none"},
+                {**_piv, "display": "flex"},
+                norm)
+    return ({**_ll,  "display": "none"},
+            {**_piv, "display": "none"},
+            {"display": "none"})
+
+
+# 13f. Render group rows from store
+@callback(
+    Output("prog-rpt-groups-container", "children"),
+    Input("prog-rpt-groups-store", "data"),
+    prevent_initial_call=False,
+)
+def _prog_rpt_render_groups(groups):
+    groups = list(groups or [])
+    if not groups:
+        groups = [{"group_cols": [], "group_filters_str": "{}",
+                   "group_aggr": None, "group_rename_str": "{}"}]
+
+    key_opts  = [{"label": k, "value": k} for k in actual_keys_in_data]
+    aggr_opts = [{"label": a, "value": a} for a in
+                 ["join", "first", "last", "nunique", "sum", "count",
+                  "mean", "min", "max", "list"]]
+    _i = {"width": "100%", "padding": "5px 7px", "fontSize": "12px",
+          "border": "1px solid #d1d5db", "borderRadius": "4px", "boxSizing": "border-box"}
+    _ta = {**_i, "resize": "vertical", "fontFamily": "monospace", "height": "44px"}
+    _l  = {"fontSize": "11px", "fontWeight": "600", "color": "#374151",
+           "display": "block", "marginBottom": "2px"}
+
+    rows = []
+    for i, grp in enumerate(groups):
+        is_first = (i == 0)
+        rows.append(html.Div(
+            style={"background": "#f8fafc" if i % 2 == 0 else "#f0f4f8",
+                   "borderRadius": "6px", "padding": "10px", "marginBottom": "8px",
+                   "border": "1px solid #e2e8f0"},
+            children=[
+                html.Div(
+                    style={"display": "flex", "justifyContent": "space-between",
+                           "alignItems": "center", "marginBottom": "8px"},
+                    children=[
+                        html.Span(f"Group {i + 1}" + (" (required)" if is_first else ""),
+                                  style={"fontSize": "12px", "fontWeight": "700",
+                                         "color": "#1e293b"}),
+                        html.Button(DashIconify(icon="lucide:x", width=12),
+                                    id={"type": "prog-rpt-grp-del", "index": i},
+                                    n_clicks=0, disabled=is_first,
+                                    style={"padding": "2px 8px", "fontSize": "12px",
+                                           "background": "#fee2e2" if not is_first else "#f3f4f6",
+                                           "color": "#dc2626" if not is_first else "#9ca3af",
+                                           "border": ("1px solid #fca5a5" if not is_first
+                                                      else "1px solid #e5e7eb"),
+                                           "borderRadius": "4px",
+                                           "cursor": "pointer" if not is_first else "default"}),
+                    ],
+                ),
+                html.Div(
+                    style={"display": "grid",
+                           "gridTemplateColumns": "2fr 1fr 1fr 1fr", "gap": "8px"},
+                    children=[
+                        html.Div(children=[
+                            html.Label(f"Columns {i + 1} *", style=_l),
+                            dcc.Dropdown(
+                                id={"type": "prog-rpt-grp-cols", "index": i},
+                                options=key_opts,
+                                value=grp.get("group_cols") or [],
+                                multi=True, placeholder="Select columns…",
+                                style={"fontSize": "12px"},
+                            ),
+                        ]),
+                        html.Div(children=[
+                            html.Label(f"Filters {i + 1} (JSON)", style=_l),
+                            dcc.Textarea(
+                                id={"type": "prog-rpt-grp-filters", "index": i},
+                                value=grp.get("group_filters_str") or "{}",
+                                placeholder='{"Program": "OPD Program"}',
+                                style=_ta,
+                            ),
+                        ]),
+                        html.Div(children=[
+                            html.Label(f"Aggregation {i + 1}", style=_l),
+                            dcc.Dropdown(
+                                id={"type": "prog-rpt-grp-aggr", "index": i},
+                                options=aggr_opts,
+                                value=grp.get("group_aggr"),
+                                placeholder="join / sum…", clearable=True,
+                                style={"fontSize": "12px"},
+                            ),
+                        ]),
+                        html.Div(children=[
+                            html.Label(f"Rename {i + 1} (JSON)", style=_l),
+                            dcc.Textarea(
+                                id={"type": "prog-rpt-grp-rename", "index": i},
+                                value=grp.get("group_rename_str") or "{}",
+                                placeholder='{"obs_value_coded": "Complaint"}',
+                                style=_ta,
+                            ),
+                        ]),
+                    ],
+                ),
+            ],
+        ))
+    return rows
+
+
+# 13g. Add group row
+@callback(
+    Output("prog-rpt-groups-store", "data", allow_duplicate=True),
+    Input("prog-rpt-add-group-btn", "n_clicks"),
+    State("prog-rpt-groups-store", "data"),
+    prevent_initial_call=True,
+)
+def _prog_rpt_add_group(n_clicks, groups):
+    if not n_clicks:
+        raise PreventUpdate
+    groups = list(groups or [{"group_cols": [], "group_filters_str": "{}",
+                               "group_aggr": None, "group_rename_str": "{}"}])
+    groups.append({"group_cols": [], "group_filters_str": "{}",
+                   "group_aggr": None, "group_rename_str": "{}"})
+    return groups
+
+
+# 13h. Delete group row (index 0 is protected)
+@callback(
+    Output("prog-rpt-groups-store", "data", allow_duplicate=True),
+    Input({"type": "prog-rpt-grp-del", "index": ALL}, "n_clicks"),
+    State("prog-rpt-groups-store", "data"),
+    prevent_initial_call=True,
+)
+def _prog_rpt_del_group(n_clicks_list, groups):
+    if not any(n or 0 for n in (n_clicks_list or [])):
+        raise PreventUpdate
+    triggered = ctx.triggered_id
+    if not isinstance(triggered, dict):
+        raise PreventUpdate
+    idx = triggered["index"]
+    groups = list(groups or [])
+    if idx > 0 and idx < len(groups):
+        groups.pop(idx)
+    return groups
+
+
+# 13i. Save report to validated_prog_reports.json
+@callback(
+    Output("prog-rpt-status",   "children"),
+    Output("prog-rpt-selector", "options", allow_duplicate=True),
+    Input("prog-rpt-save-btn", "n_clicks"),
+    State("prog-rpt-id",               "value"),
+    State("prog-rpt-name",             "value"),
+    State("prog-rpt-program",          "value"),
+    State("prog-rpt-type",             "value"),
+    State("prog-rpt-unique-col",       "value"),
+    State("prog-rpt-auth-user",        "value"),
+    State("prog-rpt-message",          "value"),
+    State("prog-rpt-groups-store",     "data"),
+    State("prog-rpt-cols-order",       "value"),
+    State("prog-rpt-merge-methods",    "value"),
+    State("prog-rpt-rename",           "value"),
+    State("prog-rpt-index-col",        "value"),
+    State("prog-rpt-columns-col",      "value"),
+    State("prog-rpt-values-col",       "value"),
+    State("prog-rpt-aggfunc",          "value"),
+    State("prog-rpt-pivot-unique-col", "value"),
+    State("prog-rpt-normalize",        "value"),
+    State("prog-rpt-filter-col1",      "value"),
+    State("prog-rpt-filter-val1",      "value"),
+    State("prog-rpt-filter-col2",      "value"),
+    State("prog-rpt-filter-val2",      "value"),
+    State("prog-rpt-filter-col3",      "value"),
+    State("prog-rpt-filter-val3",      "value"),
+    State("prog-rpt-tabular-rename",   "value"),
+    State("prog-rpt-tabular-replace",  "value"),
+    State({"type": "prog-rpt-grp-cols",    "index": ALL}, "value"),
+    State({"type": "prog-rpt-grp-filters", "index": ALL}, "value"),
+    State({"type": "prog-rpt-grp-aggr",    "index": ALL}, "value"),
+    State({"type": "prog-rpt-grp-rename",  "index": ALL}, "value"),
+    prevent_initial_call=True,
+)
+def _prog_rpt_save(
+        n_clicks, rpt_id, name, program, chart_type, unique_col, auth_user, message,
+        groups_store, cols_order, merge_methods, rename_str,
+        index_col, columns_col, values_col, aggfunc, pivot_unique, normalize,
+        fc1, fv1, fc2, fv2, fc3, fv3, tabular_rename_str, tabular_replace_str,
+        grp_cols_list, grp_filters_list, grp_aggr_list, grp_rename_list):
+    if not n_clicks:
+        raise PreventUpdate
+    if not name or not chart_type:
+        return "⚠ Report Name and Type are required.", no_update
+
+    def _parse(s):
+        try:
+            v = json.loads(s) if s and s.strip() not in ("", "{}") else {}
+            return v if isinstance(v, dict) else {}
+        except Exception:
+            return {}
+
+    reports  = _load_prog_reports()
+    auth_out = auth_user or "Any"
+    if isinstance(auth_out, list) and auth_out == ["Any"]:
+        auth_out = "Any"
+
+    payload = {
+        "id":              rpt_id or str(uuid.uuid4())[:8],
+        "report_name":     name.strip(),
+        "authorized_user": auth_out,
+        "message":         message or "",
+        "program":         program or "",
+        "type":            chart_type,
+        "unique_col":      unique_col or "person_id",
+    }
+
+    if chart_type == "LineList":
+        for i, (cols, filt_str, aggr_val, ren_str) in enumerate(
+                zip(grp_cols_list, grp_filters_list, grp_aggr_list, grp_rename_list)):
+            n = i + 1
+            if not cols:
+                continue
+            payload[f"group_cols{n}"] = cols
+            filt = _parse(filt_str)
+            if filt:
+                payload[f"group{n}_filters"] = filt
+            if aggr_val:
+                payload[f"group{n}_aggr"] = {c: aggr_val for c in cols}
+            ren = _parse(ren_str)
+            if ren:
+                payload[f"group{n}_rename"] = ren
+        if cols_order:
+            payload["cols_order"] = cols_order
+        if merge_methods:
+            payload["merge_methods"] = merge_methods
+        ren = _parse(rename_str)
+        if ren:
+            payload["rename"] = ren
+        payload["filters"] = {"unique": "any"}
+    else:
+        f = {
+            "measure":       "chart",
+            "unique":        "any",
+            "title":         name.strip(),
+            "unique_column": pivot_unique or unique_col or "encounter_id",
+            "aggfunc":       aggfunc or "sum",
+        }
+        if index_col:   f["index_col1"] = index_col
+        if columns_col: f["columns"]    = columns_col
+        if values_col:  f["values_col"] = values_col
+        if fc1:
+            f["filter_col1"] = fc1
+            f["filter_val1"] = fv1 or ""
+        if fc2:
+            f["filter_col2"] = fc2
+            f["filter_val2"] = fv2 or ""
+        if fc3:
+            f["filter_col3"] = fc3
+            f["filter_val3"] = fv3 or ""
+        ren = _parse(tabular_rename_str)
+        if ren:
+            f["rename"] = ren
+        rep = _parse(tabular_replace_str)
+        if rep:
+            f["replace"] = rep
+        if chart_type == "CrossTab" and normalize and normalize != "None":
+            f["normalize"] = normalize
+        payload["filters"] = f
+
+    existing_idx = next(
+        (i for i, r in enumerate(reports)
+         if r.get("report_name") == name.strip() or r.get("id") == payload["id"]),
+        None,
+    )
+    if existing_idx is not None:
+        reports[existing_idx] = payload
+    else:
+        reports.append(payload)
+
+    try:
+        _save_prog_reports(reports)
+        opts = [{"label": r.get("report_name"), "value": r.get("report_name")}
+                for r in reports]
+        ts = datetime.now().strftime("%H:%M:%S")
+        return f"✓ Saved {ts}", opts
+    except Exception as exc:
+        return f"Error: {exc}", no_update
+
+
+# 13j. Delete report
+@callback(
+    Output("prog-rpt-status",   "children", allow_duplicate=True),
+    Output("prog-rpt-selector", "value",    allow_duplicate=True),
+    Output("prog-rpt-selector", "options",  allow_duplicate=True),
+    Input("prog-rpt-delete-btn", "n_clicks"),
+    State("prog-rpt-id",   "value"),
+    State("prog-rpt-name", "value"),
+    prevent_initial_call=True,
+)
+def _prog_rpt_delete(n_clicks, rpt_id, name):
+    if not n_clicks:
+        raise PreventUpdate
+    if not rpt_id and not name:
+        return "⚠ No report selected.", no_update, no_update
+    reports     = _load_prog_reports()
+    new_reports = [r for r in reports
+                   if r.get("id") != rpt_id and r.get("report_name") != name]
+    if len(new_reports) == len(reports):
+        return "⚠ Not found.", no_update, no_update
+    try:
+        _save_prog_reports(new_reports)
+        opts = [{"label": r.get("report_name"), "value": r.get("report_name")}
+                for r in new_reports]
+        return "✓ Deleted.", None, opts
+    except Exception as exc:
+        return f"Error: {exc}", no_update, no_update
