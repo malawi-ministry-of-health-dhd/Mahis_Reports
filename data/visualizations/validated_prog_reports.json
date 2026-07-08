@@ -82,7 +82,7 @@
       "group_cols1": ["Date", "given_name", "family_name", "Gender", "Age"],
       "group1_filters": {"Program": "OPD Program"},
 
-      "group_cols2": ["DrugName", "ValueN"],
+      "group_cols2": ["Order_Name", "ValueN"],
       "group2_filters": {"Program": "OPD Program", "Encounter": "Dispensing", "concept_name": "Amount dispensed"},
       "group2_aggr": {"DrugName": "join", "ValueN": "join"},
 

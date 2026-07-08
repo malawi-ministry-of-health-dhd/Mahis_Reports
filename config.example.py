@@ -39,6 +39,7 @@ VALUE_NAME_ = 'Value_name'
 ORDER_NAME_ = 'Order_Name'
 PROGRAM_ = 'Program'
 ENCOUNTER_ = 'Encounter'
+IDENTIFIER_ = 'identifier'
 
 DHIS2_URL = "https://102.211.20.17/dhis"
 DHIS2_UNAME='user'
@@ -125,6 +126,10 @@ SELECT
     o.value_numeric as ValueN,
     o.value_text as Value,
     od.order_type_id as Order_Type,
+    do.dose as DrugDose,
+    do.quantity as DrugQuantity,
+    do.units as DrugUnits,
+    do.frequency as DrugFrequency,
     od.concept_id as Order_Name
 FROM encounter e
 LEFT JOIN visit v on e.visit_id = v.visit_id AND v.voided = 0
@@ -137,8 +142,9 @@ LEFT JOIN obs o ON e.encounter_id = o.encounter_id
 LEFT JOIN person_address pa ON pn.person_id = pa.person_id AND pa.voided = 0 AND pa.preferred = 0
 LEFT JOIN person_attribute pat ON p.person_id = pat.person_id AND pat.voided = 0
 LEFT JOIN orders od ON o.order_id = od.order_id AND od.discontinued = 0
-LEFT JOIN person_attribute_type patt ON pat.person_attribute_type_id = patt.person_attribute_type_id 
+LEFT JOIN person_attribute_type patt ON pat.person_attribute_type_id = patt.person_attribute_type_id
     AND patt.retired = 0 AND patt.person_attribute_type_id = 12
+LEFT JOIN drug_order do ON o.order_id = do.order_id 
 WHERE e.voided = 0
 {date_filter}
 """

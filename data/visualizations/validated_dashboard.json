@@ -735,7 +735,7 @@
                 "type": "CrossTab",
                 "level": "facility",
                 "filters": {
-                  "measure": "count",
+                  "measure": "nunique",
                   "unique": "any",
                   "duration_default": "any",
                   "title": "User Activity by Faciliy",
@@ -746,9 +746,9 @@
                   "columns": [
                     "Program"
                   ],
-                  "values_col": "encounter_id",
-                  "unique_column": "encounter_id",
-                  "aggfunc": "count",
+                  "values_col": "person_id",
+                  "unique_column": "person_id",
+                  "aggfunc": "nunique",
                   "filter_col1": "",
                   "filter_val1": "",
                   "filter_col2": "",
@@ -5972,8 +5972,8 @@
             ],
             "variable2": "Encounter",
             "value2": [
-              "NEONATAL ENROLMENT",
-              "NEONATAL TRIAGE"
+              "Neonatal enrolment",
+              "Neonatal triage"
             ],
             "variable3": "concept_name",
             "value3": [],
@@ -6002,7 +6002,7 @@
             ],
             "variable2": "Encounter",
             "value2": [
-              "NEONATAL TRIAGE"
+              "Neonatal triage"
             ],
             "variable3": "concept_name",
             "value3": [],
@@ -6031,7 +6031,7 @@
             ],
             "variable2": "Encounter",
             "value2": [
-              "NEONATAL TRIAGE"
+              "Neonatal review of systems"
             ],
             "variable3": "concept_name",
             "value3": [],
@@ -6060,7 +6060,7 @@
             ],
             "variable2": "Encounter",
             "value2": [
-              "NEONATAL SYSTEMIC EXAMINATION"
+              "Neonatal systemic examination"
             ],
             "variable3": "concept_name",
             "value3": [],
@@ -6089,7 +6089,7 @@
             ],
             "variable2": "Encounter",
             "value2": [
-              "NEONATAL REVIEW OF SYSTEMS"
+              "Treatment"
             ],
             "variable3": "concept_name",
             "value3": [],
@@ -6118,11 +6118,11 @@
             ],
             "variable2": "Encounter",
             "value2": [
-              "NEONATAL ADMISSION OUTCOMES"
+              "Neonatal admission outcomes"
             ],
             "variable3": "concept_name",
             "value3": [
-              "Admission outcome"
+              "Clinical review outcome"
             ],
             "variable4": "obs_value_coded",
             "value4": [
@@ -6151,7 +6151,7 @@
             ],
             "variable2": "Encounter",
             "value2": [
-              "NEONATAL ADMISSION OUTCOMES"
+              "Clinical review outcome"
             ],
             "variable3": "concept_name",
             "value3": [
@@ -6182,7 +6182,7 @@
             ],
             "variable2": "Encounter",
             "value2": [
-              "NEONATAL ADMISSION OUTCOMES"
+              "Clinical review outcome"
             ],
             "variable3": "concept_name",
             "value3": [
@@ -6215,7 +6215,7 @@
             ],
             "variable2": "Encounter",
             "value2": [
-              "NEONATAL ADMISSION OUTCOMES"
+              "Clinical review outcome"
             ],
             "variable3": "concept_name",
             "value3": [
@@ -6248,7 +6248,7 @@
             ],
             "variable2": "Encounter",
             "value2": [
-              "NEONATAL ADMISSION OUTCOMES"
+              "Clinical review outcome"
             ],
             "variable3": "concept_name",
             "value3": [
@@ -6284,10 +6284,13 @@
                   "unique_column": "person_id",
                   "legend_title": "Legend",
                   "color": "",
-                  "filter_col1": [],
-                  "filter_val1": "",
-                  "filter_col2": [],
-                  "filter_val2": "",
+                  "filter_col1": "Program",
+                  "filter_val1": [
+                    "NEONATAL PROGRAM"
+                  ],
+                  "filter_col2": "Encounter",
+                  "filter_val2": ["Neonatal enrolment",
+                                  "Neonatal triage"],
                   "filter_col3": [],
                   "filter_val3": "",
                   "filter_col4": [],
@@ -6308,8 +6311,10 @@
                   "measure": "nunique",
                   "unique": "any",
                   "duration_default": "any",
-                  "filter_col1": "",
-                  "filter_val1": "",
+                  "filter_col1": "Program",
+                  "filter_val1": [
+                    "NEONATAL PROGRAM"
+                  ],
                   "filter_col2": "",
                   "filter_val2": "",
                   "filter_col3": "",
@@ -6324,8 +6329,7 @@
                   "x_title": "Encounter Type",
                   "y_title": "Encounters",
                   "unique_column": "encounter_id",
-                  "legend_title": "Legend",
-                  "color": ""
+                  "legend_title": "Legend"
                 }
               }
             ]
@@ -6343,10 +6347,10 @@
                   "measure": "nunique",
                   "unique": "any",
                   "duration_default": "any",
-                  "filter_col1": "",
-                  "filter_val1": "",
-                  "filter_col2": "",
-                  "filter_val2": "",
+                  "filter_col1": "Encounter",
+                  "filter_val1": "Diagnosis",
+                  "filter_col2": "Program",
+                  "filter_val2": "NEONATAL PROGRAM",
                   "filter_col3": "",
                   "filter_val3": "",
                   "filter_col4": "",
@@ -6373,8 +6377,8 @@
                   "duration_default": "any",
                   "filter_col1": "Encounter",
                   "filter_val1": "Outcome",
-                  "filter_col2": "",
-                  "filter_val2": "",
+                  "filter_col2": "Program",
+                  "filter_val2": "NEONATAL PROGRAM",
                   "filter_col3": "",
                   "filter_val3": "",
                   "filter_col4": "",
@@ -6405,8 +6409,8 @@
                   "duration_default": "any",
                   "filter_col1": "Encounter",
                   "filter_val1": "Causes of death",
-                  "filter_col2": "",
-                  "filter_val2": "",
+                  "filter_col2": "Program",
+                  "filter_val2": "NEONATAL PROGRAM",
                   "filter_col3": "",
                   "filter_val3": "",
                   "filter_col4": "",
@@ -6468,8 +6472,8 @@
                   "duration_default": "any",
                   "filter_col1": "",
                   "filter_val1": "",
-                  "filter_col2": "",
-                  "filter_val2": "",
+                  "filter_col2": "Program",
+                  "filter_val2": "NEONATAL PROGRAM",
                   "filter_col3": "",
                   "filter_val3": "",
                   "filter_col4": "",
