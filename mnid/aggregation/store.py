@@ -2,9 +2,9 @@
 MNID aggregate store.
 
 Loads the pre-built indicator_aggregates.parquet into memory once and exposes
-query helpers used by the dashboard callbacks.  All queries are simple pandas
-filter operations on a small (~500K row) DataFrame — microseconds vs. the
-seconds-long raw-row scans they replace.
+query helpers used by the dashboard callbacks. All queries are simple pandas
+filter operations on a small (~500K row) DataFrame, so they run in microseconds
+instead of the seconds-long raw-row scans they replace.
 """
 import logging
 from pathlib import Path
@@ -16,9 +16,32 @@ _LOG = logging.getLogger(__name__)
 _DEFAULT_OUT_DIR = 'data/mnid_aggregates'
 _PARQUET_NAME    = 'indicator_aggregates.parquet'
 
-# Module-level in-memory cache — loaded once, invalidated after overnight rebuild.
+# in-memory cache, loaded once and invalidated after the overnight rebuild
 _AGG_DF: pd.DataFrame | None = None
 _LOADED = False
+
+
+def _meta_source_matches(output_dir: str) -> bool:
+    """Return False if the stored aggregate was built from a different data source."""
+    import json
+    try:
+        from config import USE_DEMO_DATA
+        meta_path = Path(output_dir) / 'meta.json'
+        if not meta_path.exists():
+            return True  # nothing to check against, trust the parquet
+        with open(meta_path, encoding='utf-8') as f:
+            meta = json.load(f)
+        agg_is_demo = bool(meta.get('use_demo_data', True))
+        if agg_is_demo != bool(USE_DEMO_DATA):
+            _LOG.warning(
+                'Aggregate was built from %s data but app is using %s data, discarding stale aggregate.',
+                'demo' if agg_is_demo else 'live',
+                'demo' if USE_DEMO_DATA else 'live',
+            )
+            return False
+    except Exception:
+        pass
+    return True
 
 
 def load_aggregate(output_dir: str = _DEFAULT_OUT_DIR) -> pd.DataFrame | None:
@@ -29,7 +52,12 @@ def load_aggregate(output_dir: str = _DEFAULT_OUT_DIR) -> pd.DataFrame | None:
 
     path = Path(output_dir) / _PARQUET_NAME
     if not path.exists():
-        _LOG.debug('Aggregate not found at %s — falling back to live compute', path)
+        _LOG.debug('Aggregate not found at %s, falling back to live compute', path)
+        _LOADED = True
+        _AGG_DF = None
+        return None
+
+    if not _meta_source_matches(output_dir):
         _LOADED = True
         _AGG_DF = None
         return None
@@ -63,13 +91,15 @@ def invalidate_cache() -> None:
     _LOG.info('Aggregate cache invalidated')
 
 
-# ── Query helpers ─────────────────────────────────────────────────────────────
+# query helpers
 
-_GRAIN_PERIOD_CODE = {'daily': 'D', 'weekly': 'W', 'monthly': 'M'}
+_GRAIN_PERIOD_CODE = {'daily': 'D', 'weekly': 'W', 'monthly': 'M', 'quarterly': 'Q', 'yearly': 'Y'}
 _GRAIN_FALLBACKS = {
     'daily': ['daily', 'weekly', 'monthly'],
     'weekly': ['weekly', 'monthly'],
     'monthly': ['monthly'],
+    'quarterly': ['quarterly', 'monthly'],
+    'yearly': ['yearly', 'quarterly', 'monthly'],
 }
 
 
