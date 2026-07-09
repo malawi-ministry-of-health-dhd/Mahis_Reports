@@ -528,46 +528,67 @@ When a user clicks a non-zero value cell, the page opens a paginated modal showi
 
 ### REST API for External Access: `helpers/api_routes.py`
 
-HMIS report data is also accessible via a REST API registered with Flask through `register_api_routes(server)`.
+Both HMIS aggregate reports and clinical program reports are accessible via a REST API registered with Flask through `register_api_routes(server)`.
 
 **Authentication**
 
-The API supports three token methods (checked in priority order):
+All endpoints require a token. It is resolved from the request in this priority order:
 
 ```
 1. Authorization: Bearer <token>    (header)
 2. X-API-Key: <token>               (header)
 3. ?token=<token>                   (query parameter)
-4. ?uuid=<token>                    (legacy — query parameter)
+4. ?uuid=<token>                    (query parameter, legacy)
 ```
 
-Tokens are validated against `user_properties.json` in the data route directory or the `ALLOWED_API_UUIDS` set in `config.py`.
+Tokens are validated against `user_properties.json` in the data route directory or the `ALLOWED_API_UUIDS` set in `config.py`. An unauthorized request returns `HTTP 403`.
 
 **Endpoints**
 
-| Method | Endpoint        | Description                                  |
-|--------|----------------|----------------------------------------------|
-| GET    | `/api/`         | Lists available endpoints and auth methods  |
-| GET    | `/api/reports`  | Returns list of all available reports       |
-| GET    | `/api/datasets` | Fetches computed report data for a period   |
+| Method | Endpoint                | Description                                                 |
+|--------|------------------------|-------------------------------------------------------------|
+| GET    | `/api/`                 | Lists all available endpoints and supported auth methods   |
+| GET    | `/api/reports`          | Lists available HMIS report templates (non-archived)       |
+| GET    | `/api/datasets`         | Returns a computed HMIS report for a given period          |
+| GET    | `/api/clinicalReports`  | Returns program/clinical report data for a date range      |
 
-**`GET /api/datasets` Parameters**
+---
 
-| Parameter     | Required | Example            | Description                         |
-|--------------|----------|--------------------|-------------------------------------|
-| `period`      | Yes      | `Monthly:1:2024`  | `{Type}:{Value}:{Year}`             |
-| `Location`    | Yes      | `1833`            | Facility code                        |
-| `report_name` | Yes      | `HIV Monthly`     | Exact report name                    |
-| `route`       | No       | `default`         | Data route (defaults to `default`)  |
+#### `GET /api/reports`
 
-**Response Structure**
+| Parameter | Required | Description                    |
+|----------|----------|--------------------------------|
+| `route`   | No       | Data route (default: `default`) |
 
+**Response:**
+```json
+{
+  "reports": [
+    { "report_id": "hiv_monthly", "report_name": "HIV Monthly Report", "date_updated": "2024-01-15" }
+  ]
+}
+```
+
+---
+
+#### `GET /api/datasets`
+
+Returns a structured HMIS report computed from an Excel template for a given facility and reporting period.
+
+| Parameter     | Required | Example               | Description                              |
+|--------------|----------|-----------------------|------------------------------------------|
+| `period`      | Yes      | `Monthly:January:2024` | `{Type}:{Value}:{Year}` — Type is `Weekly`, `Monthly`, or `Quarterly` |
+| `Location`    | Yes      | `1833`               | Facility code                            |
+| `report_name` | Yes      | `hiv_monthly`        | Report `page_name` from `hmis_reports.json` |
+| `route`       | No       | `default`            | Data route (defaults to `default`)       |
+
+**Response:**
 ```json
 {
   "report_id": "hiv_monthly",
   "report_name": "HIV Monthly Report",
   "facility_id": "1833",
-  "period": "2024-01-01 to 2024-01-31",
+  "period": "Monthly:January:2024",
   "sections": [
     {
       "section_name": "Testing",
@@ -577,6 +598,77 @@ Tokens are validated against `user_properties.json` in the data route directory 
     }
   ]
 }
+```
+
+---
+
+#### `GET /api/clinicalReports`
+
+Returns patient-level or aggregated clinical report data from `validated_prog_reports.json`. Supports LineList, PivotTable, and CrossTab report types.
+
+| Parameter   | Required | Example        | Description                                                               |
+|------------|----------|----------------|---------------------------------------------------------------------------|
+| `startDate` | Yes      | `2026-01-01`  | Start of date range (`YYYY-MM-DD`)                                        |
+| `endDate`   | Yes      | `2026-12-31`  | End of date range (`YYYY-MM-DD`) — can extend into the future             |
+| `report_id` | Yes      | `opd_1`       | Report `id` field from `validated_prog_reports.json`                      |
+| `route`     | No       | `default`     | Data route (defaults to `default`)                                        |
+| `Location`  | No       | `32,33`       | One or more `Facility_CODE` values, comma-separated. Omit for all facilities |
+
+**Response:**
+```json
+{
+  "report_id": "opd_1",
+  "report_name": "GENERAL OPD REGISTER - LINELIST OF OPD PATIENTS",
+  "facility_id": "32,33",
+  "start_date": "2026-01-01",
+  "end_date": "2026-12-31",
+  "data": [
+    { "Date": "2026-03-15", "Gender": "Female", "Age": "34", "Complaint": "Fever", ... },
+    { "Date": "2026-03-15", "Gender": "Male",   "Age": "12", "Complaint": "Cough", ... }
+  ]
+}
+```
+
+When `Location` is omitted, `facility_id` is returned as `"All facilities"`.
+
+**`data` field by report type:**
+
+| Type         | Record structure                                                             |
+|-------------|------------------------------------------------------------------------------|
+| `LineList`   | One dict per patient row; keys are the configured `cols_order` column names |
+| `PivotTable` | One dict per pivot row; keys are the index column and pivoted column headers |
+| `CrossTab`   | One dict per crosstab row; multi-level column keys joined with `\|`         |
+
+**Example — PivotTable (`opd_4`):**
+```json
+{
+  "report_id": "opd_4",
+  "report_name": "OPD DRUG DISPENSATION REPORT",
+  "facility_id": "All facilities",
+  "start_date": "2026-01-01",
+  "end_date": "2026-12-31",
+  "data": [
+    { "DRUG": "Paracetamol", "Number of drugs dispensed": "245" },
+    { "DRUG": "Amoxicillin", "Number of drugs dispensed": "130" }
+  ]
+}
+```
+
+**Finding available `report_id` values:**
+
+Query `data/visualizations/validated_prog_reports.json` directly, or read the `id` field from each report object. Each report also carries a `program` and `type` field for filtering.
+
+**Example curl calls:**
+```bash
+# LineList — all facilities
+curl "http://localhost:8050/api/clinicalReports?startDate=2026-01-01&endDate=2026-12-31&report_id=opd_1&route=default&uuid=m3his@dhd"
+
+# PivotTable — specific facility
+curl "http://localhost:8050/api/clinicalReports?startDate=2026-01-01&endDate=2026-12-31&report_id=opd_4&Location=32&route=default&uuid=m3his@dhd"
+
+# Bearer token auth
+curl -H "Authorization: Bearer m3his@dhd" \
+  "http://localhost:8050/api/clinicalReports?startDate=2026-01-01&endDate=2026-12-31&report_id=ncd_4&route=default"
 ```
 
 ---

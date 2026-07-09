@@ -5662,9 +5662,7 @@ def _rpt_save_report(n_clicks, state, page_name, drag_pos, resize_store):
         return f"Error: {e}"
 
 
-# ═══════════════════════════════════════════════════════════════════════════
 # SECTION 13: Program Report GUI  (prog-report-modal)
-# ═══════════════════════════════════════════════════════════════════════════
 
 _PROG_REPORTS_PATH = os.path.join(os.getcwd(), "data", "visualizations",
                                   "validated_prog_reports.json")
@@ -5782,6 +5780,9 @@ def _prog_rpt_load_form(report_name):
                 "group_aggr":        aggr_val,
                 "group_rename_str":  json.dumps(rpt.get(f"group{i}_rename") or {}),
             })
+        rpt_cols_order = rpt.get("cols_order") or []
+        if rpt_cols_order:
+            rpt_cols_order_text = ' | '.join(str(item) for item in rpt_cols_order) if isinstance(rpt_cols_order, list) else rpt_cols_order
         return (
             rpt.get("id", ""),
             rpt.get("report_name", ""),
@@ -5791,7 +5792,7 @@ def _prog_rpt_load_form(report_name):
             auth,
             rpt.get("message", ""),
             groups,
-            rpt.get("cols_order") or [],
+            rpt_cols_order_text,
             rpt.get("merge_methods") or [],
             json.dumps(rpt.get("rename") or {}),
             None, None, None, None, None, None,
@@ -6075,6 +6076,7 @@ def _prog_rpt_save(
             if ren:
                 payload[f"group{n}_rename"] = ren
         if cols_order:
+            print(cols_order)
             payload["cols_order"] = cols_order
         if merge_methods:
             payload["merge_methods"] = merge_methods

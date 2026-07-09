@@ -2411,7 +2411,8 @@ def create_line_list(
         })
 
     # Apply column ordering — use only cols that actually exist after rename
-    if cols_order and isinstance(cols_order, list) and not final_df.empty:
+    if cols_order and not final_df.empty:
+        cols_order = cols_order.split("|").strip() if isinstance(cols_order, str) else cols_order
         ordered  = [c for c in cols_order if c in final_df.columns]
         final_df = final_df[ordered]
 
