@@ -225,7 +225,7 @@ def build_single_chart(filtered, data_opd, delta_days,data_path, item_config,use
     """Build a single chart based on configuration"""
     chart_type = item_config["type"]
     filters = item_config["filters"]
-    
+
     if chart_type == "Line":
         figure = create_line_chart_from_config(data_opd,data_path, delta_days, filters)
     elif chart_type == "Pie":
@@ -237,11 +237,11 @@ def build_single_chart(filtered, data_opd, delta_days,data_path, item_config,use
     elif chart_type == "Histogram":
         figure = create_histogram_from_config(filtered,data_path, filters)
     elif chart_type == "PivotTable":
-        figure = create_pivot_table_from_config(filtered,data_path, filters)
+        figure, data = create_pivot_table_from_config(filtered,data_path, filters)
     elif chart_type == "CrossTab":
-        figure = create_crosstab_from_config(filtered,data_path, filters)
+        figure, data = create_crosstab_from_config(filtered,data_path, filters)
     elif chart_type == "LineList":
-        figure = create_linelist_from_config(filtered,data_path, item_config, user_role)
+        figure, data = create_linelist_from_config(filtered,data_path, item_config, user_role)
     elif chart_type == "Sankey":
         figure = create_sankey_from_config(filtered,data_path, filters)
     elif chart_type == "NewReturningSplit":
@@ -644,11 +644,12 @@ def create_pivot_table_from_config(filtered,data_path, filters):
     replace       = filters.get("replace") or {}
     custom_fields = filters.get('custom_fields') or None
 
-    return create_pivot_table(
+    table, data = create_pivot_table(
         filtered,data_path, index_col, columns, values_co, title, unique_column, aggfunc,
         filter_col1, filter_val1, filter_col2, filter_val2, filter_col3, 
         filter_val3, aggregation, rename, replace, custom_fields
     )
+    return table, data
 
 
 def create_crosstab_from_config(filtered,data_path, filters):
@@ -703,7 +704,7 @@ def create_crosstab_from_config(filtered,data_path, filters):
     replace       = filters.get("replace") or {}
     custom_fields = filters.get('custom_fields') or None
 
-    return create_crosstab_table(
+    table, data =  create_crosstab_table(
         query_fiter=filtered,
         data_path = data_path,
         index_col=index_col,
@@ -718,14 +719,14 @@ def create_crosstab_from_config(filtered,data_path, filters):
         filter_col3=filter_col3, filter_value3=filter_val3,
         rename=rename, replace=replace, custom_fields=custom_fields
     )
+    return table, data
 
-def create_linelist_from_config(query_fiter,data_path, filters, user_role=None, **kwargs):
+def create_linelist_from_config(query_fiter,data_path, filters,user_role=None, anonymize=False, **kwargs):
     """
     Convert JSON config into arguments for create_line_list().
     Accepts a SQL WHERE-clause string (query_fiter) instead of a DataFrame.
     Accepts dynamic group_cols, group_filters, group_aggr, merge methods, rename, cols_order etc.
     """
-
     def _as_list_or_str(v):
         if isinstance(v, str) and '|' in v:
             return [s.strip() for s in v.split('|') if s.strip()]
@@ -768,7 +769,7 @@ def create_linelist_from_config(query_fiter,data_path, filters, user_role=None, 
 
     group_kwargs.update(kwargs)
 
-    return create_line_list(
+    table, data = create_line_list(
         query_fiter=query_fiter,
         data_path = data_path,
         unique_col=unique_col,
@@ -779,8 +780,10 @@ def create_linelist_from_config(query_fiter,data_path, filters, user_role=None, 
         rename=rename,
         custom_fields=custom_fields,
         mask_names=mask_names,
+        anonymize = anonymize,
         **group_kwargs,
     )
+    return table, data
 
 def create_sankey_from_config(filtered,data_path, filters):
     """

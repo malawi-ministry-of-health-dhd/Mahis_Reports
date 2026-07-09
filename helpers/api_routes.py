@@ -12,7 +12,9 @@ from helpers.date_ranges import get_month_start_end, get_quarter_start_end, get_
 from helpers.reports_class import ReportTableBuilder
 
 from helpers.navigation_callbacks import DEMO_UUID
-
+from helpers.helpers import (create_linelist_from_config, create_pivot_table_from_config, 
+                             create_crosstab_from_config
+)
 ALLOWED_API_UUIDS = {DEMO_UUID}
 
 
@@ -81,6 +83,22 @@ def _is_authorized(token: str | None, route: str | None) -> bool:
     return token in ALLOWED_API_UUIDS
 
 
+def _build_prog_report_df(report_cfg: dict, report_type: str,
+                           base_where: str, data_path: str) -> pd.DataFrame:
+    """Return a DataFrame from a program report config entry."""
+    anonymize = True
+    if report_type == "LineList":
+        _, data = create_linelist_from_config(base_where, data_path, report_cfg,"", anonymize)
+        return data
+    elif report_type == "PivotTable":
+        _, data = create_pivot_table_from_config(base_where, data_path, report_cfg.get("filters") or {})
+        return data
+    elif report_type == "CrossTab":
+        _, data = create_crosstab_from_config(base_where, data_path, report_cfg.get("filters") or {})
+        return data
+    return pd.DataFrame()
+
+
 def register_api_routes(server):
     @server.route("/api/", methods=["GET"])
     def api_root():
@@ -96,6 +114,7 @@ def register_api_routes(server):
                     "reports":      "/api/reports",
                     "indicators":   "/api/indicators",
                     "data_elements":"/api/dataElements",
+                    "clinical_reports":"/api/clinicalReports"
                 },
                 "auth_methods": [
                     "Authorization: Bearer <token>  (header)",
@@ -236,6 +255,80 @@ def register_api_routes(server):
         except ValueError as exc:
             import traceback; traceback.print_exc()
             return jsonify({"error": str(exc)}), 400
+        except Exception as exc:
+            import traceback; traceback.print_exc()
+            return jsonify({"error": str(exc)}), 500
+
+    @server.route("/api/clinicalReports", methods=["GET"])
+    def get_clinical_report():
+        token        = _extract_token()
+        start_date   = request.args.get("startDate", "").strip()
+        end_date     = request.args.get("endDate", "").strip()
+        report_id    = request.args.get("report_id", "").strip()
+        data_route   = request.args.get("route", "default").strip()
+        location_raw = request.args.get("Location", "").strip()
+
+        if not all([start_date, end_date, report_id]):
+            return jsonify({"error": "Missing required parameters"}), 400
+
+        if not _is_authorized(token, data_route):
+            return jsonify({"error": "Unauthorized"}), 403
+
+        try:
+            try:
+                dt.strptime(start_date, "%Y-%m-%d")
+                dt.strptime(end_date, "%Y-%m-%d")
+            except ValueError:
+                return jsonify({"error": "Invalid date format. Expected YYYY-MM-DD"}), 400
+
+            prog_reports_path = os.path.join(
+                os.getcwd(), "data", "visualizations", "validated_prog_reports.json"
+            )
+            if not os.path.exists(prog_reports_path):
+                return jsonify({"error": "Program report configuration not found"}), 500
+
+            with open(prog_reports_path, "r") as f:
+                config = json.load(f)
+
+            report_cfg = next(
+                (r for r in config.get("reports", []) if str(r.get("id")) == report_id),
+                None,
+            )
+            if not report_cfg:
+                return jsonify({"error": f"Report id '{report_id}' not found"}), 404
+
+            parquet_path = os.path.join(os.getcwd(), f"data/{data_route}/parquet")
+
+            base_where = (
+                f"Date BETWEEN '{start_date} 00:00:00'::TIMESTAMP"
+                f" AND '{end_date} 23:59:59'::TIMESTAMP"
+            )
+
+            locations = [l.strip() for l in location_raw.split(",") if l.strip()] if location_raw else []
+            if locations:
+                quoted      = ", ".join(f"'{l}'" for l in locations)
+                base_where += f" AND Facility_CODE IN ({quoted})"
+                facility_id = location_raw
+            else:
+                facility_id = "All facilities"
+
+            report_type = report_cfg.get("type", "LineList")
+            df          = _build_prog_report_df(report_cfg, report_type, base_where, parquet_path)
+
+            if df is None or df.empty:
+                data_out = []
+            else:
+                data_out = df.fillna("").astype(str).to_dict(orient="records")
+
+            return jsonify({
+                "report_id":   report_id,
+                "report_name": report_cfg.get("report_name", ""),
+                "facility_id": facility_id,
+                "start_date":  start_date,
+                "end_date":    end_date,
+                "data":        data_out,
+            })
+
         except Exception as exc:
             import traceback; traceback.print_exc()
             return jsonify({"error": str(exc)}), 500

@@ -2473,8 +2473,7 @@ def create_prog_report_modal():
                       {"label": "encounter_id", "value": "encounter_id"}]
     normalize_opts = [{"label": n, "value": n} for n in ["all", "index", "columns"]]
     role_opts      = [{"label": r, "value": r} for r in
-                      ["Any", "Clinician", "Nurse", "Admin", "national",
-                       "district", "facility", "reports_admin"]]
+                      ["Any", "Clinician", "Nurse", "Admin"]]
 
     _i = {"width": "100%", "padding": "6px 8px", "fontSize": "12px",
           "border": "1px solid #d1d5db", "borderRadius": "4px", "boxSizing": "border-box"}
@@ -2546,7 +2545,7 @@ def create_prog_report_modal():
         ],
     )
 
-    # ── RIGHT: LineList panel ────────────────────────────────────────────────
+    # RIGHT: LineList panel
     ll_panel = html.Div(
         id="prog-rpt-linelist-panel",
         style={"display": "none", "flexDirection": "column", "gap": "8px",
@@ -2569,29 +2568,29 @@ def create_prog_report_modal():
             html.Hr(style={"margin": "6px 0", "borderColor": "#e5e7eb", "flexShrink": "0"}),
             html.Div(style={"display": "flex", "gap": "12px", "flexWrap": "wrap",
                             "flexShrink": "0"}, children=[
-                html.Div(style={"flex": "2", "minWidth": "200px"}, children=[
+                html.Div(style={"flex": "2", "minWidth": "100px"}, children=[
                     html.Label("Columns Order (in display order)", style={**_l, "marginBottom": "4px"}),
-                    dcc.Dropdown(id="prog-rpt-cols-order", options=key_opts,
-                                 multi=True, placeholder="Select columns in display order…",
-                                 style={"fontSize": "12px"}),
+                    dcc.Textarea(id="prog-rpt-cols-order",
+                                 placeholder="Separated by pipe |",
+                                 style={**_t, "height": "100px"}),
                 ]),
                 html.Div(style={"flex": "1", "minWidth": "140px"}, children=[
                     html.Label("Merge Methods (one per join)", style={**_l, "marginBottom": "4px"}),
                     dcc.Dropdown(id="prog-rpt-merge-methods", options=merge_opts,
                                  multi=True, placeholder="left / inner…",
-                                 style={"fontSize": "12px"}),
+                                 style={"fontSize": "12px","height": "100px"}),
                 ]),
-                html.Div(style={"flex": "1", "minWidth": "160px"}, children=[
+                html.Div(style={"flex": "1", "minWidth": "200px"}, children=[
                     html.Label("Global Rename (JSON)", style={**_l, "marginBottom": "4px"}),
                     dcc.Textarea(id="prog-rpt-rename",
                                  placeholder='{"given_name": "First Name", …}',
-                                 style={**_t, "height": "50px"}),
+                                 style={**_t, "height": "100px"}),
                 ]),
             ]),
         ],
     )
 
-    # ── RIGHT: PivotTable / CrossTab panel ──────────────────────────────────
+    # RIGHT: PivotTable / CrossTab panel
     piv_panel = html.Div(
         id="prog-rpt-pivot-panel",
         style={"display": "none", "flexDirection": "column", "gap": "10px",
