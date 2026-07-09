@@ -8,7 +8,7 @@ from datetime import datetime
 
 
 def run_data_storage():
-    """Run the data_storage.py script, log output, then trigger MNID aggregation."""
+    """Run the data_storage.py script and log output."""
     try:
         log_file = "/app/logs/data_update.log"
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -34,11 +34,6 @@ def run_data_storage():
 
         print(f"Data update completed at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-        # After every successful data refresh, rebuild MNID aggregates so the
-        # dashboard picks up fresh pre-computed indicator numbers.
-        if result.returncode == 0:
-            _run_mnid_aggregation()
-
     except Exception as e:
         error_msg = f"Error running data_storage.py: {str(e)}"
         print(error_msg)
@@ -63,18 +58,20 @@ def _run_mnid_aggregation():
 def run_scheduler():
     """Run the scheduler in a separate thread."""
     interval = int(os.getenv('DATA_UPDATE_INTERVAL', '30'))
+    agg_interval_hours = int(os.getenv('MNID_AGGREGATION_INTERVAL_HOURS', '6'))
 
     print(f"Scheduler started. Data will be updated every {interval} minutes.")
-    print("MNID aggregation scheduled daily at 02:00.")
+    print(f"MNID aggregation scheduled every {agg_interval_hours} hours.")
 
     schedule.every(interval).minutes.do(run_data_storage)
 
     # Independent overnight aggregation — runs even if data_storage didn't fire
-    schedule.every().day.at("02:00").do(_run_mnid_aggregation)
+    schedule.every(agg_interval_hours).hours.do(_run_mnid_aggregation)
 
     if os.getenv('INITIAL_DATA_LOAD', 'true').lower() == 'true':
         print("Running initial data load...")
         run_data_storage()
+        _run_mnid_aggregation()
 
     while True:
         schedule.run_pending()
