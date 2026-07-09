@@ -1647,7 +1647,7 @@ def create_pivot_table(query_fiter,data_path, index_col, columns_col, values_col
         },
     )
 
-    return table
+    return table, pivot
  
 def create_crosstab_table(
     query_fiter,
@@ -1854,7 +1854,7 @@ def create_crosstab_table(
         },
     )
 
-    return table
+    return table, ct_flat
  
 def create_age_gender_histogram(
     query_fiter,data_path, age_col, gender_col, title, xtitle, ytitle, bin_size,
@@ -2272,6 +2272,7 @@ def create_line_list(
         message=None,
         custom_fields=None,
         mask_names: bool = True,
+        anonymize: bool =False,
         **kwargs):
 
     # ── helper: strip date filter for cohort (all-time history) queries ──────
@@ -2293,10 +2294,13 @@ def create_line_list(
 
     queries = []
     for i in range(1, 31):
-        group_cols = kwargs.get(f"group_cols{i}", []) or []
+        group_cols = list(kwargs.get(f"group_cols{i}", [])) or []
         group_filters = kwargs.get(f"group{i}_filters", {}) or {}
         group_aggr = kwargs.get(f"group{i}_aggr", {}) or {}
         group_rename_map = kwargs.get(f"group{i}_rename", {}) or {}
+
+        anonymized = ['given_name', 'family_name','person_attribute_name', 'person_attribute_type','User']
+        group_cols = [item for item in group_cols if item not in anonymized]
 
         if not group_cols:
             continue
@@ -2466,7 +2470,7 @@ def create_line_list(
         ),
     ])
 
-    return table
+    return table, final_df
 
 def create_line_list_basic_modal(
     unique_column: str,
