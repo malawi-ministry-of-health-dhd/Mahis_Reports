@@ -1,5 +1,6 @@
 import dash
 from dash import html, dcc, dash_table, Input, Output, State, callback
+from dash_iconify import DashIconify
 import json
 import os
 import pandas as pd
@@ -1677,7 +1678,7 @@ def create_edit_modal():
         # Modal backdrop
         html.Div(
             id="modal-backdrop",
-            className="modal-backdrop",
+            className="modal-backdrop", 
             style={"display": "none"}
         ),
         # Modal content
@@ -1692,7 +1693,7 @@ def create_edit_modal():
                     children=[
                         html.H3("Dashboard Configuration", className="modal-title"),
                         html.Button(
-                            "×",
+                            DashIconify(icon="lucide:x", width=18, height=18),
                             id="cancel-btn",
                             n_clicks=0,
                             className="modal-close-btn",
@@ -2103,26 +2104,38 @@ def create_html_report_modal():
             # Tables group
             html.Span("Tables", style={"fontSize": "11px", "color": "#6b7280",
                                        "fontWeight": "600", "alignSelf": "center"}),
-            html.Button("+New",    id="rpt-add-table-btn", n_clicks=0, style=btn_style),
-            html.Button("↑ Above", id="rpt-add-above-btn", n_clicks=0, style=btn_style),
-            html.Button("↓ Below", id="rpt-add-below-btn", n_clicks=0, style=btn_style),
-            html.Button("← Left",  id="rpt-add-left-btn",  n_clicks=0, style=btn_style),
-            html.Button("→ Right", id="rpt-add-right-btn", n_clicks=0, style=btn_style),
+            html.Button([DashIconify(icon="lucide:plus", width=13), "New"],
+                        id="rpt-add-table-btn", n_clicks=0, style=btn_style),
+            html.Button([DashIconify(icon="lucide:arrow-up", width=13), " Above"],
+                        id="rpt-add-above-btn", n_clicks=0, style=btn_style),
+            html.Button([DashIconify(icon="lucide:arrow-down", width=13), " Below"],
+                        id="rpt-add-below-btn", n_clicks=0, style=btn_style),
+            html.Button([DashIconify(icon="lucide:arrow-left", width=13), " Left"],
+                        id="rpt-add-left-btn", n_clicks=0, style=btn_style),
+            html.Button([DashIconify(icon="lucide:arrow-right", width=13), " Right"],
+                        id="rpt-add-right-btn", n_clicks=0, style=btn_style),
             sep,
             # Rows/Cols group
             html.Span("Rows/Cols", style={"fontSize": "11px", "color": "#6b7280",
                                           "fontWeight": "600", "alignSelf": "center"}),
-            html.Button("+Row", id="rpt-add-row-btn", n_clicks=0, style=btn_style),
-            html.Button("−Row", id="rpt-del-row-btn", n_clicks=0, style=btn_style),
-            html.Button("+Col", id="rpt-add-col-btn", n_clicks=0, style=btn_style),
-            html.Button("−Col", id="rpt-del-col-btn", n_clicks=0, style=btn_style),
+            html.Button([DashIconify(icon="lucide:plus", width=13), "Row"],
+                        id="rpt-add-row-btn", n_clicks=0, style=btn_style),
+            html.Button([DashIconify(icon="lucide:minus", width=13), "Row"],
+                        id="rpt-del-row-btn", n_clicks=0, style=btn_style),
+            html.Button([DashIconify(icon="lucide:plus", width=13), "Col"],
+                        id="rpt-add-col-btn", n_clicks=0, style=btn_style),
+            html.Button([DashIconify(icon="lucide:minus", width=13), "Col"],
+                        id="rpt-del-col-btn", n_clicks=0, style=btn_style),
             sep,
             # Cells group
             html.Span("Cells", style={"fontSize": "11px", "color": "#6b7280",
                                       "fontWeight": "600", "alignSelf": "center"}),
-            html.Button("Merge", id="rpt-merge-btn", n_clicks=0, style=btn_style),
-            html.Button("Split", id="rpt-split-btn", n_clicks=0, style=btn_style),
-            html.Button("Clear", id="rpt-clear-btn", n_clicks=0, style=btn_style),
+            html.Button([DashIconify(icon="lucide:merge", width=13), " Merge"],
+                        id="rpt-merge-btn", n_clicks=0, style=btn_style),
+            html.Button([DashIconify(icon="lucide:split", width=13), " Split"],
+                        id="rpt-split-btn", n_clicks=0, style=btn_style),
+            html.Button([DashIconify(icon="lucide:eraser", width=13), " Clear"],
+                        id="rpt-clear-btn", n_clicks=0, style=btn_style),
             sep,
             # Style group
             html.Span("Fill:", style={"fontSize": "12px", "color": "#374151",
@@ -2145,30 +2158,45 @@ def create_html_report_modal():
             # Text style group
             html.Span("Text", style={"fontSize": "11px", "color": "#6b7280",
                                      "fontWeight": "600", "alignSelf": "center"}),
-            html.Button("B", id="rpt-bold-btn", n_clicks=0,
-                        style={**btn_style, "fontWeight": "700", "minWidth": "28px"}),
-            html.Button("I", id="rpt-italic-btn", n_clicks=0,
-                        style={**btn_style, "fontStyle": "italic", "minWidth": "28px"}),
+            html.Button(DashIconify(icon="lucide:bold", width=13), id="rpt-bold-btn",
+                        n_clicks=0, title="Bold",
+                        style={**btn_style, "minWidth": "28px"}),
+            html.Button(DashIconify(icon="lucide:italic", width=13), id="rpt-italic-btn",
+                        n_clicks=0, title="Italic",
+                        style={**btn_style, "minWidth": "28px"}),
             sep,
             # Alignment group
             html.Span("Align", style={"fontSize": "11px", "color": "#6b7280",
                                       "fontWeight": "600", "alignSelf": "center"}),
-            html.Button("≡←", id="rpt-align-left-btn",   n_clicks=0, style={**btn_style, "minWidth": "34px"}),
-            html.Button("≡≡", id="rpt-align-center-btn", n_clicks=0, style={**btn_style, "minWidth": "34px"}),
-            html.Button("≡→", id="rpt-align-right-btn",  n_clicks=0, style={**btn_style, "minWidth": "34px"}),
+            html.Button(DashIconify(icon="lucide:align-left", width=13),
+                        id="rpt-align-left-btn", n_clicks=0, title="Align left",
+                        style={**btn_style, "minWidth": "34px"}),
+            html.Button(DashIconify(icon="lucide:align-center", width=13),
+                        id="rpt-align-center-btn", n_clicks=0, title="Align center",
+                        style={**btn_style, "minWidth": "34px"}),
+            html.Button(DashIconify(icon="lucide:align-right", width=13),
+                        id="rpt-align-right-btn", n_clicks=0, title="Align right",
+                        style={**btn_style, "minWidth": "34px"}),
             sep,
             # Indent group
             html.Span("Indent", style={"fontSize": "11px", "color": "#6b7280",
                                        "fontWeight": "600", "alignSelf": "center"}),
-            html.Button("⇥", id="rpt-indent-btn", n_clicks=0,
-                        style={**btn_style, "minWidth": "32px", "title": "Indent"}),
-            html.Button("⇤", id="rpt-dedent-btn", n_clicks=0,
-                        style={**btn_style, "minWidth": "32px", "title": "Dedent"}),
+            html.Button(DashIconify(icon="lucide:indent", width=13), id="rpt-indent-btn",
+                        n_clicks=0, title="Indent",
+                        style={**btn_style, "minWidth": "32px"}),
+            html.Button(DashIconify(icon="lucide:outdent", width=13), id="rpt-dedent-btn",
+                        n_clicks=0, title="Dedent",
+                        style={**btn_style, "minWidth": "32px"}),
             sep,
             # Title & remove
-            html.Button("+Title ↑",  id="rpt-title-above-btn",  n_clicks=0, style=btn_style),
-            html.Button("+Title ↓",  id="rpt-title-below-btn",  n_clicks=0, style=btn_style),
-            html.Button("🗑 Table",   id="rpt-remove-table-btn", n_clicks=0,
+            html.Button([DashIconify(icon="lucide:heading-1", width=13), " ↑"],
+                        id="rpt-title-above-btn", n_clicks=0, title="Add title above",
+                        style=btn_style),
+            html.Button([DashIconify(icon="lucide:heading-1", width=13), " ↓"],
+                        id="rpt-title-below-btn", n_clicks=0, title="Add title below",
+                        style=btn_style),
+            html.Button([DashIconify(icon="lucide:trash-2", width=13), " Table"],
+                        id="rpt-remove-table-btn", n_clicks=0,
                         style={**btn_style, "color": "#dc2626", "borderColor": "#fca5a5"}),
         ],
     )
@@ -2248,7 +2276,8 @@ def create_html_report_modal():
                     "borderBottom": "1px solid #d1fae5", "flexShrink": "0",
                 },
                 children=[
-                    html.Button("← Back", id="rpt-flt-close-btn", n_clicks=0,
+                    html.Button([DashIconify(icon="lucide:arrow-left", width=13), " Back"],
+                                id="rpt-flt-close-btn", n_clicks=0,
                                 style={"padding": "4px 10px", "fontSize": "12px",
                                        "cursor": "pointer", "background": "#e5e7eb",
                                        "border": "1px solid #d1d5db", "borderRadius": "4px",
@@ -2311,7 +2340,8 @@ def create_html_report_modal():
                             html.Span("Variable Filters",
                                       style={"fontWeight": "600", "fontSize": "13px",
                                              "color": "#374151", "flex": "1"}),
-                            html.Button("+ Add Row", id="rpt-flt-add-row-btn", n_clicks=0,
+                            html.Button([DashIconify(icon="lucide:plus", width=13), " Add Row"],
+                                        id="rpt-flt-add-row-btn", n_clicks=0,
                                         style={"padding": "3px 10px", "fontSize": "12px",
                                                "cursor": "pointer", "background": "#e0f2fe",
                                                "border": "1px solid #38bdf8",
@@ -2340,7 +2370,8 @@ def create_html_report_modal():
                        "borderTop": "1px solid #e5e7eb", "display": "flex", "gap": "8px",
                        "alignItems": "center"},
                 children=[
-                    html.Button("💾 Save Filter", id="rpt-flt-save-btn", n_clicks=0,
+                    html.Button([DashIconify(icon="lucide:save", width=14), " Save Filter"],
+                                id="rpt-flt-save-btn", n_clicks=0,
                                 style={"padding": "6px 18px", "background": "#16a34a",
                                        "color": "#fff", "border": "none", "borderRadius": "5px",
                                        "cursor": "pointer", "fontSize": "13px",
@@ -2398,7 +2429,8 @@ def create_html_report_modal():
                                     "fontSize": "13px", "color": "#111827",
                                 },
                             ),
-                            html.Button("💾 Save", id="save-html-report-btn", n_clicks=0,
+                            html.Button([DashIconify(icon="lucide:save", width=15), " Save"],
+                                        id="save-html-report-btn", n_clicks=0,
                                         style={"padding": "5px 14px", "background": "#16a34a",
                                                "color": "#fff", "border": "none",
                                                "borderRadius": "5px", "cursor": "pointer",
@@ -2406,7 +2438,8 @@ def create_html_report_modal():
                             html.Span(id="html-report-save-status",
                                       style={"fontSize": "12px", "color": "#d1fae5",
                                              "fontStyle": "italic", "minWidth": "60px"}),
-                            html.Button("✕ Close", id="close-create-reports-modal", n_clicks=0,
+                            html.Button([DashIconify(icon="lucide:x", width=13), " Close"],
+                                        id="close-create-reports-modal", n_clicks=0,
                                         style={"marginLeft": "auto", "padding": "5px 14px",
                                                "background": "transparent", "color": "#ffffff",
                                                "border": "1px solid rgba(255,255,255,0.4)",
@@ -2415,6 +2448,283 @@ def create_html_report_modal():
                         ],
                     ),
                     # Body: left + right panels
+                    html.Div(
+                        style={"display": "flex", "flex": "1", "overflow": "hidden"},
+                        children=[left_panel, right_panel],
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
+def create_prog_report_modal():
+    """Modal for creating/editing program report configs in validated_prog_reports.json."""
+    key_opts       = [{"label": k, "value": k} for k in actual_keys_in_data]
+    program_opts   = [{"label": p, "value": p} for p in drop_down_programs]
+    ll_aggr_opts   = [{"label": a, "value": a} for a in
+                      ["join", "first", "last", "nunique", "sum", "count",
+                       "mean", "min", "max", "list"]]
+    piv_aggr_opts  = [{"label": a, "value": a} for a in
+                      ["sum", "count", "mean", "nunique", "min", "max", "first"]]
+    merge_opts     = [{"label": m, "value": m} for m in ["left", "inner", "right", "outer"]]
+    type_opts      = [{"label": t, "value": t} for t in ["LineList", "PivotTable", "CrossTab"]]
+    unique_opts    = [{"label": "person_id",    "value": "person_id"},
+                      {"label": "encounter_id", "value": "encounter_id"}]
+    normalize_opts = [{"label": n, "value": n} for n in ["all", "index", "columns"]]
+    role_opts      = [{"label": r, "value": r} for r in
+                      ["Any", "Clinician", "Nurse", "Admin", "national",
+                       "district", "facility", "reports_admin"]]
+
+    _i = {"width": "100%", "padding": "6px 8px", "fontSize": "12px",
+          "border": "1px solid #d1d5db", "borderRadius": "4px", "boxSizing": "border-box"}
+    _t = {**_i, "height": "54px", "resize": "vertical", "fontFamily": "monospace"}
+    _l = {"fontSize": "11px", "fontWeight": "600", "color": "#374151",
+          "display": "block", "marginBottom": "3px"}
+    _s = {"marginBottom": "12px"}
+
+    # ── LEFT PANEL ──────────────────────────────────────────────────────────
+    left_panel = html.Div(
+        style={"flex": "0 0 300px", "display": "flex", "flexDirection": "column",
+               "height": "100%", "overflowY": "auto", "padding": "14px 12px",
+               "borderRight": "1px solid #bbf7d0", "background": "#f0fdf4"},
+        children=[
+            html.Div(style=_s, children=[
+                html.Label("Select / Search Report", style=_l),
+                html.Div(style={"display": "flex", "gap": "6px"}, children=[
+                    dcc.Dropdown(id="prog-rpt-selector", options=[],
+                                 placeholder="Search…", clearable=True, searchable=True,
+                                 style={"flex": "1", "fontSize": "12px"}),
+                    html.Button([DashIconify(icon="lucide:plus", width=13), " New"],
+                                id="prog-rpt-new-btn", n_clicks=0,
+                                style={"padding": "4px 10px", "fontSize": "12px",
+                                       "background": "#15803d", "color": "#fff",
+                                       "border": "none", "borderRadius": "4px",
+                                       "cursor": "pointer", "whiteSpace": "nowrap"}),
+                ]),
+            ]),
+            html.Div(style=_s, children=[
+                html.Label("ID (auto)", style={**_l, "color": "#9ca3af"}),
+                dcc.Input(id="prog-rpt-id", type="text", disabled=True,
+                          placeholder="auto-generated",
+                          style={**_i, "background": "#f3f4f6", "color": "#9ca3af"}),
+            ]),
+            html.Div(style=_s, children=[
+                html.Label("Report Name *", style=_l),
+                dcc.Input(id="prog-rpt-name", type="text",
+                          placeholder="Enter report name…", style=_i),
+            ]),
+            html.Div(style=_s, children=[
+                html.Label("Program", style=_l),
+                dcc.Dropdown(id="prog-rpt-program", options=program_opts,
+                             placeholder="Select program…", clearable=True,
+                             style={"fontSize": "12px"}),
+            ]),
+            html.Div(style=_s, children=[
+                html.Label("Type *", style=_l),
+                dcc.Dropdown(id="prog-rpt-type", options=type_opts,
+                             placeholder="LineList / PivotTable / CrossTab…",
+                             clearable=False, style={"fontSize": "12px"}),
+            ]),
+            html.Div(style=_s, children=[
+                html.Label("Unique Value", style=_l),
+                dcc.Dropdown(id="prog-rpt-unique-col", options=unique_opts,
+                             placeholder="person_id / encounter_id",
+                             clearable=True, style={"fontSize": "12px"}),
+            ]),
+            html.Div(style=_s, children=[
+                html.Label("Authorized Users", style=_l),
+                dcc.Dropdown(id="prog-rpt-auth-user", options=role_opts,
+                             placeholder="Select roles…", multi=True, clearable=True,
+                             style={"fontSize": "12px"}),
+            ]),
+            html.Div(style=_s, children=[
+                html.Label("Message", style=_l),
+                dcc.Textarea(id="prog-rpt-message", placeholder="Optional display message…",
+                             style={**_t, "height": "48px"}),
+            ]),
+        ],
+    )
+
+    # ── RIGHT: LineList panel ────────────────────────────────────────────────
+    ll_panel = html.Div(
+        id="prog-rpt-linelist-panel",
+        style={"display": "none", "flexDirection": "column", "gap": "8px",
+               "height": "100%", "overflowY": "auto", "padding": "14px"},
+        children=[
+            html.Div(style={"display": "flex", "justifyContent": "space-between",
+                            "alignItems": "center", "flexShrink": "0",
+                            "borderBottom": "2px solid #e5e7eb", "paddingBottom": "8px",
+                            "marginBottom": "4px"}, children=[
+                html.Span("Group Columns",
+                          style={"fontSize": "13px", "fontWeight": "700", "color": "#1e293b"}),
+                html.Button([DashIconify(icon="lucide:plus", width=13), " Add Group"],
+                            id="prog-rpt-add-group-btn", n_clicks=0,
+                            style={"padding": "4px 12px", "fontSize": "12px",
+                                   "background": "#16a34a", "color": "#fff",
+                                   "border": "none", "borderRadius": "4px",
+                                   "cursor": "pointer"}),
+            ]),
+            html.Div(id="prog-rpt-groups-container", style={"flexShrink": "0"}),
+            html.Hr(style={"margin": "6px 0", "borderColor": "#e5e7eb", "flexShrink": "0"}),
+            html.Div(style={"display": "flex", "gap": "12px", "flexWrap": "wrap",
+                            "flexShrink": "0"}, children=[
+                html.Div(style={"flex": "2", "minWidth": "200px"}, children=[
+                    html.Label("Columns Order (in display order)", style={**_l, "marginBottom": "4px"}),
+                    dcc.Dropdown(id="prog-rpt-cols-order", options=key_opts,
+                                 multi=True, placeholder="Select columns in display order…",
+                                 style={"fontSize": "12px"}),
+                ]),
+                html.Div(style={"flex": "1", "minWidth": "140px"}, children=[
+                    html.Label("Merge Methods (one per join)", style={**_l, "marginBottom": "4px"}),
+                    dcc.Dropdown(id="prog-rpt-merge-methods", options=merge_opts,
+                                 multi=True, placeholder="left / inner…",
+                                 style={"fontSize": "12px"}),
+                ]),
+                html.Div(style={"flex": "1", "minWidth": "160px"}, children=[
+                    html.Label("Global Rename (JSON)", style={**_l, "marginBottom": "4px"}),
+                    dcc.Textarea(id="prog-rpt-rename",
+                                 placeholder='{"given_name": "First Name", …}',
+                                 style={**_t, "height": "50px"}),
+                ]),
+            ]),
+        ],
+    )
+
+    # ── RIGHT: PivotTable / CrossTab panel ──────────────────────────────────
+    piv_panel = html.Div(
+        id="prog-rpt-pivot-panel",
+        style={"display": "none", "flexDirection": "column", "gap": "10px",
+               "height": "100%", "overflowY": "auto", "padding": "14px"},
+        children=[
+            html.Div(style={"display": "grid", "gridTemplateColumns": "1fr 1fr 1fr",
+                            "gap": "12px", "flexShrink": "0"}, children=[
+                html.Div(children=[
+                    html.Label("Index Column (Rows)", style=_l),
+                    dcc.Input(id="prog-rpt-index-col", type="text",
+                              placeholder="e.g. DrugName", style=_i),
+                ]),
+                html.Div(children=[
+                    html.Label("Columns", style=_l),
+                    dcc.Input(id="prog-rpt-columns-col", type="text",
+                              placeholder="e.g. Encounter", style=_i),
+                ]),
+                html.Div(children=[
+                    html.Label("Values Column", style=_l),
+                    dcc.Input(id="prog-rpt-values-col", type="text",
+                              placeholder="e.g. ValueN", style=_i),
+                ]),
+                html.Div(children=[
+                    html.Label("Aggregation Function", style=_l),
+                    dcc.Dropdown(id="prog-rpt-aggfunc", options=piv_aggr_opts,
+                                 placeholder="sum / count…", clearable=False,
+                                 style={"fontSize": "12px"}),
+                ]),
+                html.Div(children=[
+                    html.Label("Unique Column (dedup)", style=_l),
+                    dcc.Dropdown(id="prog-rpt-pivot-unique-col", options=unique_opts,
+                                 clearable=True, placeholder="encounter_id…",
+                                 style={"fontSize": "12px"}),
+                ]),
+                html.Div(id="prog-rpt-normalize-wrap", style={"display": "none"}, children=[
+                    html.Label("Normalize (CrossTab only)", style=_l),
+                    dcc.Dropdown(id="prog-rpt-normalize", options=normalize_opts,
+                                 clearable=True, placeholder="all / index / columns",
+                                 style={"fontSize": "12px"}),
+                ]),
+            ]),
+            html.Hr(style={"margin": "4px 0", "borderColor": "#e5e7eb", "flexShrink": "0"}),
+            html.Span("Filters (up to 3)",
+                      style={"fontSize": "12px", "fontWeight": "600", "color": "#374151",
+                             "flexShrink": "0"}),
+            html.Div(style={"display": "grid", "gridTemplateColumns": "1fr 1fr",
+                            "gap": "8px 14px", "flexShrink": "0"}, children=[
+                html.Div(children=[html.Label("Filter Column 1", style=_l),
+                                   dcc.Dropdown(id="prog-rpt-filter-col1", options=key_opts,
+                                                clearable=True, style={"fontSize": "12px"})]),
+                html.Div(children=[html.Label("Filter Value 1", style=_l),
+                                   dcc.Input(id="prog-rpt-filter-val1", type="text",
+                                             placeholder="Value…", style=_i)]),
+                html.Div(children=[html.Label("Filter Column 2", style=_l),
+                                   dcc.Dropdown(id="prog-rpt-filter-col2", options=key_opts,
+                                                clearable=True, style={"fontSize": "12px"})]),
+                html.Div(children=[html.Label("Filter Value 2", style=_l),
+                                   dcc.Input(id="prog-rpt-filter-val2", type="text",
+                                             placeholder="Value…", style=_i)]),
+                html.Div(children=[html.Label("Filter Column 3", style=_l),
+                                   dcc.Dropdown(id="prog-rpt-filter-col3", options=key_opts,
+                                                clearable=True, style={"fontSize": "12px"})]),
+                html.Div(children=[html.Label("Filter Value 3", style=_l),
+                                   dcc.Input(id="prog-rpt-filter-val3", type="text",
+                                             placeholder="Value…", style=_i)]),
+            ]),
+            html.Hr(style={"margin": "4px 0", "borderColor": "#e5e7eb", "flexShrink": "0"}),
+            html.Div(style={"display": "grid", "gridTemplateColumns": "1fr 1fr",
+                            "gap": "12px", "flexShrink": "0"}, children=[
+                html.Div(children=[html.Label("Rename (JSON)", style=_l),
+                                   dcc.Textarea(id="prog-rpt-tabular-rename",
+                                                placeholder='{"DrugName": "DRUG", …}',
+                                                style=_t)]),
+                html.Div(children=[html.Label("Replace (JSON)", style=_l),
+                                   dcc.Textarea(id="prog-rpt-tabular-replace",
+                                                placeholder='{"old": "new", …}',
+                                                style=_t)]),
+            ]),
+        ],
+    )
+
+    right_panel = html.Div(
+        style={"flex": "1", "display": "flex", "flexDirection": "column",
+               "minWidth": "0"},
+        children=[ll_panel, piv_panel],
+    )
+
+    return html.Div(
+        id="prog-report-modal",
+        style={"display": "none", "position": "fixed", "top": "0", "left": "0",
+               "width": "100vw", "height": "100vh", "zIndex": "2000",
+               "alignItems": "center", "justifyContent": "center",
+               "background": "rgba(0,0,0,0.45)"},
+        children=[
+            html.Div(
+                style={"width": "96vw", "height": "92vh", "background": "#fff",
+                       "borderRadius": "10px", "display": "flex",
+                       "flexDirection": "column", "overflow": "hidden",
+                       "boxShadow": "0 20px 60px rgba(0,0,0,0.35)"},
+                children=[
+                    html.Div(
+                        style={"display": "flex", "alignItems": "center", "gap": "12px",
+                               "padding": "10px 16px", "background": "#006401",
+                               "flexShrink": "0"},
+                        children=[
+                            html.Span("Create Program Reports",
+                                      style={"fontWeight": "700", "fontSize": "16px",
+                                             "color": "#fff", "marginRight": "8px",
+                                             "whiteSpace": "nowrap"}),
+                            html.Button([DashIconify(icon="lucide:save", width=15), " Save"],
+                                        id="prog-rpt-save-btn", n_clicks=0,
+                                        style={"padding": "5px 14px", "background": "#16a34a",
+                                               "color": "#fff", "border": "none",
+                                               "borderRadius": "5px", "cursor": "pointer",
+                                               "fontSize": "13px", "fontWeight": "600"}),
+                            html.Button([DashIconify(icon="lucide:trash-2", width=14), " Delete"],
+                                        id="prog-rpt-delete-btn", n_clicks=0,
+                                        style={"padding": "5px 14px", "background": "#dc2626",
+                                               "color": "#fff", "border": "none",
+                                               "borderRadius": "5px", "cursor": "pointer",
+                                               "fontSize": "13px"}),
+                            html.Span(id="prog-rpt-status",
+                                      style={"fontSize": "12px", "color": "#d1fae5",
+                                             "fontStyle": "italic", "minWidth": "80px"}),
+                            html.Button([DashIconify(icon="lucide:x", width=13), " Close"],
+                                        id="prog-rpt-close-btn", n_clicks=0,
+                                        style={"marginLeft": "auto", "padding": "5px 14px",
+                                               "background": "transparent", "color": "#fff",
+                                               "border": "1px solid rgba(255,255,255,0.4)",
+                                               "borderRadius": "5px", "cursor": "pointer",
+                                               "fontSize": "13px"}),
+                        ],
+                    ),
                     html.Div(
                         style={"display": "flex", "flex": "1", "overflow": "hidden"},
                         children=[left_panel, right_panel],

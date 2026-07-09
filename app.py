@@ -11,11 +11,16 @@ from mnid.app import register_mnid_callbacks
 
 pathname_prefix = PREFIX_NAME if PREFIX_NAME else "/"
 
+# external_stylesheets = [
+#     "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+# ]
+
 app = dash.Dash(
     __name__,
     use_pages=True,
     suppress_callback_exceptions=True,
     requests_pathname_prefix=pathname_prefix,
+    # external_stylesheets=external_stylesheets
 )
 server = app.server
 
