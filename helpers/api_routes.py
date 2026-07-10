@@ -205,7 +205,7 @@ def register_api_routes(server):
 
             builder = ReportTableBuilder(
                 spec_path, start_date, end_date, DATA_PATH_,
-                facility_id, dhis2_period=None,report_filters=report_filters
+                facility_id,facility=None, dhis2_period=None,report_filters=report_filters
             )
             builder.load_spec()
             sections    = builder.build_section_tables()
@@ -291,8 +291,9 @@ def register_api_routes(server):
                 config = json.load(f)
 
             report_cfg = next(
-                (r for r in config.get("reports", []) if str(r.get("id")) == report_id),
-                None,
+                        (r for r in config.get("reports", []) 
+                        if str(r.get("id")) == report_id and r.get("enable_api") != "False"),
+                        None,
             )
             if not report_cfg:
                 return jsonify({"error": f"Report id '{report_id}' not found"}), 404

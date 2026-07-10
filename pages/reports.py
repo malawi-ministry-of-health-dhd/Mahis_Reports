@@ -9,6 +9,7 @@ import os
 import json
 from dash.exceptions import PreventUpdate
 from helpers.reports_class import ReportTableBuilder
+from pages.home import _resolve_user_scope, _load_user_registry
 from mnid.data_utils import prepare_mnid_dataframe
 import warnings
 warnings.filterwarnings("ignore")
@@ -22,6 +23,7 @@ from helpers.date_ranges import (
     get_biannual_start_end,
     get_dhis2_period
 )
+import pdfkit
 from reportlab.lib.pagesizes import letter, A4, portrait, landscape
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -35,6 +37,140 @@ from config import (DATE_, FACILITY_, AGE_GROUP_, GENDER_, PROGRAM_,PERSON_ID_,E
                     NEW_REVISIT_, HOME_DISTRICT_, TA_, VILLAGE_, CONCEPT_NAME_,VALUE_DATETIME_,
                     FACILITY_CODE_, DATA_PATH_, actual_keys_in_data)
 from helpers.navigation_callbacks import DEMO_UUID
+from dash_iconify import DashIconify
+
+def nav_icon(icon_name):
+    return DashIconify(icon=icon_name, className="nav-icon")
+
+
+def _get_node_text(node):
+    """Recursively extract plain text from a serialized Dash component node."""
+    if node is None:
+        return ""
+    if isinstance(node, (str, int, float)):
+        return str(node)
+    if isinstance(node, list):
+        return " ".join(_get_node_text(c) for c in node if c is not None)
+    if isinstance(node, dict):
+        children = node.get("props", {}).get("children")
+        if children is not None:
+            return _get_node_text(children)
+    return ""
+
+
+def _extract_tables_from_component(comp):
+    """
+    Walk a serialized Dash component dict and return
+    [(section_title, DataFrame), ...] for each html.Table found.
+    The first <Th> in Thead is treated as the section title.
+    """
+    results = []
+    _walk_tables(comp, results)
+    return results
+
+
+def _walk_tables(node, results):
+    if isinstance(node, list):
+        for item in node:
+            _walk_tables(item, results)
+        return
+    if not isinstance(node, dict):
+        return
+    comp_type = node.get("type", "")
+    props     = node.get("props", {})
+    children  = props.get("children", [])
+
+    if comp_type == "Table":
+        headers, rows = [], []
+        for child in (children if isinstance(children, list) else [children]):
+            if not isinstance(child, dict):
+                continue
+            ctype     = child.get("type", "")
+            cchildren = child.get("props", {}).get("children", [])
+            cchildren = cchildren if isinstance(cchildren, list) else [cchildren]
+            if ctype == "Thead":
+                for tr in cchildren:
+                    if isinstance(tr, dict) and tr.get("type") == "Tr":
+                        cells = tr.get("props", {}).get("children", [])
+                        cells = cells if isinstance(cells, list) else [cells]
+                        headers = [_get_node_text(c) for c in cells]
+            elif ctype == "Tbody":
+                for tr in cchildren:
+                    if isinstance(tr, dict) and tr.get("type") == "Tr":
+                        cells = tr.get("props", {}).get("children", [])
+                        cells = cells if isinstance(cells, list) else [cells]
+                        rows.append([_get_node_text(c) for c in cells])
+        if headers and rows:
+            section_title = headers[0] or f"Section {len(results) + 1}"
+            df = pd.DataFrame(rows, columns=headers)
+            results.append((section_title, df))
+        return  # don't recurse into processed table
+
+    _walk_tables(
+        children if isinstance(children, list) else ([children] if children else []),
+        results,
+    )
+
+
+import re as _re
+
+_TAG_MAP = {
+    "Div": "div", "Span": "span", "P": "p", "A": "a",
+    "Table": "table", "Thead": "thead", "Tbody": "tbody",
+    "Tr": "tr", "Th": "th", "Td": "td",
+    "H1": "h1", "H2": "h2", "H3": "h3", "H4": "h4", "H5": "h5", "H6": "h6",
+    "Ul": "ul", "Ol": "ol", "Li": "li",
+    "B": "b", "I": "i", "Strong": "strong", "Em": "em",
+    "Br": "br", "Hr": "hr", "Label": "label", "Button": "button",
+    "Section": "section", "Header": "header", "Footer": "footer",
+}
+_SKIP_NS = {"dash_iconify", "dash_core_components", "dash_table", "plotly"}
+_SELF_CLOSE = {"br", "hr", "img", "input"}
+
+
+def _camel_to_kebab(name):
+    s = _re.sub(r"(.)([A-Z][a-z]+)", r"\1-\2", name)
+    return _re.sub(r"([a-z0-9])([A-Z])", r"\1-\2", s).lower()
+
+
+def _comp_to_html(node):
+    """Convert a serialized Dash component dict to an HTML string."""
+    if node is None:
+        return ""
+    if isinstance(node, (str, int, float)):
+        return str(node)
+    if isinstance(node, list):
+        return "".join(_comp_to_html(c) for c in node)
+    if not isinstance(node, dict):
+        return ""
+
+    namespace = node.get("namespace", "")
+    if any(namespace.startswith(ns) for ns in _SKIP_NS):
+        return ""
+
+    comp_type = node.get("type", "")
+    tag       = _TAG_MAP.get(comp_type, "div")
+    props     = node.get("props", {})
+
+    attrs = []
+    if props.get("className"):
+        attrs.append(f'class="{props["className"]}"')
+    style = props.get("style") or {}
+    if style:
+        css = "; ".join(f"{_camel_to_kebab(k)}: {v}" for k, v in style.items())
+        attrs.append(f'style="{css}"')
+    for prop, attr in (("colSpan", "colspan"), ("rowSpan", "rowspan"),
+                       ("id", "id"), ("href", "href"), ("src", "src")):
+        val = props.get(prop)
+        if val is not None:
+            attrs.append(f'{attr}="{val}"')
+
+    attr_str = (" " + " ".join(attrs)) if attrs else ""
+    if tag in _SELF_CLOSE:
+        return f"<{tag}{attr_str}/>"
+
+    inner = _comp_to_html(props.get("children", []))
+    return f"<{tag}{attr_str}>{inner}</{tag}>"
 
 
 dash.register_page(__name__, path="/hmis_reports")
@@ -125,24 +261,6 @@ layout = html.Div(
                             ]
                         ),
                         
-                        # Period Type Filter
-                        html.Div(
-                            className="parameter-group",
-                            children=[
-                                html.Label("Period Type", className="parameter-label"),
-                                dcc.Dropdown(
-                                    id='period_type-filter',
-                                    options=[
-                                        {'label': period, 'value': period}
-                                        for period in ['Weekly', 'Monthly', 'Quarterly', 'Bi-Annual']
-                                    ],
-                                    value='Monthly',
-                                    clearable=True,
-                                    className="modern-dropdown"
-                                )
-                            ]
-                        ),
-                        
                         # Year Filter
                         html.Div(
                             className="parameter-group",
@@ -155,6 +273,24 @@ layout = html.Div(
                                         for period in relative_year
                                     ],
                                     value=dt.now().strftime("%Y"),
+                                    clearable=True,
+                                    className="modern-dropdown"
+                                )
+                            ]
+                        ),
+
+                        # Period Type Filter
+                        html.Div(
+                            className="parameter-group",
+                            children=[
+                                html.Label("Period Type", className="parameter-label"),
+                                dcc.Dropdown(
+                                    id='period_type-filter',
+                                    options=[
+                                        {'label': period, 'value': period}
+                                        for period in ['Weekly', 'Monthly', 'Quarterly', 'Bi-Annual']
+                                    ],
+                                    value='Monthly',
                                     clearable=True,
                                     className="modern-dropdown"
                                 )
@@ -178,6 +314,25 @@ layout = html.Div(
                                 )
                             ]
                         ),
+
+                        html.Div(
+                            id ='facilities',
+                            className="parameter-group",
+                            children=[
+                                html.Label("Select Facility", className="parameter-label"),
+                                dcc.Dropdown(
+                                    id='facility-filter',
+                                    options=[
+                                        {'label': hf, 'value': hf}
+                                        for hf in []
+                                    ],
+                                    multi=False,
+                                    value="",
+                                    clearable=True,
+                                    className="modern-dropdown"
+                                )
+                            ]
+                        ),
                     ]
                 ),
                 
@@ -192,16 +347,18 @@ layout = html.Div(
                             className="btn-generate-modern"
                         ),
                         html.Div(
+                            id="download-buttons-group",
                             className="download-buttons",
+                            style={"display": "none"},
                             children=[
                                 html.Button(
-                                    "📥 XLSX",
+                                    [nav_icon("lucide:file-spreadsheet"), " XLSX"],
                                     id="report-btn-xlsx",
                                     n_clicks=0,
                                     className="btn-download-csv"
                                 ),
                                 html.Button(
-                                    "📄 PDF",
+                                    [nav_icon("lucide:file-text"), " PDF"],
                                     id="report-btn-pdf",
                                     n_clicks=0,
                                     className="btn-download-pdf"
@@ -223,6 +380,7 @@ layout = html.Div(
         # Hidden Components
         dcc.Download(id="download-report-blob"),
         dcc.Store(id="report-data-store"),
+        dcc.Store(id="report-html-store"),
         dcc.Store(id="rpt-modal-page", data=1),
         dcc.Store(id="rpt-modal-data", data=None),
 
@@ -340,6 +498,36 @@ def update_month_options(period_type):
         'Bi-Annual': relative_biannual
     }
     return period_map.get(period_type, relative_quarter)
+
+@callback(
+        [Output('facility-filter', 'options'),
+         Output('facility-filter', 'value'),
+         Output('facilities', 'style')],
+        Input('url-params-store', 'data'))
+
+def load_user_facilities(urlparams):
+    data_route = urlparams.get('route', ["default"])[0] if urlparams else None
+    user_data = _load_user_registry(data_route)
+    user_row, scope = _resolve_user_scope(urlparams, user_data)
+    user_facility = user_row.get('facility_name', 'Unknown Facility')
+
+    if scope['facilities'] and len(scope['facilities']) > 1:
+        # print("here1")
+        hf = scope['facilities'] if isinstance(scope['facilities'], list) else [scope['facilities']]
+        return hf,user_facility, {'className': 'modern-dropdown'}
+    elif scope['facilities'] and len(scope['facilities']) == 1:
+        # print("here2")
+        hf = scope['facilities'] if isinstance(scope['facilities'], list) else [scope['facilities']]
+        return hf,user_facility, {'display':'none'}
+    elif scope['level'] == 'national':
+        facilities_path = os.path.join(path, f'data/{data_route}', 'dcc_dropdown_json', 'facilities_dropdowns.json')
+        with open(facilities_path, 'r') as f:
+            facilities_raw = json.load(f)
+        hf = [item for value in facilities_raw.values() if isinstance(value, list) for item in value]
+        return hf,user_facility, {'className': 'modern-dropdown'}
+    else:
+        # print("here3")
+        return ['User Facility'],user_facility, {'display':'none'}
     
 @callback(
         [Output('program_filter', 'options'),
@@ -366,6 +554,7 @@ def update_report_dropdown(urlparams, program):
     Input('period_type-filter', 'value'),
     Input('year-filter', 'value'),
     Input('month-filter', 'value'),
+    Input('facility-filter', 'value'),
     Input('report_name', 'value'),
     Input('url', 'pathname'),
     prevent_initial_call=True,
@@ -394,7 +583,7 @@ def update_report_dropdown(urlparams, program):
         ),
     ]
 )
-def update_table(clicks, urlparams, period_type, year_filter, month_filter, report_filter,pathname):
+def update_table(clicks, urlparams, period_type, year_filter, month_filter, facility_filter, report_filter,pathname):
     
     ctx = dash.callback_context
     if not ctx.triggered:
@@ -404,7 +593,7 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, repo
         raise PreventUpdate
     
     # Handle missing inputs to prevent errors
-    if not urlparams or not period_type or not year_filter or not month_filter or not report_filter:
+    if not urlparams or not period_type or not year_filter or not month_filter or not report_filter or not facility_filter:
         return html.Div("Missing Report Parameters"), 0, None
     reports_json = os.path.join(path, 'data', 'hmis_reports.json')
     with open(reports_json, "r") as f:
@@ -434,12 +623,9 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, repo
     data_route = urlparams.get('route', ["default"])[0]
     DATA_PATH_ = f"data/{data_route}/parquet"
 
-    # validate user
-    user_data_path = os.path.join(path, f'data/{data_route}','single_tables', 'users_data.csv')
-    if not os.path.exists(user_data_path):
-        user_data = pd.DataFrame(columns=['uuid', 'role'])
-    else:
-        user_data = pd.read_csv(os.path.join(path, f'data/{data_route}','single_tables', 'users_data.csv'))
+    user_data = _load_user_registry(data_route)
+    user_row, scope = _resolve_user_scope(urlparams, user_data)
+
     test_admin = pd.DataFrame(columns=['uuid', 'role'], data=[[DEMO_UUID, 'reports_admin']])
     user_data = pd.concat([user_data, test_admin], ignore_index=True)
     user_info = user_data[user_data['uuid'] == urlparams.get('uuid', [None])[0]]
@@ -479,6 +665,7 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, repo
                                      report_end_date= end_date, 
                                      data_route= DATA_PATH_, 
                                      location=location, dhis2_period= dhis2_period,
+                                     facility=facility_filter,
                                       report_design= report_design,
                                        report_filters = report_filters )
         builder.load_spec()
@@ -517,7 +704,27 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, repo
         print(f"Error: {e}")
         return html.Div(f"Error: {str(e)}"), 0, None
 
-    
+
+@callback(
+    Output("download-buttons-group", "style"),
+    Input("report-data-store", "data"),
+    prevent_initial_call=True,
+)
+def toggle_download_buttons(report_data):
+    if report_data:
+        return {"display": "flex"}
+    return {"display": "none"}
+
+
+@callback(
+    Output("report-html-store", "data"),
+    Input("standard-reports-table-container", "children"),
+    prevent_initial_call=True,
+)
+def _relay_html_to_store(children):
+    return children
+
+
 @callback(
         Output('download-report-blob', 'data'),
         [
@@ -525,9 +732,10 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, repo
         Input('report-btn-xlsx', 'n_clicks'),
         Input('report-btn-pdf', 'n_clicks')
         ],
+        State('report-html-store', 'data'),
         prevent_initial_call=True
 )
-def get_data(reports_data, xlsx, pdf):
+def get_data(reports_data, xlsx, pdf, comp_data):
     ctx = dash.callback_context
     if not ctx.triggered:
         return dash.no_update
@@ -556,219 +764,40 @@ def get_data(reports_data, xlsx, pdf):
         return dcc.send_bytes(xlsx_buffer.getvalue(), filename='MaHIS_facility_report.xlsx')
 
     elif trigger_id == 'report-btn-pdf':
-        # ── PDF: mirrors build_dash_components design ─────────────────────────
-        from reportlab.lib.units import mm
+        if not comp_data:
+            return dash.no_update
 
-        report_title    = meta.get("title", "HMIS DATASET REPORT").upper()
-        num_cols        = int(meta.get("num_page_columns", 1) or 1)
-        num_cols        = max(1, min(4, num_cols))
-        is_landscape    = str(meta.get("design", "portrait")).lower() == "landscape"
-        period_str      = meta.get("period", "")
-        location_str    = meta.get("location", "")
-        page_size       = landscape(A4) if is_landscape else portrait(A4)
-        page_w, page_h  = page_size
-        margin          = 18 * mm
-        usable_w        = page_w - 2 * margin
-        col_usable_w    = (usable_w - (num_cols - 1) * 6 * mm) / num_cols
+        is_landscape = str(meta.get("design", "portrait")).lower() == "landscape"
+        page_orient  = "landscape" if is_landscape else "portrait"
+        report_title = meta.get("title", "HMIS DATASET REPORT").upper()
+        period_str   = meta.get("period", "")
+        location_str = meta.get("location", "")
 
-        # ── Colour palette matching _create_modern_table ──────────────────────
-        C_GREEN   = colors.HexColor("#006401")   # section title bar
-        C_HEADER  = colors.HexColor("#374151")   # column header row
-        C_DE_HDR  = colors.HexColor("#1f2937")   # Data Element header cell
-        C_DE_CELL = colors.HexColor("#f9fafb")   # Data Element column background
-        C_ODD     = colors.HexColor("#f9fafb")   # odd data rows
-        C_EVEN    = colors.white
-        C_BORDER  = colors.HexColor("#e5e7eb")
-        C_WHITE   = colors.white
+        body_html = _comp_to_html(comp_data)
 
-        styles     = getSampleStyleSheet()
-        wrap_style = ParagraphStyle(
-            "Wrap", parent=styles["Normal"],
-            fontSize=7, leading=9, wordWrap="LTR", spaceBefore=1, spaceAfter=1,
-        )
-        de_style = ParagraphStyle(
-            "DE", parent=styles["Normal"],
-            fontSize=7, leading=9, wordWrap="LTR", fontName="Helvetica-Bold",
-        )
+        html_doc = f"""<!DOCTYPE html>
+            <html>
+            <head>
+            <meta charset="utf-8"/>
+            <style>
+            @page {{ size: A4 {page_orient}; margin: 18mm; @bottom-right {{ content: "Generated by MaHIS@2026"; font-size: 8px; color: #6b7280; }} }}
+            body {{ font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111; margin: 0; }}
+            table {{ width: 100%; border-collapse: collapse; margin-bottom: 10px; page-break-inside: auto; }}
+            tr {{ page-break-inside: avoid; }}
+            th, td {{ border: 1px solid #e5e7eb; padding: 3px 6px; font-size: 9px; word-wrap: break-word; }}
+            </style>
+            </head>
+            <body>{body_html}</body>
+            </html>"""
 
-        def _make_section_table(section_name: str, df: pd.DataFrame) -> list:
-            """Return a list of ReportLab flowables for one report section."""
-            df = df.dropna(how="all", axis=0).dropna(how="all", axis=1)
-            if df.empty:
-                return []
+        try:
+            from weasyprint import HTML as WeasyprintHTML
+            pdf_bytes = WeasyprintHTML(string=html_doc).write_pdf()
+        except ImportError:
+            import pdfkit
+            pdf_bytes = pdfkit.from_string(html_doc, False)
 
-            value_cols = [c for c in df.columns if c != "Data Element"]
-
-            # ── Dynamic column widths proportional to content ─────────────────
-            de_max  = max((len(str(x)) for x in df["Data Element"].tolist()), default=12)
-            de_w    = min(de_max * 4.5 + 20, col_usable_w * 0.45)
-            val_total = col_usable_w - de_w
-            val_w   = val_total / max(len(value_cols), 1)
-            col_widths_pt = [de_w] + [val_w] * len(value_cols)
-
-            # ── Section title bar (green, full width) ─────────────────────────
-            title_data  = [[Paragraph(f"<b>{section_name.upper()}</b>",
-                                      ParagraphStyle("TBar", parent=styles["Normal"],
-                                                     fontSize=8, leading=10,
-                                                     textColor=C_WHITE,
-                                                     fontName="Helvetica-Bold"))]]
-            title_table = Table(title_data, colWidths=[col_usable_w])
-            title_table.setStyle(TableStyle([
-                ("BACKGROUND",   (0, 0), (-1, -1), C_GREEN),
-                ("LEFTPADDING",  (0, 0), (-1, -1), 6),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-                ("TOPPADDING",   (0, 0), (-1, -1), 4),
-                ("BOTTOMPADDING",(0, 0), (-1, -1), 4),
-                ("ROUNDEDCORNERS", [3, 3, 0, 0]),
-            ]))
-
-            # ── Column header row ──────────────────────────────────────────────
-            hdr_row = [
-                Paragraph("<b>Data Element</b>",
-                          ParagraphStyle("HDR", parent=styles["Normal"],
-                                         fontSize=7, leading=9, textColor=C_WHITE,
-                                         fontName="Helvetica-Bold")),
-            ] + [
-                Paragraph(f"<b>{col.upper()}</b>",
-                          ParagraphStyle("HDR", parent=styles["Normal"],
-                                         fontSize=7, leading=9, textColor=C_WHITE,
-                                         fontName="Helvetica-Bold", alignment=1))
-                for col in value_cols
-            ]
-
-            # ── Data rows ──────────────────────────────────────────────────────
-            data_rows = [hdr_row]
-            for row_idx, (_, row) in enumerate(df.iterrows()):
-                de_val  = str(row.get("Data Element", ""))
-                de_cell = Paragraph(de_val, de_style)
-                val_cells = [
-                    Paragraph(str(row.get(col, "")), wrap_style)
-                    for col in value_cols
-                ]
-                data_rows.append([de_cell] + val_cells)
-
-            t = Table(data_rows, colWidths=col_widths_pt, repeatRows=1,
-                      splitByRow=True)
-            # Apply styling row by row for zebra effect
-            ts = TableStyle([
-                # Header row
-                ("BACKGROUND",    (0, 0), (-1, 0), C_HEADER),
-                ("BACKGROUND",    (0, 0), (0, 0),  C_DE_HDR),
-                ("TEXTCOLOR",     (0, 0), (-1, 0), C_WHITE),
-                ("ALIGN",         (1, 0), (-1, 0), "CENTER"),
-                ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE",      (0, 0), (-1, 0), 7),
-                # Data cells
-                ("ALIGN",         (1, 1), (-1, -1), "CENTER"),
-                ("FONTNAME",      (0, 1), (-1, -1), "Helvetica"),
-                ("FONTSIZE",      (0, 1), (-1, -1), 7),
-                # Data Element column
-                ("BACKGROUND",    (0, 1), (0, -1), C_DE_CELL),
-                ("FONTNAME",      (0, 1), (0, -1), "Helvetica-Bold"),
-                ("LINEAFTER",     (0, 0), (0, -1), 1, colors.HexColor("#d1d5db")),
-                # Grid
-                ("GRID",          (0, 0), (-1, -1), 0.4, C_BORDER),
-                # Padding
-                ("LEFTPADDING",   (0, 0), (-1, -1), 4),
-                ("RIGHTPADDING",  (0, 0), (-1, -1), 4),
-                ("TOPPADDING",    (0, 0), (-1, -1), 3),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-            ])
-            # Zebra rows
-            for row_idx in range(1, len(data_rows)):
-                bg = C_ODD if row_idx % 2 == 1 else C_EVEN
-                ts.add("BACKGROUND", (1, row_idx), (-1, row_idx), bg)
-            t.setStyle(ts)
-
-            return [title_table, t, Spacer(1, 6 * mm)]
-
-        # ── Build all section flowables ────────────────────────────────────────
-        all_section_flowables = []
-        for item in sections_raw:
-            df = pd.read_json(item["data"], orient="split")
-            if len(df.columns) <= 1:
-                continue
-            all_section_flowables.append((item["section"], df))
-
-        # ── Assemble PDF ───────────────────────────────────────────────────────
-        buffer = io.BytesIO()
-        doc    = SimpleDocTemplate(
-            buffer, pagesize=page_size,
-            leftMargin=margin, rightMargin=margin,
-            topMargin=margin, bottomMargin=margin,
-        )
-
-        elements = []
-        header_style = ParagraphStyle(
-            "RptTitle", parent=styles["Normal"],
-            fontSize=13, fontName="Helvetica-Bold",
-            textColor=C_GREEN, alignment=1, spaceAfter=4,
-        )
-        sub_style = ParagraphStyle(
-            "RptSub", parent=styles["Normal"],
-            fontSize=8, textColor=colors.HexColor("#6b7280"), alignment=1,
-        )
-        elements.append(Paragraph(report_title, header_style))
-        elements.append(Paragraph(
-            f"{location_str}  |  {period_str}  |  "
-            f"Generated: {dt.now().strftime('%Y-%m-%d %H:%M')}",
-            sub_style,
-        ))
-        elements.append(Spacer(1, 4 * mm))
-        # Divider
-        elements.append(Table([[""]], colWidths=[usable_w],
-                               style=TableStyle([
-                                   ("LINEABOVE", (0, 0), (-1, -1), 1.5, C_GREEN),
-                               ])))
-        elements.append(Spacer(1, 4 * mm))
-
-        if num_cols == 1:
-            # Single column — stack sections vertically
-            for sec_name, df in all_section_flowables:
-                elements.extend(_make_section_table(sec_name, df))
-        else:
-            # Multi-column — group sections in rows of num_cols
-            from reportlab.platypus import KeepInFrame
-            groups = [all_section_flowables[i:i + num_cols]
-                      for i in range(0, len(all_section_flowables), num_cols)]
-            for group in groups:
-                # Pad group to full width
-                while len(group) < num_cols:
-                    group.append(None)
-                row_cells = []
-                for item in group:
-                    if item is None:
-                        row_cells.append("")
-                    else:
-                        sec_name, df = item
-                        inner = _make_section_table(sec_name, df)
-                        frame = KeepInFrame(col_usable_w, 999 * mm, inner,
-                                            mode="shrink")
-                        row_cells.append(frame)
-                col_w_list = [col_usable_w] * num_cols
-                grid_gap   = 6 * mm
-                col_w_list_with_gap = []
-                for k, w in enumerate(col_w_list):
-                    col_w_list_with_gap.append(w)
-                    if k < num_cols - 1:
-                        col_w_list_with_gap.append(grid_gap)
-                        row_cells.insert(2 * k + 1, "")  # gap cell
-                multi_table = Table(
-                    [row_cells], colWidths=col_w_list_with_gap,
-                )
-                multi_table.setStyle(TableStyle([
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("LEFTPADDING",   (0, 0), (-1, -1), 0),
-                    ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
-                    ("TOPPADDING",    (0, 0), (-1, -1), 0),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-                ]))
-                elements.append(multi_table)
-                elements.append(Spacer(1, 4 * mm))
-
-        doc.build(elements)
-        buffer.seek(0)
-        return dcc.send_bytes(buffer.getvalue(), filename="MaHIS_facility_report.pdf")
+        return dcc.send_bytes(pdf_bytes, filename="MaHIS_facility_report.pdf")
 
     else:
         return dash.no_update

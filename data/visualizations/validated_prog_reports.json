@@ -8,37 +8,13 @@
         "Nurse"
       ],
       "message": "Names have been masked. Visible only to : ",
+      "enable_api": "False",
+      "routes_api": [
+        "mahisuat"
+      ],
       "program": "OPD Program",
       "type": "LineList",
       "unique_col": "person_id",
-      "filters": {
-        "unique": "any"
-      },
-      "rename": {
-        "given_name": "First Name",
-        "family_name": "Last Name",
-        "Home_district": "District",
-        "DrugName": "Medication Given",
-        "ValueN": "Quantity Dispensed"
-      },
-      "cols_order": [
-        "Date",
-        "First Name",
-        "Last Name",
-        "Gender",
-        "Age",
-        "District",
-        "TA",
-        "Village",
-        "Complaint",
-        "Diagnosis",
-        "Medication Given"
-      ],
-      "merge_methods": [
-        "left",
-        "left",
-        "left"
-      ],
       "group_cols1": [
         "Date",
         "given_name",
@@ -87,6 +63,22 @@
       },
       "group4_aggr": {
         "DrugName": "join"
+      },
+      "cols_order": "Date | First Name | Last Name | Gender | Age | District | TA | Village | Complaint | Diagnosis | Medication Given",
+      "merge_methods": [
+        "left",
+        "left",
+        "left"
+      ],
+      "rename": {
+        "given_name": "First Name",
+        "family_name": "Last Name",
+        "Home_district": "District",
+        "DrugName": "Medication Given",
+        "ValueN": "Quantity Dispensed"
+      },
+      "filters": {
+        "unique": "any"
       }
     },
     {
@@ -94,6 +86,10 @@
       "report_name": "OPD DISPENSING AND DIAGNOSES REPORT",
       "authorized_user": "Any",
       "message": "Names have been masked. Visible only to : ",
+      "enable_api": "False",
+      "routes_api": [
+        "mahisuat"
+      ],
       "program": "OPD Program",
       "type": "LineList",
       "unique_col": "person_id",
@@ -156,6 +152,10 @@
       "authorized_user": [
         "Clinician",
         "Nurse"
+      ],
+      "enable_api": "False",
+      "routes_api": [
+        "mahisuat"
       ],
       "program": "OPD Program",
       "type": "LineList",
@@ -243,6 +243,10 @@
       "id": "opd_4",
       "report_name": "OPD DRUG DISPENSATION REPORT",
       "authorized_user": "Any",
+      "enable_api": "False",
+      "routes_api": [
+        "mahisuat"
+      ],
       "program": "OPD Program",
       "date_created": "2025-12-04",
       "type": "PivotTable",
@@ -273,6 +277,10 @@
       "id": "5",
       "report_name": "ARCHIVED_REPORT",
       "authorized_user": "Any",
+      "enable_api": "False",
+      "routes_api": [
+        "mahisuat"
+      ],
       "program": "IMMUNIZATION PROGRAM",
       "date_created": "2025-12-04",
       "type": "PivotTable",
@@ -306,6 +314,10 @@
         "Clinician",
         "Nurse"
       ],
+      "enable_api": "False",
+      "routes_api": [
+        "mahisuat"
+      ],
       "program": "OPD Program",
       "date_created": "2025-12-04",
       "type": "CrossTab",
@@ -338,6 +350,10 @@
       "id": "7",
       "report_name": "ARCHIVED REPORT MALARIA DATA",
       "authorized_user": "Any",
+      "enable_api": "False",
+      "routes_api": [
+        "mahisuat"
+      ],
       "program": "OPD Program",
       "date_created": "2025-12-04",
       "type": "PivotTable",
@@ -369,6 +385,10 @@
         "Nurse"
       ],
       "message": "NOTE: This patient data only comprise selected data columns. To view more, visit the patient profile. Names have been masked. Visible only to : ",
+      "enable_api": "False",
+      "routes_api": [
+        "mahisuat"
+      ],
       "program": "NCD PROGRAM",
       "type": "LineList",
       "unique_col": "person_id",
@@ -547,6 +567,10 @@
         "Nurse"
       ],
       "message": "NOTE: This patient data only comprise selected data columns. To view more, visit the patient profile. Names have been masked. Visible only to : ",
+      "enable_api": "False",
+      "routes_api": [
+        "mahisuat"
+      ],
       "program": "NCD PROGRAM",
       "type": "LineList",
       "unique_col": "person_id",
@@ -708,6 +732,10 @@
         "Nurse"
       ],
       "message": "NOTE: This patient data only comprise selected data columns. To view more, visit the patient profile. Names have been masked. Visible only to : ",
+      "enable_api": "False",
+      "routes_api": [
+        "mahisuat"
+      ],
       "program": "NCD PROGRAM",
       "type": "LineList",
       "unique_col": "person_id",
@@ -866,6 +894,10 @@
       "id": "ncd_4",
       "report_name": "NCD DRUG DISPENSATION REPORT",
       "authorized_user": "Any",
+      "enable_api": "False",
+      "routes_api": [
+        "mahisuat"
+      ],
       "program": "NCD PROGRAM",
       "date_created": "2025-12-04",
       "type": "PivotTable",
@@ -900,6 +932,10 @@
         "Nurse"
       ],
       "message": "NOTE: This patient data only comprise selected data columns. To view more, visit the patient profile. Names have been masked. Visible only to : ",
+      "enable_api": "False",
+      "routes_api": [
+        "mahisuat"
+      ],
       "program": "HTS PROGRAM",
       "type": "LineList",
       "unique_col": [
@@ -1079,6 +1115,10 @@
         "Nurse"
       ],
       "message": "NOTE: This patient data only comprise selected data columns. To view more, visit the patient profile. Names have been masked. Visible only to : ",
+      "enable_api": "False",
+      "routes_api": [
+        "mahisuat"
+      ],
       "program": "HIV PROGRAM",
       "type": "LineList",
       "unique_col": "person_id",
