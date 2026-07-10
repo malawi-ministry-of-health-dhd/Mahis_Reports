@@ -50,6 +50,7 @@ data/mahisdev
 data/mahis
 data/mahisuat
 data/parquet
+demo_parquet
 # data/visualizations
 configurations.json
 __pycache__/

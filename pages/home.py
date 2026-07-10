@@ -331,7 +331,8 @@ def load_dashboard_menu():
 
 def load_dashboard_tab_config():
     raw_config = {}
-    config_path = dashboard_tabs_config_path if os.path.exists(dashboard_tabs_config_path) else dashboard_tabs_example_config_path
+    config_path = json_path
+    # config_path = dashboard_tabs_config_path if os.path.exists(dashboard_tabs_config_path) else dashboard_tabs_example_config_path
     try:
         with open(config_path, 'r') as f:
             raw_config = json.load(f) or {}
