@@ -10,6 +10,24 @@
         "facility_name": null,
         "facility_code": "1833"
       }
+    },
+    {
+      "username": "lizziekadango",
+      "properties": {
+        "uuid": "ad77cc0c-be9b-4b87-8a5d-3caae9818a37",
+        "role": "Global Superuser",
+        "user_level": "district",
+        "district": [
+          "Lilongwe"
+        ],
+        "facility_name": [
+          "Area 25 Urban Health Centre",
+          "Area 18 Health Centre",
+          "Biwi Health Centre"
+        ],
+        "facility_code": "1833",
+        "assigned_facility": null
+      }
     }
   ]
 }

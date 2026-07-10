@@ -30,10 +30,10 @@ from helpers.config_helper import (load_dashboards_from_file, save_dashboards_to
                         _load_facilities, _extract_identifiers, dashboards_json_path)
 from config import actual_keys_in_data
 from helpers.navigation_callbacks import DEMO_UUID
-from dash_iconify import DashIconify
 
 dash.register_page(__name__, path="/reports_config", title="Admin Dashboard")
 
+from dash_iconify import DashIconify
 def nav_icon(icon_name):
     return DashIconify(icon=icon_name, className="nav-icon")
 
@@ -722,6 +722,7 @@ layout = html.Div(
                 
                 # Store components
                 dcc.Store(id="reports-current-page", data=1),
+                dcc.Store(id="users-table-page", data=1),
                 dcc.Store(id="dashboard-modal-initialized", data=False),
                 dcc.Store(id="current-editing-report", data=None),
                 dcc.Store(id="excel-sheet-data", data=None),
@@ -737,7 +738,7 @@ layout = html.Div(
                 dcc.Interval(id="ds-refresh-interval", interval=2000,
                              n_intervals=0, disabled=True),
 
-                # ── Report Builder stores ────────────────────────────────────
+                #Report Builder stores
                 dcc.Store(id="rpt-state", data={"tables": [], "next_id": 1}),
                 dcc.Store(id="rpt-sel",   data={"tid": None, "cells": []}),
                 dcc.Store(id="rpt-drag-pos", data={}),
@@ -761,7 +762,7 @@ layout = html.Div(
                     n_intervals=0
                 ),
 
-                # ── User Configuration Panel ─────────────────────────────────
+                #User Configuration Panel
                 html.Div(
                     id="user-config-panel",
                     style={"display": "none"},
@@ -3351,7 +3352,8 @@ def update_facility_options(districts, urlparams):
 # 7. Save user properties
 @callback(
     [Output("uc-save-status",         "children"),
-     Output("configured-users-table", "children")],
+     Output("configured-users-table", "children"),
+     Output("users-table-page",       "data")],
     [Input("uc-save-btn", "n_clicks"),
      Input('url-params-store', 'data')],
     [State("uc-username",      "value"),
@@ -3380,6 +3382,7 @@ def save_user_properties(n_clicks,urlparams, username, uuid_val, facility_code, 
             "district":      districts      if user_level == "district" else None,
             "facility_name": facilities     if (user_level == "district" and facilities) else None,
             "facility_code": facility_code or None,
+            "assigned_facility": None
         },
     }
 
@@ -3392,7 +3395,7 @@ def save_user_properties(n_clicks,urlparams, username, uuid_val, facility_code, 
     props_data["users"] = users
     _save_user_props(props_data, route)
 
-    return "✓ Saved", _build_users_table(users)
+    return "✓ Saved", _build_users_table(users), 1
 
 
 # 8. Remove user
@@ -3401,7 +3404,8 @@ def save_user_properties(n_clicks,urlparams, username, uuid_val, facility_code, 
      Output("configured-users-table", "children", allow_duplicate=True),
      Output("user-property-form",     "style",    allow_duplicate=True),
      Output("user-form-placeholder",  "style",    allow_duplicate=True),
-     Output("user-search-dropdown",   "value")],
+     Output("user-search-dropdown",   "value"),
+     Output("users-table-page",       "data",     allow_duplicate=True)],
     Input("uc-remove-btn", "n_clicks"),
     Input('url-params-store', 'data'),
     State("uc-username", "value"),
@@ -3416,12 +3420,13 @@ def remove_user(n_clicks,urlparams, username):
     _save_user_props(props_data, route)
     placeholder_style = {"display": "block", "color": "#9ca3af", "fontSize": "14px",
                           "padding": "40px", "textAlign": "center"}
-    return "✓ Removed", _build_users_table(props_data["users"]), {"display": "none"}, placeholder_style, None
+    return "✓ Removed", _build_users_table(props_data["users"]), {"display": "none"}, placeholder_style, None, 1
 
 
 # 9. Populate configured-users-table when panel opens
 @callback(
-    Output("configured-users-table", "children", allow_duplicate=True),
+    [Output("configured-users-table", "children", allow_duplicate=True),
+     Output("users-table-page",       "data",     allow_duplicate=True)],
     Input("user-config-panel", "style"),
     Input('url-params-store', 'data'),
     prevent_initial_call=True,
@@ -3431,7 +3436,33 @@ def refresh_users_table(panel_style, urlparams):
     if not panel_style or panel_style.get("display") == "none":
         raise PreventUpdate
     data = _load_user_props(route)
-    return _build_users_table(data.get("users", []))
+    return _build_users_table(data.get("users", [])), 1
+
+
+# 10. Paginate users table
+@callback(
+    [Output("configured-users-table", "children", allow_duplicate=True),
+     Output("users-table-page",       "data",     allow_duplicate=True)],
+    Input("users-tbl-prev", "n_clicks"),
+    Input("users-tbl-next", "n_clicks"),
+    State("users-table-page",  "data"),
+    State("url-params-store",  "data"),
+    prevent_initial_call=True,
+)
+def paginate_users_table(n_prev, n_next, page, urlparams):
+    from dash import ctx
+    if not ctx.triggered_id:
+        raise PreventUpdate
+    route = (urlparams or {}).get("route", ["default"])[0]
+    data  = _load_user_props(route)
+    users = data.get("users", [])
+    page  = page or 1
+    if ctx.triggered_id == "users-tbl-prev":
+        page = max(1, page - 1)
+    else:
+        total_pages = max(1, -(-len(users) // 10))
+        page = min(total_pages, page + 1)
+    return _build_users_table(users, page), page
 
 
 # ── Configure Data Sources callbacks ─────────────────────────────────────────
@@ -5730,6 +5761,8 @@ def _prog_rpt_new(_):
     Output("prog-rpt-unique-col",      "value"),
     Output("prog-rpt-auth-user",       "value"),
     Output("prog-rpt-message",         "value"),
+    Output("prog-rpt-enable-endpoint", "value"),
+    Output("prog-rpt-endpoint-routes", "value"),
     Output("prog-rpt-groups-store",    "data"),
     Output("prog-rpt-cols-order",      "value"),
     Output("prog-rpt-merge-methods",   "value"),
@@ -5791,6 +5824,8 @@ def _prog_rpt_load_form(report_name):
             rpt.get("unique_col"),
             auth,
             rpt.get("message", ""),
+            rpt.get("api_allowed", 'False'),
+            rpt.get("routes_allowed", []),
             groups,
             rpt_cols_order_text,
             rpt.get("merge_methods") or [],
@@ -5813,6 +5848,8 @@ def _prog_rpt_load_form(report_name):
         rpt.get("unique_col"),
         auth,
         rpt.get("message", ""),
+        rpt.get("enable_api", 'False'),
+        rpt.get("routes_api", []),
         [],
         [], [], "",
         f.get("index_col1") or f.get("index"),
@@ -6003,6 +6040,8 @@ def _prog_rpt_del_group(n_clicks_list, groups):
     State("prog-rpt-unique-col",       "value"),
     State("prog-rpt-auth-user",        "value"),
     State("prog-rpt-message",          "value"),
+    State("prog-rpt-enable-endpoint", "value"),
+    State("prog-rpt-endpoint-routes", "value"),
     State("prog-rpt-groups-store",     "data"),
     State("prog-rpt-cols-order",       "value"),
     State("prog-rpt-merge-methods",    "value"),
@@ -6028,7 +6067,7 @@ def _prog_rpt_del_group(n_clicks_list, groups):
     prevent_initial_call=True,
 )
 def _prog_rpt_save(
-        n_clicks, rpt_id, name, program, chart_type, unique_col, auth_user, message,
+        n_clicks, rpt_id, name, program, chart_type, unique_col, auth_user, message,enable_api,api_route,
         groups_store, cols_order, merge_methods, rename_str,
         index_col, columns_col, values_col, aggfunc, pivot_unique, normalize,
         fc1, fv1, fc2, fv2, fc3, fv3, tabular_rename_str, tabular_replace_str,
@@ -6055,6 +6094,8 @@ def _prog_rpt_save(
         "report_name":     name.strip(),
         "authorized_user": auth_out,
         "message":         message or "",
+        "enable_api":      enable_api or "",
+        "routes_api":      api_route or [],
         "program":         program or "",
         "type":            chart_type,
         "unique_col":      unique_col or "person_id",

@@ -8,7 +8,7 @@ import duckdb
 import os
 from datetime import datetime
 from dash import html, dcc, dash_table
-from config import (DATE_,CONCEPT_NAME_,
+from config import (DATE_,CONCEPT_NAME_,FACILITY_,
                     ENCOUNTER_ID_,PERSON_ID_,VALUE_NUMERIC_,VALUE_DATETIME_,FACILITY_CODE_,
                     DHIS2_URL, actual_keys_in_data)
 
@@ -16,8 +16,8 @@ from config import (DATE_,CONCEPT_NAME_,
 
 class ReportTableBuilder:
     def __init__(self, excel_path: str,report_start_date, 
-                 report_end_date,data_route, location:str, 
-                 dhis2_period: str, report_design = None, report_filters=None):
+                 report_end_date,data_route, location:str, facility=None,
+                 dhis2_period= None, report_design = None, report_filters=None):
         self.excel_path = excel_path
         self.dhis_url = f"{DHIS2_URL}/api/dataValueSets.json"
         self.vars_df: pd.DataFrame | None = None
@@ -33,6 +33,7 @@ class ReportTableBuilder:
         self.start_date = report_start_date
         self.end_date = report_end_date
         self.location = location
+        self.facility = facility
         self.data_route = data_route
         self.report_design = report_design
         self.report_filters = report_filters
@@ -166,9 +167,13 @@ class ReportTableBuilder:
                 result_str = "N/A"
             self._value_cache[filter_name] = result_str
             return result_str
-
-        filtered_dates = f"{DATE_} BETWEEN '{self.start_date}'::TIMESTAMP AND '{self.end_date}'::TIMESTAMP AND {FACILITY_CODE_} = '{self.location}' "
-        original_dates = f"{DATE_} <= '{self.end_date}'::TIMESTAMP AND {FACILITY_CODE_} = '{self.location}' "
+        
+        if self.facility:
+            filtered_dates = f"{DATE_} BETWEEN '{self.start_date}'::TIMESTAMP AND '{self.end_date}'::TIMESTAMP AND {FACILITY_} = '{self.facility}' "
+            original_dates = f"{DATE_} <= '{self.end_date}'::TIMESTAMP AND {FACILITY_} = '{self.facility}'"
+        else:
+            filtered_dates = f"{DATE_} BETWEEN '{self.start_date}'::TIMESTAMP AND '{self.end_date}'::TIMESTAMP AND {FACILITY_CODE_} = '{self.location}' "
+            original_dates = f"{DATE_} <= '{self.end_date}'::TIMESTAMP AND {FACILITY_CODE_} = '{self.location}' "
 
         if measure == "sum":
             args = [filtered_dates,self.data_route, PERSON_ID_, spec["unique_column"]]
@@ -620,6 +625,8 @@ class ReportTableBuilder:
             "margin":     "0 auto",
         }
 
+        hf_title = self.facility if self.facility else self.location_name
+
         header = html.Div(
             style={"textAlign": "center", "marginBottom": "14px",
                    "paddingBottom": "8px", "borderBottom": "2px solid #006401"},
@@ -628,7 +635,7 @@ class ReportTableBuilder:
                         style={"margin": "0", "color": "#000000",
                                "fontSize": "15px", "fontWeight": "700",
                                "letterSpacing": "0.5px"}),
-                html.Div(f"{self.location_name}", style={"textAlign":"center"}),
+                html.Div(f"{hf_title}", style={"textAlign":"center"}),
                 html.Div(f"{self.start_date} to {self.end_date}", style={"textAlign":"center"})
             ],
         )
@@ -872,6 +879,8 @@ class ReportTableBuilder:
             "margin": "0 auto",
         }
 
+        hf_title = self.facility if self.facility else self.location_name
+
         header = html.Div(
             style={"textAlign": "center", "marginBottom": "18px",
                    "paddingBottom": "10px",
@@ -881,7 +890,7 @@ class ReportTableBuilder:
                         style={"margin": "0 0 4px", "color": "#000000",
                                "fontSize": "15px", "fontWeight": "700",
                                "letterSpacing": "0.5px"}),
-                html.Div(f"{self.location_name}", style={"textAlign":"center"}),
+                html.Div(f"{hf_title}", style={"textAlign":"center"}),
                 html.Div(f"{self.start_date} to {self.end_date}", style={"textAlign":"center"})
                 # html.Span(
                 #     f"{'Landscape' if is_landscape else 'Portrait'}  ·  "

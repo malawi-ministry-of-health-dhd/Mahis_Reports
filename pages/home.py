@@ -23,6 +23,10 @@ from helpers.date_ranges import (
                     RELATIVE_PERIOD_LIST
             )
 from helpers.navigation_callbacks import DEMO_UUID, DEMO_LOCATION
+from dash_iconify import DashIconify
+
+def nav_icon(icon_name):
+    return DashIconify(icon=icon_name, className="nav-icon")
 
 # Importing parquet file path and from config
 
@@ -145,6 +149,7 @@ def _load_user_registry(route) -> pd.DataFrame:
         'district': ["Salima"],
         'facility_name': None,
         'facility_code': DEMO_LOCATION,
+        'assigned_facility':'Biwi Health Centre'
     }
 
     user_data = pd.concat([user_data, pd.DataFrame([demo_row])], ignore_index=True)
@@ -588,7 +593,7 @@ layout = html.Div(
                     },
                     children=[
                         html.Button(
-                            "⊞ Filters",
+                            [nav_icon("lucide:filter"), " Filter"],
                             id="filter-drawer-toggle-btn",
                             n_clicks=0,
                             style={
@@ -608,7 +613,7 @@ layout = html.Div(
                         html.Div(
                             id="filter-period-text",
                             style={"fontWeight":"400",
-                                   "color":"black",
+                                   "color":"grey",
                                    "fontSize":"12px"}
                             )
                     ],

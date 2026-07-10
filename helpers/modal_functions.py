@@ -2022,13 +2022,22 @@ def _build_ds_list(sources):
     return html.Div(rows, style={"borderRadius": "8px", "overflow": "hidden"})
 
 
-def _build_users_table(users):
+_USERS_PAGE_SIZE = 10
+
+
+def _build_users_table(users, page=1):
     if not users:
         return html.Div(
             "No users configured yet.",
             style={"padding": "16px", "color": "#9ca3af", "fontSize": "13px",
                    "textAlign": "center"},
         )
+
+    total       = len(users)
+    total_pages = max(1, -(-total // _USERS_PAGE_SIZE))
+    page        = max(1, min(page, total_pages))
+    start       = (page - 1) * _USERS_PAGE_SIZE
+    page_users  = users[start: start + _USERS_PAGE_SIZE]
 
     th_style = {
         "padding": "10px 14px", "textAlign": "left",
@@ -2037,18 +2046,18 @@ def _build_users_table(users):
         "whiteSpace": "nowrap",
     }
     header = html.Thead(html.Tr([
-        html.Th("Username",      style=th_style),
-        html.Th("UUID",          style={**th_style, "maxWidth": "160px", "overflow": "hidden",
-                                        "textOverflow": "ellipsis"}),
-        html.Th("Facility Code", style=th_style),
-        html.Th("Role",          style=th_style),
-        html.Th("Level",         style=th_style),
-        html.Th("District(s)",   style=th_style),
+        html.Th("Username",         style=th_style),
+        # html.Th("UUID",             style={**th_style, "maxWidth": "160px", "overflow": "hidden",
+        #                                    "textOverflow": "ellipsis"}),
+        html.Th("Facility Code",    style=th_style),
+        html.Th("Role",             style=th_style),
+        html.Th("Level",            style=th_style),
+        html.Th("District(s)",      style=th_style),
         html.Th("Facility Name(s)", style=th_style),
     ]))
 
     body_rows = []
-    for i, u in enumerate(users):
+    for i, u in enumerate(page_users):
         p        = u.get("properties", {})
         bg       = "#f2f9f2" if i % 2 == 0 else "#ffffff"
         td       = {"padding": "8px 14px", "fontSize": "12px",
@@ -2063,23 +2072,46 @@ def _build_users_table(users):
         uuid_short = (uuid_val[:18] + "…") if len(uuid_val) > 20 else uuid_val
 
         body_rows.append(html.Tr([
-            html.Td(u.get("username", ""),    style={**td, "fontWeight": "500",
-                                                     "color": "#006401"}),
-            html.Td(uuid_short,               style={**td, "fontFamily": "monospace",
-                                                     "fontSize": "11px"},
-                    title=uuid_val),
+            html.Td(u.get("username", ""),         style={**td, "fontWeight": "500",
+                                                          "color": "#006401"}),
+            # html.Td(uuid_short,                    style={**td, "fontFamily": "monospace",
+            #                                               "fontSize": "11px"},
+            #         title=uuid_val),
             html.Td(p.get("facility_code", "") or "—", style=td),
-            html.Td(p.get("role", "")         or "—", style=td),
-            html.Td(p.get("user_level", "")   or "—", style=td),
-            html.Td(dist_str,                  style=td),
-            html.Td(fac_str,                   style=td),
+            html.Td(p.get("role", "")          or "—", style=td),
+            html.Td(p.get("user_level", "")    or "—", style=td),
+            html.Td(dist_str,                      style=td),
+            html.Td(fac_str,                       style=td),
         ]))
 
-    return html.Table(
+    table = html.Table(
         [header, html.Tbody(body_rows)],
         style={"width": "100%", "borderCollapse": "collapse",
                "fontSize": "13px", "tableLayout": "auto"},
     )
+
+    btn = {"padding": "4px 12px", "fontSize": "12px", "cursor": "pointer",
+           "border": "1px solid #d1d5db", "borderRadius": "4px",
+           "background": "#fff", "color": "#374151"}
+    disabled_btn = {**btn, "opacity": "0.4", "cursor": "default"}
+
+    pagination = html.Div([
+        html.Button("‹ Prev", id="users-tbl-prev", n_clicks=0,
+                    style=btn if page > 1 else disabled_btn,
+                    disabled=page <= 1),
+        html.Span(
+            f"Page {page} of {total_pages}  ({total} users)",
+            style={"fontSize": "12px", "color": "#6b7280",
+                   "margin": "0 12px", "alignSelf": "center"},
+        ),
+        html.Button("Next ›", id="users-tbl-next", n_clicks=0,
+                    style=btn if page < total_pages else disabled_btn,
+                    disabled=page >= total_pages),
+    ], style={"display": "flex", "alignItems": "center",
+              "justifyContent": "flex-end", "padding": "8px 14px",
+              "borderTop": "1px solid #e5e7eb", "background": "#f9fafb"})
+
+    return html.Div([table, pagination])
 
 
 def create_html_report_modal():
@@ -2460,6 +2492,12 @@ def create_html_report_modal():
 
 def create_prog_report_modal():
     """Modal for creating/editing program report configs in validated_prog_reports.json."""
+
+
+    config_path = os.path.join(os.getcwd(), 'configurations.json')
+    with open(config_path, 'r') as r:
+        configurations = json.load(r)
+
     key_opts       = [{"label": k, "value": k} for k in actual_keys_in_data]
     program_opts   = [{"label": p, "value": p} for p in drop_down_programs]
     ll_aggr_opts   = [{"label": a, "value": a} for a in
@@ -2474,6 +2512,11 @@ def create_prog_report_modal():
     normalize_opts = [{"label": n, "value": n} for n in ["all", "index", "columns"]]
     role_opts      = [{"label": r, "value": r} for r in
                       ["Any", "Clinician", "Nurse", "Admin"]]
+    role_opts      = [{"label": r, "value": r} for r in
+                      ["Any", "Clinician", "Nurse", "Admin"]]
+    
+    routes          = [{"label": r, "value": r} for r in
+                      [r['data_path'] for r in configurations]]
 
     _i = {"width": "100%", "padding": "6px 8px", "fontSize": "12px",
           "border": "1px solid #d1d5db", "borderRadius": "4px", "boxSizing": "border-box"}
@@ -2541,6 +2584,23 @@ def create_prog_report_modal():
                 html.Label("Message", style=_l),
                 dcc.Textarea(id="prog-rpt-message", placeholder="Optional display message…",
                              style={**_t, "height": "48px"}),
+            ]),
+            html.Div(style=_s, children=[
+                html.Label("Enable endpoint (/api/clinicalReports)", style=_l),
+                dcc.RadioItems(
+                        id='prog-rpt-enable-endpoint',
+                        options=[
+                            {'label': 'True', 'value': 'True'},
+                            {'label': 'False', 'value': 'False'},
+                        ],
+                        value='False'  # The default selected value
+                    )
+            ]),
+            html.Div(style=_s, children=[
+                html.Label("Endpoint site", style=_l),
+                dcc.Dropdown(id="prog-rpt-endpoint-routes", options=routes,
+                             placeholder="Select route…", multi=True, clearable=True,
+                             style={"fontSize": "12px"}),
             ]),
         ],
     )
