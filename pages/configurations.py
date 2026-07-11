@@ -42,50 +42,6 @@ def nav_icon(icon_name):
 path = os.getcwd()
 dashboards_data = load_dashboards_from_file()
 
-
-instructions = html.Div(
-    className="instructions-container",
-    children=[
-        html.Div(
-            className="instructions-steps",
-            children=[
-                html.Div(
-                    className="step-card",
-                    children=[
-                        html.Div(className="step-number", children="1"),
-                        html.Div(className="step-content", children=[
-                            html.H3("Update Excel Template"),
-                            html.P("Update an excel template as provided on the menu below. Be sure to fill all worksheets", 
-                                   className="step-description")
-                        ])
-                    ]
-                ),
-                html.Div(
-                    className="step-card",
-                    children=[
-                        html.Div(className="step-number", children="2"),
-                        html.Div(className="step-content", children=[
-                            html.H3("Upload & Validate"),
-                            html.P("Upload the worksheet. Dry run to check if the values are consistent with requirements",
-                                   className="step-description")
-                        ])
-                    ]
-                ),
-                html.Div(
-                    className="step-card",
-                    children=[
-                        html.Div(className="step-number", children="3"),
-                        html.Div(className="step-content", children=[
-                            html.H3("Edit or Archive"),
-                            html.P("To edit or archive, click on the item end and edit or review. The edit will open a popup editing tool with worksheets",
-                                   className="step-description")
-                        ])
-                    ]
-                ),
-            ]
-        )
-    ]
-)
 preview_modal = html.Div([
         html.Div([
             # ── Header ────────────────────────────────────────────────────────
@@ -443,122 +399,6 @@ upload_prog_reports_json_popup_modal = html.Div([
         'alignItems': 'center',
         'zIndex': '1000'
     })
-archive_popup_modal = html.Div([
-        html.Div([
-            html.H3("Edit Excel File", id="edit-popup-title", style={'marginBottom': '20px'}),
-            
-            # Tabs for different sheets
-            dcc.Tabs(id="sheet-tabs", value=None),
-            
-            # Tables container
-            html.Div(id="sheet-tables-container", style={'maxHeight': '400px', 'overflowY': 'auto', 'marginBottom': '20px'}),
-            
-            # Action buttons
-            html.Div([
-                html.Button(
-                    "Save Changes",
-                    id="save-excel-btn",
-                    n_clicks=0,
-                    style={
-                        'backgroundColor': '#198754',
-                        'color': 'white',
-                        'border': 'none',
-                        'padding': '8px 16px',
-                        'borderRadius': '6px',
-                        'cursor': 'pointer',
-                        'marginRight': '10px'
-                    }
-                ),
-                html.Button(
-                    "Cancel",
-                    id="edit-cancel-btn",
-                    n_clicks=0,
-                    style={
-                        'backgroundColor': '#6c757d',
-                        'color': 'white',
-                        'border': 'none',
-                        'padding': '8px 16px',
-                        'borderRadius': '6px',
-                        'cursor': 'pointer'
-                    }
-                ),
-            ], style={'textAlign': 'center'})
-        ], style={
-            'backgroundColor': 'white',
-            'padding': '30px',
-            'borderRadius': '10px',
-            'width': '90%',
-            'maxWidth': '1200px',
-            'maxHeight': '90vh',
-            'overflowY': 'auto',
-            'margin': 'auto'
-        })
-    ], id="edit-popup", style={
-        'position': 'fixed',
-        'top': '0',
-        'left': '0',
-        'width': '100%',
-        'height': '100%',
-        'backgroundColor': 'rgba(0,0,0,0.5)',
-        'display': 'none',
-        'justifyContent': 'center',
-        'alignItems': 'center',
-        'zIndex': '1000'
-    })
-archive_confirmation_modal = html.Div([
-        html.Div([
-            html.H3("Archive Report", style={'marginBottom': '20px'}),
-            
-            html.Div(id="archive-confirmation-message", style={'marginBottom': '20px', 'fontSize': '16px'}),
-            
-            html.Div([
-                html.Button(
-                    "Confirm Archive",
-                    id="confirm-archive-btn",
-                    n_clicks=0,
-                    style={
-                        'backgroundColor': '#dc3545',
-                        'color': 'white',
-                        'border': 'none',
-                        'padding': '8px 16px',
-                        'borderRadius': '6px',
-                        'cursor': 'pointer',
-                        'marginRight': '10px'
-                    }
-                ),
-                html.Button(
-                    "Cancel",
-                    id="cancel-archive-btn",
-                    n_clicks=0,
-                    style={
-                        'backgroundColor': '#6c757d',
-                        'color': 'white',
-                        'border': 'none',
-                        'padding': '8px 16px',
-                        'borderRadius': '6px',
-                        'cursor': 'pointer'
-                    }
-                ),
-            ], style={'textAlign': 'center'})
-        ], style={
-            'backgroundColor': 'white',
-            'padding': '30px',
-            'borderRadius': '10px',
-            'width': '500px',
-            'margin': 'auto'
-        })
-    ], id="archive-popup", style={
-        'position': 'fixed',
-        'top': '0',
-        'left': '0',
-        'width': '100%',
-        'height': '100%',
-        'backgroundColor': 'rgba(0,0,0,0.5)',
-        'display': 'none',
-        'justifyContent': 'center',
-        'alignItems': 'center',
-        'zIndex': '1000'
-    })
 reports_table = html.Div(
     id="reports-table-wrapper",
     style={"display": "none"},
@@ -567,7 +407,7 @@ reports_table = html.Div(
             style={"display": "flex", "justifyContent": "space-between",
                    "alignItems": "center", "padding": "8px 0 12px"},
             children=[
-                html.Span("Dataset Reports",
+                html.Span("",
                           style={"fontWeight": "600", "fontSize": "16px", "color": "#1e293b"}),
                 html.Button(
                     "✕ Close",
@@ -580,6 +420,99 @@ reports_table = html.Div(
             ],
         ),
         html.Div(id="reports-table-container"),
+    ],
+)
+
+# ── Report Settings Modal ─────────────────────────────────────────────────────
+_RS_HIDDEN  = {"display": "none"}
+_RS_VISIBLE = {
+    "display": "flex", "position": "fixed", "top": 0, "left": 0,
+    "width": "100%", "height": "100%", "zIndex": 2500,
+    "background": "rgba(0,0,0,0.45)", "alignItems": "center", "justifyContent": "center",
+}
+
+def _rs_label(text):
+    return html.Label(text, style={"fontSize": "12px", "fontWeight": "600",
+                                   "color": "#374151", "marginBottom": "5px"})
+
+def _rs_field(label, component):
+    return html.Div([_rs_label(label), component], style={"marginBottom": "14px"})
+
+_RS_INP = {"width": "100%", "padding": "8px 10px", "border": "1px solid #d1d5db",
+           "borderRadius": "6px", "fontSize": "13px", "color": "#1f2937",
+           "boxSizing": "border-box"}
+_RS_DD  = {"fontSize": "13px"}
+
+rpt_settings_modal = html.Div(
+    id="rpt-settings-modal",
+    style=_RS_HIDDEN,
+    children=[
+        html.Div(
+            style={"background": "#fff", "borderRadius": "12px", "padding": "28px 32px",
+                   "width": "500px", "maxWidth": "96vw", "position": "relative",
+                   "boxShadow": "0 12px 40px rgba(0,0,0,0.22)",
+                   "maxHeight": "92vh", "overflowY": "auto"},
+            children=[
+                html.Div([
+                    html.H3("Report Settings",
+                            style={"margin": 0, "fontSize": "15px",
+                                   "fontWeight": "700", "color": "#1e293b"}),
+                    html.Button("✕", id="rpt-settings-close-btn", n_clicks=0,
+                                style={"position": "absolute", "top": "16px", "right": "16px",
+                                       "background": "none", "border": "none",
+                                       "fontSize": "18px", "cursor": "pointer",
+                                       "color": "#64748b", "lineHeight": "1"}),
+                ]),
+                html.Hr(style={"margin": "14px 0 20px", "borderColor": "#e5e7eb"}),
+
+                _rs_field("Report ID",
+                    html.Div(id="rpt-settings-id-display",
+                             style={"padding": "8px 12px", "background": "#f8fafc",
+                                    "borderRadius": "6px", "fontSize": "13px",
+                                    "color": "#64748b", "fontFamily": "monospace",
+                                    "border": "1px solid #e2e8f0"})),
+
+                _rs_field("Report Name",
+                    dcc.Input(id="rpt-settings-name", type="text",
+                              style=_RS_INP, debounce=False)),
+
+                _rs_field("Programs",
+                    dcc.Dropdown(id="rpt-settings-programs", multi=True,
+                                 clearable=True, style=_RS_DD)),
+
+                _rs_field("Archive",
+                    dcc.Dropdown(id="rpt-settings-archive", clearable=False,
+                                 options=[{"label": "Active",   "value": "False"},
+                                          {"label": "Archived",  "value": "True"}],
+                                 style=_RS_DD)),
+
+                _rs_field("Access",
+                    dcc.Dropdown(id="rpt-settings-access", clearable=False,
+                                 options=[{"label": "Global",  "value": "global"},
+                                          {"label": "Limited", "value": "limited"}],
+                                 value="global", style=_RS_DD)),
+
+                _rs_field("Enable API Endpoint",
+                    dcc.Dropdown(id="rpt-settings-enable-api", clearable=False,
+                                 options=[{"label": "Enabled",  "value": "True"},
+                                          {"label": "Disabled", "value": "False"}],
+                                 value="True", style=_RS_DD)),
+
+                _rs_field("Route",
+                    dcc.Dropdown(id="rpt-settings-route",multi=True, clearable=False, style=_RS_DD)),
+
+                html.Div([
+                    html.Span(id="rpt-settings-status",
+                              style={"fontSize": "12px", "color": "#16a34a"}),
+                    html.Button("Save Changes", id="rpt-settings-save-btn", n_clicks=0,
+                                style={"padding": "8px 20px", "background": "#006401",
+                                       "color": "#fff", "border": "none",
+                                       "borderRadius": "6px", "fontSize": "13px",
+                                       "fontWeight": "600", "cursor": "pointer"}),
+                ], style={"display": "flex", "justifyContent": "space-between",
+                          "alignItems": "center", "marginTop": "8px"}),
+            ],
+        ),
     ],
 )
 
@@ -710,11 +643,10 @@ layout = html.Div(
                 upload_excel_popup_modal,
                 upload_dashboard_json_popup_modal,
                 upload_prog_reports_json_popup_modal,
-                archive_popup_modal,
-                archive_confirmation_modal,
                 create_edit_modal(),
                 create_html_report_modal(),
                 create_prog_report_modal(),
+                rpt_settings_modal,
 
                 # Hidden Components
                 dcc.Interval(id="refresh-interval", interval=10*60*1000, n_intervals=0),
@@ -723,6 +655,7 @@ layout = html.Div(
                 # Store components
                 dcc.Store(id="reports-current-page", data=1),
                 dcc.Store(id="users-table-page", data=1),
+                dcc.Store(id="rpt-settings-current-id", data=None),
                 dcc.Store(id="dashboard-modal-initialized", data=False),
                 dcc.Store(id="current-editing-report", data=None),
                 dcc.Store(id="excel-sheet-data", data=None),
@@ -849,6 +782,13 @@ layout = html.Div(
                                                                                       style={"width": "100%"},
                                                                                       placeholder="from CSV"),
                                                                         ]),
+                                                                    ],
+                                                                ),
+                                                                html.Div(
+                                                                    style={"display": "flex", "gap": "12px",
+                                                                           "flexWrap": "wrap",
+                                                                           "marginBottom": "12px"},
+                                                                    children=[
                                                                         html.Div(style={"flex": "1", "minWidth": "160px"}, children=[
                                                                             html.Label("Role", className="form-label"),
                                                                             dcc.Dropdown(
@@ -868,6 +808,34 @@ layout = html.Div(
                                                                                     {"label": "District",  "value": "district"},
                                                                                     {"label": "National",  "value": "national"},
                                                                                 ],
+                                                                                value="facility",
+                                                                                clearable=False,
+                                                                                className="modern-dropdown",
+                                                                            ),
+                                                                        ]),
+                                                                        html.Div(style={"flex": "1", "minWidth": "150px"}, children=[
+                                                                            html.Label("Assign Limited Dataset Reports", className="form-label"),
+                                                                            dcc.Dropdown(
+                                                                                id="uc-limited-hmis-report",
+                                                                                options=[
+                                                                                    {"label": "Facility",  "value": "facility"},
+                                                                                    {"label": "District",  "value": "district"},
+                                                                                    {"label": "National",  "value": "national"},
+                                                                                ],
+                                                                                multi=True,
+                                                                                value="facility",
+                                                                                clearable=False,
+                                                                                className="modern-dropdown",
+                                                                            ),
+                                                                        ]),
+                                                                        html.Div(style={"flex": "1", "minWidth": "150px"}, children=[
+                                                                            html.Label("Assign Limited Program Reports", className="form-label"),
+                                                                            dcc.Dropdown(
+                                                                                id="uc-limited-prog-report",
+                                                                                options=[
+                                                                                    {"label": "Test",  "value": "None"},
+                                                                                ],
+                                                                                multi=True,
                                                                                 value="facility",
                                                                                 clearable=False,
                                                                                 className="modern-dropdown",
@@ -1420,6 +1388,160 @@ def update_reports_page(prev_clicks, next_clicks, current_page):
     )
 
     return current_page, table
+
+
+@callback(
+    Output("uc-limited-hmis-report", "options"),
+    Input("refresh-interval", "n_intervals"),
+)
+def populate_limited_hmis_report_options(_):
+    hmis_path = os.path.join(os.getcwd(), "data", "hmis_reports.json")
+    try:
+        with open(hmis_path, "r") as f:
+            data = json.load(f)
+        return [
+            {"label": r.get("page_name", ""), "value": r.get("page_name", "")}
+            for r in data.get("reports", [])
+            if r.get("page_name") and r.get("archived", "False") == "False" 
+            and r.get("access", "global") == "limited"
+        ]
+    except Exception:
+        return []
+
+
+#Report Settings Modal callbacks
+
+@callback(
+    Output("rpt-settings-modal",      "style"),
+    Output("rpt-settings-id-display", "children"),
+    Output("rpt-settings-name",       "value"),
+    Output("rpt-settings-programs",   "options"),
+    Output("rpt-settings-programs",   "value"),
+    Output("rpt-settings-archive",    "value"),
+    Output("rpt-settings-access",     "value"),
+    Output("rpt-settings-enable-api", "value"),
+    Output("rpt-settings-route",      "options"),
+    Output("rpt-settings-route",      "value"),
+    Output("rpt-settings-status",     "children"),
+    Output("rpt-settings-current-id", "data"),
+    Input({"type": "edit-btn", "index": ALL}, "n_clicks"),
+    State("url-params-store", "data"),
+    prevent_initial_call=True,
+)
+def open_rpt_settings(n_clicks_list, urlparams):
+    from dash import ctx
+    if not any(n for n in (n_clicks_list or []) if n):
+        raise PreventUpdate
+    triggered = ctx.triggered_id
+    if not isinstance(triggered, dict) or triggered.get("type") != "edit-btn":
+        raise PreventUpdate
+
+    report_id = triggered["index"]
+
+    # Load report from hmis_reports.json
+    hmis_path = os.path.join(os.getcwd(), "data", "hmis_reports.json")
+    with open(hmis_path, "r") as f:
+        hmis_data = json.load(f)
+    report = next((r for r in hmis_data.get("reports", [])
+                   if r.get("report_id") == report_id), None)
+    if not report:
+        raise PreventUpdate
+
+    # Programs dropdown from route-specific dropdowns.json
+    route = (urlparams or {}).get("route", ["default"])[0]
+    dp_path = os.path.join(os.getcwd(), f"data/{route}/dcc_dropdown_json/dropdowns.json")
+    if not os.path.exists(dp_path):
+        dp_path = os.path.join(os.getcwd(), "data/default/dcc_dropdown_json/dropdowns.json")
+    with open(dp_path, "r") as f:
+        dropdowns = json.load(f)
+    prog_options = [{"label": p, "value": p} for p in dropdowns.get("programs", [])]
+
+    # Route options from configurations.json
+    cfg_path = os.path.join(os.getcwd(), "configurations.json")
+    with open(cfg_path, "r") as f:
+        cfg_list = json.load(f)
+    route_options = [{"label": c.get("name", c["data_path"]), "value": c["data_path"]}
+                     for c in cfg_list if c.get("data_path")]
+
+    current_route = report.get("route") or (route_options[0]["value"] if route_options else None)
+
+    id_display = f"#{report.get('report_id')}  ·  {report.get('page_name', '')}"
+
+    return (
+        _RS_VISIBLE,
+        id_display,
+        report.get("report_name", ""),
+        prog_options,
+        report.get("programs", []),
+        str(report.get("archived", "False")),
+        report.get("access", "global"),
+        str(report.get("enable_api", "True")),
+        route_options,
+        current_route,
+        "",
+        report_id,
+    )
+
+
+@callback(
+    Output("rpt-settings-modal", "style", allow_duplicate=True),
+    Input("rpt-settings-close-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+def close_rpt_settings(n_clicks):
+    if not n_clicks:
+        raise PreventUpdate
+    return _RS_HIDDEN
+
+
+@callback(
+    Output("rpt-settings-modal",          "style",    allow_duplicate=True),
+    Output("rpt-settings-status",         "children", allow_duplicate=True),
+    Output("reports-table-container",     "children", allow_duplicate=True),
+    Input("rpt-settings-save-btn", "n_clicks"),
+    State("rpt-settings-current-id", "data"),
+    State("rpt-settings-name",       "value"),
+    State("rpt-settings-programs",   "value"),
+    State("rpt-settings-archive",    "value"),
+    State("rpt-settings-access",     "value"),
+    State("rpt-settings-enable-api", "value"),
+    State("rpt-settings-route",      "value"),
+    prevent_initial_call=True,
+)
+def save_rpt_settings(n_clicks, report_id, report_name, programs,
+                      archive, access, enable_api, route):
+    if not n_clicks or report_id is None:
+        raise PreventUpdate
+
+    hmis_path = os.path.join(os.getcwd(), "data", "hmis_reports.json")
+    with open(hmis_path, "r") as f:
+        hmis_data = json.load(f)
+
+    reports = hmis_data.get("reports", [])
+    idx = next((i for i, r in enumerate(reports) if r.get("report_id") == report_id), None)
+    if idx is None:
+        return dash.no_update, "Report not found.", dash.no_update
+
+    from datetime import datetime as _dt
+    reports[idx].update({
+        "report_name": report_name or reports[idx].get("report_name"),
+        "programs":    programs or [],
+        "archived":    archive or "False",
+        "access":      access or "global",
+        "enable_api":  enable_api if enable_api is not None else "True",
+        "route":       route,
+        "date_updated": _dt.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "updated_by":  "admin",
+    })
+    hmis_data["reports"] = reports
+
+    with open(hmis_path, "w") as f:
+        json.dump(hmis_data, f, indent=2)
+
+    updated_table = build_reports_table(reports)
+    return _RS_HIDDEN, "", updated_table
+
+
 # excel
 @callback(
     [Output("upload-popup", "style", allow_duplicate=True),
@@ -1766,252 +1888,6 @@ def upload_file(n_clicks, contents):
     except Exception as e:
         error_message = html.Div(f"Upload failed: {str(e)}", style={'color': 'red'})
         return dash.no_update, error_message, ""
-
-
-@callback(
-    [Output("edit-popup", "style", allow_duplicate=True),
-     Output("current-editing-report", "data"),
-     Output("edit-popup-title", "children"),
-     Output("sheet-tabs", "children"),
-     Output("sheet-tabs", "value"),
-     Output("sheet-tables-container", "children", allow_duplicate=True),
-     Output("excel-sheet-data", "data", allow_duplicate=True)],
-    [Input({"type": "edit-btn", "index": dash.ALL}, "n_clicks"),
-     Input("edit-cancel-btn", "n_clicks")],
-    [State("reports-table-container", "children")],
-    prevent_initial_call=True
-)
-def toggle_edit_popup(edit_clicks, cancel_clicks, reports_table):
-    ctx = dash.callback_context
-    if not ctx.triggered:
-        return dash.no_update
-    
-    trigger_id = ctx.triggered[0]['prop_id']
-    
-    if "edit-cancel-btn" in trigger_id:
-        return {'display': 'none'}, None, "", None, None, "", None
-    
-    if "edit-btn" in trigger_id:
-        # Determine which edit button was clicked
-        button_index = None
-        for i, count in enumerate(edit_clicks):
-            if count and count > 0:
-                button_index = i
-                break
-
-        if button_index is None:
-            return dash.no_update
-
-        button_id = ctx.triggered[0]['prop_id'].split('.')[0]
-        button_id_dict = json.loads(button_id.replace("'", '"'))
-        report_id = button_id_dict['index']
-        
-        # Find the report data
-        data = load_reports_data()
-        reports = data.get("reports", [])
-        current_report = None
-        
-        for report in reports:
-            if report.get("report_id") == report_id:
-                current_report = report
-                break
-        
-        if not current_report:
-            return dash.no_update
-        
-        page_name = current_report.get("page_name")
-        report_name = current_report.get("report_name")
-        
-        # Load the Excel file
-        excel_file = load_excel_file(page_name)
-        if not excel_file:
-            return dash.no_update
-        
-        # Create tabs for each sheet
-        sheet_names = excel_file.sheet_names
-        tabs = []
-        sheet_tables = []
-        sheet_data_dict = {}
-        
-        for i, sheet_name in enumerate(sheet_names):
-            # Read sheet data
-            df = pd.read_excel(excel_file, sheet_name=sheet_name)
-            sheet_data_dict[sheet_name] = df.to_dict('records')
-            
-            # Create tab
-            tabs.append(dcc.Tab(label=sheet_name, value=sheet_name))
-            
-            # Create table for this sheet
-            sheet_table = create_editable_table(df, sheet_name)
-            sheet_tables.append(sheet_table)
-        
-        # Set first sheet as active
-        active_tab = sheet_names[0] if sheet_names else None
-        
-        title = f"Editing: {report_name} ({page_name}.xlsx)"
-        
-        return (
-            {'display': 'flex'}, 
-            current_report,
-            title,
-            tabs,
-            active_tab,
-            sheet_tables[0] if sheet_tables else "No sheets found",
-            sheet_data_dict
-        )
-    
-    return dash.no_update
-
-
-@callback(
-    Output("sheet-tables-container", "children", allow_duplicate=True),
-    Input("sheet-tabs", "value"),
-    State("excel-sheet-data", "data"),
-    prevent_initial_call=True
-)
-def update_sheet_display(selected_sheet, sheet_data):
-    if not selected_sheet or not sheet_data or selected_sheet not in sheet_data:
-        return "No sheet selected"
-    
-    # Convert the stored data back to DataFrame
-    df = pd.DataFrame(sheet_data[selected_sheet])
-    
-    # Create the editable table
-    return create_editable_table(df, selected_sheet)
-
-
-@callback(
-    Output("excel-sheet-data", "data", allow_duplicate=True),
-    Input({"type": "editable-table", "sheet": dash.ALL}, "data"),
-    State({"type": "editable-table", "sheet": dash.ALL}, "id"),
-    State("excel-sheet-data", "data"),
-    prevent_initial_call=True
-)
-def update_sheet_data(table_data, table_ids, current_sheet_data):
-    if not table_data or not current_sheet_data:
-        return dash.no_update
-    
-    ctx = dash.callback_context
-    if not ctx.triggered:
-        return dash.no_update
-    
-    # Get the sheet that was updated
-    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
-    trigger_id_dict = json.loads(trigger_id.replace("'", '"'))
-    updated_sheet = trigger_id_dict['sheet']
-    
-    # Find the index of the updated table
-    for i, table_id in enumerate(table_ids):
-        if table_id['sheet'] == updated_sheet:
-            # Update the data for this sheet
-            current_sheet_data[updated_sheet] = table_data[i]
-            break
-    
-    return current_sheet_data
-
-
-@callback(
-    [Output("edit-popup", "style", allow_duplicate=True),
-     Output("upload-validation-result", "children", allow_duplicate=True)],
-    Input("save-excel-btn", "n_clicks"),
-    [State("current-editing-report", "data"),
-     State("excel-sheet-data", "data")],
-    prevent_initial_call=True
-)
-def save_excel_changes(save_clicks, current_report, sheet_data):
-    if not save_clicks or not current_report or not sheet_data:
-        return dash.no_update
-    
-    try:
-        page_name = current_report.get("page_name")
-        report_id = current_report.get("report_id")
-        
-        # Convert sheet data back to DataFrames
-        sheet_dataframes = {}
-        for sheet_name, data_dict in sheet_data.items():
-            sheet_dataframes[sheet_name] = pd.DataFrame(data_dict)
-        
-        # Save to Excel file
-        save_excel_file(page_name, sheet_dataframes)
-        
-        # Update metadata in reports.json
-        update_report_metadata(report_id)
-        
-        success_message = html.Div([
-            html.Div("Excel file saved successfully!", style={'color': 'green', 'marginBottom': '10px', 'fontWeight': 'bold'}),
-            html.Div(f"File: {page_name}.xlsx", style={'color': 'blue', 'marginBottom': '5px'}),
-            html.Div(f"Updated: {datetime.now().strftime('%Y-%m-%d')}", style={'color': 'blue', 'marginBottom': '5px'})
-        ])
-        
-        # Close the popup
-        return {'display': 'none'}, success_message
-        
-    except Exception as e:
-        error_message = html.Div(f"❌ Error saving file: {str(e)}", style={'color': 'red'})
-        return dash.no_update, error_message
-
-
-@callback(
-    [Output("archive-popup", "style", allow_duplicate=True),
-     Output("current-archive-report", "data"),
-     Output("archive-confirmation-message", "children")],
-    [Input({"type": "archive-btn", "index": dash.ALL}, "n_clicks"),
-     Input("cancel-archive-btn", "n_clicks")],
-    [State({"type": "archive-btn", "index": dash.ALL}, "id"),
-     State("reports-table-container", "children")],
-    prevent_initial_call=True
-)
-def toggle_archive_popup(archive_clicks, cancel_clicks, archive_buttons_ids, reports_table):
-    ctx = dash.callback_context
-    if not ctx.triggered:
-        return dash.no_update
-    
-    trigger_id = ctx.triggered[0]['prop_id']
-    
-    if "cancel-archive-btn" in trigger_id:
-        return {'display': 'none'}, None, ""
-    
-    if "archive-btn" in trigger_id:
-        # Find which archive button was clicked
-        button_index = None
-        for i, clicks in enumerate(archive_clicks):
-            if clicks and clicks > 0:  # Only proceed if button was actually clicked
-                button_index = i
-                break
-        if button_index is None:
-            return dash.no_update
-        # if button_index == 0:
-        #     return dash.no_update
-        
-        # Get the report_id from the button that was clicked
-        report_id = archive_buttons_ids[button_index]['index']
-        
-        # Find the report data
-        data = load_reports_data()
-        reports = data.get("reports", [])
-        current_report = None
-        
-        for report in reports:
-            if report.get("report_id") == report_id:
-                current_report = report
-                break
-        
-        if not current_report:
-            return dash.no_update
-        
-        # Create confirmation message
-        confirmation_message = html.Div([
-            html.Div("Are you sure you want to archive this report?", style={'marginBottom': '10px', 'fontWeight': 'bold'}),
-            html.Div(f"Report ID: {current_report.get('report_id')}", style={'marginBottom': '5px'}),
-            html.Div(f"Report Name: {current_report.get('report_name')}", style={'marginBottom': '5px'}),
-            html.Div(f"Page Name: {current_report.get('page_name')}", style={'marginBottom': '10px'}),
-            html.Div("⚠️ This action cannot be undone. The report will be hidden from the main list.", 
-                    style={'color': 'orange', 'fontStyle': 'italic'})
-        ])
-        
-        return {'display': 'flex'}, current_report, confirmation_message
-    
-    return dash.no_update
 
 @callback(
      Output("download-xlsx-report", "data"),
@@ -3231,16 +3107,18 @@ def populate_user_dropdown(panel_style, urlparams):
 
 # 3. Load user properties into the form when a user is selected
 @callback(
-    [Output("user-property-form",    "style"),
-     Output("user-form-placeholder", "style"),
-     Output("uc-username",           "value"),
-     Output("uc-uuid",               "value"),
-     Output("uc-facility-code",      "value"),
-     Output("uc-role",               "options"),
-     Output("uc-role",               "value"),
-     Output("uc-user-level",         "value"),
-     Output("uc-district",           "value"),
-     Output("uc-facility-name",      "value")],
+    [Output("user-property-form",       "style"),
+     Output("user-form-placeholder",    "style"),
+     Output("uc-username",              "value"),
+     Output("uc-uuid",                  "value"),
+     Output("uc-facility-code",         "value"),
+     Output("uc-role",                  "options"),
+     Output("uc-role",                  "value"),
+     Output("uc-user-level",            "value"),
+     Output("uc-district",              "value"),
+     Output("uc-facility-name",         "value"),
+     Output("uc-limited-hmis-report",   "value"),
+     Output("uc-limited-prog-report",   "value")],
     Input("user-search-dropdown", "value"),
     Input('url-params-store', 'data'),
     prevent_initial_call=True,
@@ -3253,7 +3131,7 @@ def load_user_into_form(username, urlparams):
 
     if not username:
         return ({"display": "none"}, placeholder_shown,
-                "", "", "", [], None, "facility", [], [])
+                "", "", "", [], None, "facility", [], [], [], [])
 
     df = _load_user_csv(route)
     user_row = df[df["User"] == username]
@@ -3275,24 +3153,28 @@ def load_user_into_form(username, urlparams):
     props_data = _load_user_props(route)
     existing   = next((u for u in props_data.get("users", []) if u.get("username") == username), None)
     if existing:
-        p            = existing.get("properties", {})
-        saved_uuid   = p.get("uuid",          csv_uuid)     or csv_uuid
-        saved_fcode  = p.get("facility_code", csv_location) or csv_location
-        saved_role   = p.get("role",          default_role)
-        saved_level  = p.get("user_level",    "facility")
-        saved_dist   = p.get("district")      or []
-        saved_fac    = p.get("facility_name") or []
+        p               = existing.get("properties", {})
+        saved_uuid      = p.get("uuid",                csv_uuid)     or csv_uuid
+        saved_fcode     = p.get("facility_code",       csv_location) or csv_location
+        saved_role      = p.get("role",                default_role)
+        saved_level     = p.get("user_level",          "facility")
+        saved_dist      = p.get("district")            or []
+        saved_fac       = p.get("facility_name")       or []
+        saved_hmis_rpts = p.get("limited_hmis_reports") or []
+        saved_prog_rpts = p.get("limited_prog_reports") or []
         if isinstance(saved_dist, str):
             saved_dist = [saved_dist]
         if isinstance(saved_fac, str):
             saved_fac = [saved_fac]
     else:
-        saved_uuid  = csv_uuid
-        saved_fcode = csv_location
-        saved_role  = default_role
-        saved_level = "facility"
-        saved_dist  = []
-        saved_fac   = []
+        saved_uuid      = csv_uuid
+        saved_fcode     = csv_location
+        saved_role      = default_role
+        saved_level     = "facility"
+        saved_dist      = []
+        saved_fac       = []
+        saved_hmis_rpts = []
+        saved_prog_rpts = []
 
     return (
         {"display": "block"},
@@ -3305,6 +3187,8 @@ def load_user_into_form(username, urlparams):
         saved_level,
         saved_dist,
         saved_fac,
+        saved_hmis_rpts,
+        saved_prog_rpts,
     )
 
 
@@ -3356,16 +3240,20 @@ def update_facility_options(districts, urlparams):
      Output("users-table-page",       "data")],
     [Input("uc-save-btn", "n_clicks"),
      Input('url-params-store', 'data')],
-    [State("uc-username",      "value"),
-     State("uc-uuid",          "value"),
-     State("uc-facility-code", "value"),
-     State("uc-role",          "value"),
-     State("uc-user-level",    "value"),
-     State("uc-district",      "value"),
-     State("uc-facility-name", "value")],
+    [State("uc-username",            "value"),
+     State("uc-uuid",                "value"),
+     State("uc-facility-code",       "value"),
+     State("uc-role",                "value"),
+     State("uc-user-level",          "value"),
+     State("uc-district",            "value"),
+     State("uc-facility-name",       "value"),
+     State("uc-limited-hmis-report", "value"),
+     State("uc-limited-prog-report", "value")],
     prevent_initial_call=True,
 )
-def save_user_properties(n_clicks,urlparams, username, uuid_val, facility_code, role, user_level, districts, facilities):
+def save_user_properties(n_clicks, urlparams, username, uuid_val, facility_code,
+                         role, user_level, districts, facilities,
+                         limited_hmis, limited_prog):
     route = urlparams.get('route', ["default"])[0]
     if not n_clicks or not username:
         raise PreventUpdate
@@ -3376,13 +3264,14 @@ def save_user_properties(n_clicks,urlparams, username, uuid_val, facility_code, 
     new_entry = {
         "username": username,
         "properties": {
-            "uuid":          uuid_val      or "",
-            "role":          role          or "facility",
-            "user_level":    user_level    or "facility",
-            "district":      districts      if user_level == "district" else None,
-            "facility_name": facilities     if (user_level == "district" and facilities) else None,
-            "facility_code": facility_code or None,
-            "assigned_facility": None
+            "uuid":                 uuid_val      or "",
+            "role":                 role          or "facility",
+            "user_level":           user_level    or "facility",
+            "district":             districts      if user_level == "district" else None,
+            "facility_name":        facilities     if (user_level == "district" and facilities) else None,
+            "facility_code":        facility_code or None,
+            "limited_hmis_reports": limited_hmis  or [],
+            "limited_prog_reports": limited_prog  or [],
         },
     }
 
