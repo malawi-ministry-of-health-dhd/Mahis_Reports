@@ -9,7 +9,7 @@ import os
 import json
 from dash.exceptions import PreventUpdate
 from helpers.reports_class import ReportTableBuilder
-from pages.home import _resolve_user_scope, _load_user_registry
+from pages.home import _resolve_user_scope, _load_user_registry, _load_user_properties
 from mnid.data_utils import prepare_mnid_dataframe
 import warnings
 warnings.filterwarnings("ignore")
@@ -184,31 +184,6 @@ relative_biannual = RELATIVE_BIANNUAL
 relative_year = [str(year) for year in range(2024, 2051)]
 
 path = os.getcwd()
-
-def load_report_options(program=None):
-    """Load reports from JSON and return concatenated options for dropdown"""
-    try:
-        with open('data/hmis_reports.json', 'r') as f:
-            data = json.load(f)
-        # Create concatenated options: "ID - Report Name"
-        options = [
-            {'label': f"{report['report_name']}", 
-             'value': report['report_id']}
-            for report in data['reports'] 
-            if report.get('archived', 'False').lower() == 'false'
-            and (program is None or program in report.get('programs', []))
-        ]
-        return options
-    except FileNotFoundError:
-        print("report.json file not found")
-        return []
-    except json.JSONDecodeError:
-        print("Error decoding JSON from report.json")
-        return []
-    except KeyError as e:
-        print(f"Missing key in JSON: {e}")
-        return []
-
 
 layout = html.Div(
     className="reports-modern-container",
@@ -528,20 +503,64 @@ def load_user_facilities(urlparams):
     else:
         # print("here3")
         return ['User Facility'],user_facility, {'display':'none'}
-    
+
+def load_report_options(program=None, user_data=None):
+    """Load reports from JSON and return concatenated options for dropdown"""
+    try:
+        with open('data/hmis_reports.json', 'r') as f:
+            data = json.load(f)
+        # Create concatenated options: "ID - Report Name"
+        options_global = [
+            {'label': f"{report['report_name']}", 
+             'value': report['report_id']}
+            for report in data['reports'] 
+            if report.get('archived', 'False').lower() == 'false'
+            and report.get('access', 'global').lower() == 'global'
+            and (program is None or program in report.get('programs', []))
+        ]
+        options_limited = [
+            {'label': f"{report['report_name']}", 
+            'value': report['report_id']}
+            for report in data['reports'] 
+            if report.get('archived', 'False').lower() == 'false'
+            and report.get('page_name', '').lower() in (user_data.get('properties', {}).get('limited_hmis_reports', []) if user_data is not None else [])
+            and (program is None or program in report.get('programs', []))
+        ]
+        return options_global + options_limited
+    except FileNotFoundError:
+        print("report.json file not found")
+        return []
+    except json.JSONDecodeError:
+        print("Error decoding JSON from report.json")
+        return []
+    except KeyError as e:
+        print(f"Missing key in JSON: {e}")
+        return []
+      
 @callback(
         [Output('program_filter', 'options'),
          Output('report_name', 'options')],
         [Input('url-params-store', 'data'),
         Input('program_filter','value')]
 )
+   
 def update_report_dropdown(urlparams, program):
     data_route = urlparams.get('route', ["default"])[0] if urlparams else None
+    user_id = urlparams.get('uuid', ["default"])[0] if urlparams else None
+    user_properties = _load_user_properties(data_route)
+    user_data = next(
+                    (
+                        r for r in user_properties
+                        if r.get('properties').get('uuid') == user_id
+                    ),
+                    None
+                )
+    
     data_set_programs_path = os.path.join(path, f'data', 'hmis_reports.json')
     with open(data_set_programs_path) as x:
             dropdowns = json.load(x)
     prog_options = ['General Reports'] + list(set([program["programs"][0] for program in dropdowns['reports']]))
-    return prog_options, load_report_options(program)
+    return prog_options, load_report_options(program, user_data)
 
 @callback(
     [

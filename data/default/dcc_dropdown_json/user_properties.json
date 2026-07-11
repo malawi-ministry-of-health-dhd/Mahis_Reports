@@ -8,7 +8,11 @@
         "user_level": "national",
         "district": null,
         "facility_name": null,
-        "facility_code": "1833"
+        "facility_code": "1833",
+        "limited_hmis_reports": [
+          "ncd_quarterly"
+        ],
+        "limited_prog_reports": []
       }
     },
     {

@@ -27,6 +27,10 @@ from config import (actual_keys_in_data,
                     DRUG_NAME_,
                     VALUE_NAME_)
 
+from dash_iconify import DashIconify
+def nav_icon(icon_name):
+    return DashIconify(icon=icon_name, className="nav-icon")
+
 path = os.getcwd()
 path_dcc_json = os.path.join(path, 'data/default', 'dcc_dropdown_json','dropdowns.json')
 if os.path.exists(path_dcc_json):
@@ -1311,115 +1315,141 @@ dashboards_data = load_dashboards_from_file()
 
 
 def build_reports_table(data, page=1, page_size=10):
-    # Filter active reports
     active_reports = [item for item in data if item.get("archived", "False") == "False"]
 
-    # Pagination calculations
-    total = len(active_reports)
-    start = (page - 1) * page_size
-    end = start + page_size
+    total       = len(active_reports)
+    total_pages = max(1, -(-total // page_size))
+    page        = max(1, min(page, total_pages))
+    start       = (page - 1) * page_size
+    paginated_items = active_reports[start: start + page_size]
 
-    paginated_items = active_reports[start:end]
+    # ── Palette ───────────────────────────────────────────────────────────────
+    TH_BG       = "#3a4252"   # dark blue-grey header
+    TH_TEXT     = "#ffffff"
+    ROW_ODD     = "transparent"
+    ROW_EVEN    = "#f7f7f5"
+    DIVIDER     = "#ececec"
+    TEXT_PRI    = "#2c2c2a"
+    TEXT_SEC    = "#5f5e5a"
 
-    # Modern styled header
+    th_base = {
+        "padding": "10px 12px",
+        "fontSize": "12px",
+        "fontWeight": "600",
+        "background": TH_BG,
+        "color": TH_TEXT,
+        "textAlign": "left",
+        "letterSpacing": "0.03em",
+        "whiteSpace": "nowrap",
+        "borderBottom": f"2px solid {TH_BG}",
+    }
+
     table_header = html.Thead(
         html.Tr([
-            html.Th("#", className="report-table-header", style={"width": "50px"}),
-            html.Th("Report Name", style={"text-align":"left"}),
-            html.Th("Short Name", style={"text-align":"left"}),
-            html.Th("Creator", style={"text-align":"left"}),
-            html.Th("Date Updated", style={"text-align":"left"}),
-            # html.Th("Report Type", style={"text-align":"left"}),
-            html.Th("Actions", style={"text-align":"left"}),
+            html.Th("#",            style={**th_base, "width": "44px", "textAlign": "center"}),
+            html.Th("Report Name",  style=th_base),
+            html.Th("Short Name",   style=th_base),
+            html.Th("Creator",      style=th_base),
+            html.Th("Date Updated", style=th_base),
+            html.Th("Actions",      style={**th_base, "textAlign": "center", "width": "80px"}),
         ])
     )
 
-    # Build rows with modern styling
-    start_row_number = (page - 1) * page_size + 1
+    td_base = {
+        "padding": "10px 12px",
+        "fontSize": "12px",
+        "color": TEXT_PRI,
+        "borderBottom": f"1px solid {DIVIDER}",
+        "whiteSpace": "nowrap",
+    }
+    td_sec = {**td_base, "color": TEXT_SEC, "fontSize": "12px"}
+
+    start_row_number = start + 1
     table_rows = []
     for idx, item in enumerate(paginated_items):
-        row_number = start_row_number + idx
+        row_bg = ROW_ODD if idx % 2 == 0 else ROW_EVEN
+        row_style = {
+            "background": row_bg,
+            "transition": "background 150ms ease",
+        }
         table_rows.append(
             html.Tr(
-                className="report-table-row",
+                style=row_style,
+                className="rpt-tbl-row",
                 children=[
-                    html.Td(row_number, className="report-table-cell", style={"textAlign": "center", "fontWeight": "500"}),
-                    html.Td(item.get("report_name").upper(), className="report-table-cell"),
-                    html.Td(item.get("page_name"), className="report-table-cell"),
-                    html.Td(item.get("creator"), className="report-table-cell"),
-                    html.Td(item.get("date_updated"), className="report-table-cell"),
-                    # html.Td(item.get("kind","dataset"), className="report-table-cell"),
                     html.Td(
-                        className="report-table-actions",
-                        style={"gap":"5px"},
+                        start_row_number + idx,
+                        style={**td_base, "textAlign": "center",
+                               "color": TEXT_SEC, "fontSize": "12px"},
+                    ),
+                    html.Td(item.get("report_name", ""), style=td_base),
+                    html.Td(item.get("page_name", ""),   style=td_sec),
+                    html.Td(item.get("creator", ""),     style=td_sec),
+                    html.Td(item.get("date_updated", ""), style=td_sec),
+                    html.Td(
+                        style={**td_base, "textAlign": "center"},
                         children=[
                             html.Button(
-                                "✏️",
+                                nav_icon("lucide:settings"),
                                 id={"type": "edit-btn", "index": item.get("report_id")},
-                                className="action-btn edit-btn"
+                                className="action-btn edit-btn",
+                                style={"marginRight": "4px"},
                             ),
                             html.Button(
-                                "Archive",
-                                id={"type": "archive-btn", "index": item.get("report_id")},
-                                className="action-btn archive-btn"
-                            ),
-                            html.Button(
-                                "⬇️",
+                                nav_icon("lucide:download"),
                                 id={"type": "download-btn", "index": item.get("report_id")},
-                                className="action-btn download-btn"
+                                className="action-btn edit-btn",
                             ),
-                        ]
+                        ],
                     ),
-                ]
+                ],
             )
         )
 
     table_body = html.Tbody(table_rows)
+    #Pagination bar
+    pg_btn = {
+        "padding": "4px 12px", "fontSize": "12px", "cursor": "pointer",
+        "border": "1px solid #d5d4d0", "borderRadius": "4px",
+        "background": "#fff", "color": TEXT_PRI,
+    }
+    pg_btn_disabled = {**pg_btn, "opacity": "0.4", "cursor": "default"}
+
+    pagination = html.Div(
+        style={"display": "flex", "alignItems": "center", "justifyContent": "flex-end",
+               "padding": "8px 12px", "borderTop": f"1px solid {DIVIDER}",
+               "background": "#fafaf8", "gap": "10px"},
+        children=[
+            html.Button("‹ Prev", id="prev-page", n_clicks=0,
+                        style=pg_btn if page > 1 else pg_btn_disabled,
+                        disabled=page <= 1),
+            html.Span(
+                f"Page {page} of {total_pages}  ({total} reports)",
+                id="page-label",
+                style={"fontSize": "12px", "color": TEXT_SEC},
+            ),
+            html.Button("Next ›", id="next-page", n_clicks=0,
+                        style=pg_btn if page < total_pages else pg_btn_disabled,
+                        disabled=page >= total_pages),
+        ],
+    )
 
     return html.Div(
         className="reports-table-wrapper",
         children=[
             html.Div(
-                className="reports-header",
                 children=[
-                    html.H2("Dataset Reports", className="reports-title"),
-                    html.P(
-                        "These are HMIS dataset reports. To update, click Edit or upload a report template bearing the same page_name (id)",
-                        className="reports-description"
-                    ),
-                ]
+                    html.H4("Dataset Reports", className="reports-title-admin"),
+                ],
             ),
-
-            # Table Output
             html.Table(
                 [table_header, table_body],
-                className="reports-table"
+                className="reports-table",
+                style={"width": "100%", "borderCollapse": "collapse",
+                       "tableLayout": "auto"},
             ),
-
-            # Pagination controls
-            html.Div(
-                className="pagination-controls",
-                children=[
-                    html.Button(
-                        "Previous",
-                        id="prev-page",
-                        n_clicks=0,
-                        className="pagination-btn"
-                    ),
-                    html.Button(
-                        "Next",
-                        id="next-page",
-                        n_clicks=0,
-                        className="pagination-btn"
-                    ),
-                    html.Span(
-                        f"Page {page} / { (total // page_size) + (1 if total % page_size else 0) }",
-                        id="page-label",
-                        className="pagination-info"
-                    ),
-                ]
-            ),
-        ]
+            pagination,
+        ],
     )
 
 
