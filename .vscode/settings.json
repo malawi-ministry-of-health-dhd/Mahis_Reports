@@ -12,5 +12,6 @@
     "Avoid magic numbers/strings",
     "Avoid global mutable state",
     "Write unit tests"
-  ]
+  ],
+  "python-envs.defaultEnvManager": "ms-python.python:system"
 }
