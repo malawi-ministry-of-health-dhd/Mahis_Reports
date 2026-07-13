@@ -1038,8 +1038,8 @@ def update_menu(interval, color, urlparams):
         data_route = urlparams.get('route', ["default"])[0]
         user_data = _load_user_registry(data_route)
         user_row, scope = _resolve_user_scope(urlparams, user_data)
-        user_id = int(user_row.get('user_id', '0')) if user_row else 0
-        user_uuid = user_row.get('uuid') if user_row else 0
+        user_id = int(user_row.get('user_id', '0')) 
+        user_uuid = user_row.get('uuid')
         user_programs_path = os.path.join(os.getcwd(), f"data/{data_route}/single_tables/user_programs.csv")
         dashboard_path = os.path.join(os.getcwd(), f"data/visualizations/validated_dashboard.json")
         user_programs = duckdb.sql(
@@ -1099,6 +1099,8 @@ def update_menu(interval, color, urlparams):
         else:
             return general_summary_button + filtered_buttons + filtered_buttons_limited
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return []
 
 
@@ -1242,8 +1244,10 @@ def update_dashboard(gen, start_date, end_date, level,
         network_query = (
             f"{DATE_} >= '{default_start_date}'::TIMESTAMP"
             f" AND {DATE_} <= '{end_dt}'::TIMESTAMP"
-            + network_suffix
+            + scope_suffix
         )
+
+        print(filtered_query)
 
         # Scope label (used by MNID topbar; harmless for non-MNID)
         facility_names = []
