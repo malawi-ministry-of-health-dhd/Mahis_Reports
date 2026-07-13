@@ -612,7 +612,7 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, faci
         raise PreventUpdate
     
     # Handle missing inputs to prevent errors
-    if not urlparams or not period_type or not year_filter or not month_filter or not report_filter or not facility_filter:
+    if not urlparams or not period_type or not year_filter or not month_filter or not report_filter:
         return html.Div("Missing Report Parameters"), 0, None
     reports_json = os.path.join(path, 'data', 'hmis_reports.json')
     with open(reports_json, "r") as f:
