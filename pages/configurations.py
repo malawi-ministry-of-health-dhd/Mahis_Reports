@@ -841,6 +841,19 @@ layout = html.Div(
                                                                                 className="modern-dropdown",
                                                                             ),
                                                                         ]),
+                                                                        html.Div(style={"flex": "1", "minWidth": "150px"}, children=[
+                                                                            html.Label("Assign Limited Dashboards", className="form-label"),
+                                                                            dcc.Dropdown(
+                                                                                id="uc-limited-dashboards",
+                                                                                options=[
+                                                                                    {"label": "Test",  "value": "None"},
+                                                                                ],
+                                                                                multi=True,
+                                                                                value="facility",
+                                                                                clearable=False,
+                                                                                className="modern-dropdown",
+                                                                            ),
+                                                                        ]),
                                                                     ],
                                                                 ),
 
@@ -1408,8 +1421,59 @@ def populate_limited_hmis_report_options(_):
     except Exception:
         return []
 
+@callback(
+    Output("uc-limited-dashboards", "options"),
+    Input("refresh-interval", "n_intervals"),
+)
+def populate_limited_dashboards(_):
+    hmis_path = os.path.join(os.getcwd(), "data", "visualizations", "validated_dashboard.json")
+    try:
+        with open(hmis_path, "r") as f:
+            data = json.load(f)
+        return [
+            {"label": r.get("report_name", ""), "value": r.get("report_name", "")}
+            for r in data
+            if r.get("report_name") and r.get("access", "global") == "limited"
+        ]
+    except Exception:
+        return []
 
-#Report Settings Modal callbacks
+
+@callback(
+    Output("dashboard-program-selector", "options"),
+    Input("refresh-interval", "n_intervals"),
+    Input("url-params-store", "data"),
+)
+def populate_dashboard_program_options(_, urlparams):
+    route = (urlparams or {}).get("route", ["default"])[0]
+    dp_path = os.path.join(os.getcwd(), f"data/{route}/dcc_dropdown_json/dropdowns.json")
+    if not os.path.exists(dp_path):
+        dp_path = os.path.join(os.getcwd(), "data/default/dcc_dropdown_json/dropdowns.json")
+    try:
+        with open(dp_path, "r") as f:
+            dropdowns = json.load(f)
+        return [{"label": p, "value": p} for p in dropdowns.get("programs", [])]
+    except Exception:
+        return []
+
+
+@callback(
+    Output("dashboard-program-selector", "value"),
+    Output("dashboard-access-selector",  "value"),
+    Input("dashboard-selector", "value"),
+    prevent_initial_call=True,
+)
+def load_dashboard_program_access(selector_value):
+    if selector_value == "new" or selector_value is None:
+        return [], "global"
+    dashboards_data = load_dashboards_from_file()
+    if isinstance(selector_value, int) and 0 <= selector_value < len(dashboards_data):
+        d = dashboards_data[selector_value]
+        return d.get("associated_programs", []), d.get("access", "global")
+    return [], "global"
+
+
+# ── Report Settings Modal callbacks ──────────────────────────────────────────
 
 @callback(
     Output("rpt-settings-modal",      "style"),
@@ -2923,7 +2987,9 @@ def update_chart_fields(chart_type, selector_value, report_id):
      State({"type": "mnid-denominator-var3", "index": dash.ALL}, "value"),
      State({"type": "mnid-denominator-val3", "index": dash.ALL}, "value"),
      State({"type": "mnid-denominator-var4", "index": dash.ALL}, "value"),
-     State({"type": "mnid-denominator-val4", "index": dash.ALL}, "value")],
+     State({"type": "mnid-denominator-val4", "index": dash.ALL}, "value"),
+     State("dashboard-program-selector", "value"),
+     State("dashboard-access-selector",  "value")],
     prevent_initial_call=True
 )
 def save_dashboard_config(save_clicks, selector_value, report_id, report_name, date_created,
@@ -2932,7 +2998,8 @@ def save_dashboard_config(save_clicks, selector_value, report_id, report_name, d
                           indicator_ids, indicator_labels, indicator_categories, indicator_targets,
                           indicator_statuses, indicator_uniques, indicator_notes,
                           n_var1, n_val1, n_var2, n_val2, n_var3, n_val3, n_var4, n_val4,
-                          d_var1, d_val1, d_var2, d_val2, d_var3, d_val3, d_var4, d_val4):
+                          d_var1, d_val1, d_var2, d_val2, d_var3, d_val3, d_var4, d_val4,
+                          associated_programs, access):
     if not save_clicks:
         raise PreventUpdate
 
@@ -2976,6 +3043,8 @@ def save_dashboard_config(save_clicks, selector_value, report_id, report_name, d
     dashboard["report_name"] = report_name or dashboard.get("report_name") or "New Dashboard"
     dashboard["date_created"] = date_created or dashboard.get("date_created") or datetime.now().strftime("%Y-%m-%d")
     dashboard["count_items_per_row"] = int(count_items_per_row or 5)
+    dashboard["associated_programs"] = associated_programs or []
+    dashboard["access"] = access or "global"
     dashboard.setdefault("visualization_types", {})
     dashboard["visualization_types"].setdefault("counts", [])
     dashboard["visualization_types"].setdefault("charts", {})
@@ -3118,7 +3187,8 @@ def populate_user_dropdown(panel_style, urlparams):
      Output("uc-district",              "value"),
      Output("uc-facility-name",         "value"),
      Output("uc-limited-hmis-report",   "value"),
-     Output("uc-limited-prog-report",   "value")],
+     Output("uc-limited-prog-report",   "value"),
+     Output("uc-limited-dashboards",   "value")],
     Input("user-search-dropdown", "value"),
     Input('url-params-store', 'data'),
     prevent_initial_call=True,
@@ -3131,7 +3201,7 @@ def load_user_into_form(username, urlparams):
 
     if not username:
         return ({"display": "none"}, placeholder_shown,
-                "", "", "", [], None, "facility", [], [], [], [])
+                "", "", "", [], None, "facility", [], [], [], [],[])
 
     df = _load_user_csv(route)
     user_row = df[df["User"] == username]
@@ -3162,6 +3232,7 @@ def load_user_into_form(username, urlparams):
         saved_fac       = p.get("facility_name")       or []
         saved_hmis_rpts = p.get("limited_hmis_reports") or []
         saved_prog_rpts = p.get("limited_prog_reports") or []
+        saved_dashbaords = p.get("limited_dashboards") or []
         if isinstance(saved_dist, str):
             saved_dist = [saved_dist]
         if isinstance(saved_fac, str):
@@ -3175,6 +3246,7 @@ def load_user_into_form(username, urlparams):
         saved_fac       = []
         saved_hmis_rpts = []
         saved_prog_rpts = []
+        saved_dashbaords = []
 
     return (
         {"display": "block"},
@@ -3189,6 +3261,7 @@ def load_user_into_form(username, urlparams):
         saved_fac,
         saved_hmis_rpts,
         saved_prog_rpts,
+        saved_dashbaords
     )
 
 
@@ -3248,12 +3321,13 @@ def update_facility_options(districts, urlparams):
      State("uc-district",            "value"),
      State("uc-facility-name",       "value"),
      State("uc-limited-hmis-report", "value"),
-     State("uc-limited-prog-report", "value")],
+     State("uc-limited-prog-report", "value"),
+     State("uc-limited-dashboards", "value")],
     prevent_initial_call=True,
 )
 def save_user_properties(n_clicks, urlparams, username, uuid_val, facility_code,
                          role, user_level, districts, facilities,
-                         limited_hmis, limited_prog):
+                         limited_hmis, limited_prog, limited_dashboards):
     route = urlparams.get('route', ["default"])[0]
     if not n_clicks or not username:
         raise PreventUpdate
@@ -3272,6 +3346,7 @@ def save_user_properties(n_clicks, urlparams, username, uuid_val, facility_code,
             "facility_code":        facility_code or None,
             "limited_hmis_reports": limited_hmis  or [],
             "limited_prog_reports": limited_prog  or [],
+            "limited_dashboards": limited_dashboards  or [],
         },
     }
 

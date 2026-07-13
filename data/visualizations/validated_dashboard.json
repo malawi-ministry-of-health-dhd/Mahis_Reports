@@ -281,8 +281,8 @@
                     "AETC PROGRAM": "AETC",
                     "ANC PROGRAM": "ANC",
                     "IMMUNIZATION PROGRAM": "EPI",
-                    "LABOUR AND DELIVERY PROGRAM":"LABOUR",
-                    "NEONATAL PROGRAM":"NEONATAL",
+                    "LABOUR AND DELIVERY PROGRAM": "LABOUR",
+                    "NEONATAL PROGRAM": "NEONATAL",
                     "PNC PROGRAM": "PNC"
                   },
                   "replace": {
@@ -763,8 +763,8 @@
                     "AETC PROGRAM": "AETC",
                     "ANC PROGRAM": "ANC",
                     "IMMUNIZATION PROGRAM": "EPI",
-                    "LABOUR AND DELIVERY PROGRAM":"LABOUR",
-                    "NEONATAL PROGRAM":"NEONATAL",
+                    "LABOUR AND DELIVERY PROGRAM": "LABOUR",
+                    "NEONATAL PROGRAM": "NEONATAL",
                     "PNC PROGRAM": "PNC"
                   },
                   "replace": ""
@@ -1472,7 +1472,12 @@
           }
         ]
       }
-    }
+    },
+    "count_items_per_row": 5,
+    "associated_programs": [
+      "OPD Program"
+    ],
+    "access": "global"
   },
   {
     "report_id": "report_b1a5e211",
@@ -1962,7 +1967,12 @@
           }
         ]
       }
-    }
+    },
+    "count_items_per_row": 5,
+    "associated_programs": [
+      "NCD PROGRAM"
+    ],
+    "access": "global"
   },
   {
     "report_id": "report_0a89c762",
@@ -4462,7 +4472,7 @@
           "id": "count_imm_1",
           "name": "Total Attendance",
           "level": "facility",
-          "drill_down":"True",
+          "drill_down": "True",
           "filters": {
             "measure": "nunique",
             "unique": "person_id",
@@ -4716,7 +4726,12 @@
           }
         ]
       }
-    }
+    },
+    "count_items_per_row": 5,
+    "associated_programs": [
+      "IMMUNIZATION PROGRAM"
+    ],
+    "access": "global"
   },
   {
     "report_id": "report_a9f70d4c",
@@ -5325,13 +5340,19 @@
           }
         ]
       }
-    }
+    },
+    "count_items_per_row": 5,
+    "associated_programs": [
+      "HTC PROGRAM",
+      "HIV PROGRAM"
+    ],
+    "access": "global"
   },
   {
     "report_id": "report_f6d7d65d",
     "report_name": "Advanced HIV Disease",
     "date_created": "2026-05-06",
-    "count_items_per_row":6,
+    "count_items_per_row": 6,
     "visualization_types": {
       "counts": [
         {
@@ -5560,8 +5581,10 @@
             ],
             "variable4": "obs_value_coded",
             "value4": [
-              "WHO stage III adult","WHO stage III peds",
-              "WHO stage IV adult","WHO stage IV peds"
+              "WHO stage III adult",
+              "WHO stage III peds",
+              "WHO stage IV adult",
+              "WHO stage IV peds"
             ],
             "variable5": "ValueN",
             "value5": "",
@@ -5615,7 +5638,7 @@
             "variable3": "concept_name",
             "value3": "HIV status",
             "variable4": "obs_value_coded",
-            "value4":"HIV Positive",
+            "value4": "HIV Positive",
             "variable5": "Program",
             "value5": "*IPD",
             "variable6": "Value",
@@ -5627,14 +5650,12 @@
           }
         },
         {
-          "id":"calculated101",
-          "name":"% HIV Patients Screened",
-          "flag":"ok",
-          "filters":
-            {
-              "measure":"calculated",
-              "expression":"count_ea6f5d0d/count_1f7400bf*100"
-
+          "id": "calculated101",
+          "name": "% HIV Patients Screened",
+          "flag": "ok",
+          "filters": {
+            "measure": "calculated",
+            "expression": "count_ea6f5d0d/count_1f7400bf*100"
           }
         }
       ],
@@ -5642,7 +5663,7 @@
         "sections": [
           {
             "section_name": "HIV SCREENING",
-            "chart_items_per_row":2,
+            "chart_items_per_row": 2,
             "items": [
               {
                 "id": "chart_d3b7b75a",
@@ -5682,12 +5703,17 @@
                   "duration_default": "7days",
                   "title": "Proportion of Patients Screened for HIV Status",
                   "unique_column": "person_id",
-                  "query1":"",
-                  "query2":"WHERE concept_name = 'HIV status'",
-                  "query3":"",
-                  "query4":"",
-                  "query5":"",
-                  "custom_fields":[{"column": "metric_value", "expr": "query2/query1*100"}],
+                  "query1": "",
+                  "query2": "WHERE concept_name = 'HIV status'",
+                  "query3": "",
+                  "query4": "",
+                  "query5": "",
+                  "custom_fields": [
+                    {
+                      "column": "metric_value",
+                      "expr": "query2/query1*100"
+                    }
+                  ],
                   "date_col": "Date",
                   "y_col": "person_id",
                   "x_title": "Date",
@@ -5743,7 +5769,9 @@
                   "duration_default": "7days",
                   "title": "ART Status of HIV Positive Patients",
                   "unique_column": "person_id",
-                  "filter_col1": ["concept_name"],
+                  "filter_col1": [
+                    "concept_name"
+                  ],
                   "filter_val1": "Is the client on ART?",
                   "filter_col2": [],
                   "filter_val2": "",
@@ -5765,7 +5793,7 @@
           },
           {
             "section_name": "AHD Screening",
-            "chart_items_per_row":2,
+            "chart_items_per_row": 2,
             "items": [
               {
                 "id": "chart_6a133940",
@@ -5777,12 +5805,17 @@
                   "duration_default": "7days",
                   "title": "Proportion of HIV Positive Patients Screened for AHD",
                   "unique_column": "person_id",
-                  "query1":"WHERE concept_name = 'HIV status' AND obs_value_coded = 'HIV Positive'",
-                  "query2":"WHERE Encounter = 'Ahd hiv staging'",
-                  "query3":"",
-                  "query4":"",
-                  "query5":"",
-                  "custom_fields":[{"column": "metric_value", "expr": "query2/query1*100"}],
+                  "query1": "WHERE concept_name = 'HIV status' AND obs_value_coded = 'HIV Positive'",
+                  "query2": "WHERE Encounter = 'Ahd hiv staging'",
+                  "query3": "",
+                  "query4": "",
+                  "query5": "",
+                  "custom_fields": [
+                    {
+                      "column": "metric_value",
+                      "expr": "query2/query1*100"
+                    }
+                  ],
                   "date_col": "Date",
                   "y_col": "person_id",
                   "x_title": "Date",
@@ -5884,7 +5917,7 @@
           },
           {
             "section_name": "AHD Screening and Results",
-            "chart_items_per_row":2,
+            "chart_items_per_row": 2,
             "items": [
               {
                 "id": "chart_02d1942a",
@@ -5951,7 +5984,11 @@
           }
         ]
       }
-    }
+    },
+    "associated_programs": [
+      "HIV PROGRAM"
+    ],
+    "access": "global"
   },
   {
     "report_id": "report_96a9f88e",
@@ -6289,8 +6326,10 @@
                     "NEONATAL PROGRAM"
                   ],
                   "filter_col2": "Encounter",
-                  "filter_val2": ["Neonatal enrolment",
-                                  "Neonatal triage"],
+                  "filter_val2": [
+                    "Neonatal enrolment",
+                    "Neonatal triage"
+                  ],
                   "filter_col3": [],
                   "filter_val3": "",
                   "filter_col4": [],
@@ -6525,6 +6564,28 @@
           }
         ]
       }
-    }
+    },
+    "count_items_per_row": 5,
+    "associated_programs": [
+      "NEONATAL PROGRAM"
+    ],
+    "access": "global"
+  },
+  {
+    "report_id": "report_4c23d45b",
+    "report_name": "AIMS TRACKER",
+    "date_created": "2026-07-13",
+    "visualization_types": {
+      "counts": [],
+      "charts": {
+        "sections": []
+      }
+    },
+    "count_items_per_row": 5,
+    "associated_programs": [
+      "HIV PROGRAM",
+      "HTC PROGRAM"
+    ],
+    "access": "limited"
   }
 ]

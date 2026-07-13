@@ -1591,7 +1591,7 @@ def generate_dashboard_items_list(dashboard):
                     ]),
                     html.Div(className="list-item-actions", children=[
                         html.Button(
-                            "✏️",
+                            [nav_icon("mdi:pencil"), ""],
                             id={"type": "count-edit", "index": idx},
                             n_clicks=0
                         ),
@@ -1630,7 +1630,7 @@ def generate_dashboard_items_list(dashboard):
                     ]),
                     html.Div(className="list-item-actions", children=[
                         html.Button(
-                            "✏️",
+                            [nav_icon("mdi:pencil"), ""],
                             id={"type": "section-edit", "index": section_idx},
                             n_clicks=0,
                         ),
@@ -1668,7 +1668,7 @@ def generate_dashboard_items_list(dashboard):
                         ]),
                         html.Div(className="list-item-actions", children=[
                             html.Button(
-                                "✏️",
+                                [nav_icon("mdi:pencil"), ""],
                                 id={"type": "chart-edit", "section": section_idx, "chart": chart_idx},
                                 n_clicks=0,
                             ),
@@ -1829,6 +1829,36 @@ def create_edit_modal():
                                                         ),
                                                     ]),
                                                 ]),
+                                                # lets associate dashboards with mahis programs
+                                                html.Div(style={"display": "flex", "gap": "12px"}, children=[
+                                                    html.Div(className="form-group", style={"flex": "1"}, children=[
+                                                        html.Label("Associated Program", className="form-label"),
+                                                        dcc.Dropdown(
+                                                            id="dashboard-program-selector",
+                                                            options=[
+                                                                {"label": "Standard", "value": "standard"},
+                                                                {"label": "MNID Outlook", "value": "mnid"},
+                                                            ],
+                                                            multi=True,
+                                                            value="",
+                                                            clearable=False,
+                                                            className="modern-dropdown",
+                                                        ),
+                                                    ]),
+                                                    html.Div(className="form-group", style={"flex": "0 0 110px"}, children=[
+                                                        html.Label("Access", className="form-label"),
+                                                        dcc.Dropdown(
+                                                            id="dashboard-access-selector",
+                                                            options=[
+                                                                {"label": "Global",  "value": "global"},
+                                                                {"label": "Limited", "value": "limited"},
+                                                            ],
+                                                            value="global",
+                                                            clearable=False,
+                                                            className="modern-dropdown",
+                                                        ),
+                                                    ]),
+                                                ]),
                                                 # MNID fields — hidden unless type == "mnid"
                                                 html.Div(
                                                     id="mnid-section",
@@ -1893,12 +1923,12 @@ def create_edit_modal():
                                                     children=[
                                                         html.H4("Dashboard Items", className="dashboard-card-title"),
                                                         html.Div(style={"display": "flex", "gap": "6px"}, children=[
-                                                            html.Button("➕ Metric",
+                                                            html.Button([nav_icon("lucide:plus"), "Metric"],
                                                                         id="add-count-btn",
                                                                         n_clicks=0,
                                                                         className="btn-primary-modern btn-small",
                                                                         title="Add a new metric/count"),
-                                                            html.Button("➕ Section",
+                                                            html.Button([nav_icon("lucide:plus"), "Charts"],
                                                                         id="add-section-btn",
                                                                         n_clicks=0,
                                                                         className="btn-primary-modern btn-small",
@@ -1934,7 +1964,7 @@ def create_edit_modal():
                                             style={"flexShrink": "0", "padding": "12px 16px"},
                                             children=[
                                                 html.Div(style={"display": "flex", "alignItems": "center", "gap": "10px"}, children=[
-                                                    html.Span("✏️", style={"fontSize": "18px"}),
+                                                    html.Span([nav_icon("mdi:pencil"), ""], style={"fontSize": "18px"}),
                                                     html.Div(children=[
                                                         html.H4("Edit Panel", className="dashboard-card-title",
                                                                 style={"margin": "0"}),
@@ -2044,7 +2074,7 @@ def _build_ds_list(sources):
                     html.Div(ds.get("date_updated", ""),
                              style={"fontSize": "11px", "color": "#9ca3af"}),
                 ]),
-                html.Button("✏️", id={"type": "ds-edit-btn", "index": i},
+                html.Button([nav_icon("mdi:pencil"), ""], id={"type": "ds-edit-btn", "index": i},
                             n_clicks=0, className="btn-secondary btn-small",
                             title="Edit"),
             ],

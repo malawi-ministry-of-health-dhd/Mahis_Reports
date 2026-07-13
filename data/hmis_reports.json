@@ -5473,6 +5473,19 @@
         "tables": [],
         "next_id": 3
       }
+    },
+    {
+      "report_id": 20,
+      "report_name": "AIMS INTERNAL PERFORMANCE TRACKER (FACILITY)",
+      "date_created": "2026-07-12",
+      "creator": "admin",
+      "programs": [
+        "HIV PROGRAM"
+      ],
+      "date_updated": "2026-07-12",
+      "updated_by": "admin",
+      "page_name": "aims_report",
+      "archived": "False"
     }
   ]
 }
