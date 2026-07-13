@@ -1034,69 +1034,72 @@ dash.clientside_callback(
         State('url-params-store', 'data'))
 
 def update_menu(interval, color, urlparams):
-    data_route = urlparams.get('route', ["default"])[0]
-    user_data = _load_user_registry(data_route)
-    user_row, scope = _resolve_user_scope(urlparams, user_data)
-    user_id = int(user_row.get('user_id', '0'))
-    user_uuid = user_row.get('uuid')
-    user_programs_path = os.path.join(os.getcwd(), f"data/{data_route}/single_tables/user_programs.csv")
-    dashboard_path = os.path.join(os.getcwd(), f"data/visualizations/validated_dashboard.json")
-    user_programs = duckdb.sql(
-                                f"SELECT name FROM '{user_programs_path}' WHERE user_id = {user_id}"
-                            ).df()['name'].to_list()
-    
-    user_props = next((user['properties'] for user in  _load_user_properties(data_route) if user.get('properties').get('uuid') == user_uuid), None)
-    limited_dashboards = user_props.get('limited_dashboards', []) if user_props else []
+    try:
+        data_route = urlparams.get('route', ["default"])[0]
+        user_data = _load_user_registry(data_route)
+        user_row, scope = _resolve_user_scope(urlparams, user_data)
+        user_id = int(user_row.get('user_id', '0')) if user_row else 0
+        user_uuid = user_row.get('uuid') if user_row else 0
+        user_programs_path = os.path.join(os.getcwd(), f"data/{data_route}/single_tables/user_programs.csv")
+        dashboard_path = os.path.join(os.getcwd(), f"data/visualizations/validated_dashboard.json")
+        user_programs = duckdb.sql(
+                                    f"SELECT name FROM '{user_programs_path}' WHERE user_id = {user_id}"
+                                ).df()['name'].to_list()
+        
+        user_props = next((user['properties'] for user in  _load_user_properties(data_route) if user.get('properties').get('uuid') == user_uuid), None)
+        limited_dashboards = user_props.get('limited_dashboards', []) if user_props else []
 
-    with open(json_path, 'r') as f:
-        menu_json = json.load(f)
+        with open(json_path, 'r') as f:
+            menu_json = json.load(f)
 
-    general_summary_button = [
+        general_summary_button = [
+                                html.Button(
+                                    "General Summary",
+                                    className="menu-btn active" if color == "General Summary" else "menu-btn",
+                                    id={"type": "menu-button", "name": "General Summary"}
+                                )
+                            ]
+        
+        filtered_buttons = [
                             html.Button(
-                                "General Summary",
-                                className="menu-btn active" if color == "General Summary" else "menu-btn",
-                                id={"type": "menu-button", "name": "General Summary"}
+                                display_report_name(d["report_name"]),
+                                className="menu-btn active" if color == d["report_name"] else "menu-btn",
+                                id={"type": "menu-button", "name": d["report_name"]}
+                            )
+                            for d in menu_json
+                            if d.get("report_name") != "Newborn" and d.get('access', 'global') =='global'
+                            and any(program in user_programs for program in d.get("associated_programs", []))
+                        ]
+        filtered_buttons_limited = [
+                            html.Button(
+                                display_report_name(d["report_name"]),
+                                className="menu-btn-alt active" if color == d["report_name"] else "menu-btn-alt",
+                                id={"type": "menu-button", "name": d["report_name"]}
+                            )
+                            for d in menu_json
+                            if (
+                                d.get("report_name") != "Newborn" 
+                                and d.get('access', 'global') == 'limited'
+                                and any(program in user_programs for program in d.get("associated_programs", []))
+                                and any(item in display_report_name(d["report_name"]) for item in limited_dashboards)
                             )
                         ]
-    
-    filtered_buttons = [
-                        html.Button(
-                            display_report_name(d["report_name"]),
-                            className="menu-btn active" if color == d["report_name"] else "menu-btn",
-                            id={"type": "menu-button", "name": d["report_name"]}
-                        )
-                        for d in menu_json
-                        if d.get("report_name") != "Newborn" and d.get('access', 'global') =='global'
-                        and any(program in user_programs for program in d.get("associated_programs", []))
-                    ]
-    filtered_buttons_limited = [
-                        html.Button(
-                            display_report_name(d["report_name"]),
-                            className="menu-btn-alt active" if color == d["report_name"] else "menu-btn-alt",
-                            id={"type": "menu-button", "name": d["report_name"]}
-                        )
-                        for d in menu_json
-                        if (
-                            d.get("report_name") != "Newborn" 
-                            and d.get('access', 'global') == 'limited'
-                            and any(program in user_programs for program in d.get("associated_programs", []))
-                            and any(item in display_report_name(d["report_name"]) for item in limited_dashboards)
-                        )
-                    ]
-    all_buttons = [
-                        html.Button(
-                            display_report_name(d["report_name"]),
-                            className="menu-btn active" if color == d["report_name"] else "menu-btn",
-                            id={"type": "menu-button", "name": d["report_name"]}
-                        )
-                        for d in menu_json
-                        if d.get("report_name") != "Newborn"
-                    ]
-    
-    if user_uuid == DEMO_UUID:
-        return all_buttons
-    else:
-        return general_summary_button + filtered_buttons + filtered_buttons_limited
+        all_buttons = [
+                            html.Button(
+                                display_report_name(d["report_name"]),
+                                className="menu-btn active" if color == d["report_name"] else "menu-btn",
+                                id={"type": "menu-button", "name": d["report_name"]}
+                            )
+                            for d in menu_json
+                            if d.get("report_name") != "Newborn"
+                        ]
+        
+        if user_uuid == DEMO_UUID:
+            return all_buttons
+        else:
+            return general_summary_button + filtered_buttons + filtered_buttons_limited
+    except Exception as e:
+        return []
 
 
 @callback(
@@ -1166,7 +1169,7 @@ def update_dashboard(gen, start_date, end_date, level,
         if user_row is None:
             return (html.Div("Unauthorized User. Please contact system administrator."), level,
                     {'display': 'none'} if level in ['National', 'Facility'] else {},
-                    [], [], False, "", [], [], clicked_name)
+                    [], [], False, "", [],"", [], clicked_name)
 
         user_level = scope['level']
         user_districts = scope.get('districts') or []
