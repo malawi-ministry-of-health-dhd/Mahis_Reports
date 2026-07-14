@@ -1247,8 +1247,6 @@ def update_dashboard(gen, start_date, end_date, level,
             + scope_suffix
         )
 
-        print(filtered_query)
-
         # Scope label (used by MNID topbar; harmless for non-MNID)
         facility_names = []
         if effective_level == 'facility' and location:

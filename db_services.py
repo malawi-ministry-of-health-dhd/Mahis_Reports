@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any, Generator
 import warnings
 warnings.filterwarnings("ignore")
 from config import (BATCH_SIZE, DB_CONFIG, SSH_CONFIG, USE_LOCALHOST,
-                    DB_CONFIG_LOCAL, START_DATE, LOAD_FRESH_DATA,DATA_PATH_)
+                    START_DATE, LOAD_FRESH_DATA, DATA_PATH_)
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -23,15 +23,14 @@ if LOAD_FRESH_DATA:
         logger.info("Removed existing data file for fresh load.")
 
 class DataFetcher:
-    def __init__(self, use_localhost=USE_LOCALHOST, ssh_config=SSH_CONFIG, 
-                 db_config=DB_CONFIG, db_config_local=DB_CONFIG_LOCAL,start_date=START_DATE, 
+    def __init__(self, use_localhost=USE_LOCALHOST, ssh_config=SSH_CONFIG,
+                 db_config=DB_CONFIG, start_date=START_DATE,
                  load_fresh_data=LOAD_FRESH_DATA, single_tables_folder="data/single_tables",
                  batch_size=BATCH_SIZE, batch_folder="data/batches"):
         self.use_localhost = use_localhost
         self.load_fresh_data = load_fresh_data
         self.ssh_config = ssh_config
         self.db_config = db_config
-        self.db_config_local = db_config_local
         self.batch_size = batch_size
         self.batch_folder = batch_folder
         self.single_tables_folder = single_tables_folder
@@ -96,13 +95,13 @@ class DataFetcher:
                     read_timeout=3600,
                 )
             else:
-                # Local connection (no SSL)
+                # Local connection (no SSH, no SSL) — uses the same db_config
                 conn = pymysql.connect(
-                    host=self.db_config_local.get('host', 'localhost'),
-                    port=self.db_config_local.get('port', 3306),
-                    user=self.db_config_local['user'],
-                    password=self.db_config_local['password'],
-                    database=self.db_config_local['database'],
+                    host=self.db_config.get('host', 'localhost'),
+                    port=self.db_config.get('port', 3306),
+                    user=self.db_config['user'],
+                    password=self.db_config['password'],
+                    database=self.db_config['database'],
                     connect_timeout=30,
                     read_timeout=1800,
                 )
@@ -342,12 +341,6 @@ class DataFetcher:
                 conn.close()
             
             output_path = os.path.join(output_folder, f"{table_name}.{output_format}")
-            # first check if the file exists to prevent overwritting
-            if os.path.exists(output_path):
-                data_length = len(pd.read_csv(output_path))
-                if len(df) <= data_length:
-                    return
-            # os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else '.', exist_ok=True)
             if output_format == 'csv':
                 df.to_csv(output_path, index=False)
             elif output_format == 'parquet':
