@@ -1267,6 +1267,342 @@
       "group9_rename": {
         "Order_Name": "Medication_Given"
       }
+    },
+    {
+      "id": "e1108576",
+      "report_name": "TEST IMAM NRU PROGRAM",
+      "authorized_user": "Any",
+      "message": "Names are Masked",
+      "enable_api": "False",
+      "routes_api": [],
+      "program": "UNDER 5 PROGRAM",
+      "type": "LineList",
+      "unique_col": "person_id",
+      "group_cols1": [
+        "identifier",
+        "person_id",
+        "Date",
+        "birthdate",
+        "Gender",
+        "Program",
+        "location_id",
+        "District"
+      ],
+      "group1_filters": {
+        "Program": [
+          "NRU PROGRAM"
+        ]
+      },
+      "group_cols2": [
+        "ValueN"
+      ],
+      "group2_filters": {
+        "Program": "NRU PROGRAM",
+        "Encounter": "Vitals",
+        "concept_name": "Weight"
+      },
+      "group2_aggr": {
+        "ValueN": "max"
+      },
+      "group2_rename": {
+        "ValueN": "weight_kg"
+      },
+      "group_cols3": [
+        "ValueN"
+      ],
+      "group3_filters": {
+        "Program": "NRU PROGRAM",
+        "Encounter": "Vitals",
+        "concept_name": "MUAC"
+      },
+      "group3_aggr": {
+        "ValueN": "max"
+      },
+      "group3_rename": {
+        "ValueN": "muac_cm"
+      },
+      "group_cols4": [
+        "obs_value_coded"
+      ],
+      "group4_filters": {
+        "Program": "NRU PROGRAM",
+        "Encounter": "Vitals",
+        "concept_name": "Oedema"
+      },
+      "group4_aggr": {
+        "obs_value_coded": "first"
+      },
+      "group4_rename": {
+        "obs_value_coded": "oedema_present"
+      },
+      "group_cols5": [
+        "obs_value_coded"
+      ],
+      "group5_filters": {
+        "Program": "OTS/SFP PROGRAM",
+        "Encounter": "Medical Assessment",
+        "concept_name": "Appetite test"
+      },
+      "group5_aggr": {
+        "obs_value_coded": "first"
+      },
+      "group5_rename": {
+        "obs_value_coded": "appetite_test"
+      },
+      "group_cols6": [
+        "ValueN"
+      ],
+      "group6_filters": {
+        "Program": "OTS/SFP PROGRAM",
+        "Encounter": "Dispensing",
+        "concept_name": "Amount dispensed",
+        "DrugName": [
+          "Ready-to-Use Therapeutic Food (RUTF)"
+        ]
+      },
+      "group6_aggr": {
+        "ValueN": "sum"
+      },
+      "group6_rename": {
+        "ValueN": "rutf_sachets_dispensed"
+      },
+      "group_cols7": [
+        "ValueN"
+      ],
+      "group7_filters": {
+        "Program": "OTS/SFP PROGRAM",
+        "Encounter": "Dispensing",
+        "concept_name": "Amount dispensed",
+        "DrugName": [
+          "Ready-to-Use Supplementary Food (RUSF)"
+        ]
+      },
+      "group7_aggr": {
+        "ValueN": "sum"
+      },
+      "group7_rename": {
+        "ValueN": "csb_kg_dispensed"
+      },
+      "group_cols8": [
+        "Value"
+      ],
+      "group8_filters": {
+        "Program": "NRU PROGRAM",
+        "Encounter": "Drugs given",
+        "concept_name": "Given drugs"
+      },
+      "group8_aggr": {
+        "Value": "join"
+      },
+      "group8_rename": {
+        "Value": "medication_given"
+      },
+      "cols_order": "MAHIS ID |Patient ID|Date of Enrollment|Date of Birth|Gender|Program|Location|District|weight_kg|height_cm|muac_cm|oedema_present|appetite_test|rutf_sachets_dispensed|csb_kg_dispensed|medication_given",
+      "merge_methods": [
+        "left",
+        "left",
+        "left",
+        "left",
+        "left",
+        "left",
+        "left",
+        "left"
+      ],
+      "rename": {
+        "person_id": "Patient ID",
+        "Date": "Date of Enrollment",
+        "birthdate": "Date of Birth",
+        "location_id": "Location",
+        "identifier": "MAHIS ID"
+      },
+      "filters": {
+        "unique": "any"
+      },
+      "group_cols9": [
+        "ValueN"
+      ],
+      "group9_filters": {
+        "Program": "NRU PROGRAM",
+        "Encounter": "Vitals",
+        "concept_name": "Height (cm)"
+      },
+      "group9_aggr": {
+        "ValueN": "max"
+      },
+      "group9_rename": {
+        "ValueN": "height_cm"
+      }
+    },
+    {
+      "id": "b9022b9a",
+      "report_name": "TEST IMAM OTS/SFP PROGRAM",
+      "authorized_user": "Any",
+      "message": "",
+      "enable_api": "True",
+      "routes_api": [
+        "mahisuat"
+      ],
+      "program": "UNDER 5 PROGRAM",
+      "type": "LineList",
+      "unique_col": "person_id",
+      "group_cols1": [
+        "identifier",
+        "person_id",
+        "Date",
+        "birthdate",
+        "Gender",
+        "Program",
+        "location_id",
+        "District"
+      ],
+      "group1_filters": {
+        "Program": [
+          "OTS/SFP PROGRAM"
+        ]
+      },
+      "group_cols2": [
+        "ValueN"
+      ],
+      "group2_filters": {
+        "Program": "OTS/SFP PROGRAM",
+        "Encounter": "Vitals",
+        "concept_name": "Weight"
+      },
+      "group2_aggr": {
+        "ValueN": "max"
+      },
+      "group2_rename": {
+        "ValueN": "weight_kg"
+      },
+      "group_cols3": [
+        "ValueN"
+      ],
+      "group3_filters": {
+        "Program": "OTS/SFP PROGRAM",
+        "Encounter": "Vitals",
+        "concept_name": "MUAC"
+      },
+      "group3_aggr": {
+        "ValueN": "max"
+      },
+      "group3_rename": {
+        "ValueN": "muac_cm"
+      },
+      "group_cols4": [
+        "obs_value_coded"
+      ],
+      "group4_filters": {
+        "Program": "OTS/SFP PROGRAM",
+        "Encounter": "Vitals",
+        "concept_name": "Oedema"
+      },
+      "group4_aggr": {
+        "obs_value_coded": "first"
+      },
+      "group4_rename": {
+        "obs_value_coded": "oedema_present"
+      },
+      "group_cols5": [
+        "obs_value_coded"
+      ],
+      "group5_filters": {
+        "Program": "OTS/SFP PROGRAM",
+        "Encounter": "Medical Assessment",
+        "concept_name": "Appetite test"
+      },
+      "group5_aggr": {
+        "obs_value_coded": "first"
+      },
+      "group5_rename": {
+        "obs_value_coded": "appetite_test"
+      },
+      "group_cols6": [
+        "ValueN"
+      ],
+      "group6_filters": {
+        "Program": "OTS/SFP PROGRAM",
+        "Encounter": "Dispensing",
+        "concept_name": "Amount dispensed",
+        "DrugName": [
+          "Ready-to-Use Therapeutic Food (RUTF)"
+        ]
+      },
+      "group6_aggr": {
+        "ValueN": "sum"
+      },
+      "group6_rename": {
+        "ValueN": "rutf_sachets_dispensed"
+      },
+      "group_cols7": [
+        "ValueN"
+      ],
+      "group7_filters": {
+        "Program": "OTS/SFP PROGRAM",
+        "Encounter": "Dispensing",
+        "concept_name": "Amount dispensed",
+        "DrugName": [
+          "Ready-to-Use Supplementary Food (RUSF)"
+        ]
+      },
+      "group7_aggr": {
+        "ValueN": "sum"
+      },
+      "group7_rename": {
+        "ValueN": "csb_kg_dispensed"
+      },
+      "group_cols8": [
+        "DrugName"
+      ],
+      "group8_filters": {
+        "Program": "OTS/SFP PROGRAM",
+        "Encounter": "Dispensing",
+        "concept_name": "Amount dispensed",
+        "DrugName": [
+          "Amoxicillin (125mg tablet)",
+          "Polio Vaccination"
+        ]
+      },
+      "group8_aggr": {
+        "DrugName": "join"
+      },
+      "group8_rename": {
+        "DrugName": "medication_given"
+      },
+      "cols_order": "MAHIS ID|Patient ID|Date of Enrollment|Date of Birth|Gender|Program|Location|weight_kg|height_cm|muac_cm|oedema_present|appetite_test|rutf_sachets_dispensed|csb_kg_dispensed|medication_given",
+      "merge_methods": [
+        "left",
+        "left",
+        "left",
+        "left",
+        "left",
+        "left",
+        "left",
+        "left"
+      ],
+      "rename": {
+        "person_id": "Patient ID",
+        "Date": "Date of Enrollment",
+        "birthdate": "Date of Birth",
+        "location_id": "Location",
+        "identifier":"MAHIS ID"
+      },
+      "filters": {
+        "unique": "any"
+      },
+      "group_cols9": [
+        "ValueN"
+      ],
+      "group9_filters": {
+        "Program": "OTS/SFP PROGRAM",
+        "Encounter": "Vitals",
+        "concept_name": "Height (cm)"
+      },
+      "group9_aggr": {
+        "ValueN": "max"
+      },
+      "group9_rename": {
+        "ValueN": "height_cm"
+      }
     }
   ]
 }

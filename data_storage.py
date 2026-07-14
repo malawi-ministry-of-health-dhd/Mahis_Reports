@@ -72,8 +72,8 @@ class DataStorage:
     def fetch_transactional_data(self, date_column, incremental_id_column):
         """Fetch fresh data from DB and save to Parquet."""
         logging.info("Fetching Transactional Tables.")
-        fetcher = DataFetcher(use_localhost=self.use_localhost, ssh_config=self.ssh_config, 
-                 db_config=self.db_config, db_config_local=self.db_config,start_date=self.start_date, 
+        fetcher = DataFetcher(use_localhost=self.use_localhost, ssh_config=self.ssh_config,
+                 db_config=self.db_config, start_date=self.start_date,
                  load_fresh_data=self.load_fresh_data, single_tables_folder=self.tables_dir,
                  batch_size=self.batch_size)
 
@@ -288,9 +288,9 @@ class DataStorage:
 
     def fetch_and_save_single_table(self, table_name, format="csv"):
         """Fetch fresh data from DB and save to CSV."""
-        fetcher = DataFetcher(use_localhost=USE_LOCALHOST, 
-                              ssh_config=self.ssh_config, 
-                                db_config=self.db_config)
+        fetcher = DataFetcher(use_localhost=self.use_localhost,
+                              ssh_config=self.ssh_config,
+                              db_config=self.db_config)
         return fetcher.fetch_single_table(
             query=self.query,
             table_name=table_name,
@@ -322,8 +322,9 @@ if __name__ == "__main__":
                 "pause_data_source": False,
                 "batch_size": cfg.BATCH_SIZE,
                 "db_config": cfg.DB_CONFIG,
-                "ssh_config": cfg.SSH_CONFIG, 
-                }
+                # ssh_config only needed when not using localhost
+                "ssh_config": None if cfg.USE_LOCALHOST else cfg.SSH_CONFIG,
+            }
         ]
         with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "configurations.json"), 'w') as f:
             json.dump(global_configurations, f, indent=2)
@@ -344,41 +345,35 @@ if __name__ == "__main__":
             if items.get("pause_data_source"):
                 continue
             
-            programs = DataStorage(query=QUERY_PROGRAMS,data_dir=DATA_ROUTE,
-                                db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
+            _st_kwargs = dict(data_dir=DATA_ROUTE, db_config=DB_CONFIG,
+                              ssh_config=SSH_CONFIG, use_localhost=USE_LOCALHOST)
+
+            programs = DataStorage(query=QUERY_PROGRAMS, **_st_kwargs)
             programs.fetch_and_save_single_table(table_name="programs_data")
 
-            concepts = DataStorage(query=QUERY_CONCEPT_NAMES,data_dir=DATA_ROUTE,
-                                db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
+            concepts = DataStorage(query=QUERY_CONCEPT_NAMES, **_st_kwargs)
             concepts.fetch_and_save_single_table(table_name="concept_names_data")
 
-            encounter_types = DataStorage(query=QUERY_ENCOUNTER_TYPES,data_dir=DATA_ROUTE,
-                                        db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
+            encounter_types = DataStorage(query=QUERY_ENCOUNTER_TYPES, **_st_kwargs)
             encounter_types.fetch_and_save_single_table(table_name="encounter_types_data")
 
-            locations = DataStorage(query=QUERY_LOCATIONS,data_dir=DATA_ROUTE,
-                                    db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
+            locations = DataStorage(query=QUERY_LOCATIONS, **_st_kwargs)
             locations.fetch_and_save_single_table(table_name="locations_data")
 
             # if not IS_HARMONIZED_MAHIS:
-            #     facilities = DataStorage(query=QUERY_FACILITIES)
+            #     facilities = DataStorage(query=QUERY_FACILITIES, **_st_kwargs)
             #     facilities.fetch_and_save_single_table(table_name="facilities_data")
 
-            drugs = DataStorage(query=QUERY_DRUGS,data_dir=DATA_ROUTE,
-                                db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
+            drugs = DataStorage(query=QUERY_DRUGS, **_st_kwargs)
             drugs.fetch_and_save_single_table(table_name="drugs_data")
 
-            order_types = DataStorage(query=QUERY_ORDER_TYPES,data_dir=DATA_ROUTE,
-                                    db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
+            order_types = DataStorage(query=QUERY_ORDER_TYPES, **_st_kwargs)
             order_types.fetch_and_save_single_table(table_name="order_types_data")
 
-
-            users = DataStorage(query=QUERY_USERS,data_dir=DATA_ROUTE,
-                                db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
+            users = DataStorage(query=QUERY_USERS, **_st_kwargs)
             users.fetch_and_save_single_table(table_name="users_data")
 
-            user_programs = DataStorage(query=QUERY_USER_PROGRAMS,data_dir=DATA_ROUTE,
-                                        db_config=DB_CONFIG, ssh_config=SSH_CONFIG,)
+            user_programs = DataStorage(query=QUERY_USER_PROGRAMS, **_st_kwargs)
             user_programs.fetch_and_save_single_table(table_name="user_programs")
 
             # bids = DataStorage(query=QUERY_BIDS)
