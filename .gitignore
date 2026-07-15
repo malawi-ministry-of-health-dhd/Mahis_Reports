@@ -53,10 +53,27 @@ test.ipynb
 app copy.py
 dashboardsxx.json
 models.py
-# nav_drawer.py
-# latest_data_opd.parquet.backup
+pages/reports_config
+nav_drawer.py
+data/TimeStamp.csv
+# start_prod.sh
+# start_dev.sh
+data/users_data.csv
+data/TimeStamp.csv
+data/concepts_data.csv
+cache
+latest_data_opd.parquet.backup
+data/single_tables
+venv
+data/parquet
+data/dcc_dropdown_json
 demo_parquet/
+scripts/
 docs/
-# generate_demo_parquet.py
-scripts/generate_demo_mnid_data.py
+# # generate_demo_parquet.py
+# scripts/generate_demo_mnid_data.py
 # data/mnid_aggregates/
+# data/visualizations/dashboard_tabs_config.json
+.mnid_exec_cache/
+/.junie/
+/.idea/
