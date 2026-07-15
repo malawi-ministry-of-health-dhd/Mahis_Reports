@@ -1088,6 +1088,14 @@ def _normalize_mnid_semantics(df: pd.DataFrame) -> pd.DataFrame:
         return df
 
     out = df
+    for _col in ('District', 'Facility', 'Facility_CODE'):
+        # Dropdown/scope-filter resolution (register_facility_metadata, _resolve_scope_filters)
+        # strips whitespace before matching, but these raw columns weren't - a trailing/leading
+        # space in the source data silently breaks a filter match (both live facility_df
+        # filtering and the aggregate engine's per-facility/district grouping), forcing every
+        # indicator on that view to fall back to the slow live row-scan path.
+        if _col in out.columns:
+            out[_col] = out[_col].astype(object).fillna('').astype(str).str.strip()
     if 'Program' in out.columns and 'Source_Program' not in out.columns:
         out['Source_Program'] = out['Program']
 
