@@ -31,7 +31,7 @@ data/uploads/
 # data/visualizations/home.json
 # data/visualizations/master.json
 # data/visualizations/opd.json
-
+data/mnid_aggregates/indicator_aggregates.parquet.bak
 # Demo & generated data
 demo_parquet/
 generate_demo_parquet.py
