@@ -85,6 +85,8 @@ preview_modal = html.Div([
                     style={"marginTop": "6px", "fontSize": "12px",
                            "lineHeight": "1.6", "minHeight": "20px"},
                 ),
+                # ── Saved queries ─────────────────────────────────────────────
+                html.Div(id="saved-queries-list", style={"marginTop": "6px"}),
                 html.Div(style={"display": "flex", "gap": "10px",
                                 "alignItems": "center", "marginTop": "10px"}, children=[
                     html.Button(
@@ -663,6 +665,7 @@ layout = html.Div(
                 dcc.Download(id="download-template"),
                 dcc.Download(id="download-xlsx-report"),
                 dcc.Store(id="preview-data-store", data=None),
+                dcc.Store(id="saved-queries-store", data=[]),
                 dcc.Store(id='current-dashboard-data', data={}),
                 dcc.Store(id='current-dashboard-index', data=-1),
                 dcc.Store(id='delete-confirmation', data=False),
@@ -3960,16 +3963,69 @@ def validate_sql_columns(n_blur, sql):
     return parts
 
 
+_SAVED_QUERIES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                   "..", "data", "saved_queries.json")
+
+
+def _load_saved_queries():
+    try:
+        with open(_SAVED_QUERIES_PATH, "r") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+
+def _save_query_to_file(sql_text):
+    queries = _load_saved_queries()
+    clean = sql_text.strip()
+    if any(q["sql"].strip() == clean for q in queries):
+        return queries
+    queries.insert(0, {"sql": clean})
+    queries = queries[:5]
+    for i, q in enumerate(queries):
+        q["name"] = f"query {i + 1}"
+    with open(_SAVED_QUERIES_PATH, "w") as f:
+        json.dump(queries, f, indent=2)
+    return queries
+
+
+def _render_saved_queries(queries):
+    if not queries:
+        return []
+    chips = [
+        html.Button(
+            q["name"],
+            id={"type": "saved-query-btn", "index": i},
+            n_clicks=0,
+            title=q["sql"],
+            style={
+                "fontSize": "11px", "padding": "3px 10px",
+                "background": "#f3f4f6", "border": "1px solid #d1d5db",
+                "borderRadius": "12px", "cursor": "pointer",
+                "color": "#374151", "marginRight": "4px",
+            },
+        )
+        for i, q in enumerate(queries)
+    ]
+    return [
+        html.Div("Saved queries:", style={"fontSize": "11px", "color": "#9ca3af",
+                                          "marginBottom": "4px"}),
+        html.Div(chips, style={"display": "flex", "flexWrap": "wrap", "gap": "4px"}),
+    ]
+
+
 @callback(
     [Output("preview-data-info",  "children", allow_duplicate=True),
      Output("preview-data-table", "children", allow_duplicate=True),
-     Output("preview-run-status", "children")],
+     Output("preview-run-status", "children"),
+     Output("saved-queries-list", "children", allow_duplicate=True),
+     Output("saved-queries-store", "data", allow_duplicate=True)],
     Input("preview-run-btn", "n_clicks"),
     Input("url-params-store", "data"),
     State("preview-sql-input", "value"),
     prevent_initial_call=True,
 )
-def run_preview_query(n_clicks,urlparams, sql):
+def run_preview_query(n_clicks, urlparams, sql):
     """Execute the user-supplied SQL via DuckDB and display results."""
     if not n_clicks or not sql or not sql.strip():
         raise PreventUpdate
@@ -3984,7 +4040,7 @@ def run_preview_query(n_clicks,urlparams, sql):
                      .replace("User","identifier"))
         else:
             query = sql
-        
+
         if ("LIMIT" or "limit") not in query:
             query = query  + " LIMIT 100"
         df = DataStorage.query_duckdb(query.strip())
@@ -4003,14 +4059,16 @@ def run_preview_query(n_clicks,urlparams, sql):
                 "color": "#dc2626", "maxHeight": "160px", "overflowY": "auto",
             }),
         ])
-        return error_div, "", ""
+        return error_div, "", "", dash.no_update, dash.no_update
 
     if df is None or df.empty:
         return (
             html.Div("⚠ Query returned no rows.",
                      style={"color": "#f59e0b", "fontWeight": "600"}),
-            "", "",
+            "", "", dash.no_update, dash.no_update,
         )
+
+    saved = _save_query_to_file(sql)
 
     info = html.Div(style={"display": "flex", "gap": "20px", "flexWrap": "wrap"}, children=[
         html.Span(f"✓ {len(df):,} rows",
@@ -4021,7 +4079,33 @@ def run_preview_query(n_clicks,urlparams, sql):
                   style={"color": "#6b7280", "fontStyle": "italic", "fontSize": "12px"}),
     ])
 
-    return info, create_preview_table(df), ""
+    return info, create_preview_table(df), "", _render_saved_queries(saved), saved
+
+
+@callback(
+    [Output("saved-queries-list", "children"),
+     Output("saved-queries-store", "data")],
+    Input("refresh-interval", "n_intervals"),
+    prevent_initial_call=False,
+)
+def load_saved_queries(n_intervals):
+    queries = _load_saved_queries()
+    return _render_saved_queries(queries), queries
+
+
+@callback(
+    Output("preview-sql-input", "value"),
+    Input({"type": "saved-query-btn", "index": ALL}, "n_clicks"),
+    State("saved-queries-store", "data"),
+    prevent_initial_call=True,
+)
+def populate_from_saved_query(all_clicks, queries):
+    if not any(all_clicks) or not queries:
+        raise PreventUpdate
+    idx = next((i for i, c in enumerate(all_clicks) if c), None)
+    if idx is None or idx >= len(queries):
+        raise PreventUpdate
+    return queries[idx]["sql"]
 
 
 # =============================================================================
