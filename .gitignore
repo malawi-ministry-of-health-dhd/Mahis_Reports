@@ -53,4 +53,4 @@ data/parquet
 configurations.json
 __pycache__/
 CLAUDE.md
-saved_queries.json
+saved_queries.json.mnid_exec_cache/
