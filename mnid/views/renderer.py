@@ -199,11 +199,11 @@ def _build_executive_tab_view(
     view_cache_key = _executive_view_cache_key(selected, state, scope_meta=scope_meta, config=config)
     _etv_key       = _dk('etv', view_cache_key)
 
-    # Maternal and newborn tabs hold dcc.Stores whose data_key values reference
-    # the in-process _MNID_UI_CACHE. That cache is wiped on every server restart,
-    # so serving a stale disk-cached view would leave callbacks with no raw data.
-    # Only the worker-local (in-process) cache is safe for these tabs.
-    _use_disk_cache = selected not in ('maternal-dashboard', 'newborn-dashboard')
+    # Maternal and newborn tabs hold dcc.Stores whose data_key values point into
+    # _MNID_UI_CACHE (mnid/core/data_utils.py), which is now disk-backed and
+    # shared across worker processes and restarts - so every tab can safely use
+    # the shared disk cache, not just the worker-local one.
+    _use_disk_cache = True
 
     cached_view = _worker_view_cache.get(_etv_key)
     if cached_view is None and _use_disk_cache:

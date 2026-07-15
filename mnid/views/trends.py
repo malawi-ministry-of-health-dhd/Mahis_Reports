@@ -255,31 +255,62 @@ def _run_chart_cards(
     if selected_ids:
         id_set = set(selected_ids)
         tracked = [i for i in tracked if i.get('id') in id_set] or tracked
-    if not tracked or df is None or df.empty:
+    if not tracked:
         return [html.Div('No indicators configured for this category.',
                          style={'color': MUTED, 'fontSize': '13px', 'padding': '24px'})]
 
+    if agg_df is None:
+        agg_df = _get_aggregate()
+
+    # Raw rows can be empty for the exact scope/date window in view (a narrow
+    # custom range, a district with sparse day-level data) even though the
+    # pre-built aggregate still has matching periods for these indicators -
+    # don't give up on the raw-row check alone, the aggregate can drive the
+    # whole chart on its own (same as the coverage bars above it already do).
     source_df = fallback_df if fallback_df is not None and not fallback_df.empty else df
-    plot_df, fac_filter, dist_filter = _trend_scope_filters(source_df, location)
-    dates = pd.to_datetime(plot_df['Date'], errors='coerce').dropna() if 'Date' in plot_df.columns else pd.Series([], dtype='datetime64[ns]')
+    have_raw_rows = source_df is not None and not source_df.empty
+
+    plot_df = pd.DataFrame()
+    fac_filter = dist_filter = None
+    dates = pd.Series([], dtype='datetime64[ns]')
+    periods: list = []
+    tickfmt, hfmt = '%b %y', '%b %Y'
+
+    if have_raw_rows:
+        plot_df, fac_filter, dist_filter = _trend_scope_filters(source_df, location)
+        dates = pd.to_datetime(plot_df['Date'], errors='coerce').dropna() if 'Date' in plot_df.columns else pd.Series([], dtype='datetime64[ns]')
+        if not dates.empty:
+            plot_df, periods, tickfmt, hfmt = _trend_period_context(plot_df, grain)
+            periods = sorted(plot_df['_p'].dropna().unique())
+
+    if fac_filter is None and dist_filter is None and scope_meta:
+        _, fac_codes, districts = _resolve_scope_filters(source_df if have_raw_rows else pd.DataFrame(), scope_meta)
+        fac_filter  = fac_codes or None
+        dist_filter = districts or None
+
+    if dates.empty and agg_df is not None and not agg_df.empty:
+        _ind_ids   = {_agg_resolve_id(agg_df, i['id'], i.get('label')) for i in tracked}
+        _grain_set = set(_agg_candidate_grains(grain))
+        _amask = agg_df['grain'].isin(_grain_set) & agg_df['indicator_id'].isin(_ind_ids)
+        if fac_filter:
+            _amask &= agg_df['facility_code'].isin([str(f) for f in fac_filter])
+        elif dist_filter:
+            _amask &= agg_df['district'].isin([str(d) for d in dist_filter])
+        _agg_candidate = agg_df[_amask]
+        if not _agg_candidate.empty:
+            plot_df = pd.DataFrame({'Date': pd.to_datetime(_agg_candidate['period_start'])})
+            dates = plot_df['Date']
+            plot_df, periods, tickfmt, hfmt = _trend_period_context(plot_df, grain)
+            periods = sorted(plot_df['_p'].dropna().unique())
+
     if dates.empty:
         return [html.Div('No data for the selected location.',
                          style={'color': MUTED, 'fontSize': '13px', 'padding': '24px'})]
-
-    plot_df, periods, tickfmt, hfmt = _trend_period_context(plot_df, grain)
-    periods = sorted(plot_df['_p'].dropna().unique())
     if not periods:
         return [html.Div('No time periods available.',
                          style={'color': MUTED, 'fontSize': '13px', 'padding': '24px'})]
 
     date_min, date_max = dates.min(), dates.max()
-
-    if agg_df is None:
-        agg_df = _get_aggregate()
-    if fac_filter is None and dist_filter is None and scope_meta:
-        _, fac_codes, districts = _resolve_scope_filters(plot_df, scope_meta)
-        fac_filter  = fac_codes or None
-        dist_filter = districts or None
 
     _agg_slice = None
     if agg_df is not None and not agg_df.empty:

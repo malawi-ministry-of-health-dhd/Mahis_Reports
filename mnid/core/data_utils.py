@@ -8,25 +8,28 @@ import numpy as np
 import pandas as pd
 pd.options.mode.chained_assignment = None
 
-# Lightweight in-memory store for the two active DataFrames the trend and
-# compare callbacks need (fallback when aggregate is not yet built).
-# Only ever holds 2 entries, so we skip disk files and eviction logic.
-_MNID_UI_CACHE: dict = {}
+from mnid.core.cache import _MNID_EXECUTIVE_DISK_CACHE, _MNID_UI_CACHE_TTL_SECONDS
 
 
 def _remember_ui_payload(prefix: str, records_or_fn, stable_key: str | None = None) -> str:
+    """Stash a DataFrame payload the trend/compare/Nest360 callbacks need to
+    restore later, in the same disk-backed cache used everywhere else. A plain
+    in-memory dict here was only ever visible to the one worker process that
+    built it - under multiple Gunicorn workers, any other worker handling the
+    follow-up callback would silently get an empty DataFrame back (no error,
+    just "no data" shown) instead of the real payload."""
     cache_key = f'{prefix}:{stable_key}' if stable_key else f'{prefix}:{uuid.uuid4().hex}'
-    if cache_key in _MNID_UI_CACHE:
+    if _MNID_EXECUTIVE_DISK_CACHE.get(cache_key) is not None:
         return cache_key
     records = records_or_fn() if callable(records_or_fn) else records_or_fn
-    _MNID_UI_CACHE[cache_key] = records
+    _MNID_EXECUTIVE_DISK_CACHE.set(cache_key, records, expire=_MNID_UI_CACHE_TTL_SECONDS)
     return cache_key
 
 
 def _restore_ui_dataframe(cache_key: str | None) -> pd.DataFrame:
     if not cache_key:
         return pd.DataFrame()
-    obj = _MNID_UI_CACHE.get(cache_key)
+    obj = _MNID_EXECUTIVE_DISK_CACHE.get(cache_key)
     if isinstance(obj, pd.DataFrame):
         return obj
     return deserialize_store_df(obj)

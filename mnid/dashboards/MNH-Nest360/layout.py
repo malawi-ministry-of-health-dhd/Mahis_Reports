@@ -100,6 +100,54 @@ def _nest360_update_ind_filter(tab_value, stored):
     return options, values
 
 
+def _render_coverage_panel(cat, cat_indicators, data_opd, agg_df, start_date, end_date):
+    return html.Div([
+        dmc.Paper([
+            dmc.Text(f"{cat} — Coverage", fw=700, size="lg", mb="sm"),
+            _coverage_charts_section(
+                {cat: cat_indicators},
+                data_opd,
+                categories=[cat],
+                agg_df=agg_df,
+                start_date=start_date,
+                end_date=end_date,
+            ),
+        ], withBorder=True, shadow="sm", p="md"),
+    ], style={'padding': '16px'})
+
+
+# Callback: build the active coverage tab's charts on demand
+#
+# Coverage charts used to be built for all 11 subcategories up front on every
+# render, even though only one tab is visible at a time - this made every first
+# visit to the dashboard far slower than it needed to be. Now only the active
+# tab's charts are computed, the same lazy pattern the run-charts section below
+# already uses.
+@callback(
+    Output('n360-coverage-container', 'children'),
+    Input('n360-subcategory-tabs', 'value'),
+    State('n360-coverage-store', 'data'),
+)
+def _nest360_sync_coverage(tab_value, stored):
+    if not tab_value or not stored:
+        raise PreventUpdate
+    by_cat = stored.get('by_cat', {})
+    cat_indicators = by_cat.get(tab_value, [])
+    if not cat_indicators:
+        return html.Div(f'No indicators configured for {tab_value}.',
+                        style={'color': '#94A3B8', 'padding': '16px'})
+
+    data_opd = _restore_ui_dataframe(stored.get('data_key'))
+    agg_df   = _restore_ui_dataframe(stored.get('agg_data_key'))
+    if agg_df is not None and agg_df.empty:
+        agg_df = None
+
+    return _render_coverage_panel(
+        tab_value, cat_indicators, data_opd, agg_df,
+        stored.get('start_date'), stored.get('end_date'),
+    )
+
+
 # Main render function
 #
 # Called by renderer.py when the user clicks the "MNH-Nest360" tab.
@@ -158,10 +206,18 @@ def render_mnh_nest360_dashboard(
 
     # Store the full indicator list + data key in a dcc.Store so the callbacks
     # can access them without hitting the database again.
+    _data_key = _remember_ui_payload('n360_trend', data_opd)
     trend_store = {
         'all_trend_indicators': trend_indicators,
-        'data_key': _remember_ui_payload('n360_trend', data_opd),
+        'data_key': _data_key,
         'scope_meta': scope_meta or {},
+    }
+    coverage_store = {
+        'by_cat': by_cat,
+        'data_key': _data_key,
+        'agg_data_key': _remember_ui_payload('n360_agg', agg_df if agg_df is not None else pd.DataFrame()),
+        'start_date': start_date,
+        'end_date': end_date,
     }
 
     # Pre-render the default tab's run charts so the user sees content immediately
@@ -177,31 +233,27 @@ def render_mnh_nest360_dashboard(
     return html.Div([
 
         # Section 1: Coverage
-        # One tab per clinical subcategory. Each tab shows horizontal bar charts
-        # for every indicator in that subcategory, coloured by performance vs target.
+        # One tab per clinical subcategory. Only the active tab's charts are ever
+        # built - clicking a tab fires _nest360_sync_coverage above instead of all
+        # 11 subcategories being computed and shipped to the browser up front.
         dcc.Tabs(
             id='n360-subcategory-tabs',
             value=default_cat,
             children=[
-                dcc.Tab(
-                    label=cat,
-                    value=cat,
-                    children=html.Div([
-                        dmc.Paper([
-                            dmc.Text(f"{cat} — Coverage", fw=700, size="lg", mb="sm"),
-                            _coverage_charts_section(
-                                {cat: by_cat[cat]},
-                                data_opd,
-                                categories=[cat],
-                                agg_df=agg_df,
-                                start_date=start_date,
-                                end_date=end_date,
-                            ),
-                        ], withBorder=True, shadow="sm", p="md"),
-                    ], style={'padding': '16px'}),
-                )
+                dcc.Tab(label=cat, value=cat)
                 for cat in cat_order
             ],
+        ),
+        dcc.Store(id='n360-coverage-store', data=coverage_store),
+        dcc.Loading(
+            html.Div(
+                id='n360-coverage-container',
+                children=(
+                    _render_coverage_panel(default_cat, by_cat[default_cat], data_opd, agg_df, start_date, end_date)
+                    if default_cat else []
+                ),
+            ),
+            type='circle', color='#15803d',
         ),
 
         #  Section 2: Run charts 

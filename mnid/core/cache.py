@@ -194,10 +194,8 @@ def _get_network_df_from_state(state: dict):
 
 
 def clear_runtime_caches() -> None:
-    from mnid.core.data_utils import _MNID_UI_CACHE
     _network_df_cache.clear()
     _worker_view_cache.clear()
-    _MNID_UI_CACHE.clear()
     try:
         _MNID_EXECUTIVE_DISK_CACHE.clear()
     except Exception:
