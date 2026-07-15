@@ -585,9 +585,9 @@ def create_sum(query_fiter,data_path, unique_column=PERSON_ID_, num_field='Value
     for col, val in zip(filter_cols, filter_vals):
         query = build_filter_query(col, val,data_path, [unique_column,num_field], isSet, start_date, end_date)
         queries.append(query)
-    joined_query =f"SELECT {unique_column}, {num_field} FROM '{data_path}' WHERE {query_fiter} AND "  + " AND ".join(queries)
+    joined_query =f"SELECT DISTINCT {unique_column}, {num_field} FROM '{data_path}' WHERE {query_fiter} AND "  + " AND ".join(queries)
     if not queries:
-        joined_query =f"SELECT {unique_column}, {num_field} FROM '{data_path}' WHERE {query_fiter}"  
+        joined_query =f"SELECT DISTINCT {unique_column}, {num_field} FROM '{data_path}' WHERE {query_fiter}"  
     
     # print("create sum", joined_query)
     result = DataStorage.query_duckdb(joined_query)
