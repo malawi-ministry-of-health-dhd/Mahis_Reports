@@ -415,7 +415,7 @@ def build_filter_query(cols, vals,data_path, unique_column, isSet, start_date, e
             return f"({clause})"
         if col == "defaulter_period":
             return (f"concept_name = 'Drug end date' "
-                    + f"GROUP BY {unique_column} "
+                    + f"GROUP BY {unique_column}, CAST({DATE_} AS DATE)"
                     + f"HAVING MAX(CAST({VALUE_DATETIME_} AS TIMESTAMP)) < ('{end_date}'::DATE - INTERVAL {val} DAY)")
         if col == "days_before_visit_date":
             return f"{DATE_} >= ('{start_date}'::DATE - INTERVAL {int(val)} DAY) AND {DATE_} <= ('{end_date}'::DATE - INTERVAL 0 DAY)"
@@ -469,6 +469,7 @@ def create_count(query_fiter,data_path, aggregation='count', unique_column=PERSO
         query = build_filter_query(col, val,data_path, unique_column, isSet, start_date, end_date)
         queries.append(query)
 
+
     joined_query =f"SELECT DISTINCT {unique_column}, {DATE_}::DATE FROM '{data_path}' WHERE {query_fiter} AND "  + " AND ".join(queries)
     if not queries:
         joined_query = f"SELECT DISTINCT {unique_column}, {DATE_}::DATE FROM '{data_path}' WHERE {query_fiter}"
@@ -477,7 +478,6 @@ def create_count(query_fiter,data_path, aggregation='count', unique_column=PERSO
                                             f"({unique_column}), DATEDIFF('minute', MIN({DATE_}), MAX({DATE_})) AS patient_session_minutes")
                                             + f" GROUP BY {unique_column}, CAST({DATE_} AS DATE)")
     
-    # print("Create count",joined_query)
     result = DataStorage.query_duckdb(joined_query)
     unique_patients = result[unique_column].unique().tolist()
     if aggregation == 'count':
@@ -585,9 +585,9 @@ def create_sum(query_fiter,data_path, unique_column=PERSON_ID_, num_field='Value
     for col, val in zip(filter_cols, filter_vals):
         query = build_filter_query(col, val,data_path, [unique_column,num_field], isSet, start_date, end_date)
         queries.append(query)
-    joined_query =f"SELECT {unique_column}, {num_field} FROM '{data_path}' WHERE {query_fiter} AND "  + " AND ".join(queries)
+    joined_query =f"SELECT DISTINCT {unique_column}, {num_field} FROM '{data_path}' WHERE {query_fiter} AND "  + " AND ".join(queries)
     if not queries:
-        joined_query =f"SELECT {unique_column}, {num_field} FROM '{data_path}' WHERE {query_fiter}"  
+        joined_query =f"SELECT DISTINCT {unique_column}, {num_field} FROM '{data_path}' WHERE {query_fiter}"  
     
     # print("create sum", joined_query)
     result = DataStorage.query_duckdb(joined_query)

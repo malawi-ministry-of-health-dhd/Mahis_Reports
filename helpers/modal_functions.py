@@ -27,6 +27,10 @@ from config import (actual_keys_in_data,
                     DRUG_NAME_,
                     VALUE_NAME_)
 
+from dash_iconify import DashIconify
+def nav_icon(icon_name):
+    return DashIconify(icon=icon_name, className="nav-icon")
+
 path = os.getcwd()
 path_dcc_json = os.path.join(path, 'data/default', 'dcc_dropdown_json','dropdowns.json')
 if os.path.exists(path_dcc_json):
@@ -1311,115 +1315,141 @@ dashboards_data = load_dashboards_from_file()
 
 
 def build_reports_table(data, page=1, page_size=10):
-    # Filter active reports
     active_reports = [item for item in data if item.get("archived", "False") == "False"]
 
-    # Pagination calculations
-    total = len(active_reports)
-    start = (page - 1) * page_size
-    end = start + page_size
+    total       = len(active_reports)
+    total_pages = max(1, -(-total // page_size))
+    page        = max(1, min(page, total_pages))
+    start       = (page - 1) * page_size
+    paginated_items = active_reports[start: start + page_size]
 
-    paginated_items = active_reports[start:end]
+    # ── Palette ───────────────────────────────────────────────────────────────
+    TH_BG       = "#3a4252"   # dark blue-grey header
+    TH_TEXT     = "#ffffff"
+    ROW_ODD     = "transparent"
+    ROW_EVEN    = "#f7f7f5"
+    DIVIDER     = "#ececec"
+    TEXT_PRI    = "#2c2c2a"
+    TEXT_SEC    = "#5f5e5a"
 
-    # Modern styled header
+    th_base = {
+        "padding": "10px 12px",
+        "fontSize": "12px",
+        "fontWeight": "600",
+        "background": TH_BG,
+        "color": TH_TEXT,
+        "textAlign": "left",
+        "letterSpacing": "0.03em",
+        "whiteSpace": "nowrap",
+        "borderBottom": f"2px solid {TH_BG}",
+    }
+
     table_header = html.Thead(
         html.Tr([
-            html.Th("#", className="report-table-header", style={"width": "50px"}),
-            html.Th("Report Name", style={"text-align":"left"}),
-            html.Th("Short Name", style={"text-align":"left"}),
-            html.Th("Creator", style={"text-align":"left"}),
-            html.Th("Date Updated", style={"text-align":"left"}),
-            # html.Th("Report Type", style={"text-align":"left"}),
-            html.Th("Actions", style={"text-align":"left"}),
+            html.Th("#",            style={**th_base, "width": "44px", "textAlign": "center"}),
+            html.Th("Report Name",  style=th_base),
+            html.Th("Short Name",   style=th_base),
+            html.Th("Creator",      style=th_base),
+            html.Th("Date Updated", style=th_base),
+            html.Th("Actions",      style={**th_base, "textAlign": "center", "width": "80px"}),
         ])
     )
 
-    # Build rows with modern styling
-    start_row_number = (page - 1) * page_size + 1
+    td_base = {
+        "padding": "10px 12px",
+        "fontSize": "12px",
+        "color": TEXT_PRI,
+        "borderBottom": f"1px solid {DIVIDER}",
+        "whiteSpace": "nowrap",
+    }
+    td_sec = {**td_base, "color": TEXT_SEC, "fontSize": "12px"}
+
+    start_row_number = start + 1
     table_rows = []
     for idx, item in enumerate(paginated_items):
-        row_number = start_row_number + idx
+        row_bg = ROW_ODD if idx % 2 == 0 else ROW_EVEN
+        row_style = {
+            "background": row_bg,
+            "transition": "background 150ms ease",
+        }
         table_rows.append(
             html.Tr(
-                className="report-table-row",
+                style=row_style,
+                className="rpt-tbl-row",
                 children=[
-                    html.Td(row_number, className="report-table-cell", style={"textAlign": "center", "fontWeight": "500"}),
-                    html.Td(item.get("report_name").upper(), className="report-table-cell"),
-                    html.Td(item.get("page_name"), className="report-table-cell"),
-                    html.Td(item.get("creator"), className="report-table-cell"),
-                    html.Td(item.get("date_updated"), className="report-table-cell"),
-                    # html.Td(item.get("kind","dataset"), className="report-table-cell"),
                     html.Td(
-                        className="report-table-actions",
-                        style={"gap":"5px"},
+                        start_row_number + idx,
+                        style={**td_base, "textAlign": "center",
+                               "color": TEXT_SEC, "fontSize": "12px"},
+                    ),
+                    html.Td(item.get("report_name", ""), style=td_base),
+                    html.Td(item.get("page_name", ""),   style=td_sec),
+                    html.Td(item.get("creator", ""),     style=td_sec),
+                    html.Td(item.get("date_updated", ""), style=td_sec),
+                    html.Td(
+                        style={**td_base, "textAlign": "center"},
                         children=[
                             html.Button(
-                                "✏️",
+                                nav_icon("lucide:settings"),
                                 id={"type": "edit-btn", "index": item.get("report_id")},
-                                className="action-btn edit-btn"
+                                className="action-btn edit-btn",
+                                style={"marginRight": "4px"},
                             ),
                             html.Button(
-                                "Archive",
-                                id={"type": "archive-btn", "index": item.get("report_id")},
-                                className="action-btn archive-btn"
-                            ),
-                            html.Button(
-                                "⬇️",
+                                nav_icon("lucide:download"),
                                 id={"type": "download-btn", "index": item.get("report_id")},
-                                className="action-btn download-btn"
+                                className="action-btn edit-btn",
                             ),
-                        ]
+                        ],
                     ),
-                ]
+                ],
             )
         )
 
     table_body = html.Tbody(table_rows)
+    #Pagination bar
+    pg_btn = {
+        "padding": "4px 12px", "fontSize": "12px", "cursor": "pointer",
+        "border": "1px solid #d5d4d0", "borderRadius": "4px",
+        "background": "#fff", "color": TEXT_PRI,
+    }
+    pg_btn_disabled = {**pg_btn, "opacity": "0.4", "cursor": "default"}
+
+    pagination = html.Div(
+        style={"display": "flex", "alignItems": "center", "justifyContent": "flex-end",
+               "padding": "8px 12px", "borderTop": f"1px solid {DIVIDER}",
+               "background": "#fafaf8", "gap": "10px"},
+        children=[
+            html.Button("‹ Prev", id="prev-page", n_clicks=0,
+                        style=pg_btn if page > 1 else pg_btn_disabled,
+                        disabled=page <= 1),
+            html.Span(
+                f"Page {page} of {total_pages}  ({total} reports)",
+                id="page-label",
+                style={"fontSize": "12px", "color": TEXT_SEC},
+            ),
+            html.Button("Next ›", id="next-page", n_clicks=0,
+                        style=pg_btn if page < total_pages else pg_btn_disabled,
+                        disabled=page >= total_pages),
+        ],
+    )
 
     return html.Div(
         className="reports-table-wrapper",
         children=[
             html.Div(
-                className="reports-header",
                 children=[
-                    html.H2("Dataset Reports", className="reports-title"),
-                    html.P(
-                        "These are HMIS dataset reports. To update, click Edit or upload a report template bearing the same page_name (id)",
-                        className="reports-description"
-                    ),
-                ]
+                    html.H4("Dataset Reports", className="reports-title-admin"),
+                ],
             ),
-
-            # Table Output
             html.Table(
                 [table_header, table_body],
-                className="reports-table"
+                className="reports-table",
+                style={"width": "100%", "borderCollapse": "collapse",
+                       "tableLayout": "auto"},
             ),
-
-            # Pagination controls
-            html.Div(
-                className="pagination-controls",
-                children=[
-                    html.Button(
-                        "Previous",
-                        id="prev-page",
-                        n_clicks=0,
-                        className="pagination-btn"
-                    ),
-                    html.Button(
-                        "Next",
-                        id="next-page",
-                        n_clicks=0,
-                        className="pagination-btn"
-                    ),
-                    html.Span(
-                        f"Page {page} / { (total // page_size) + (1 if total % page_size else 0) }",
-                        id="page-label",
-                        className="pagination-info"
-                    ),
-                ]
-            ),
-        ]
+            pagination,
+        ],
     )
 
 
@@ -1561,7 +1591,7 @@ def generate_dashboard_items_list(dashboard):
                     ]),
                     html.Div(className="list-item-actions", children=[
                         html.Button(
-                            "✏️",
+                            [nav_icon("mdi:pencil"), ""],
                             id={"type": "count-edit", "index": idx},
                             n_clicks=0
                         ),
@@ -1600,7 +1630,7 @@ def generate_dashboard_items_list(dashboard):
                     ]),
                     html.Div(className="list-item-actions", children=[
                         html.Button(
-                            "✏️",
+                            [nav_icon("mdi:pencil"), ""],
                             id={"type": "section-edit", "index": section_idx},
                             n_clicks=0,
                         ),
@@ -1638,7 +1668,7 @@ def generate_dashboard_items_list(dashboard):
                         ]),
                         html.Div(className="list-item-actions", children=[
                             html.Button(
-                                "✏️",
+                                [nav_icon("mdi:pencil"), ""],
                                 id={"type": "chart-edit", "section": section_idx, "chart": chart_idx},
                                 n_clicks=0,
                             ),
@@ -1799,6 +1829,36 @@ def create_edit_modal():
                                                         ),
                                                     ]),
                                                 ]),
+                                                # lets associate dashboards with mahis programs
+                                                html.Div(style={"display": "flex", "gap": "12px"}, children=[
+                                                    html.Div(className="form-group", style={"flex": "1"}, children=[
+                                                        html.Label("Associated Program", className="form-label"),
+                                                        dcc.Dropdown(
+                                                            id="dashboard-program-selector",
+                                                            options=[
+                                                                {"label": "Standard", "value": "standard"},
+                                                                {"label": "MNID Outlook", "value": "mnid"},
+                                                            ],
+                                                            multi=True,
+                                                            value="",
+                                                            clearable=False,
+                                                            className="modern-dropdown",
+                                                        ),
+                                                    ]),
+                                                    html.Div(className="form-group", style={"flex": "0 0 110px"}, children=[
+                                                        html.Label("Access", className="form-label"),
+                                                        dcc.Dropdown(
+                                                            id="dashboard-access-selector",
+                                                            options=[
+                                                                {"label": "Global",  "value": "global"},
+                                                                {"label": "Limited", "value": "limited"},
+                                                            ],
+                                                            value="global",
+                                                            clearable=False,
+                                                            className="modern-dropdown",
+                                                        ),
+                                                    ]),
+                                                ]),
                                                 # MNID fields — hidden unless type == "mnid"
                                                 html.Div(
                                                     id="mnid-section",
@@ -1863,12 +1923,12 @@ def create_edit_modal():
                                                     children=[
                                                         html.H4("Dashboard Items", className="dashboard-card-title"),
                                                         html.Div(style={"display": "flex", "gap": "6px"}, children=[
-                                                            html.Button("➕ Metric",
+                                                            html.Button([nav_icon("lucide:plus"), "Metric"],
                                                                         id="add-count-btn",
                                                                         n_clicks=0,
                                                                         className="btn-primary-modern btn-small",
                                                                         title="Add a new metric/count"),
-                                                            html.Button("➕ Section",
+                                                            html.Button([nav_icon("lucide:plus"), "Charts"],
                                                                         id="add-section-btn",
                                                                         n_clicks=0,
                                                                         className="btn-primary-modern btn-small",
@@ -1904,7 +1964,7 @@ def create_edit_modal():
                                             style={"flexShrink": "0", "padding": "12px 16px"},
                                             children=[
                                                 html.Div(style={"display": "flex", "alignItems": "center", "gap": "10px"}, children=[
-                                                    html.Span("✏️", style={"fontSize": "18px"}),
+                                                    html.Span([nav_icon("mdi:pencil"), ""], style={"fontSize": "18px"}),
                                                     html.Div(children=[
                                                         html.H4("Edit Panel", className="dashboard-card-title",
                                                                 style={"margin": "0"}),
@@ -2014,7 +2074,7 @@ def _build_ds_list(sources):
                     html.Div(ds.get("date_updated", ""),
                              style={"fontSize": "11px", "color": "#9ca3af"}),
                 ]),
-                html.Button("✏️", id={"type": "ds-edit-btn", "index": i},
+                html.Button([nav_icon("mdi:pencil"), ""], id={"type": "ds-edit-btn", "index": i},
                             n_clicks=0, className="btn-secondary btn-small",
                             title="Edit"),
             ],
@@ -2022,13 +2082,22 @@ def _build_ds_list(sources):
     return html.Div(rows, style={"borderRadius": "8px", "overflow": "hidden"})
 
 
-def _build_users_table(users):
+_USERS_PAGE_SIZE = 10
+
+
+def _build_users_table(users, page=1):
     if not users:
         return html.Div(
             "No users configured yet.",
             style={"padding": "16px", "color": "#9ca3af", "fontSize": "13px",
                    "textAlign": "center"},
         )
+
+    total       = len(users)
+    total_pages = max(1, -(-total // _USERS_PAGE_SIZE))
+    page        = max(1, min(page, total_pages))
+    start       = (page - 1) * _USERS_PAGE_SIZE
+    page_users  = users[start: start + _USERS_PAGE_SIZE]
 
     th_style = {
         "padding": "10px 14px", "textAlign": "left",
@@ -2037,18 +2106,18 @@ def _build_users_table(users):
         "whiteSpace": "nowrap",
     }
     header = html.Thead(html.Tr([
-        html.Th("Username",      style=th_style),
-        html.Th("UUID",          style={**th_style, "maxWidth": "160px", "overflow": "hidden",
-                                        "textOverflow": "ellipsis"}),
-        html.Th("Facility Code", style=th_style),
-        html.Th("Role",          style=th_style),
-        html.Th("Level",         style=th_style),
-        html.Th("District(s)",   style=th_style),
+        html.Th("Username",         style=th_style),
+        # html.Th("UUID",             style={**th_style, "maxWidth": "160px", "overflow": "hidden",
+        #                                    "textOverflow": "ellipsis"}),
+        html.Th("Facility Code",    style=th_style),
+        html.Th("Role",             style=th_style),
+        html.Th("Level",            style=th_style),
+        html.Th("District(s)",      style=th_style),
         html.Th("Facility Name(s)", style=th_style),
     ]))
 
     body_rows = []
-    for i, u in enumerate(users):
+    for i, u in enumerate(page_users):
         p        = u.get("properties", {})
         bg       = "#f2f9f2" if i % 2 == 0 else "#ffffff"
         td       = {"padding": "8px 14px", "fontSize": "12px",
@@ -2063,23 +2132,46 @@ def _build_users_table(users):
         uuid_short = (uuid_val[:18] + "…") if len(uuid_val) > 20 else uuid_val
 
         body_rows.append(html.Tr([
-            html.Td(u.get("username", ""),    style={**td, "fontWeight": "500",
-                                                     "color": "#006401"}),
-            html.Td(uuid_short,               style={**td, "fontFamily": "monospace",
-                                                     "fontSize": "11px"},
-                    title=uuid_val),
+            html.Td(u.get("username", ""),         style={**td, "fontWeight": "500",
+                                                          "color": "#006401"}),
+            # html.Td(uuid_short,                    style={**td, "fontFamily": "monospace",
+            #                                               "fontSize": "11px"},
+            #         title=uuid_val),
             html.Td(p.get("facility_code", "") or "—", style=td),
-            html.Td(p.get("role", "")         or "—", style=td),
-            html.Td(p.get("user_level", "")   or "—", style=td),
-            html.Td(dist_str,                  style=td),
-            html.Td(fac_str,                   style=td),
+            html.Td(p.get("role", "")          or "—", style=td),
+            html.Td(p.get("user_level", "")    or "—", style=td),
+            html.Td(dist_str,                      style=td),
+            html.Td(fac_str,                       style=td),
         ]))
 
-    return html.Table(
+    table = html.Table(
         [header, html.Tbody(body_rows)],
         style={"width": "100%", "borderCollapse": "collapse",
                "fontSize": "13px", "tableLayout": "auto"},
     )
+
+    btn = {"padding": "4px 12px", "fontSize": "12px", "cursor": "pointer",
+           "border": "1px solid #d1d5db", "borderRadius": "4px",
+           "background": "#fff", "color": "#374151"}
+    disabled_btn = {**btn, "opacity": "0.4", "cursor": "default"}
+
+    pagination = html.Div([
+        html.Button("‹ Prev", id="users-tbl-prev", n_clicks=0,
+                    style=btn if page > 1 else disabled_btn,
+                    disabled=page <= 1),
+        html.Span(
+            f"Page {page} of {total_pages}  ({total} users)",
+            style={"fontSize": "12px", "color": "#6b7280",
+                   "margin": "0 12px", "alignSelf": "center"},
+        ),
+        html.Button("Next ›", id="users-tbl-next", n_clicks=0,
+                    style=btn if page < total_pages else disabled_btn,
+                    disabled=page >= total_pages),
+    ], style={"display": "flex", "alignItems": "center",
+              "justifyContent": "flex-end", "padding": "8px 14px",
+              "borderTop": "1px solid #e5e7eb", "background": "#f9fafb"})
+
+    return html.Div([table, pagination])
 
 
 def create_html_report_modal():
@@ -2460,6 +2552,12 @@ def create_html_report_modal():
 
 def create_prog_report_modal():
     """Modal for creating/editing program report configs in validated_prog_reports.json."""
+
+
+    config_path = os.path.join(os.getcwd(), 'configurations.json')
+    with open(config_path, 'r') as r:
+        configurations = json.load(r)
+
     key_opts       = [{"label": k, "value": k} for k in actual_keys_in_data]
     program_opts   = [{"label": p, "value": p} for p in drop_down_programs]
     ll_aggr_opts   = [{"label": a, "value": a} for a in
@@ -2474,6 +2572,11 @@ def create_prog_report_modal():
     normalize_opts = [{"label": n, "value": n} for n in ["all", "index", "columns"]]
     role_opts      = [{"label": r, "value": r} for r in
                       ["Any", "Clinician", "Nurse", "Admin"]]
+    role_opts      = [{"label": r, "value": r} for r in
+                      ["Any", "Clinician", "Nurse", "Admin"]]
+    
+    routes          = [{"label": r, "value": r} for r in
+                      [r['data_path'] for r in configurations]]
 
     _i = {"width": "100%", "padding": "6px 8px", "fontSize": "12px",
           "border": "1px solid #d1d5db", "borderRadius": "4px", "boxSizing": "border-box"}
@@ -2541,6 +2644,23 @@ def create_prog_report_modal():
                 html.Label("Message", style=_l),
                 dcc.Textarea(id="prog-rpt-message", placeholder="Optional display message…",
                              style={**_t, "height": "48px"}),
+            ]),
+            html.Div(style=_s, children=[
+                html.Label("Enable endpoint (/api/clinicalReports)", style=_l),
+                dcc.RadioItems(
+                        id='prog-rpt-enable-endpoint',
+                        options=[
+                            {'label': 'True', 'value': 'True'},
+                            {'label': 'False', 'value': 'False'},
+                        ],
+                        value='False'  # The default selected value
+                    )
+            ]),
+            html.Div(style=_s, children=[
+                html.Label("Endpoint site", style=_l),
+                dcc.Dropdown(id="prog-rpt-endpoint-routes", options=routes,
+                             placeholder="Select route…", multi=True, clearable=True,
+                             style={"fontSize": "12px"}),
             ]),
         ],
     )

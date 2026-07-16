@@ -5,10 +5,37 @@
       "properties": {
         "uuid": "2fdb97bf-3ed4-4d89-9ba6-9f717c1d826f",
         "role": "reports_admin",
-        "user_level": "national",
-        "district": null,
+        "user_level": "district",
+        "district": [
+          "Dowa"
+        ],
         "facility_name": null,
-        "facility_code": "1833"
+        "facility_code": "1833",
+        "limited_hmis_reports": [
+          "ncd_quarterly"
+        ],
+        "limited_prog_reports": [],
+        "limited_dashboards": [
+          "AIMS TRACKER"
+        ]
+      }
+    },
+    {
+      "username": "lizziekadango",
+      "properties": {
+        "uuid": "ad77cc0c-be9b-4b87-8a5d-3caae9818a37",
+        "role": "Global Superuser",
+        "user_level": "district",
+        "district": [
+          "Lilongwe"
+        ],
+        "facility_name": [
+          "Area 25 Urban Health Centre",
+          "Area 18 Health Centre",
+          "Biwi Health Centre"
+        ],
+        "facility_code": "1833",
+        "assigned_facility": null
       }
     }
   ]

@@ -8,7 +8,7 @@
       "programs": [
         "NCD PROGRAM"
       ],
-      "date_updated": "2026-05-05",
+      "date_updated": "2026-07-11 22:20:03",
       "updated_by": "admin",
       "page_name": "ncd_quarterly",
       "archived": "False",
@@ -454,7 +454,15 @@
           }
         ],
         "next_id": 7
-      }
+      },
+      "access": "global",
+      "enable_api": "True",
+      "route": [
+        "mahis",
+        "mahisuat",
+        "mahisdev",
+        "mahistest"
+      ]
     },
     {
       "report_id": 2,
@@ -2993,7 +3001,7 @@
       "programs": [
         "NCD PROGRAM"
       ],
-      "date_updated": "2026-05-13",
+      "date_updated": "2026-07-13",
       "updated_by": "admin",
       "page_name": "FYfNvfwNw7C",
       "archived": "False"
@@ -5465,6 +5473,19 @@
         "tables": [],
         "next_id": 3
       }
+    },
+    {
+      "report_id": 20,
+      "report_name": "AIMS INTERNAL PERFORMANCE TRACKER (FACILITY)",
+      "date_created": "2026-07-12",
+      "creator": "admin",
+      "programs": [
+        "HIV PROGRAM"
+      ],
+      "date_updated": "2026-07-12",
+      "updated_by": "admin",
+      "page_name": "aims_report",
+      "archived": "False"
     }
   ]
 }

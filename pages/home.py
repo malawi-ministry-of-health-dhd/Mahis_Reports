@@ -1,5 +1,5 @@
 import dash
-from dash import html, dcc, Input, Output, callback, State, no_update, ALL, callback_context
+from dash import html, dcc, Input, Output, callback, State, no_update, ALL, callback_context, ctx
 import pandas as pd
 import plotly.express as px
 import os
@@ -17,12 +17,17 @@ from datetime import datetime as dt
 from data_storage import DataStorage
 from config import DATA_PATH_,CUSTOM_GENDER_MAP, DATA_FILE_NAME_
 import warnings
+import duckdb
 warnings.filterwarnings("ignore")
 from helpers.date_ranges import (
                     get_relative_date_range,
                     RELATIVE_PERIOD_LIST
             )
-# from helpers.navigation_callbacks import DEMO_UUID, DEMO_LOCATION
+from helpers.navigation_callbacks import DEMO_UUID, DEMO_LOCATION
+from dash_iconify import DashIconify
+
+def nav_icon(icon_name):
+    return DashIconify(icon=icon_name, className="nav-icon")
 
 # Importing parquet file path and from config
 
@@ -207,14 +212,16 @@ def _load_user_registry(route) -> pd.DataFrame:
     if os.path.exists(user_data_path):
         user_data = pd.read_csv(user_data_path)
     else:
-        user_data = pd.DataFrame(columns=['uuid', 'role','user_level','district','facility_name','facility_code'])
+        user_data = pd.DataFrame(columns=['user_id','uuid', 'role','user_level','district','facility_name','facility_code'])
     demo_row = {
+        'user_id':1000000,
         'uuid': DEMO_UUID,
         'role': 'reports_admin',
         'user_level': 'national',
         'district': ["Salima"],
         'facility_name': None,
         'facility_code': DEMO_LOCATION,
+        'assigned_facility':'Biwi Health Centre'
     }
 
     user_data = pd.concat([user_data, pd.DataFrame([demo_row])], ignore_index=True)
@@ -399,8 +406,9 @@ def get_enabled_dashboard_menu():
     return filtered_menu, config
 
 def get_dashboard_names():
-    menu_json, _ = get_enabled_dashboard_menu()
-    return [d.get("report_name") for d in menu_json if d.get("report_name")]
+    menu_items = [d.get("report_name") for d in load_dashboard_menu() 
+                  if d.get("report_name")]
+    return menu_items
 
 def normalize_report_name(name, menu_json):
     if not name:
@@ -869,7 +877,7 @@ layout = html.Div(
                     },
                     children=[
                         html.Button(
-                            "⊞ Filters",
+                            [nav_icon("lucide:filter"), " Filter"],
                             id="filter-drawer-toggle-btn",
                             n_clicks=0,
                             style={
@@ -889,7 +897,7 @@ layout = html.Div(
                         html.Div(
                             id="filter-period-text",
                             style={"fontWeight":"400",
-                                   "color":"black",
+                                   "color":"grey",
                                    "fontSize":"12px"}
                             )
                     ],
@@ -1258,7 +1266,6 @@ def _kpi_render_page(page, modal_data):
     prevent_initial_call=True,
 )
 def _kpi_modal_nav(n_prev, n_next, page, modal_data):
-    from dash import ctx
     if not modal_data:
         raise PreventUpdate
     total       = modal_data.get("total", 0)
@@ -1306,33 +1313,79 @@ dash.clientside_callback(
 
 @callback(
         Output('scrolling-menu', 'children'),
-        Output('dashboard-menu-section', 'style'),
         [Input('dashboard-interval-update-today', 'n_intervals'),
-        Input('active-button-store', 'data')])
+        Input('active-button-store', 'data')],
+        State('url-params-store', 'data'))
 
-def update_menu(interval, color):
-    ctx = callback_context
-    triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else ""
-    if 'dashboard-interval-update-today' in triggered_id:
-        raise PreventUpdate
+def update_menu(interval, color, urlparams):
+    try:
+        data_route = urlparams.get('route', ["default"])[0]
+        user_data = _load_user_registry(data_route)
+        user_row, scope = _resolve_user_scope(urlparams, user_data)
+        user_id = int(user_row.get('user_id', '0')) 
+        user_uuid = user_row.get('uuid')
+        user_programs_path = os.path.join(os.getcwd(), f"data/{data_route}/single_tables/user_programs.csv")
+        dashboard_path = os.path.join(os.getcwd(), f"data/visualizations/validated_dashboard.json")
+        user_programs = duckdb.sql(
+                                    f"SELECT name FROM '{user_programs_path}' WHERE user_id = {user_id}"
+                                ).df()['name'].to_list()
+        
+        user_props = next((user['properties'] for user in  _load_user_properties(data_route) if user.get('properties').get('uuid') == user_uuid), None)
+        limited_dashboards = user_props.get('limited_dashboards', []) if user_props else []
 
-    menu_json, config = get_enabled_dashboard_menu()
-    default_report = config.get("default_report")
-    fallback_active = default_report if any(d.get("report_name") == default_report for d in menu_json) else None
-    active_name = color if any(d.get("report_name") == color for d in menu_json) else fallback_active
-    show_menu = len(menu_json) > 1
+        with open(json_path, 'r') as f:
+            menu_json = json.load(f)
 
-    buttons = [
-        html.Button(
-            display_report_name(d["report_name"]),
-            className="menu-btn active" if active_name == d["report_name"] else "menu-btn",
-            id={"type": "menu-button", "name": d["report_name"]}
-        )
-        for d in menu_json
-        if d.get("report_name") != "Newborn"
-    ]
-
-    return buttons, ({} if show_menu else {"display": "none"})
+        general_summary_button = [
+                                html.Button(
+                                    "General Summary",
+                                    className="menu-btn active" if color == "General Summary" else "menu-btn",
+                                    id={"type": "menu-button", "name": "General Summary"}
+                                )
+                            ]
+        
+        filtered_buttons = [
+                            html.Button(
+                                display_report_name(d["report_name"]),
+                                className="menu-btn active" if color == d["report_name"] else "menu-btn",
+                                id={"type": "menu-button", "name": d["report_name"]}
+                            )
+                            for d in menu_json
+                            if d.get("report_name") != "Newborn" and d.get('access', 'global') =='global'
+                            and any(program in user_programs for program in d.get("associated_programs", []))
+                        ]
+        filtered_buttons_limited = [
+                            html.Button(
+                                display_report_name(d["report_name"]),
+                                className="menu-btn-alt active" if color == d["report_name"] else "menu-btn-alt",
+                                id={"type": "menu-button", "name": d["report_name"]}
+                            )
+                            for d in menu_json
+                            if (
+                                d.get("report_name") != "Newborn" 
+                                and d.get('access', 'global') == 'limited'
+                                and any(program in user_programs for program in d.get("associated_programs", []))
+                                and any(item in display_report_name(d["report_name"]) for item in limited_dashboards)
+                            )
+                        ]
+        all_buttons = [
+                            html.Button(
+                                display_report_name(d["report_name"]),
+                                className="menu-btn active" if color == d["report_name"] else "menu-btn",
+                                id={"type": "menu-button", "name": d["report_name"]}
+                            )
+                            for d in menu_json
+                            if d.get("report_name") != "Newborn"
+                        ]
+        
+        if user_uuid == DEMO_UUID:
+            return all_buttons
+        else:
+            return general_summary_button + filtered_buttons + filtered_buttons_limited
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return []
 
 
 @callback(
@@ -1400,39 +1453,12 @@ def update_dashboard(gen, start_date, end_date, level,
         if triggered_id and "menu-button" in triggered_id:
             prop_dict = json.loads(triggered_id.split('.')[0])
             clicked_name = prop_dict['name']
-
-        # Preserve the active MNID tab across filter/date changes; reset when switching reports
-        initial_mnid_tab = (
-            'country-profile'
-            if triggered_id and 'menu-button' in triggered_id
-            else (active_mnid_tab or 'country-profile')
-        )
-
-        menu_json, dashboard_tab_config = get_enabled_dashboard_menu()
-        if not menu_json:
-            return (
-                dash.no_update,
-                level,
-                {'display': 'none'} if level in ['National', 'Facility'] else {},
-                [],
-                [],
-                False,
-                "",
-                [],
-                [],
-                "",
-                current_active or dash.no_update,
-                {'status': 'error', 'message': 'No dashboards are enabled in the dashboard tabs config.'},
-            )
-
-        config_default_report = dashboard_tab_config.get("default_report")
-        if config_default_report and not any(d.get("report_name") == config_default_report for d in menu_json):
-            config_default_report = None
-
+        
+        menu_json = load_dashboard_menu()
         if overview:
             selected_reports = overview
         else:
-            default_report = config_default_report or menu_json[0]["report_name"]
+            default_report = "General Summary" or menu_json[0]["report_name"]
             selected_reports = [clicked_name] if clicked_name in {d.get("report_name") for d in menu_json} else [default_report]
         selected_reports = list(dict.fromkeys(normalize_report_name(r, menu_json) for r in selected_reports))
         # Date Logic
@@ -1451,7 +1477,7 @@ def update_dashboard(gen, start_date, end_date, level,
         if user_row is None:
             return (html.Div("Unauthorized User. Please contact system administrator."), level,
                     {'display': 'none'} if level in ['National', 'Facility'] else {},
-                    [], [], False, "", [], [], clicked_name)
+                    [], [], False, "", [],"", [], clicked_name)
 
         user_level = scope['level']
         user_districts = scope.get('districts') or []
@@ -1488,7 +1514,7 @@ def update_dashboard(gen, start_date, end_date, level,
             all_districts = sorted(facilities_dict.keys())
             all_facilities = sorted(set(
                 facility
-                for district in user_districts
+                for district in districts
                 if district in all_districts
                 for facility in facilities_dict.get(district, [])
             ))
@@ -1496,7 +1522,8 @@ def update_dashboard(gen, start_date, end_date, level,
             all_districts = sorted(set(user_districts))
             all_facilities = sorted(set(
                 facility
-                for district in all_districts
+                for district in user_districts
+                if district in all_districts
                 for facility in facilities_dict.get(district, [])
             ))
         else:
@@ -1523,10 +1550,10 @@ def update_dashboard(gen, start_date, end_date, level,
         network_query = (
             f"{DATE_} >= '{default_start_date}'::TIMESTAMP"
             f" AND {DATE_} <= '{end_dt}'::TIMESTAMP"
-            + network_suffix
+            + scope_suffix
         )
 
-        # ── Scope label (used by MNID topbar; harmless for non-MNID) ─────────
+        # Scope label (used by MNID topbar; harmless for non-MNID)
         facility_names = []
         if effective_level == 'facility' and location:
             try:
@@ -1618,7 +1645,7 @@ def update_dashboard(gen, start_date, end_date, level,
                 'url_object': url_object,
                 'start_dt': start_dt.isoformat(),
                 'end_dt': end_dt.isoformat(),
-                'initial_mnid_tab': initial_mnid_tab,
+                # 'initial_mnid_tab': initial_mnid_tab,
                 'mnid_only_request': False,
                 'facility_level': moh_level or 'All',
             },

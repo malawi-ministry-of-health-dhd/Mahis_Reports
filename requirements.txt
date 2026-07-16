@@ -18,4 +18,6 @@ reportlab
 duckdb
 diskcache
 geopandas
+pdfkit
+
 dash-iconify
