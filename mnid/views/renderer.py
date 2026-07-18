@@ -27,7 +27,7 @@ from mnid.views.kpi_engine import (
 )
 from mnid.core.data_utils import prepare_mnid_dataframe as _prepare_mnid_dataframe
 from mnid.dashboards import load_dashboard_module
-from mnid.views.executive_views import render_country_profile, render_operational_readiness
+from mnid.views.executive_views import render_country_profile, render_operational_readiness, _profile_scope_name
 from mnid.components.run_charts import (
     bucket_multi_series, bucket_time_series,
     _multi_run_chart, _run_chart, describe_grain_window,
@@ -296,7 +296,7 @@ def _build_executive_tab_view(
     return views.get('country-profile', html.Div())
 
 
-def _render_beginnings_shell(initial_tab: str, hidden_mnid_tabs: set[str], newborn_config, initial_children=None) -> html.Div:
+def _render_beginnings_shell(initial_tab: str, hidden_mnid_tabs: set[str], newborn_config, initial_children=None, scope_meta: dict | None = None) -> html.Div:
     _tab_style = {
         'padding': '10px 18px',
         'borderRadius': '12px',
@@ -314,8 +314,9 @@ def _render_beginnings_shell(initial_tab: str, hidden_mnid_tabs: set[str], newbo
     }
     _tab_active2 = dict(_tab_active, backgroundColor='#F8FAFC')
 
+    _profile_tab_label = _profile_scope_name(scope_meta)['tab_label']
     tab_children = [
-        dcc.Tab(label='Country Profile', value='country-profile', style=_tab_style, selected_style=_tab_active),
+        dcc.Tab(label=_profile_tab_label, value='country-profile', style=_tab_style, selected_style=_tab_active),
     ]
     if 'operational-readiness' not in hidden_mnid_tabs:
         tab_children.append(
@@ -359,6 +360,7 @@ def _render_mnh_dashboard_view(selected_view: str, state: dict, views: dict):
             hidden_mnid_tabs=hidden_mnid_tabs,
             newborn_config=state.get('newborn_config'),
             initial_children=[_mnid_loading_placeholder()],
+            scope_meta=state.get('scope_meta'),
         )
 
     if selected_view == 'mnh-moh':
@@ -537,6 +539,7 @@ def render_mnid_dashboard(filtered, data_opd, data_path, config,
         hidden_mnid_tabs=_load_dashboard_tab_config().get('hidden_mnid_tabs', set()),
         newborn_config=newborn_config,
         initial_children=_initial_ec,
+        scope_meta=scope_meta,
     )
 
     mnh_tab_specs = _load_dashboard_tab_config().get('mnh_tabs', [])

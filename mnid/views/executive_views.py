@@ -348,6 +348,38 @@ def _hierarchy_scope(df: pd.DataFrame, scope_meta: dict | None, period_label: st
     ]
 
 
+def _profile_scope_name(scope_meta: dict | None) -> dict:
+    """Derive the profile view's naming from the active LEVEL/district/facility scope.
+
+    national -> Country Profile; a single district/facility -> that place's own
+    profile; 2+ selected -> Multi-District/Multi-Facility. Falls back to the
+    national wording if level/selection is missing or unrecognized.
+    """
+    scope_meta = scope_meta or {}
+    level = scope_meta.get("level")
+    districts = [str(d) for d in (scope_meta.get("selected_districts") or []) if d]
+    facilities = [str(f) for f in (scope_meta.get("selected_facilities") or []) if f]
+
+    if level == "facility" and facilities:
+        if len(facilities) == 1:
+            name = facilities[0]
+            return {"eyebrow": f"{name} Profile", "tab_label": "Facility Profile",
+                    "overview": f"{name} facility overview"}
+        return {"eyebrow": "Multi-Facility Profile", "tab_label": "Multi-Facility",
+                "overview": f"{len(facilities)} facilities overview"}
+
+    if level == "district" and districts:
+        if len(districts) == 1:
+            name = districts[0]
+            return {"eyebrow": f"{name} District Profile", "tab_label": "District Profile",
+                    "overview": f"{name} district overview"}
+        return {"eyebrow": "Multi-District Profile", "tab_label": "Multi-District",
+                "overview": f"{len(districts)} districts overview"}
+
+    return {"eyebrow": "Country Profile", "tab_label": "Country Profile",
+            "overview": "Malawi national overview"}
+
+
 def _metric_snapshot(df: pd.DataFrame) -> dict:
     if df is None or df.empty:
         return {
@@ -795,6 +827,7 @@ def _mortality_distribution_chart(df: pd.DataFrame, title: str, color: str) -> g
 
 
 def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, indicator_label: str = "Maternal Indicators") -> html.Div:
+    profile_name = _profile_scope_name(scope_meta)
     df = _copy_df(df)
     prev_df = _prior_period_df(df)
     current_metrics = _metric_snapshot(df)
@@ -959,7 +992,7 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
         p="xl",
         style={"marginBottom": "20px", "borderColor": "#e2e8f0"},
         children=[
-            html.Div("Country Profile", style={
+            html.Div(profile_name["eyebrow"], style={
                 "fontSize": "10px", "fontWeight": "700", "color": "#0f766e",
                 "letterSpacing": ".12em", "textTransform": "uppercase",
                 "marginBottom": "10px",
@@ -970,7 +1003,7 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
                         "fontSize": "26px", "fontWeight": "800", "color": "#0f172a",
                         "letterSpacing": "-.04em", "lineHeight": "1.15", "marginBottom": "6px",
                     }),
-                    html.P(f"Malawi national overview · {indicator_label} · Evidence for action · Decision support", style={
+                    html.P(f"{profile_name['overview']} · {indicator_label} · Evidence for action · Decision support", style={
                         "fontSize": "13px", "color": "#64748b", "marginBottom": "16px",
                     }),
                     html.Div([

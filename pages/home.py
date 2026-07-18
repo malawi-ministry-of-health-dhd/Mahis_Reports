@@ -1614,6 +1614,7 @@ def update_dashboard(gen, start_date, end_date, level,
                 facility_code=location,
                 scope_meta=scope_meta,
                 url_object=url_object,
+                initial_tab=active_mnid_tab,
             )
             rendered.append(html.Div([
                 html.H3(report_name, style={"marginTop": "10px"}),
