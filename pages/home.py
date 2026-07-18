@@ -15,7 +15,7 @@ from helpers.visualizations import create_line_list_basic_modal
 from datetime import datetime
 from datetime import datetime as dt
 from data_storage import DataStorage
-from config import DATA_PATH_,CUSTOM_GENDER_MAP, DATA_FILE_NAME_
+from config import DATA_PATH_,CUSTOM_GENDER_MAP
 import warnings
 import duckdb
 warnings.filterwarnings("ignore")
@@ -160,12 +160,13 @@ def _start_mnid_prewarm(version: str | None = None):
     _log.info('MNID pre-warm thread started')
 
 
-def _latest_available_date() -> pd.Timestamp | None:
-    cache_key = f'{DATA_PATH_}:{_dataset_version_token()}'
+def _latest_available_date(route: str = 'default') -> pd.Timestamp | None:
+    route_data_path = f'data/{route}/parquet'
+    cache_key = f'{route_data_path}:{_dataset_version_token(route)}'
     if cache_key in _LATEST_DATA_DATE_CACHE:
         return _LATEST_DATA_DATE_CACHE[cache_key]
     try:
-        latest = DataStorage.query_duckdb(f"SELECT MAX(Date) AS max_date FROM '{DATA_PATH_}'")
+        latest = DataStorage.query_duckdb(f"SELECT MAX(Date) AS max_date FROM '{route_data_path}'")
         max_date = pd.to_datetime(latest.loc[0, 'max_date'], errors='coerce') if len(latest) else pd.NaT
     except Exception:
         max_date = pd.NaT
@@ -175,16 +176,16 @@ def _latest_available_date() -> pd.Timestamp | None:
     return resolved
 
 
-def _default_date_window():
-    latest = _latest_available_date()
+def _default_date_window(route: str = 'default'):
+    latest = _latest_available_date(route)
     anchor = latest.date() if latest is not None else datetime.now().date()
     start = anchor - pd.Timedelta(days=29)
     return start, anchor
 
 
-def _dataset_version_token() -> str:
-    timestamp_path = os.path.join(path, 'data', 'TimeStamp.csv')
-    data_path = os.path.join(path, 'data', DATA_PATH_)
+def _dataset_version_token(route: str = 'default') -> str:
+    timestamp_path = os.path.join(path, f'data/{route}', 'TimeStamp.csv')
+    data_path = os.path.join(path, f'data/{route}', 'parquet')
     parts = []
     try:
         parts.append(str(os.path.getmtime(data_path)))
@@ -519,9 +520,11 @@ def _load_scoped_dashboard_data(
     end_dt: pd.Timestamp,
     default_start_date: pd.Timestamp,
     mnid_only_request: bool,
+    route: str = 'default',
 ):
     data = None
     mnid_full_scope_data = None
+    route_data_path = f'data/{route}/parquet'
 
     if mnid_only_request:
         district_col_for_scope = "District"
@@ -541,7 +544,7 @@ def _load_scoped_dashboard_data(
                 'Home_district', 'TA', 'Village', 'Age', 'Age_Group', 'Gender',
                 'Source_Program',
             ])
-            sql_full = f"SELECT {mnid_cols} FROM '{DATA_FILE_NAME_}'"
+            sql_full = f"SELECT {mnid_cols} FROM '{route_data_path}'"
             full = DataStorage.query_duckdb(sql_full)
             full[DATE_] = pd.to_datetime(full[DATE_], errors='coerce')
             full = _apply_scope_to_data(full, scope, district_col_for_scope)
@@ -557,9 +560,9 @@ def _load_scoped_dashboard_data(
     if data is None:
         sql_comment = f"-- version:{dataset_version} scope:{user_level} level:{effective_level}"
         if user_level == 'facility':
-            sql = f"{sql_comment}\nSELECT * FROM '{DATA_FILE_NAME_}' WHERE {FACILITY_CODE_} = '{location}'"
+            sql = f"{sql_comment}\nSELECT * FROM '{route_data_path}' WHERE {FACILITY_CODE_} = '{location}'"
         else:
-            sql = f"{sql_comment}\nSELECT * FROM '{DATA_FILE_NAME_}'"
+            sql = f"{sql_comment}\nSELECT * FROM '{route_data_path}'"
         data_cache_key = (dataset_version, user_level, effective_level, location)
         if data_cache_key in _dashboard_data_cache:
             data_full = _dashboard_data_cache[data_cache_key]
@@ -585,17 +588,19 @@ def _load_filter_source_data(
     scope: dict,
     end_dt: pd.Timestamp,
     default_start_date: pd.Timestamp,
+    route: str = 'default',
 ):
     filter_cols = []
     for col in [DATE_, FACILITY_, FACILITY_CODE_, AGE_GROUP_, ENCOUNTER_, HOME_DISTRICT_, 'District']:
         if col and col not in filter_cols:
             filter_cols.append(col)
 
+    route_data_path = f'data/{route}/parquet'
     sql_comment = f"-- version:{dataset_version} scope:{user_level} level:{effective_level} filters"
     if user_level == 'facility':
-        sql = f"{sql_comment}\nSELECT {', '.join(filter_cols)} FROM '{DATA_FILE_NAME_}' WHERE {FACILITY_CODE_} = '{location}'"
+        sql = f"{sql_comment}\nSELECT {', '.join(filter_cols)} FROM '{route_data_path}' WHERE {FACILITY_CODE_} = '{location}'"
     else:
-        sql = f"{sql_comment}\nSELECT {', '.join(filter_cols)} FROM '{DATA_FILE_NAME_}'"
+        sql = f"{sql_comment}\nSELECT {', '.join(filter_cols)} FROM '{route_data_path}'"
 
     cache_key = (dataset_version, user_level, effective_level, location, 'filters')
     if cache_key in _dashboard_filter_cache:
@@ -1446,14 +1451,15 @@ def update_dashboard(gen, start_date, end_date, level,
         ctx = callback_context
         triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else None
 
-        dataset_version = _dataset_version_token()
+        data_route = (urlparams or {}).get('route', ["default"])[0]
+        dataset_version = _dataset_version_token(data_route)
 
         # Determine which report to show
         clicked_name = current_active
         if triggered_id and "menu-button" in triggered_id:
             prop_dict = json.loads(triggered_id.split('.')[0])
             clicked_name = prop_dict['name']
-        
+
         menu_json = load_dashboard_menu()
         if overview:
             selected_reports = overview
@@ -1462,13 +1468,12 @@ def update_dashboard(gen, start_date, end_date, level,
             selected_reports = [clicked_name] if clicked_name in {d.get("report_name") for d in menu_json} else [default_report]
         selected_reports = list(dict.fromkeys(normalize_report_name(r, menu_json) for r in selected_reports))
         # Date Logic
-        default_start, default_end = _default_date_window()
+        default_start, default_end = _default_date_window(data_route)
         start_dt = pd.to_datetime(start_date or default_start).replace(hour=0, minute=0, second=0)
         end_dt = pd.to_datetime(end_date or default_end).replace(hour=23, minute=59, second=59)
         default_start_date = start_dt - pd.Timedelta(days=DEFAULT_DASHBOARD_DAYS)
 
         location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0]
-        data_route = urlparams.get('route', ["default"])[0]
         DATA_PATH_ = f"data/{data_route}/parquet"
 
         user_data = _load_user_registry(data_route)
@@ -1589,6 +1594,7 @@ def update_dashboard(gen, start_date, end_date, level,
             'selected_districts':  active_dists,
             'data_period_note':    None,
             'dataset_version':     dataset_version,
+            'route':               data_route,
         }
 
         rendered = []
@@ -1679,11 +1685,13 @@ def update_dashboard(gen, start_date, end_date, level,
      Output('dashboard-date-range-picker', 'end_date')],
     [Input('dashboard-period-type-filter', 'value'),
      Input('dashboard-interval-update-today', 'n_intervals')],
+    [State('url-params-store', 'data')],
 )
-def sync_picker_with_logic(period_type, n):
+def sync_picker_with_logic(period_type, n, urlparams):
     ctx = callback_context
     triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else ""
-    default_start, default_end = _default_date_window()
+    data_route = (urlparams or {}).get('route', ["default"])[0]
+    default_start, default_end = _default_date_window(data_route)
     anchor = default_end
 
     if "dashboard-interval-update-today" in triggered_id:

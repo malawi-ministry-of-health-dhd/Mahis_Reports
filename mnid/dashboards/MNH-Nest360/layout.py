@@ -59,7 +59,7 @@ def _nest360_sync_trends(tab_value, selected_inds, location, grain, stored):
     # DataFrames over the wire through dcc.Store.
     tracked = stored.get('all_trend_indicators', [])
     df      = _restore_ui_dataframe(stored.get('data_key'))
-    agg     = get_aggregate()
+    agg     = get_aggregate(route=(stored.get('scope_meta') or {}).get('route', 'default'))
     grain   = (grain or 'monthly').strip().lower()
 
     # Keep only the indicators that belong to the currently selected tab.
@@ -121,7 +121,7 @@ def render_mnh_nest360_dashboard(
 
     # Narrow the aggregate to the current scope (district / facility selection)
     # so coverage charts and trend charts reflect the active filter.
-    agg_df = get_aggregate()
+    agg_df = get_aggregate(route=(scope_meta or {}).get('route', 'default'))
     if agg_df is not None and network_df is not None and scope_meta:
         _, fac_codes, districts = _resolve_scope_filters(network_df, scope_meta)
         if fac_codes:

@@ -31,6 +31,7 @@ def _restore_ui_dataframe(cache_key: str | None) -> pd.DataFrame:
         return obj
     return deserialize_store_df(obj)
 
+from . import constants as _constants
 from .constants import (
     ALL_DISTRICTS,
     ALL_FACILITIES,
@@ -1146,10 +1147,24 @@ def _normalize_mnid_semantics(df: pd.DataFrame) -> pd.DataFrame:
     return _derive_person_level_context(out)
 
 
-def register_facility_metadata(df: pd.DataFrame) -> None:
-    """Update live facility metadata caches from the current MNID dataframe."""
+def register_facility_metadata(df: pd.DataFrame, route: str = 'default') -> None:
+    """Update live facility metadata caches from the current MNID dataframe.
+
+    These caches are flat dicts read by dozens of chart/heatmap/dropdown call
+    sites, so instead of nesting them by route we clear and repopulate them
+    whenever the active route changes (tracked in constants._METADATA_ROUTE),
+    so one route's facility labels never linger into another route's view.
+    """
     if df is None or df.empty:
         return
+
+    if _constants._METADATA_ROUTE != route:
+        FACILITY_NAMES.clear()
+        ALL_FACILITIES.clear()
+        FACILITY_DISTRICT.clear()
+        ALL_DISTRICTS.clear()
+        FACILITY_COORDS.clear()
+        _constants._METADATA_ROUTE = route
 
     def _clean(s: pd.Series) -> pd.Series:
         return s.fillna('').astype(str).str.strip()
@@ -1200,7 +1215,7 @@ _MNID_COLUMNS = [
 ]
 
 
-def prepare_mnid_dataframe(df: pd.DataFrame | None) -> pd.DataFrame:
+def prepare_mnid_dataframe(df: pd.DataFrame | None, route: str = 'default') -> pd.DataFrame:
     """Normalise the live shared MAHIS dataframe used across MNID sections."""
     if df is None:
         return pd.DataFrame()
@@ -1241,7 +1256,7 @@ def prepare_mnid_dataframe(df: pd.DataFrame | None) -> pd.DataFrame:
         mch_full['Date'] = pd.to_datetime(mch_full['Date'], errors='coerce')
 
     mch_full.attrs.update(source_attrs)
-    register_facility_metadata(mch_full)
+    register_facility_metadata(mch_full, route=route)
     return mch_full
 
 

@@ -72,14 +72,13 @@ def _mnid_loading_placeholder() -> html.Div:
     )
 
 
-def prewarm_cache(dataset_version: str | None = None) -> bool:
+def prewarm_cache(dataset_version: str | None = None, route: str = 'default') -> bool:
     """
     Pre-compute and cache the prepared MNID network DataFrame so the first
     user request hits a warm cache instead of running the 8-9s prepare step.
     Safe to call from a background thread at server startup.
     """
     try:
-        from config import DATA_FILE_NAME_
         from data_storage import DataStorage
 
         _mnid_cols = ', '.join([
@@ -89,10 +88,11 @@ def prewarm_cache(dataset_version: str | None = None) -> bool:
             'Home_district', 'TA', 'Village', 'Age', 'Age_Group', 'Gender',
             'Source_Program',
         ])
-        full = DataStorage.query_duckdb(f"SELECT {_mnid_cols} FROM '{DATA_FILE_NAME_}'")
+        full = DataStorage.query_duckdb(f"SELECT {_mnid_cols} FROM 'data/{route}/parquet'")
         full['Date'] = pd.to_datetime(full['Date'], errors='coerce')
 
         opd_key = (
+            route,
             dataset_version,
             len(full),
             tuple(full.columns.tolist()) if not full.empty else (),
@@ -103,7 +103,7 @@ def prewarm_cache(dataset_version: str | None = None) -> bool:
             return False
 
         _LOGGER.info('MNID pre-warm: preparing %d rows...', len(full))
-        net_df = _prepare_mnid_dataframe(full)
+        net_df = _prepare_mnid_dataframe(full, route=route)
         _network_df_cache[opd_key] = net_df
         _trim_cache(_network_df_cache, _NETWORK_DF_CACHE_MAX)
         _LOGGER.info('MNID pre-warm complete: %d rows cached', len(net_df))
@@ -437,12 +437,14 @@ def render_mnid_dashboard(filtered, data_opd, data_path, config,
         data_opd = _DS.query_duckdb(
             f"SELECT {_MNID_SQL_COLUMNS} FROM '{data_path}' WHERE {data_opd}"
         )
+    route               = (scope_meta or {}).get('route', 'default')
     dataset_version     = (scope_meta or {}).get('dataset_version')
     selected_programs   = tuple(sorted((scope_meta or {}).get('mnid_categories') or []))
     selected_facilities = tuple(sorted((scope_meta or {}).get('selected_facilities') or []))
     selected_districts  = tuple(sorted((scope_meta or {}).get('selected_districts') or []))
 
     _opd_key = (
+        route,
         dataset_version,
         len(data_opd),
         tuple(data_opd.columns.tolist()) if not data_opd.empty else (),
@@ -450,7 +452,7 @@ def render_mnid_dashboard(filtered, data_opd, data_path, config,
         selected_districts,
     )
     if _opd_key not in _network_df_cache:
-        _network_df_cache[_opd_key] = _prepare_mnid_dataframe(data_opd)
+        _network_df_cache[_opd_key] = _prepare_mnid_dataframe(data_opd, route=route)
         _trim_cache(_network_df_cache, _NETWORK_DF_CACHE_MAX)
     network_df = _network_df_cache[_opd_key]
 
@@ -485,6 +487,7 @@ def render_mnid_dashboard(filtered, data_opd, data_path, config,
         f'ed:{executive_token}',
         {
             'opd_key':           _opd_key,
+            'route':             route,
             'config':            config,
             'facility_code':     facility_code,
             'start_date':        start_date,

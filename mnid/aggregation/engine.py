@@ -189,22 +189,28 @@ def run_aggregation(
     viz_dir: str = _DEFAULT_VIZ_DIR,
     output_dir: str = _DEFAULT_OUT_DIR,
     grains: list[str] | None = None,
+    data_source: str | None = None,
 ) -> bool:
     """
     Full aggregation pipeline. Returns True on success.
-    Loads data from the same source as the live app (DATA_FILE_NAME_ in config).
+    Loads data from `data_source` (a DuckDB-queryable path); defaults to the
+    same global source the live app used before per-route data existed
+    (config.DATA_FILE_NAME_), for backward-compatible CLI/ad-hoc use.
     Typically called overnight after data_storage.py refreshes the parquet files.
     """
     from mnid.core.data_utils import prepare_mnid_dataframe as _prepare
-    from config import DATA_FILE_NAME_
     from data_storage import DataStorage
+
+    if data_source is None:
+        from config import DATA_FILE_NAME_
+        data_source = DATA_FILE_NAME_
 
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     parquet_out = out / 'indicator_aggregates.parquet'
     meta_out    = out / 'meta.json'
 
-    _LOG.info('MNID aggregation started')
+    _LOG.info('MNID aggregation started (data_source=%s)', data_source)
     started_at = datetime.utcnow()
 
     # load raw data the same way the live app does
@@ -216,17 +222,17 @@ def run_aggregation(
         'Source_Program',
     ])
     try:
-        raw_df = DataStorage.query_duckdb(f"SELECT {_mnid_cols} FROM '{DATA_FILE_NAME_}'")
+        raw_df = DataStorage.query_duckdb(f"SELECT {_mnid_cols} FROM '{data_source}'")
         raw_df['Date'] = pd.to_datetime(raw_df['Date'], errors='coerce')
     except Exception as exc:
-        _LOG.error('Failed to load data from %s: %s', DATA_FILE_NAME_, exc)
+        _LOG.error('Failed to load data from %s: %s', data_source, exc)
         return False
 
     if raw_df.empty:
-        _LOG.warning('No data in %s, skipping aggregation', DATA_FILE_NAME_)
+        _LOG.warning('No data in %s, skipping aggregation', data_source)
         return False
 
-    _LOG.info('Loaded %d raw rows from %s', len(raw_df), DATA_FILE_NAME_)
+    _LOG.info('Loaded %d raw rows from %s', len(raw_df), data_source)
 
     # derive person-level context, clean dates, etc.
     prepared_df = _prepare(raw_df)
@@ -239,7 +245,7 @@ def run_aggregation(
     if grains is not None:
         active_grains = grains
     else:
-        active_grains = _DEMO_GRAINS if DATA_FILE_NAME_ == 'demo_parquet' else _GRAINS
+        active_grains = _DEMO_GRAINS if data_source == 'demo_parquet' else _GRAINS
     _LOG.info('Aggregating %d indicators across grains: %s', len(indicators), active_grains)
 
     parts = []
@@ -254,6 +260,8 @@ def run_aggregation(
 
     agg_df.to_parquet(str(parquet_out), index=False, engine='pyarrow')
 
+    from config import USE_DEMO_DATA
+
     elapsed = (datetime.utcnow() - started_at).total_seconds()
     meta = {
         'generated_at':    started_at.isoformat(),
@@ -261,8 +269,8 @@ def run_aggregation(
         'rows':            len(agg_df),
         'indicators':      len(indicators),
         'grains':          active_grains,
-        'data_source':     DATA_FILE_NAME_,
-        'use_demo_data':   bool(DATA_FILE_NAME_ == 'demo_parquet'),
+        'data_source':     data_source,
+        'use_demo_data':   bool(USE_DEMO_DATA),
         'last_run_status': 'ok',
     }
     with open(meta_out, 'w', encoding='utf-8') as f:

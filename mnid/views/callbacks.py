@@ -138,8 +138,9 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
 
     store_payload = stored or {}
     tracked = store_payload.get('tracked', [])
+    compare_route = store_payload.get('route', 'default')
 
-    _compare_agg_check  = _get_aggregate()
+    _compare_agg_check  = _get_aggregate(route=compare_route)
     mch_full_fallback   = _restore_ui_dataframe(store_payload.get('data_key'))
     mch_full            = pd.DataFrame() if _compare_agg_check is not None else (mch_full_fallback if mch_full_fallback is not None else pd.DataFrame())
 
@@ -227,7 +228,7 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
     }
     period_code, period_fmt, max_periods = _grain_cfg.get(time_grain, _grain_cfg['monthly'])
 
-    _compare_agg = _get_aggregate()
+    _compare_agg = _get_aggregate(route=compare_route)
     if _compare_agg is None:
         d2 = mch_full.copy()
         d2['_period'] = pd.to_datetime(d2['Date']).dt.to_period(period_code)

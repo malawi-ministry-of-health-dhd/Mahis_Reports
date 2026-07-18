@@ -275,7 +275,7 @@ def _run_chart_cards(
     date_min, date_max = dates.min(), dates.max()
 
     if agg_df is None:
-        agg_df = _get_aggregate()
+        agg_df = _get_aggregate(route=(scope_meta or {}).get('route', 'default'))
     if fac_filter is None and dist_filter is None and scope_meta:
         _, fac_codes, districts = _resolve_scope_filters(plot_df, scope_meta)
         fac_filter  = fac_codes or None
@@ -520,7 +520,7 @@ def update_trend_chart(n_clicks_list, location, selected_inds, grain, stored_tre
     ind_opts_by_cat = trend_payload.get('ind_opts_by_cat') or {}
     ind_options     = ind_opts_by_cat.get(cat, [])
 
-    _agg_now = _get_aggregate()
+    _agg_now = _get_aggregate(route=scope_meta.get('route', 'default'))
     _df_full = _restore_ui_dataframe(trend_payload.get('data_key'))
     if _agg_now is not None:
         _d_min = trend_payload.get('date_min')

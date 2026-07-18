@@ -60,3 +60,4 @@ CLAUDE.md
 /.junie/
 /.idea/
 saved_queries.json.mnid_exec_cache/
+.temp/

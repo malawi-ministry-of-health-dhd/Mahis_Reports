@@ -7,18 +7,62 @@ filter operations on a small (~500K row) DataFrame, so they run in microseconds
 instead of the seconds-long raw-row scans they replace.
 """
 import logging
+import threading
 from pathlib import Path
 
 import pandas as pd
 
 _LOG = logging.getLogger(__name__)
 
-_DEFAULT_OUT_DIR = 'data/mnid_aggregates'
+_DEFAULT_ROUTE   = 'default'
+_AGG_ROOT_DIR    = 'data/mnid_aggregates'
 _PARQUET_NAME    = 'indicator_aggregates.parquet'
 
-# in-memory cache, loaded once and invalidated after the overnight rebuild
-_AGG_DF: pd.DataFrame | None = None
-_LOADED = False
+# in-memory cache, keyed by route, loaded once per route and invalidated after
+# the overnight rebuild. A single un-keyed global here would let one route's
+# aggregate leak into another's requests, so every route gets its own slot.
+_AGG_DF_BY_ROUTE: dict[str, pd.DataFrame | None] = {}
+_LOADED_ROUTES: set[str] = set()
+_AGG_CACHE_MAX_ROUTES = 8
+
+# routes with a background build already in flight, so a burst of requests
+# for a not-yet-built route doesn't launch duplicate aggregation jobs.
+_ROUTES_BUILDING: set[str] = set()
+
+
+def _route_out_dir(route: str) -> str:
+    return str(Path(_AGG_ROOT_DIR) / route)
+
+
+def _trim_route_cache() -> None:
+    while len(_AGG_DF_BY_ROUTE) > _AGG_CACHE_MAX_ROUTES:
+        oldest = next(iter(_AGG_DF_BY_ROUTE))
+        _AGG_DF_BY_ROUTE.pop(oldest, None)
+        _LOADED_ROUTES.discard(oldest)
+
+
+def _trigger_background_build(route: str) -> None:
+    """Kick off an aggregation build for a route with no aggregate yet.
+
+    Fire-and-forget: the current request still falls back to a live compute
+    (get_aggregate returns None), the next one for this route gets the
+    pre-aggregated fast path once the background build lands.
+    """
+    if route in _ROUTES_BUILDING:
+        return
+    _ROUTES_BUILDING.add(route)
+
+    def _build():
+        try:
+            from mnid.aggregation.scheduler import run_aggregation_job
+            _LOG.info('No aggregate found for route=%s, building monthly grain in background...', route)
+            run_aggregation_job(grains=['monthly'], route=route)
+        except Exception as exc:
+            _LOG.warning('Background aggregate build failed for route=%s: %s', route, exc)
+        finally:
+            _ROUTES_BUILDING.discard(route)
+
+    threading.Thread(target=_build, daemon=True, name=f'mnid-agg-build-{route}').start()
 
 
 def _meta_source_matches(output_dir: str) -> bool:
@@ -44,51 +88,60 @@ def _meta_source_matches(output_dir: str) -> bool:
     return True
 
 
-def load_aggregate(output_dir: str = _DEFAULT_OUT_DIR) -> pd.DataFrame | None:
-    """Read the aggregate parquet from disk into memory. Returns None if absent."""
-    global _AGG_DF, _LOADED
-    if _LOADED:
-        return _AGG_DF
+def load_aggregate(route: str = _DEFAULT_ROUTE, output_dir: str | None = None) -> pd.DataFrame | None:
+    """Read the aggregate parquet for one route from disk into memory. Returns None if absent."""
+    output_dir = output_dir or _route_out_dir(route)
+    if route in _LOADED_ROUTES:
+        return _AGG_DF_BY_ROUTE.get(route)
 
     path = Path(output_dir) / _PARQUET_NAME
     if not path.exists():
-        _LOG.debug('Aggregate not found at %s, falling back to live compute', path)
-        _LOADED = True
-        _AGG_DF = None
+        _LOG.debug('Aggregate not found at %s (route=%s), falling back to live compute', path, route)
+        _trigger_background_build(route)
+        _LOADED_ROUTES.add(route)
+        _AGG_DF_BY_ROUTE[route] = None
+        _trim_route_cache()
         return None
 
     if not _meta_source_matches(output_dir):
-        _LOADED = True
-        _AGG_DF = None
+        _LOADED_ROUTES.add(route)
+        _AGG_DF_BY_ROUTE[route] = None
+        _trim_route_cache()
         return None
 
     try:
-        _AGG_DF = pd.read_parquet(str(path))
-        _AGG_DF['period_start'] = pd.to_datetime(_AGG_DF['period_start'])
-        _LOADED = True
-        _LOG.info('Aggregate loaded: %d rows from %s', len(_AGG_DF), path)
-        return _AGG_DF
+        agg_df = pd.read_parquet(str(path))
+        agg_df['period_start'] = pd.to_datetime(agg_df['period_start'])
+        _AGG_DF_BY_ROUTE[route] = agg_df
+        _LOADED_ROUTES.add(route)
+        _trim_route_cache()
+        _LOG.info('Aggregate loaded: %d rows from %s (route=%s)', len(agg_df), path, route)
+        return agg_df
     except Exception as exc:
-        _LOG.warning('Failed to load aggregate parquet: %s', exc)
-        _LOADED = True
-        _AGG_DF = None
+        _LOG.warning('Failed to load aggregate parquet for route=%s: %s', route, exc)
+        _LOADED_ROUTES.add(route)
+        _AGG_DF_BY_ROUTE[route] = None
+        _trim_route_cache()
         return None
 
 
-def get_aggregate(output_dir: str = _DEFAULT_OUT_DIR) -> pd.DataFrame | None:
-    """Return the in-memory aggregate, loading it on first call."""
-    global _LOADED
-    if not _LOADED:
-        load_aggregate(output_dir)
-    return _AGG_DF
+def get_aggregate(route: str = _DEFAULT_ROUTE, output_dir: str | None = None) -> pd.DataFrame | None:
+    """Return the in-memory aggregate for one route, loading it on first call."""
+    if route not in _LOADED_ROUTES:
+        return load_aggregate(route, output_dir)
+    return _AGG_DF_BY_ROUTE.get(route)
 
 
-def invalidate_cache() -> None:
-    """Force the next get_aggregate() call to reload from disk."""
-    global _AGG_DF, _LOADED
-    _AGG_DF = None
-    _LOADED = False
-    _LOG.info('Aggregate cache invalidated')
+def invalidate_cache(route: str | None = None) -> None:
+    """Force the next get_aggregate() call to reload from disk. route=None clears every route."""
+    if route is None:
+        _AGG_DF_BY_ROUTE.clear()
+        _LOADED_ROUTES.clear()
+        _LOG.info('Aggregate cache invalidated (all routes)')
+        return
+    _AGG_DF_BY_ROUTE.pop(route, None)
+    _LOADED_ROUTES.discard(route)
+    _LOG.info('Aggregate cache invalidated (route=%s)', route)
 
 
 # query helpers

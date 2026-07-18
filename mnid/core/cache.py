@@ -46,11 +46,11 @@ def _trim_cache(cache: dict, max_entries: int) -> None:
             break
 
 
-def _agg_version_stamp() -> str:
-    """Return a string that changes whenever the aggregate parquet is rebuilt."""
+def _agg_version_stamp(route: str = 'default') -> str:
+    """Return a string that changes whenever route's aggregate parquet is rebuilt."""
     try:
         import json as _json
-        meta_path = Path(os.getcwd()) / 'data' / 'mnid_aggregates' / 'meta.json'
+        meta_path = Path(os.getcwd()) / 'data' / 'mnid_aggregates' / route / 'meta.json'
         if meta_path.exists():
             meta = _json.loads(meta_path.read_text(encoding='utf-8'))
             return str(meta.get('generated_at', ''))
@@ -64,6 +64,7 @@ def _executive_view_cache_key(selected: str, state: dict,
                               config: dict | None = None) -> tuple:
     effective_scope = scope_meta or state.get('scope_meta') or {}
     effective_config = config or state.get('config') or {}
+    route = state.get('route') or (effective_scope or {}).get('route', 'default')
     return (
         selected,
         effective_config.get('report_name'),
@@ -75,13 +76,14 @@ def _executive_view_cache_key(selected: str, state: dict,
         tuple(sorted((effective_scope or {}).get('selected_districts') or [])),
         tuple(sorted((effective_scope or {}).get('mnid_categories') or [])),
         (effective_scope or {}).get('dataset_version'),
-        _agg_version_stamp(),
+        _agg_version_stamp(route),
         _EXECUTIVE_RENDER_VERSION,
     )
 
 
 def _country_profile_cache_key(scope_meta, opd_key, start_date, end_date, report_name,
                                 selected_facilities=(), selected_districts=()):
+    route = (scope_meta or {}).get('route', 'default')
     return (
         (
             (scope_meta or {}).get('dataset_version'),
@@ -92,7 +94,7 @@ def _country_profile_cache_key(scope_meta, opd_key, start_date, end_date, report
         start_date,
         end_date,
         report_name,
-        _agg_version_stamp(),
+        _agg_version_stamp(route),
         _COUNTRY_PROFILE_RENDER_VERSION,
     )
 
@@ -206,10 +208,16 @@ def clear_runtime_caches() -> None:
     _agg_invalidate()
 
 
-def _maybe_build_aggregate_on_startup() -> None:
-    """Build the indicator aggregate parquet in a background thread at startup."""
-    _agg_path = Path('data') / 'mnid_aggregates' / 'indicator_aggregates.parquet'
-    _lock_path = Path('data') / 'mnid_aggregates' / '.agg_running'
+def _maybe_build_aggregate_on_startup(route: str = 'default') -> None:
+    """Build the indicator aggregate parquet for one route in a background thread at startup.
+
+    Only the eagerly-warmed route (today, just 'default') needs this — any
+    other route gets its aggregate lazily on first request, triggered from
+    mnid.aggregation.store.load_aggregate() instead.
+    """
+    _out_dir = Path('data') / 'mnid_aggregates' / route
+    _agg_path = _out_dir / 'indicator_aggregates.parquet'
+    _lock_path = _out_dir / '.agg_running'
 
     if _agg_path.exists():
         return
@@ -223,21 +231,21 @@ def _maybe_build_aggregate_on_startup() -> None:
                 age = _dt.datetime.utcnow().timestamp() - _lock_path.stat().st_mtime
                 if not (0 <= age < 3600):
                     _lock_path.unlink(missing_ok=True)
-                    _LOGGER.info('Cleared stale aggregation lock before startup build.')
+                    _LOGGER.info('Cleared stale aggregation lock before startup build (route=%s).', route)
         except Exception:
             pass
         try:
             from mnid.aggregation.scheduler import run_aggregation_job
-            _LOGGER.info('Aggregate parquet not found, building monthly grain in background...')
-            ok = run_aggregation_job(grains=['monthly'])
+            _LOGGER.info('Aggregate parquet not found for route=%s, building monthly grain in background...', route)
+            ok = run_aggregation_job(grains=['monthly'], route=route)
             if ok:
-                _LOGGER.info('Startup aggregation complete (monthly grain).')
+                _LOGGER.info('Startup aggregation complete for route=%s (monthly grain).', route)
             else:
-                _LOGGER.warning('Startup aggregation returned False, check data source and indicators.')
+                _LOGGER.warning('Startup aggregation returned False for route=%s, check data source and indicators.', route)
         except Exception as _exc:
-            _LOGGER.warning('Startup aggregation failed: %s', _exc)
+            _LOGGER.warning('Startup aggregation failed for route=%s: %s', route, _exc)
 
-    t = threading.Thread(target=_build, daemon=True, name='mnid-startup-agg')
+    t = threading.Thread(target=_build, daemon=True, name=f'mnid-startup-agg-{route}')
     t.start()
 
 
@@ -256,8 +264,9 @@ def _warm_worker_ndf_from_diskcache() -> None:
                 return
             _network_df_cache[opd_key] = ndf
             _trim_cache(_network_df_cache, _NETWORK_DF_CACHE_MAX)
+            _warm_route = opd_key[0] if isinstance(opd_key, tuple) and opd_key else 'default'
             from mnid.core.data_utils import register_facility_metadata as _reg
-            _reg(ndf)
+            _reg(ndf, route=_warm_route)
             _LOGGER.info('Worker ndf warm: %d rows loaded from diskcache', len(ndf))
         except Exception as exc:
             _LOGGER.debug('Worker ndf warm failed (non-fatal): %s', exc)

@@ -647,7 +647,7 @@ def render_mnh_moh_dashboard(
         include_moh=True,
     )
     category_order = _resolve_category_order(source_indicators, ['ANC', 'Labour', 'PNC', 'Newborn'])
-    agg_df = _get_aggregate()
+    agg_df = _get_aggregate(route=scope_meta.get('route', 'default'))
 
     # mohupdate: filter out tertiary-only indicators when level is not Tertiary/All
     def _is_visible(ind: dict) -> bool:

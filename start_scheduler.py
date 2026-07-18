@@ -41,15 +41,28 @@ def run_data_storage():
             f.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - {error_msg}\n")
 
 
+def _configured_routes():
+    """Every route declared in configurations.json (falls back to 'default')."""
+    import json
+    try:
+        with open('/app/configurations.json') as f:
+            configs = json.load(f)
+        routes = [c.get('data_path') for c in configs if c.get('data_path')]
+        return routes or ['default']
+    except Exception:
+        return ['default']
+
+
 def _run_mnid_aggregation():
-    """Run the MNID pre-aggregation pipeline in a background thread."""
+    """Run the MNID pre-aggregation pipeline for every configured route, in a background thread."""
     def _job():
-        try:
-            from mnid.aggregation.scheduler import run_aggregation_job, log_to_file
-            log_to_file('/app/logs')
-            run_aggregation_job()
-        except Exception as exc:
-            print(f"MNID aggregation error: {exc}")
+        from mnid.aggregation.scheduler import run_aggregation_job, log_to_file
+        log_to_file('/app/logs')
+        for route in _configured_routes():
+            try:
+                run_aggregation_job(route=route)
+            except Exception as exc:
+                print(f"MNID aggregation error (route={route}): {exc}")
 
     t = threading.Thread(target=_job, daemon=True)
     t.start()

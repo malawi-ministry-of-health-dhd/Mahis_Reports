@@ -29,6 +29,11 @@ HEATMAP_CS = [
 ]
 
 # Live metadata is filled from the MAHIS dataframe during MNID rendering.
+# Scoped to a single route at a time (see register_facility_metadata in
+# data_utils.py): every read site across the chart/heatmap/dropdown code
+# treats these as flat dicts, so instead of nesting them by route we clear
+# and repopulate them whenever the active route changes, tracked here.
+_METADATA_ROUTE = None
 FACILITY_DISTRICT = {}
 ALL_FACILITIES = []
 ALL_DISTRICTS = []

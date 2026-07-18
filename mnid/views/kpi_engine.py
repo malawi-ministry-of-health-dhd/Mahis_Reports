@@ -403,7 +403,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
 
     _t0 = _time.monotonic()
 
-    _agg = _get_aggregate()
+    _agg = _get_aggregate(route=(scope_meta or {}).get('route', 'default'))
     _fac_filter  = selected_facility_codes or None
     _dist_filter = selected_districts or None
     _kpi_grain   = 'monthly'
@@ -551,6 +551,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
     _t4 = _time.monotonic()
     comparative_div = _comparative_analysis_section(
         all_inds, facility_code, facility_df, payload_key=payload_key,
+        scope_meta=scope_meta,
     )
     _LOGGER.info('MNID timing: comparative %.2fs', _time.monotonic() - _t4)
 
@@ -758,19 +759,21 @@ def _get_facility_df_from_state(state: dict, network_df=None):
 def _resolve_heatmap_store(network_df: pd.DataFrame, all_inds: list,
                            facility_code: str, scope_meta: dict | None,
                            store_key: str) -> dict:
+    route = (scope_meta or {}).get('route', 'default')
     _, selected_facility_codes, selected_districts = _resolve_scope_filters(network_df, scope_meta or {})
     tracked = [i for i in all_inds if i.get('status') == 'tracked']
     cache_key = (
+        route,
         facility_code,
         tuple(i.get('id') for i in tracked),
         tuple(sorted(selected_facility_codes)),
         tuple(sorted(selected_districts)),
-        _agg_version_stamp(),
+        _agg_version_stamp(route),
     )
     _hms_key = _dk('hms', cache_key)
     cached_hms = _MNID_EXECUTIVE_DISK_CACHE.get(_hms_key)
     if cached_hms is None:
-        agg_for_heatmap = _get_aggregate()
+        agg_for_heatmap = _get_aggregate(route=route)
         if agg_for_heatmap is not None and not agg_for_heatmap.empty:
             if selected_facility_codes:
                 agg_for_heatmap = agg_for_heatmap[
