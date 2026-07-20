@@ -31,8 +31,9 @@ ingestion model.
 - Raw audit, normalized atomic data, calculated indicators, validation reports, and
   last-known-good output separated under ignored runtime folders.
 - Opt-in DHIS2 dashboard mode without render-time network access.
-- A working MNH Beginnings HMIS test view with 25 grouped KPI cards, domain trends,
-  priority-outcome district comparison, and facility-level filtering/table output.
+- A working MNH Beginnings HMIS test view with a current-period summary and 25
+  individually labeled monthly run-chart cards, grouped by clinical domain, plus
+  priority-outcome district comparison and facility-level filtering/table output.
 - Application startup and routing support for a DHIS2-only test environment where
   the legacy `data/default/parquet` MAHIS source is unavailable.
 
@@ -185,8 +186,10 @@ during import or rendering.
 
 A sample inner tab named **MNH HMIS test** is available under MNH Beginnings. It reads
 only local `hmis_test.parquet` output and currently displays 25 verified indicators
-through Country Profile-inspired grouped KPI cards, recent-month movement, domain
-trends, a priority-outcome district comparison, and a filterable facility table.
+through a Country Profile-inspired header, alert and scope bands, current-period
+summary, and one labeled monthly line-chart card per indicator. Charts are grouped as
+Births and Outcomes, Antenatal Care, and Delivery and Newborn Care, followed by a
+priority-outcome district comparison and a filterable facility table.
 Existing MNID date, district, and facility scope is applied. The sample contains
 232,769 calculated aggregate rows across 867 DHIS2 organisation units, 32 districts,
 and all 14 configured months from April 2025 through May 2026. It retains 65,721

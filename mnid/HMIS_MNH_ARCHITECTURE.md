@@ -137,9 +137,11 @@ The dashboard reads `hmis_test.parquet` once per render operation and applies:
 - indicator grouping.
 
 The visualization structure follows the MNID Country Profile design language: a dark
-scope and reporting-period header, domain section markers, grouped compact indicator
-cards, recent-month movement, separate domain trend panels, priority-outcome district
-ranking, and a facility drill-down table. KPI cards sum each indicator over the active
+scope and reporting-period header, priority alert, scope band, current-period summary
+cards, and a dedicated labeled monthly run-chart card for each of the 25 indicators.
+Charts are grouped under Births and Outcomes, Antenatal Care, and Delivery and Newborn
+Care, followed by priority-outcome district ranking and a facility drill-down table.
+KPI cards sum each indicator over the active
 scope. Monthly charts group by reporting month and indicator. District comparisons sum
 within district. The facility table retains facility, district, domain, indicator, and
 value and supports client-side sorting and filtering.

@@ -19,7 +19,6 @@ MUTED = "#64748B"
 BORDER = "#E2E8F0"
 SURFACE = "#FFFFFF"
 BACKGROUND = "#F8FAFC"
-HERO = "#182136"
 
 DEFAULT_DATA_PATH = (
     Path(__file__).resolve().parents[2]
@@ -48,6 +47,46 @@ ADVERSE_OUTCOME_IDS = {
     "fresh_stillbirths", "macerated_stillbirths", "maternal_deaths",
     "neonatal_deaths", "stillbirths",
 }
+INDICATOR_DESCRIPTIONS = {
+    "live_births": "Live births reported by facilities in the selected scope.",
+    "total_births": "Combined live births and stillbirths.",
+    "fresh_stillbirths": "Fresh stillbirths reported during the selected period.",
+    "macerated_stillbirths": "Macerated stillbirths reported during the selected period.",
+    "maternal_deaths": "Maternal deaths reported by facilities.",
+    "neonatal_deaths": "Neonatal deaths reported by facilities.",
+    "stillbirths": "Combined fresh and macerated stillbirths.",
+    "anc_visits": "Total recorded ANC contacts across visit stages.",
+    "blood_pressure_measured": "ANC clients whose blood pressure was measured.",
+    "tested_for_hiv": "ANC clients tested for HIV.",
+    "screened_for_syphilis": "ANC clients screened for syphilis.",
+    "at_least_4_anc_contacts": "Clients completing at least four ANC contacts.",
+    "tetanus_doses_2": "ANC clients receiving two or more tetanus doses.",
+    "new_anc_registrations": "New ANC registrations reported by facilities.",
+    "started_anc_in_first_trimester_0_12_weeks": "Clients starting ANC within 0–12 weeks.",
+    "received_120_fefo_tablets": "ANC clients receiving at least 120 FeFo tablets.",
+    "received_itn_during_anc": "ANC clients receiving an insecticide-treated net.",
+    "uterotonic_given_after_birth": "Women receiving a uterotonic after birth.",
+    "newborns_not_breathing_at_birth_receiving_bag_mask_ventilation": "Non-breathing newborns receiving bag-mask ventilation.",
+    "vitamin_k_at_birth": "Newborns receiving Vitamin K at birth.",
+    "facility_deliveries": "Deliveries reported through facility maternity services.",
+    "delivered_at_this_facility": "Women delivering at the reporting facility.",
+    "delivered_at_home_or_in_transit": "Deliveries occurring at home or in transit.",
+    "delivered_by_skilled_attendant": "Deliveries attended by a skilled provider.",
+    "normal_vaginal_delivery": "Normal vaginal deliveries reported by facilities.",
+}
+INDICATOR_COLORS = {
+    "maternal_deaths": "#E11D48",
+    "neonatal_deaths": "#D97706",
+    "stillbirths": "#7C3AED",
+    "fresh_stillbirths": "#DB2777",
+    "macerated_stillbirths": "#8B5CF6",
+    "total_births": "#0284C7",
+    "live_births": "#16A34A",
+}
+SUMMARY_INDICATOR_IDS = (
+    "total_births", "live_births", "stillbirths", "fresh_stillbirths",
+    "macerated_stillbirths", "maternal_deaths", "neonatal_deaths",
+)
 
 
 def _empty(message: str) -> html.Div:
@@ -134,47 +173,47 @@ def _scope_label(scope_meta: dict, facility_count: int, district_count: int) -> 
 
 def _hero(period_min: str, period_max: str, indicator_count: int, facility_count: int,
           district_count: int, scope_meta: dict) -> html.Div:
-    pills = [
-        ("Reporting period", f"{period_min} – {period_max}"),
-        ("Active scope", _scope_label(scope_meta, facility_count, district_count)),
-        ("Indicators", f"{indicator_count} verified indicators"),
-        ("Source", "Malawi HMIS DHIS2 snapshot"),
-    ]
     return html.Div(
         [
             html.Div("MNH HMIS COUNTRY PROFILE", style={
-                "fontSize": "10px", "fontWeight": 800, "letterSpacing": ".13em",
-                "color": "#86EFAC", "marginBottom": "7px",
+                "fontSize": "10px", "fontWeight": 800, "letterSpacing": ".12em",
+                "color": TEAL, "marginBottom": "10px",
             }),
-            html.Div("Maternal & Newborn Health", style={
-                "fontSize": "28px", "fontWeight": 850, "color": "#FFFFFF",
-                "letterSpacing": "-.02em",
+            html.Div("Maternal and Neonatal Outcomes Dashboard", style={
+                "fontSize": "26px", "fontWeight": 850, "color": TEXT,
+                "letterSpacing": "-.04em", "lineHeight": "1.15",
             }),
             html.Div(
-                "Facility-reported aggregate performance from the latest controlled DHIS2 synchronization.",
-                style={"fontSize": "12px", "color": "#CBD5E1", "marginTop": "5px"},
+                "Malawi national overview · HMIS aggregate indicators · Evidence for action · Decision support",
+                style={"fontSize": "12px", "color": MUTED, "marginTop": "6px"},
             ),
             html.Div([
-                html.Div([
-                    html.Div(label, style={
-                        "fontSize": "9px", "fontWeight": 800, "color": "#94A3B8",
-                        "textTransform": "uppercase", "letterSpacing": ".07em",
-                    }),
-                    html.Div(value, style={
-                        "fontSize": "12px", "fontWeight": 700, "color": "#F8FAFC",
-                        "marginTop": "3px",
-                    }),
-                ], style={
-                    "background": "rgba(255,255,255,.07)",
-                    "border": "1px solid rgba(255,255,255,.12)",
-                    "borderRadius": "10px", "padding": "10px 12px", "minWidth": "180px",
-                })
-                for label, value in pills
-            ], style={"display": "flex", "gap": "9px", "flexWrap": "wrap", "marginTop": "18px"}),
+                html.Span("Live snapshot", style={
+                    "background": "#ECFDF5", "border": "1px solid #BBF7D0",
+                    "color": GREEN, "fontSize": "10px", "fontWeight": 750,
+                    "padding": "4px 10px", "borderRadius": "99px",
+                }),
+                html.Span(f"{period_min} – {period_max}", style={
+                    "background": BACKGROUND, "border": f"1px solid {BORDER}",
+                    "color": "#475569", "fontSize": "10px", "fontWeight": 700,
+                    "padding": "4px 10px", "borderRadius": "99px",
+                }),
+                html.Span(f"{district_count} Districts · {facility_count} Reporting Units", style={
+                    "background": BACKGROUND, "border": f"1px solid {BORDER}",
+                    "color": "#475569", "fontSize": "10px", "fontWeight": 700,
+                    "padding": "4px 10px", "borderRadius": "99px",
+                }),
+                html.Span(f"{indicator_count} Indicators", style={
+                    "background": BACKGROUND, "border": f"1px solid {BORDER}",
+                    "color": "#475569", "fontSize": "10px", "fontWeight": 700,
+                    "padding": "4px 10px", "borderRadius": "99px",
+                }),
+            ], style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "16px"}),
         ],
         style={
-            "background": HERO, "borderRadius": "16px", "padding": "22px 24px",
-            "boxShadow": "0 10px 24px rgba(15,23,42,.12)",
+            "background": SURFACE, "border": f"1px solid {BORDER}",
+            "borderRadius": "16px", "padding": "22px 24px",
+            "boxShadow": "0 2px 8px rgba(15,23,42,.04)", "marginBottom": "18px",
         },
     )
 
@@ -214,6 +253,89 @@ def _indicator_summary(frame: pd.DataFrame) -> pd.DataFrame:
     return summary.sort_values(["indicator_group", "indicator_name"])
 
 
+def _summary_lookup(summary: pd.DataFrame) -> dict[str, object]:
+    return {row.indicator_id: row for row in summary.itertuples(index=False)}
+
+
+def _priority_alert(summary: pd.DataFrame) -> html.Div:
+    lookup = _summary_lookup(summary)
+    specs = [
+        ("Maternal deaths", "maternal_deaths", "#E11D48"),
+        ("Neonatal deaths", "neonatal_deaths", AMBER),
+        ("Stillbirths", "stillbirths", PURPLE),
+    ]
+    present = [(label, lookup.get(indicator_id), color) for label, indicator_id, color in specs]
+    present = [(label, row, color) for label, row, color in present if row is not None]
+    events = int(sum(float(row.latest or 0) for _, row, _ in present))
+    return html.Div(
+        [
+            html.Div([
+                html.Div("●", style={"fontSize": "15px", "color": RED}),
+                html.Div(f"{events:,}", style={"fontSize": "18px", "fontWeight": 850, "color": RED}),
+                html.Div("latest-month events", style={"fontSize": "8px", "color": "#9A3412"}),
+            ], style={"width": "88px", "textAlign": "center", "flexShrink": "0"}),
+            html.Div(style={"width": "1px", "alignSelf": "stretch", "background": "#FED7AA"}),
+            html.Div([
+                html.Div("Priority Alert", style={
+                    "fontSize": "12px", "fontWeight": 850, "color": "#9A3412",
+                }),
+                html.Div(
+                    "Maternal, neonatal, or stillbirth deaths were reported in the latest month.",
+                    style={"fontSize": "10px", "color": "#9A3412", "margin": "2px 0 8px"},
+                ),
+                html.Div([
+                    html.Div([
+                        html.Span(label, style={"fontSize": "10px", "fontWeight": 750, "color": "#7C2D12"}),
+                        html.Span(f"{float(row.latest or 0):,.0f}", style={
+                            "fontSize": "19px", "fontWeight": 850, "color": color,
+                        }),
+                        html.Span("Latest reporting month", style={"fontSize": "9px", "color": "#9A3412"}),
+                    ], style={
+                        "display": "flex", "alignItems": "baseline", "gap": "5px",
+                        "background": SURFACE, "border": "1px solid #FED7AA",
+                        "borderRadius": "9px", "padding": "8px 10px", "flex": "1",
+                        "minWidth": "210px",
+                    })
+                    for label, row, color in present
+                ], style={"display": "flex", "gap": "9px", "flexWrap": "wrap"}),
+            ], style={"flex": "1"}),
+        ],
+        style={
+            "display": "flex", "gap": "12px", "alignItems": "stretch",
+            "background": "#FFF7ED", "border": "1px solid #FED7AA",
+            "borderRadius": "11px", "padding": "10px 12px", "marginBottom": "18px",
+        },
+    )
+
+
+def _scope_band(period_min: str, period_max: str, indicator_count: int,
+                facility_count: int, district_count: int, row_count: int,
+                scope_meta: dict) -> html.Div:
+    items = [
+        ("Period", f"{period_min} – {period_max}"),
+        ("Scope", _scope_label(scope_meta, facility_count, district_count)),
+        ("Districts", f"{district_count:,}"),
+        ("Reporting units", f"{facility_count:,}"),
+        ("Indicators", f"{indicator_count:,}"),
+        ("Aggregate records", f"{row_count:,}"),
+    ]
+    return html.Div([
+        html.Div([
+            html.Span(label, style={
+                "display": "block", "fontSize": "8px", "fontWeight": 800,
+                "color": "#94A3B8", "textTransform": "uppercase",
+                "letterSpacing": ".07em", "marginBottom": "3px",
+            }),
+            html.Span(value, style={"fontSize": "10px", "fontWeight": 700, "color": TEXT}),
+        ], style={"padding": "9px 13px", "borderRight": f"1px solid {BORDER}"})
+        for label, value in items
+    ], style={
+        "display": "flex", "flexWrap": "wrap", "background": BACKGROUND,
+        "border": f"1px solid {BORDER}", "borderRadius": "10px",
+        "overflow": "hidden", "marginBottom": "18px",
+    })
+
+
 def _indicator_card(row, color: str) -> html.Div:
     change = row.change
     increase_is_adverse = row.indicator_id in ADVERSE_OUTCOME_IDS
@@ -235,11 +357,11 @@ def _indicator_card(row, color: str) -> html.Div:
                 "fontSize": "11px", "fontWeight": 750, "color": TEXT,
                 "lineHeight": "1.35", "minHeight": "30px",
             }),
-            html.Div(f"{row.total:,.0f}", style={
+            html.Div(f"{float(row.latest or 0):,.0f}", style={
                 "fontSize": "25px", "fontWeight": 850, "color": color,
                 "letterSpacing": "-.03em", "marginTop": "8px",
             }),
-            html.Div("Selected-period total", style={
+            html.Div("Latest reporting month", style={
                 "fontSize": "9px", "color": MUTED, "marginTop": "-2px",
             }),
             html.Div([
@@ -247,7 +369,7 @@ def _indicator_card(row, color: str) -> html.Div:
                     "fontSize": "9px", "fontWeight": 750, "color": change_color,
                     "background": change_bg, "borderRadius": "99px", "padding": "3px 7px",
                 }),
-                html.Span(f"{int(row.reporting_units):,} units", style={
+                html.Span(f"Total {float(row.total):,.0f}", style={
                     "fontSize": "9px", "color": MUTED,
                 }),
             ], style={
@@ -282,29 +404,111 @@ def _chart_card(title: str, subtitle: str, figure) -> html.Div:
     )
 
 
-def _trend_figure(frame: pd.DataFrame, group: str, color: str):
-    group_frame = frame[frame["indicator_group"] == group]
-    trend = group_frame.groupby(
-        ["period_start", "indicator_name"], as_index=False
-    )["value"].sum()
+def _indicator_trend_figure(frame: pd.DataFrame, indicator_id: str, color: str):
+    trend = (
+        frame[frame["indicator_id"] == indicator_id]
+        .groupby("period_start", as_index=False)["value"].sum()
+        .sort_values("period_start")
+    )
     figure = px.line(
-        trend, x="period_start", y="value", color="indicator_name", markers=True,
-        labels={
-            "period_start": "Reporting month", "value": "Reported value",
-            "indicator_name": "Indicator",
-        },
+        trend, x="period_start", y="value", markers=True,
+        labels={"period_start": "Reporting month", "value": "Reported count"},
     )
-    figure.update_traces(line={"width": 2}, marker={"size": 5})
+    rgb = tuple(int(color[index:index + 2], 16) for index in (1, 3, 5))
+    figure.update_traces(
+        line={"width": 2.5, "color": color},
+        marker={"size": 6, "color": color},
+        fill="tozeroy", fillcolor=f"rgba{rgb + (0.08,)}",
+        hovertemplate="%{x|%b %Y}<br>%{y:,.0f}<extra></extra>",
+    )
     figure.update_layout(
-        margin={"l": 35, "r": 15, "t": 20, "b": 35},
-        legend={"orientation": "h", "y": -0.28, "font": {"size": 9}},
+        margin={"l": 42, "r": 18, "t": 18, "b": 42},
         plot_bgcolor=SURFACE, paper_bgcolor=SURFACE,
-        hovermode="x unified", colorway=[color, BLUE, AMBER, PURPLE, TEAL, RED, GREEN],
-        font={"color": TEXT},
+        hovermode="x unified", showlegend=False, font={"color": TEXT, "size": 10},
     )
-    figure.update_xaxes(showgrid=False)
-    figure.update_yaxes(gridcolor="#EEF2F7")
+    figure.update_xaxes(showgrid=False, tickformat="%b %Y", tickangle=-25)
+    figure.update_yaxes(gridcolor="#EEF2F7", rangemode="tozero", title="Reported count")
     return figure
+
+
+def _change_badge(row) -> tuple[str, str, str]:
+    change = row.change
+    adverse = row.indicator_id in ADVERSE_OUTCOME_IDS
+    if pd.isna(change):
+        return "No prior comparison", MUTED, "#F1F5F9"
+    if change > 0:
+        return (
+            f"Increase {change:.1f}%", RED if adverse else GREEN,
+            "#FEE2E2" if adverse else "#DCFCE7",
+        )
+    if change < 0:
+        return (
+            f"Decrease {abs(change):.1f}%", GREEN if adverse else RED,
+            "#DCFCE7" if adverse else "#FEE2E2",
+        )
+    return "No change", MUTED, "#F1F5F9"
+
+
+def _indicator_chart_card(frame: pd.DataFrame, row, color: str) -> html.Div:
+    badge, badge_color, badge_bg = _change_badge(row)
+    indicator_frame = frame[frame["indicator_id"] == row.indicator_id]
+    period_start = indicator_frame["period_start"].min().strftime("%b %Y")
+    period_end = indicator_frame["period_start"].max().strftime("%b %Y")
+    return html.Div([
+        html.Div([
+            html.Div([
+                html.Div(row.indicator_name, style={
+                    "fontSize": "13px", "fontWeight": 850, "color": TEXT,
+                }),
+                html.Div(
+                    INDICATOR_DESCRIPTIONS.get(
+                        row.indicator_id, "Monthly facility-reported HMIS aggregate."
+                    ),
+                    style={"fontSize": "10px", "color": MUTED, "marginTop": "3px"},
+                ),
+            ], style={"flex": "1", "minWidth": "240px"}),
+            html.Span("Monthly", style={
+                "fontSize": "9px", "fontWeight": 750, "color": color,
+                "border": f"1px solid {color}55", "background": f"{color}10",
+                "borderRadius": "99px", "padding": "4px 9px",
+            }),
+        ], style={"display": "flex", "justifyContent": "space-between", "gap": "12px"}),
+        html.Div([
+            html.Div([
+                html.Div(f"{float(row.latest or 0):,.0f}", style={
+                    "fontSize": "20px", "fontWeight": 850, "color": color,
+                }),
+                html.Div("Latest month", style={"fontSize": "8px", "color": MUTED}),
+            ]),
+            html.Span(badge, style={
+                "fontSize": "9px", "fontWeight": 750, "color": badge_color,
+                "background": badge_bg, "borderRadius": "99px", "padding": "4px 8px",
+            }),
+            html.Div([
+                html.Div(f"{float(row.total):,.0f}", style={
+                    "fontSize": "14px", "fontWeight": 800, "color": TEXT,
+                }),
+                html.Div("Selected-period total", style={"fontSize": "8px", "color": MUTED}),
+            ]),
+        ], style={
+            "display": "flex", "alignItems": "center", "gap": "16px",
+            "padding": "10px 0 2px", "flexWrap": "wrap",
+        }),
+        dcc.Graph(
+            figure=_indicator_trend_figure(frame, row.indicator_id, color),
+            config={"displayModeBar": False, "responsive": True},
+            style={"height": "310px"},
+        ),
+        html.Div(
+            f"Showing monthly data, {period_start} to {period_end} · "
+            f"{int(row.reporting_units):,} reporting units",
+            style={"fontSize": "9px", "color": MUTED, "marginTop": "-6px"},
+        ),
+    ], style={
+        "background": SURFACE, "border": f"1px solid {BORDER}",
+        "borderTop": f"3px solid {color}", "borderRadius": "12px",
+        "padding": "15px", "boxShadow": "0 2px 8px rgba(15,23,42,.04)",
+    })
 
 
 def _district_figure(frame: pd.DataFrame):
@@ -391,7 +595,17 @@ def render_mnh_hmis_test_dashboard(
     district_count = filtered["district"].dropna().nunique()
     summary = _indicator_summary(filtered)
 
-    indicator_sections = []
+    summary_lookup = _summary_lookup(summary)
+    summary_cards = [
+        _indicator_card(
+            summary_lookup[indicator_id],
+            INDICATOR_COLORS.get(indicator_id, GROUP_COLORS["Births and outcomes"]),
+        )
+        for indicator_id in SUMMARY_INDICATOR_IDS
+        if indicator_id in summary_lookup
+    ]
+
+    chart_sections = []
     available_groups = list(GROUP_ORDER) + [
         group for group in summary["indicator_group"].dropna().unique()
         if group not in GROUP_ORDER
@@ -400,32 +614,29 @@ def render_mnh_hmis_test_dashboard(
         group_summary = summary[summary["indicator_group"] == group]
         if group_summary.empty:
             continue
-        color = GROUP_COLORS.get(group, PURPLE)
-        indicator_sections.extend([
+        group_color = GROUP_COLORS.get(group, PURPLE)
+        chart_sections.extend([
             _section_header(
                 group,
-                f"{len(group_summary)} indicators · totals and latest-month movement",
-                color,
+                f"{len(group_summary)} monthly indicator run charts · active geographic scope",
+                group_color,
             ),
             html.Div(
-                [_indicator_card(row, color) for row in group_summary.itertuples(index=False)],
+                [
+                    _indicator_chart_card(
+                        filtered,
+                        row,
+                        INDICATOR_COLORS.get(row.indicator_id, group_color),
+                    )
+                    for row in group_summary.itertuples(index=False)
+                ],
                 style={
                     "display": "grid",
-                    "gridTemplateColumns": "repeat(auto-fit, minmax(205px, 1fr))",
-                    "gap": "10px",
+                    "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
+                    "gap": "14px", "marginBottom": "8px",
                 },
             ),
         ])
-
-    trend_cards = []
-    for group in GROUP_ORDER:
-        if group not in set(filtered["indicator_group"]):
-            continue
-        trend_cards.append(_chart_card(
-            f"{group} trends",
-            "Monthly totals recalculate for the active period and geographic scope.",
-            _trend_figure(filtered, group, GROUP_COLORS[group]),
-        ))
 
     district_title, district_figure = _district_figure(filtered)
     return html.Div(
@@ -435,20 +646,26 @@ def render_mnh_hmis_test_dashboard(
                 period_min, period_max, indicator_count, facility_count,
                 district_count, scope_meta or {},
             ),
-            _section_header(
-                "Indicator portfolio",
-                f"{indicator_count} indicators available in the active HMIS snapshot",
+            _priority_alert(summary),
+            _scope_band(
+                period_min, period_max, indicator_count, facility_count,
+                district_count, len(filtered), scope_meta or {},
             ),
-            *indicator_sections,
             _section_header(
-                "Performance over time",
-                "Country Profile-style monthly views by service domain",
+                "Country summary · Latest reporting month",
+                "Key birth and mortality indicators; totals reflect the active filter window",
+            ),
+            html.Div(summary_cards, style={
+                "display": "grid",
+                "gridTemplateColumns": "repeat(auto-fit, minmax(190px, 1fr))",
+                "gap": "12px", "marginBottom": "18px",
+            }),
+            _section_header(
+                "Indicator run charts",
+                "Every available HMIS indicator is shown in its own monthly chart and clinical domain",
                 BLUE,
             ),
-            html.Div(trend_cards, style={
-                "display": "grid", "gridTemplateColumns": "repeat(auto-fit, minmax(480px, 1fr))",
-                "gap": "14px",
-            }),
+            *chart_sections,
             _section_header("Geographic profile", "District comparison for priority outcomes", RED),
             _chart_card(
                 "Top 15 districts",
