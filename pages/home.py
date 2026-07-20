@@ -5,17 +5,17 @@ import plotly.express as px
 import os
 import json
 import numpy as np
+from pathlib import Path
 from dash.exceptions import PreventUpdate
 from flask import request
 from helpers.helpers import build_charts_section, build_metrics_section
 from mnid_renderer import render_mnid_dashboard
 from dashboard_layouts import build_premium_dashboard
-from dash import ctx
 from helpers.visualizations import create_line_list_basic_modal
 from datetime import datetime
 from datetime import datetime as dt
 from data_storage import DataStorage
-from config import DATA_PATH_,CUSTOM_GENDER_MAP
+from config import CUSTOM_GENDER_MAP
 import warnings
 import duckdb
 warnings.filterwarnings("ignore")
@@ -23,7 +23,6 @@ from helpers.date_ranges import (
                     get_relative_date_range,
                     RELATIVE_PERIOD_LIST
             )
-from helpers.navigation_callbacks import DEMO_UUID, DEMO_LOCATION
 from dash_iconify import DashIconify
 
 def nav_icon(icon_name):
@@ -170,6 +169,14 @@ def _latest_available_date(route: str = 'default') -> pd.Timestamp | None:
         max_date = pd.to_datetime(latest.loc[0, 'max_date'], errors='coerce') if len(latest) else pd.NaT
     except Exception:
         max_date = pd.NaT
+    if pd.isna(max_date):
+        hmis_path = Path(path) / 'mnid' / 'data' / 'dhis2' / 'aggregates' / 'hmis_test.parquet'
+        if hmis_path.exists():
+            try:
+                latest = pd.read_parquet(hmis_path, columns=['period_start'])['period_start'].max()
+                max_date = pd.to_datetime(latest, errors='coerce')
+            except Exception:
+                max_date = pd.NaT
     resolved = None if pd.isna(max_date) else max_date.normalize()
     _LATEST_DATA_DATE_CACHE.clear()
     _LATEST_DATA_DATE_CACHE[cache_key] = resolved
@@ -177,6 +184,18 @@ def _latest_available_date(route: str = 'default') -> pd.Timestamp | None:
 
 
 def _default_date_window(route: str = 'default'):
+    route_data_path = Path(path) / 'data' / route / 'parquet'
+    hmis_path = Path(path) / 'mnid' / 'data' / 'dhis2' / 'aggregates' / 'hmis_test.parquet'
+    if not route_data_path.exists() and hmis_path.exists():
+        try:
+            periods = pd.to_datetime(
+                pd.read_parquet(hmis_path, columns=['period_start'])['period_start'],
+                errors='coerce',
+            ).dropna()
+            if not periods.empty:
+                return periods.min().date(), periods.max().date()
+        except Exception:
+            pass
     latest = _latest_available_date(route)
     anchor = latest.date() if latest is not None else datetime.now().date()
     start = anchor - pd.Timedelta(days=29)
@@ -1317,23 +1336,31 @@ dash.clientside_callback(
 
 
 @callback(
-        Output('scrolling-menu', 'children'),
-        [Input('dashboard-interval-update-today', 'n_intervals'),
-        Input('active-button-store', 'data')],
-        State('url-params-store', 'data'))
-
+    Output('scrolling-menu', 'children'),
+    [
+        Input('dashboard-interval-update-today', 'n_intervals'),
+        Input('active-button-store', 'data'),
+        Input('url-params-store', 'data'),
+    ],
+)
 def update_menu(interval, color, urlparams):
     try:
+        urlparams = urlparams or {}
         data_route = urlparams.get('route', ["default"])[0]
         user_data = _load_user_registry(data_route)
-        user_row, scope = _resolve_user_scope(urlparams, user_data)
+        user_row, _scope = _resolve_user_scope(urlparams, user_data)
+        if user_row is None:
+            return []
+
         user_id = int(user_row.get('user_id', '0')) 
         user_uuid = user_row.get('uuid')
         user_programs_path = os.path.join(os.getcwd(), f"data/{data_route}/single_tables/user_programs.csv")
-        dashboard_path = os.path.join(os.getcwd(), f"data/visualizations/validated_dashboard.json")
-        user_programs = duckdb.sql(
-                                    f"SELECT name FROM '{user_programs_path}' WHERE user_id = {user_id}"
-                                ).df()['name'].to_list()
+        if user_uuid == DEMO_UUID or not os.path.exists(user_programs_path):
+            user_programs = []
+        else:
+            user_programs = duckdb.sql(
+                                        f"SELECT name FROM '{user_programs_path}' WHERE user_id = {user_id}"
+                                    ).df()['name'].to_list()
         
         user_props = next((user['properties'] for user in  _load_user_properties(data_route) if user.get('properties').get('uuid') == user_uuid), None)
         limited_dashboards = user_props.get('limited_dashboards', []) if user_props else []
@@ -1436,9 +1463,9 @@ def _save_mnid_executive_tab(tab_value):
         Input({"type": "menu-button", "name": ALL}, "n_clicks"),
         Input('url', 'pathname'),
         Input('dashboard-moh-level-filter', 'value'),
+        Input('url-params-store', 'data'),
     ],
     [
-        State('url-params-store', 'data'),
         State('dashboard-age-filter', 'value'),
         State('active-button-store', 'data'),
         State('mnid-active-tab-store', 'data'),
@@ -1482,7 +1509,8 @@ def update_dashboard(gen, start_date, end_date, level,
         if user_row is None:
             return (html.Div("Unauthorized User. Please contact system administrator."), level,
                     {'display': 'none'} if level in ['National', 'Facility'] else {},
-                    [], [], False, "", [],"", [], clicked_name)
+                    [], [], False, "", [], "", "", clicked_name,
+                    {'status': 'unauthorized'})
 
         user_level = scope['level']
         user_districts = scope.get('districts') or []

@@ -12,6 +12,8 @@ RELATIVE_DAYS = [ 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'This Wee
 
 # REFERENTIAL COLUMNS - THESE SHOULD MATCH THE QUERY OUTPUT COLUMNS
 DATA_PATH_ = "data/default"
+USE_DEMO_DATA = False
+DATA_FILE_NAME_ = "demo_parquet" if USE_DEMO_DATA else "data/parquet"
 
 # REFERENCE COLUMNS
 FIRST_NAME_ = 'given_name'
