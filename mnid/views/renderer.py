@@ -262,6 +262,18 @@ def _build_executive_tab_view(
         _cache_view(rendered_view)
         return rendered_view
 
+    if selected == 'mnh-hmis-test':
+        module = load_dashboard_module('MNH-HMIS-Test')
+        rendered_view = module.render_mnh_hmis_test_dashboard(
+            start_date=start_date,
+            end_date=end_date,
+            scope_meta=scope_meta,
+        )
+        if store_in_views:
+            views[selected] = rendered_view
+        _cache_view(rendered_view)
+        return rendered_view
+
     if selected == 'maternal-dashboard' and network_df is not None and config is not None:
         _mat_t0 = _time.monotonic()
         bundle = _build_mnid_indicator_content(
@@ -322,6 +334,9 @@ def _render_beginnings_shell(initial_tab: str, hidden_mnid_tabs: set[str], newbo
         tab_children.append(
             dcc.Tab(label='Operational Readiness', value='operational-readiness', style=_tab_style, selected_style=_tab_active2)
         )
+    tab_children.append(
+        dcc.Tab(label='MNH HMIS test', value='mnh-hmis-test', style=_tab_style, selected_style=_tab_active2)
+    )
     tab_children.append(
         dcc.Tab(label='Maternal', value='maternal-dashboard', style=_tab_style, selected_style=_tab_active2)
     )

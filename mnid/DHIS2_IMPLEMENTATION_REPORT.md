@@ -173,6 +173,18 @@ district filters and displays source, last successful synchronization, latest at
 freshness, and mapping version. MaHIS remains the default. There is no network call
 during import or rendering.
 
+A sample inner tab named **MNH HMIS test** is available under MNH Beginnings. It reads
+only local `hmis_test.parquet` output and currently displays five verified indicators
+through KPI cards, monthly trends, a top-district comparison, and a filterable facility
+table. Existing MNID date, district, and facility scope is applied. The sample contains
+51,309 rows across 866 facilities, 32 districts, and all 14 configured months.
+
+Refresh the sample explicitly with:
+
+```bash
+python -m mnid.dhis2.sample_sync
+```
+
 ## Tests and manual checks
 
 At the latest implementation checkpoint, 34 MNID DHIS2 tests pass using `unittest`. Coverage
