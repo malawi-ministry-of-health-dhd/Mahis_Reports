@@ -459,7 +459,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         for ind in inds:
             if _cur_batch:
                 num, den, pct = _batch_cov(_cur_batch, ind['id'], _kpi_fallbacks)
-                if den == 0:
+                if den == 0 and ind.get('numerator_filters') and ind.get('denominator_filters'):
                     num, den, pct = _cov(facility_df, ind['numerator_filters'], ind['denominator_filters'])
             elif _agg is not None and _s is not None:
                 num, den, pct = _agg_coverage(
@@ -468,8 +468,10 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
                     districts=_dist_filter if not _fac_filter else None,
                     grain=_kpi_grain, indicator_label=ind.get('label'),
                 )
-            else:
+            elif ind.get('numerator_filters') and ind.get('denominator_filters'):
                 num, den, pct = _cov(facility_df, ind['numerator_filters'], ind['denominator_filters'])
+            else:
+                num, den, pct = 0, 0, 0.0
             computed.append({**ind, 'pct': pct, 'numerator': num, 'denominator': den,
                               'attained_pct': _target_attainment_pct(pct, ind.get('target', 0), ind)})
         return computed
@@ -478,7 +480,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         for c in computed_list:
             if _prev_batch and prev_start is not None:
                 _, prev_den, prev_pct = _batch_cov(_prev_batch, c['id'], _kpi_fallbacks)
-                if prev_den == 0:
+                if prev_den == 0 and c.get('numerator_filters') and c.get('denominator_filters'):
                     try:
                         _, _, prev_pct = _cov(_prev_df_filtered, c['numerator_filters'], c['denominator_filters'])
                     except Exception:
@@ -495,7 +497,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
                     c['delta_pct'] = round(c['pct'] - prev_pct, 1)
                 except Exception:
                     c['delta_pct'] = None
-            elif prev_start is not None:
+            elif prev_start is not None and c.get('numerator_filters') and c.get('denominator_filters'):
                 try:
                     _, _, prev_pct = _cov(_prev_df_filtered, c['numerator_filters'], c['denominator_filters'])
                     c['delta_pct'] = round(c['pct'] - prev_pct, 1)
@@ -544,6 +546,7 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         display_inds, facility_code, network_df,
         precomputed_store=_resolve_heatmap_store(
             network_df, display_inds, facility_code, scope_meta, payload_key,
+            facility_df=facility_df, start_date=_s, end_date=_e,
         ),
     )
     _LOGGER.info('MNID timing: heatmap_section %.2fs', _time.monotonic() - _t3)
@@ -758,10 +761,14 @@ def _get_facility_df_from_state(state: dict, network_df=None):
 
 def _resolve_heatmap_store(network_df: pd.DataFrame, all_inds: list,
                            facility_code: str, scope_meta: dict | None,
-                           store_key: str) -> dict:
+                           store_key: str,
+                           facility_df: pd.DataFrame | None = None,
+                           start_date=None, end_date=None) -> dict:
     route = (scope_meta or {}).get('route', 'default')
     _, selected_facility_codes, selected_districts = _resolve_scope_filters(network_df, scope_meta or {})
     tracked = [i for i in all_inds if i.get('status') == 'tracked']
+    _s_key = pd.Timestamp(start_date).isoformat() if start_date is not None else None
+    _e_key = pd.Timestamp(end_date).isoformat() if end_date is not None else None
     cache_key = (
         route,
         facility_code,
@@ -769,10 +776,14 @@ def _resolve_heatmap_store(network_df: pd.DataFrame, all_inds: list,
         tuple(sorted(selected_facility_codes)),
         tuple(sorted(selected_districts)),
         _agg_version_stamp(route),
+        _s_key, _e_key,
     )
     _hms_key = _dk('hms', cache_key)
     cached_hms = _MNID_EXECUTIVE_DISK_CACHE.get(_hms_key)
     if cached_hms is None:
+        # Same window the KPI cards use (facility_df) -- the heatmap is no
+        # longer an independent "all time" view with its own Year selector.
+        row_level_df = facility_df if facility_df is not None else network_df
         agg_for_heatmap = _get_aggregate(route=route)
         if agg_for_heatmap is not None and not agg_for_heatmap.empty:
             if selected_facility_codes:
@@ -783,16 +794,19 @@ def _resolve_heatmap_store(network_df: pd.DataFrame, all_inds: list,
                 agg_for_heatmap = agg_for_heatmap[
                     agg_for_heatmap['district'].isin([str(d) for d in selected_districts])
                 ]
-            cached_hms = _compute_heatmap_store_from_agg(agg_for_heatmap, tracked, facility_code)
+            cached_hms = _compute_heatmap_store_from_agg(
+                agg_for_heatmap, tracked, facility_code,
+                start_date=start_date, end_date=end_date,
+            )
             # If no indicator IDs matched (stale aggregate with old IDs), fall back to raw df
             if not any(v.get('x') for v in cached_hms.get('by_facility', {}).values()):
                 _LOGGER.warning(
                     'Heatmap aggregate returned no matching indicators — falling back to raw df. '
                     'Rebuild the aggregate with run_aggregation_job() to restore performance.'
                 )
-                cached_hms = _compute_heatmap_store(network_df, tracked, facility_code)
+                cached_hms = _compute_heatmap_store(row_level_df, tracked, facility_code)
         else:
-            cached_hms = _compute_heatmap_store(network_df, tracked, facility_code)
+            cached_hms = _compute_heatmap_store(row_level_df, tracked, facility_code)
         if selected_districts:
             cached_hms['current_district'] = selected_districts[0]
         _MNID_EXECUTIVE_DISK_CACHE.set(_hms_key, cached_hms, expire=_MNID_UI_CACHE_TTL_SECONDS)

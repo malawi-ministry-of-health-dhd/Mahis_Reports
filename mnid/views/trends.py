@@ -140,6 +140,8 @@ def _indicator_run_fig(
         n_vals = precomputed['numerator'].tolist()
         d_vals = precomputed['denominator'].tolist()
         ys = [y if d > 0 else None for y, d in zip(ys, d_vals)]
+    elif not (ind.get('numerator_filters') and ind.get('denominator_filters')):
+        xs, ys, n_vals, d_vals = list(periods), [None] * len(periods), [0] * len(periods), [0] * len(periods)
     else:
         nm  = _mask(plot_df, ind['numerator_filters'])
         dm  = _mask(plot_df, ind['denominator_filters'])
@@ -343,8 +345,10 @@ def _run_chart_cards(
                                         facility_codes=fac_filter,
                                         districts=dist_filter if not fac_filter else None,
                                         grain=grain, indicator_label=ind.get('label'))[2]
-            else:
+            elif ind.get('numerator_filters') and ind.get('denominator_filters'):
                 cur_pct = _cov(plot_df, ind['numerator_filters'], ind['denominator_filters'])[2]
+            else:
+                cur_pct = 0.0
             cls = _css(cur_pct, target, ind)
             badge_colors = {'ok': ('#D1FAE5', '#065F46'), 'warn': ('#FEF3C7', '#92400E'), 'danger': ('#FEE2E2', '#991B1B')}
             bg, fg = badge_colors.get(cls, ('#F1F5F9', '#475569'))

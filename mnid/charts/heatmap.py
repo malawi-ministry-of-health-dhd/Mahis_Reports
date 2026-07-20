@@ -19,6 +19,12 @@ from mnid.core.constants import (
     FACILITY_NAMES as _FACILITY_NAMES,
 )
 from mnid.charts.chart_helpers import _display_pct, _infer_facility_type, _contrast_text
+from mnid.aggregation.store import _floor_to_period
+
+# Monthly first (cheapest, normally broadest coverage), then progressively
+# finer/other grains as a fallback when monthly has zero rows for a given
+# facility/district scope + date window. See _compute_heatmap_store_from_agg.
+_HEATMAP_GRAIN_FALLBACK = ['monthly', 'weekly', 'daily', 'quarterly', 'yearly']
 from mnid.charts.geo_utils import (
     load_malawi_district_geojson as _load_malawi_district_geojson,
     build_geo_reference as _build_geo_reference,
@@ -51,6 +57,10 @@ def _matrix_by_group(df: pd.DataFrame, inds: list,
     n_by_grp = {}
     d_by_grp = {}
     for ind in inds:
+        if not (ind.get('numerator_filters') and ind.get('denominator_filters')):
+            n_by_grp[ind['id']] = {}
+            d_by_grp[ind['id']] = {}
+            continue
         nm = _mask(df, ind['numerator_filters'])
         dm = _mask(df, ind['denominator_filters'])
         n_by_grp[ind['id']] = df[nm].groupby(group_col)['person_id'].nunique().to_dict()
@@ -79,6 +89,10 @@ def _matrix_monthly(df: pd.DataFrame, inds: list) -> tuple:
     n_by_m = {}
     d_by_m = {}
     for ind in inds:
+        if not (ind.get('numerator_filters') and ind.get('denominator_filters')):
+            n_by_m[ind['id']] = {}
+            d_by_m[ind['id']] = {}
+            continue
         nm = _mask(d2, ind['numerator_filters'])
         dm = _mask(d2, ind['denominator_filters'])
         n_by_m[ind['id']] = d2[nm].groupby('_m')['person_id'].nunique().to_dict()
@@ -113,7 +127,12 @@ def _cov_color(pct):
 
 def _compute_heatmap_store(mch_full: pd.DataFrame, tracked: list,
                            facility_code: str) -> dict:
-    """Pre-compute all view x year matrices into a JSON-serialisable store."""
+    """Pre-compute all view matrices into a JSON-serialisable store.
+
+    mch_full is expected to already be scoped to the caller's selected date
+    range (the same dataframe the KPI cards use) -- this function has no
+    independent "all years" view of its own anymore.
+    """
     current_district = _FACILITY_DISTRICT.get(facility_code, '')
     if len(mch_full) and 'Facility_CODE' in mch_full.columns:
         all_facilities = sorted(mch_full['Facility_CODE'].dropna().astype(str).unique().tolist())
@@ -149,108 +168,114 @@ def _compute_heatmap_store(mch_full: pd.DataFrame, tracked: list,
     y_labels  = [i['label'][:32] for i in sorted_inds]
     y_targets = [i['target']     for i in sorted_inds]
 
-    store = {
-        'y_labels': y_labels, 'y_targets': y_targets,
-        'current_fac': facility_code, 'current_district': current_district,
-        'all_facilities': all_facilities, 'all_districts': all_districts,
-        'monthly': {}, 'by_facility': {}, 'by_district': {},
-        'by_district_facs': {d: {} for d in all_districts},
-        'yearly': {}, 'district_avgs': {},
-    }
-
-    if not len(mch_full) or not sorted_inds:
-        return store
-
-    years = []
-    if 'Date' in mch_full.columns:
-        years = sorted(mch_full['Date'].dt.year.dropna().astype(int).unique().tolist())
-    year_options = {'All years': None, **{str(y): y for y in years}}
     district_facs_map = {
         d: [f for f in all_facilities if _FACILITY_DISTRICT.get(f) == d]
         for d in all_districts
     }
-    store['facilities_by_district'] = district_facs_map
 
-    for ylbl, yval in year_options.items():
-        df = mch_full[mch_full['Date'].dt.year == yval] if yval else mch_full
-        if not len(df):
-            for key in ['monthly', 'by_facility', 'by_district']:
-                store[key][ylbl] = {'x': [], 'z': [], 'tick_angle': 0}
-            for d in all_districts:
-                store['by_district_facs'][d][ylbl] = {'x': [], 'z': [], 'tick_angle': -30}
-            store['district_avgs'][ylbl] = {d: None for d in all_districts}
-            continue
+    store = {
+        'y_labels': y_labels, 'y_targets': y_targets,
+        'current_fac': facility_code, 'current_district': current_district,
+        'all_facilities': all_facilities, 'all_districts': all_districts,
+        'facilities_by_district': district_facs_map,
+        'monthly': {}, 'by_facility': {}, 'by_district': {},
+        'by_district_facs': {d: {} for d in all_districts},
+        'yearly': {}, 'district_avgs': {}, 'counts': {},
+    }
 
-        # Monthly - current facility only
-        fac_df = df[df['Facility_CODE'] == facility_code]
-        if len(fac_df):
-            x_m, z_m = _matrix_monthly(fac_df, sorted_inds)
-        else:
-            x_m, z_m = [], []
-        store['monthly'][ylbl] = {'x': x_m, 'z': z_m, 'tick_angle': 0}
+    # Sentinel key kept for compatibility with the chart builders below (they
+    # all index stored[...]['All years']) -- there's only ever one bucket now,
+    # scoped to whatever date range the caller already filtered mch_full to.
+    ylbl = 'All years'
 
-        # Vectorised groupby for facility and district - one pass per indicator
-        n_by_fac  = {}; d_by_fac  = {}
-        n_by_dist = {}; d_by_dist = {}
-        has_dist  = 'District' in df.columns
+    if not len(mch_full) or not sorted_inds:
+        for key in ['monthly', 'by_facility', 'by_district']:
+            store[key][ylbl] = {'x': [], 'z': [], 'tick_angle': 0}
+        for d in all_districts:
+            store['by_district_facs'][d][ylbl] = {'x': [], 'z': [], 'tick_angle': -30}
+        store['district_avgs'][ylbl] = {d: None for d in all_districts}
+        return store
 
-        for ind in sorted_inds:
-            nm = _mask(df, ind['numerator_filters'])
-            dm = _mask(df, ind['denominator_filters'])
-            n_by_fac[ind['id']]  = df[nm].groupby('Facility_CODE')['person_id'].nunique().to_dict()
-            d_by_fac[ind['id']]  = df[dm].groupby('Facility_CODE')['person_id'].nunique().to_dict()
+    df = mch_full
+
+    # Monthly - current facility only
+    fac_df = df[df['Facility_CODE'] == facility_code]
+    if len(fac_df):
+        x_m, z_m = _matrix_monthly(fac_df, sorted_inds)
+    else:
+        x_m, z_m = [], []
+    store['monthly'][ylbl] = {'x': x_m, 'z': z_m, 'tick_angle': 0}
+
+    # Vectorised groupby for facility and district - one pass per indicator
+    n_by_fac  = {}; d_by_fac  = {}
+    n_by_dist = {}; d_by_dist = {}
+    has_dist  = 'District' in df.columns
+
+    for ind in sorted_inds:
+        if not (ind.get('numerator_filters') and ind.get('denominator_filters')):
+            n_by_fac[ind['id']] = {}; d_by_fac[ind['id']] = {}
             if has_dist:
-                n_by_dist[ind['id']] = df[nm].groupby('District')['person_id'].nunique().to_dict()
-                d_by_dist[ind['id']] = df[dm].groupby('District')['person_id'].nunique().to_dict()
-
-        def _cell(n_dict, d_dict, ind_id, key):
-            n = n_dict.get(ind_id, {}).get(key, 0)
-            d = d_dict.get(ind_id, {}).get(key, 0)
-            return round(n / d * 100, 1) if d > 0 else None
-
-        # All facilities
-        x_f = [f'{f}*' if f == facility_code else f for f in all_facilities]
-        z_f = [[_cell(n_by_fac, d_by_fac, ind['id'], fac) for fac in all_facilities]
-               for ind in sorted_inds]
-        store['by_facility'][ylbl] = {
-            'x': x_f, 'z': z_f, 'tick_angle': -30,
-            'districts': [_FACILITY_DISTRICT.get(f, '') for f in all_facilities],
-        }
-
-        # All districts
+                n_by_dist[ind['id']] = {}; d_by_dist[ind['id']] = {}
+            continue
+        nm = _mask(df, ind['numerator_filters'])
+        dm = _mask(df, ind['denominator_filters'])
+        n_by_fac[ind['id']]  = df[nm].groupby('Facility_CODE')['person_id'].nunique().to_dict()
+        d_by_fac[ind['id']]  = df[dm].groupby('Facility_CODE')['person_id'].nunique().to_dict()
         if has_dist:
-            data_districts = sorted(df['District'].dropna().unique().tolist())
-            z_d = [[_cell(n_by_dist, d_by_dist, ind['id'], dist) for dist in data_districts]
-                   for ind in sorted_inds]
-            store['by_district'][ylbl] = {'x': data_districts[:], 'z': z_d, 'tick_angle': -20}
-            d_avgs = {}
-            for di, dist in enumerate(data_districts):
-                vals = [
-                    z_d[ii][di] for ii in range(len(sorted_inds))
-                    if (ii < len(z_d) and di < len(z_d[ii])
-                        and z_d[ii][di] is not None
-                        and z_d[ii][di] == z_d[ii][di])
-                ]
-                d_avgs[dist] = round(sum(vals) / len(vals), 1) if vals else None
-            store['district_avgs'][ylbl] = d_avgs
-        else:
-            store['by_district'][ylbl]   = {'x': [], 'z': [], 'tick_angle': -20}
-            store['district_avgs'][ylbl] = {}
+            n_by_dist[ind['id']] = df[nm].groupby('District')['person_id'].nunique().to_dict()
+            d_by_dist[ind['id']] = df[dm].groupby('District')['person_id'].nunique().to_dict()
 
-        # Per-district facility breakdowns
-        for dist in all_districts:
-            dfacs = district_facs_map[dist]
-            x_df  = [f'{f}*' if f == facility_code else f for f in dfacs]
-            z_df  = [[_cell(n_by_fac, d_by_fac, ind['id'], fac) for fac in dfacs]
-                     for ind in sorted_inds]
-            store['by_district_facs'][dist][ylbl] = {'x': x_df, 'z': z_df, 'tick_angle': -30}
+    def _cell(n_dict, d_dict, ind_id, key):
+        n = n_dict.get(ind_id, {}).get(key, 0)
+        d = d_dict.get(ind_id, {}).get(key, 0)
+        return round(n / d * 100, 1) if d > 0 else None
 
-    # Year-over-year for current facility
+    # All facilities
+    x_f = [f'{f}*' if f == facility_code else f for f in all_facilities]
+    z_f = [[_cell(n_by_fac, d_by_fac, ind['id'], fac) for fac in all_facilities]
+           for ind in sorted_inds]
+    store['by_facility'][ylbl] = {
+        'x': x_f, 'z': z_f, 'tick_angle': -30,
+        'districts': [_FACILITY_DISTRICT.get(f, '') for f in all_facilities],
+    }
+
+    # All districts
+    if has_dist:
+        data_districts = sorted(df['District'].dropna().unique().tolist())
+        z_d = [[_cell(n_by_dist, d_by_dist, ind['id'], dist) for dist in data_districts]
+               for ind in sorted_inds]
+        store['by_district'][ylbl] = {'x': data_districts[:], 'z': z_d, 'tick_angle': -20}
+        d_avgs = {}
+        for di, dist in enumerate(data_districts):
+            vals = [
+                z_d[ii][di] for ii in range(len(sorted_inds))
+                if (ii < len(z_d) and di < len(z_d[ii])
+                    and z_d[ii][di] is not None
+                    and z_d[ii][di] == z_d[ii][di])
+            ]
+            d_avgs[dist] = round(sum(vals) / len(vals), 1) if vals else None
+        store['district_avgs'][ylbl] = d_avgs
+    else:
+        store['by_district'][ylbl]   = {'x': [], 'z': [], 'tick_angle': -20}
+        store['district_avgs'][ylbl] = {}
+
+    # Per-district facility breakdowns
+    for dist in all_districts:
+        dfacs = district_facs_map[dist]
+        x_df  = [f'{f}*' if f == facility_code else f for f in dfacs]
+        z_df  = [[_cell(n_by_fac, d_by_fac, ind['id'], fac) for fac in dfacs]
+                 for ind in sorted_inds]
+        store['by_district_facs'][dist][ylbl] = {'x': x_df, 'z': z_df, 'tick_angle': -30}
+
+    # Year-over-year for current facility, within the selected window
     fac_full = mch_full[mch_full['Facility_CODE'] == facility_code]
     if len(fac_full) and 'Date' in fac_full.columns:
         years = sorted(fac_full['Date'].dt.year.dropna().astype(int).unique().tolist())
         n_yr = {}; d_yr = {}
         for ind in sorted_inds:
+            if not (ind.get('numerator_filters') and ind.get('denominator_filters')):
+                n_yr[ind['id']] = {}; d_yr[ind['id']] = {}
+                continue
             nm = _mask(fac_full, ind['numerator_filters'])
             dm = _mask(fac_full, ind['denominator_filters'])
             yr_col = fac_full['Date'].dt.year.astype(int)
@@ -262,24 +287,18 @@ def _compute_heatmap_store(mch_full: pd.DataFrame, tracked: list,
                   for yr in years] for ind in sorted_inds]
         store['yearly'] = {'x': x_yr, 'z': z_yr, 'tick_angle': 0}
 
-    # # MNID encounter volume counts for the right panel
+    # MNID encounter volume counts for the right panel
     counts: dict = {}
     if 'Encounter' in mch_full.columns:
-        enc_col = mch_full['Encounter'].fillna('').str.upper()
         fac_mask = mch_full['Facility_CODE'] == facility_code
-        for ylbl, yval in {'All years': None, '2025': 2025, '2026': 2026}.items():
-            if yval and 'Date' in mch_full.columns:
-                yr_mask = mch_full['Date'].dt.year == yval
-            else:
-                yr_mask = pd.Series(True, index=mch_full.index)
-            df_yr = mch_full[yr_mask & fac_mask]
-            enc_yr = df_yr['Encounter'].fillna('').str.upper() if len(df_yr) else pd.Series(dtype=str)
-            counts[ylbl] = {
-                'ANC visits':   int(df_yr[enc_yr.str.contains('ANC',      na=False)]['person_id'].nunique()),
-                'Deliveries':   int(df_yr[enc_yr.str.contains('LABOUR|DELIVERY|BIRTH', na=False)]['person_id'].nunique()),
-                'PNC visits':   int(df_yr[enc_yr.str.contains('PNC|POSTNATAL|POST.NATAL', na=False)]['person_id'].nunique()),
-                'All MCH encounters': int(df_yr['person_id'].nunique()),
-            }
+        df_yr = mch_full[fac_mask]
+        enc_yr = df_yr['Encounter'].fillna('').str.upper() if len(df_yr) else pd.Series(dtype=str)
+        counts[ylbl] = {
+            'ANC visits':   int(df_yr[enc_yr.str.contains('ANC',      na=False)]['person_id'].nunique()),
+            'Deliveries':   int(df_yr[enc_yr.str.contains('LABOUR|DELIVERY|BIRTH', na=False)]['person_id'].nunique()),
+            'PNC visits':   int(df_yr[enc_yr.str.contains('PNC|POSTNATAL|POST.NATAL', na=False)]['person_id'].nunique()),
+            'All MCH encounters': int(df_yr['person_id'].nunique()),
+        }
     store['counts'] = counts
 
     return store
@@ -289,18 +308,47 @@ def _compute_heatmap_store_from_agg(
     agg_df: pd.DataFrame,
     tracked: list,
     facility_code: str,
+    start_date=None,
+    end_date=None,
+    grain: str = 'monthly',
 ) -> dict:
     """Build the heatmap store from pre-aggregated data instead of raw row scans.
 
     Replaces _compute_heatmap_store when the aggregate parquet is available,
     converting seconds of groupby work into millisecond pandas filter+pivot ops.
     The 'counts' key is returned empty since encounter-type counts are not in the
-    aggregate.
+    aggregate. Scoped to [start_date, end_date] -- the same window the KPI cards
+    use -- not an independent "all time" view.
+
+    `grain` is tried first (monthly by default -- cheapest, and normally has
+    broad coverage), falling back through _HEATMAP_GRAIN_FALLBACK only if that
+    grain has zero matching rows for this specific facility/district scope +
+    date window. The aggregate's monthly rollups are sparse for some scopes,
+    so a narrow window filtered to one district can land on zero monthly rows
+    even though a finer grain has plenty; conversely defaulting straight to a
+    fine grain would make the common unfiltered case needlessly expensive
+    (monthly is ~4x fewer rows than daily). Picking whichever grain actually
+    has data for the current scope avoids both silently falling through to
+    the much slower raw-row scan, and needless heavy queries when monthly
+    would have worked fine.
     """
     current_district = _FACILITY_DISTRICT.get(facility_code, '')
 
     ind_ids = {i['id'] for i in tracked}
-    base = agg_df[agg_df['indicator_id'].isin(ind_ids) & (agg_df['grain'] == 'monthly')].copy()
+    by_grain = agg_df[agg_df['indicator_id'].isin(ind_ids)]
+    base = by_grain.iloc[0:0]  # empty but keeps columns, in case no candidate grain has data
+    resolved_grain = grain
+    _grain_candidates = [grain] + [g for g in _HEATMAP_GRAIN_FALLBACK if g != grain]
+    for candidate in _grain_candidates:
+        trial = by_grain[by_grain['grain'] == candidate].copy()
+        if start_date is not None:
+            trial = trial[trial['period_start'] >= _floor_to_period(start_date, candidate)]
+        if end_date is not None:
+            trial = trial[trial['period_start'] <= pd.Timestamp(end_date)]
+        if not trial.empty:
+            base = trial
+            resolved_grain = candidate
+            break
 
     agg_facs  = sorted(base['facility_code'].dropna().astype(str).unique().tolist())
     agg_dists = sorted(base['district'].dropna().astype(str).unique().tolist())
@@ -349,9 +397,11 @@ def _compute_heatmap_store_from_agg(
         return store
 
     base['_yr'] = base['period_start'].dt.year
-    years = sorted(base['_yr'].dropna().astype(int).unique().tolist())
-    year_options = {'All years': None, **{str(y): y for y in years}}
     ind_order = [i['id'] for i in sorted_inds]
+    # Sentinel key kept for compatibility with the chart builders below (they
+    # all index stored[...]['All years']) -- there's only ever one bucket now,
+    # scoped to [start_date, end_date] above, not literally every year loaded.
+    ylbl = 'All years'
 
     def _pct_dict(sub, group_col):
         """Return {ind_id: {group_key: float|None}} with NaN explicitly replaced by None."""
@@ -374,69 +424,69 @@ def _compute_heatmap_store_from_agg(
         """Build z[indicator_idx][key_idx] from a pct dict-of-dicts."""
         return [[pct_d.get(iid, {}).get(k) for k in keys] for iid in ind_order]
 
-    for ylbl, yval in year_options.items():
-        sub = base[base['_yr'] == yval] if yval else base
+    sub = base
+    if sub.empty:
+        for key in ['monthly', 'by_facility', 'by_district']:
+            store[key][ylbl] = {'x': [], 'z': [], 'tick_angle': 0}
+        for d in all_districts:
+            store['by_district_facs'][d][ylbl] = {'x': [], 'z': [], 'tick_angle': -30}
+        store['district_avgs'][ylbl] = {d: None for d in all_districts}
+        return store
 
-        if sub.empty:
-            for key in ['monthly', 'by_facility', 'by_district']:
-                store[key][ylbl] = {'x': [], 'z': [], 'tick_angle': 0}
-            for d in all_districts:
-                store['by_district_facs'][d][ylbl] = {'x': [], 'z': [], 'tick_angle': -30}
-            store['district_avgs'][ylbl] = {d: None for d in all_districts}
-            continue
+    # monthly view: current facility only, pivot over period_start
+    fac_sub = sub[sub['facility_code'] == str(facility_code)]
+    if not fac_sub.empty:
+        gm = fac_sub.groupby(['indicator_id', 'period_start'])[['numerator', 'denominator']].sum().reset_index()
+        gm['pct'] = (gm['numerator'] / gm['denominator'].where(gm['denominator'] > 0) * 100).round(1)
+        piv_m = gm.pivot(index='indicator_id', columns='period_start', values='pct')
+        periods = sorted(piv_m.columns.tolist())
+        _label_fmt = '%d %b %y' if resolved_grain in ('daily', 'weekly') else '%b %y'
+        x_m = [pd.Timestamp(p).strftime(_label_fmt) for p in periods]
+        m_dict = piv_m.where(pd.notna, other=None).to_dict(orient='index')
+        z_m = [[m_dict.get(iid, {}).get(p) for p in periods] for iid in ind_order]
+    else:
+        x_m, z_m = [], []
+    store['monthly'][ylbl] = {'x': x_m, 'z': z_m, 'tick_angle': 0}
 
-        # monthly view: current facility only, pivot over period_start
-        fac_sub = sub[sub['facility_code'] == str(facility_code)]
-        if not fac_sub.empty:
-            gm = fac_sub.groupby(['indicator_id', 'period_start'])[['numerator', 'denominator']].sum().reset_index()
-            gm['pct'] = (gm['numerator'] / gm['denominator'].where(gm['denominator'] > 0) * 100).round(1)
-            piv_m = gm.pivot(index='indicator_id', columns='period_start', values='pct')
-            periods = sorted(piv_m.columns.tolist())
-            x_m = [f"{pd.Timestamp(p).strftime('%b')} {str(pd.Timestamp(p).year)[2:]}" for p in periods]
-            m_dict = piv_m.where(pd.notna, other=None).to_dict(orient='index')
-            z_m = [[m_dict.get(iid, {}).get(p) for p in periods] for iid in ind_order]
-        else:
-            x_m, z_m = [], []
-        store['monthly'][ylbl] = {'x': x_m, 'z': z_m, 'tick_angle': 0}
+    # by facility, pivot over facility_code
+    fp = _pct_dict(sub, 'facility_code')
+    x_f = [f'{f}*' if f == str(facility_code) else f for f in all_facilities]
+    z_f = _z_matrix(fp, all_facilities)
+    store['by_facility'][ylbl] = {
+        'x': x_f, 'z': z_f, 'tick_angle': -30,
+        'districts': [_FACILITY_DISTRICT.get(f, '') for f in all_facilities],
+    }
 
-        # by facility, pivot over facility_code
-        fp = _pct_dict(sub, 'facility_code')
-        x_f = [f'{f}*' if f == str(facility_code) else f for f in all_facilities]
-        z_f = _z_matrix(fp, all_facilities)
-        store['by_facility'][ylbl] = {
-            'x': x_f, 'z': z_f, 'tick_angle': -30,
-            'districts': [_FACILITY_DISTRICT.get(f, '') for f in all_facilities],
-        }
+    # by district, pivot over district
+    data_dists = sorted(sub['district'].dropna().astype(str).unique().tolist())
+    if data_dists:
+        dp = _pct_dict(sub, 'district')
+        z_d = _z_matrix(dp, data_dists)
+        d_avgs = {}
+        for di, dist in enumerate(data_dists):
+            vals = [
+                z_d[ii][di] for ii in range(len(sorted_inds))
+                if (ii < len(z_d) and di < len(z_d[ii])
+                    and z_d[ii][di] is not None
+                    and z_d[ii][di] == z_d[ii][di])  # exclude NaN (NaN != NaN)
+            ]
+            d_avgs[dist] = round(sum(vals) / len(vals), 1) if vals else None
+        store['by_district'][ylbl] = {'x': data_dists, 'z': z_d, 'tick_angle': -20}
+        store['district_avgs'][ylbl] = d_avgs
+    else:
+        store['by_district'][ylbl] = {'x': [], 'z': [], 'tick_angle': -20}
+        store['district_avgs'][ylbl] = {}
 
-        # by district, pivot over district
-        data_dists = sorted(sub['district'].dropna().astype(str).unique().tolist())
-        if data_dists:
-            dp = _pct_dict(sub, 'district')
-            z_d = _z_matrix(dp, data_dists)
-            d_avgs = {}
-            for di, dist in enumerate(data_dists):
-                vals = [
-                    z_d[ii][di] for ii in range(len(sorted_inds))
-                    if (ii < len(z_d) and di < len(z_d[ii])
-                        and z_d[ii][di] is not None
-                        and z_d[ii][di] == z_d[ii][di])  # exclude NaN (NaN != NaN)
-                ]
-                d_avgs[dist] = round(sum(vals) / len(vals), 1) if vals else None
-            store['by_district'][ylbl] = {'x': data_dists, 'z': z_d, 'tick_angle': -20}
-            store['district_avgs'][ylbl] = d_avgs
-        else:
-            store['by_district'][ylbl] = {'x': [], 'z': [], 'tick_angle': -20}
-            store['district_avgs'][ylbl] = {}
+    # per-district facility breakdowns, reuse fp computed above
+    for dist in all_districts:
+        dfacs = district_facs_map[dist]
+        x_df = [f'{f}*' if f == str(facility_code) else f for f in dfacs]
+        z_df = _z_matrix(fp, dfacs)
+        store['by_district_facs'][dist][ylbl] = {'x': x_df, 'z': z_df, 'tick_angle': -30}
 
-        # per-district facility breakdowns, reuse fp computed above
-        for dist in all_districts:
-            dfacs = district_facs_map[dist]
-            x_df = [f'{f}*' if f == str(facility_code) else f for f in dfacs]
-            z_df = _z_matrix(fp, dfacs)
-            store['by_district_facs'][dist][ylbl] = {'x': x_df, 'z': z_df, 'tick_angle': -30}
-
-    # yearly view: current facility, year-over-year, pivot over _yr
-    fac_all = base[base['facility_code'] == str(facility_code)]
+    # yearly view: current facility, year-over-year within the selected window
+    years = sorted(sub['_yr'].dropna().astype(int).unique().tolist())
+    fac_all = sub[sub['facility_code'] == str(facility_code)]
     if not fac_all.empty and years:
         gy = fac_all.groupby(['indicator_id', '_yr'])[['numerator', 'denominator']].sum().reset_index()
         gy['pct'] = (gy['numerator'] / gy['denominator'].where(gy['denominator'] > 0) * 100).round(1)

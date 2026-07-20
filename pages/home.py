@@ -47,7 +47,8 @@ from config import (actual_keys_in_data,
                     VALUE_,
                     VALUE_NUMERIC_,
                     DRUG_NAME_,
-                    VALUE_NAME_)
+                    VALUE_NAME_,
+                    MNID_DATA_SOURCE)
 
 dash.register_page(__name__, path="/home")
 
@@ -1442,6 +1443,27 @@ def _save_mnid_executive_tab(tab_value):
 
 
 @callback(
+    Output('active-button-store', 'data'),
+    Input({"type": "menu-button", "name": ALL}, "n_clicks"),
+    prevent_initial_call=True,
+)
+def _set_active_button(menu_clicks):
+    # Split out of update_dashboard so active-button-store.data isn't written
+    # by the same callback that reads dashboard-moh-level-filter.value -- that
+    # combination is what created a Dash dependency cycle with
+    # toggle_moh_level_visibility (which writes dashboard-moh-level-filter.value
+    # from active-button-store.data). Only a menu-button click ever changes
+    # which report is active, so this mirrors update_dashboard's own
+    # clicked_name logic without needing moh_level as an input at all.
+    ctx = callback_context
+    triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else None
+    if not triggered_id or "menu-button" not in triggered_id:
+        raise PreventUpdate
+    prop_dict = json.loads(triggered_id.split('.')[0])
+    return prop_dict['name']
+
+
+@callback(
     [Output('dashboard-container', 'children'),
      Output('dashboard-level-filter', 'value'),
      Output('dashboard-district-filter-group', 'style'),
@@ -1452,7 +1474,6 @@ def _save_mnid_executive_tab(tab_value):
      Output('dashboard-facility-filter', 'options'),
      Output('dashboard-facility-filter', 'value'),
      Output('filter-period-text', 'children'),
-     Output('active-button-store', 'data'),
      Output('dashboard-render-state', 'data')],
     [
         Input('dashboard-btn-generate', 'n_clicks'),
@@ -1512,7 +1533,7 @@ def update_dashboard(gen, start_date, end_date, level,
         if user_row is None:
             return (html.Div("Unauthorized User. Please contact system administrator."), level,
                     {'display': 'none'} if level in ['National', 'Facility'] else {},
-                    [], [], False, "", [], "", "", clicked_name,
+                    [], [], False, "", [], "", "",
                     {'status': 'unauthorized'})
 
         user_level = scope['level']
@@ -1637,6 +1658,12 @@ def update_dashboard(gen, start_date, end_date, level,
         user_facility_level = (
             resolve_facility_level(scope.get('facility_code')) if scope.get('facility_code') else None
         )
+        # MNID's indicator-coverage views (get_aggregate() call sites) read from
+        # the 'dhis2' pseudo-route instead of the real MAHIS route when that data
+        # source is selected -- data_route/DATA_PATH_ elsewhere in this function
+        # (facility dropdowns, raw MAHIS queries) are untouched, since DHIS2 has no
+        # equivalent for those.
+        aggregate_route = 'dhis2' if MNID_DATA_SOURCE == 'dhis2' else data_route
         scope_meta = {
             'label':               scope_label,
             'value':               scope_value,
@@ -1646,7 +1673,7 @@ def update_dashboard(gen, start_date, end_date, level,
             'selected_districts':  active_dists,
             'data_period_note':    None,
             'dataset_version':     dataset_version,
-            'route':               data_route,
+            'route':               aggregate_route,
             'user_facility_level': user_facility_level,
         }
 
@@ -1688,7 +1715,6 @@ def update_dashboard(gen, start_date, end_date, level,
             [{'label': f, 'value': f} for f in all_facilities],
             facilities,
             f"{start_dt} - {end_dt}",
-            clicked_name,
             {
                 'status': 'ok',
                 'selected_reports': selected_reports,
@@ -1721,7 +1747,6 @@ def update_dashboard(gen, start_date, end_date, level,
                 html.P(f"{type(e).__name__}", style={"color": "#64748b", "fontSize": "12px", "fontWeight": "600"}),
                 html.P(str(e), style={"color": "#94A3B8", "fontSize": "12px"}),
             ]),
-            dash.no_update,
             dash.no_update,
             dash.no_update,
             dash.no_update,

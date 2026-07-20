@@ -4930,6 +4930,30 @@
           "value1": "Newborn"
         },
         "note": "Proxy from admission thermal status \u2014 longitudinal stay temperature not yet in extract."
+      },
+      {
+        "id": "mnid_lab_core_totalbirths",
+        "label": "Total Births",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator (Analytics sum of live births + stillbirths). No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_freshstillbirths",
+        "label": "Fresh Stillbirths",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_maceratedstillbirths",
+        "label": "Macerated Stillbirths",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
       }
     ],
     "mnid_categories": [
@@ -6282,6 +6306,30 @@
           "value1": "Newborn"
         },
         "note": "Proxy from admission thermal status \u2014 longitudinal stay temperature not yet in extract."
+      },
+      {
+        "id": "mnid_lab_core_totalbirths",
+        "label": "Total Births",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator (Analytics sum of live births + stillbirths). No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_freshstillbirths",
+        "label": "Fresh Stillbirths",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_maceratedstillbirths",
+        "label": "Macerated Stillbirths",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
       }
     ],
     "mnid_categories": [

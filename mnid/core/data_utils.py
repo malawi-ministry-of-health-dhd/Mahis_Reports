@@ -1111,6 +1111,36 @@ def _facility_level_by_code() -> dict[str, str]:
     return _FACILITY_LEVEL_BY_CODE
 
 
+_FACILITY_REGISTRY_BY_CODE: dict[str, dict] | None = None
+
+
+def _facility_registry_by_code() -> dict[str, dict]:
+    """Load data/geo/facilities_levels.json once into {Facility_CODE: {name, district}}.
+
+    Same source file as _facility_level_by_code, but keyed to name/district
+    instead of level -- used to resolve facility labels for codes that come
+    from an external source (e.g. DHIS2's crosswalk) and never appear as rows
+    in the locally-loaded MAHIS dataset, so register_facility_metadata's
+    dataset-derived FACILITY_NAMES/FACILITY_DISTRICT wouldn't otherwise know
+    them.
+    """
+    global _FACILITY_REGISTRY_BY_CODE
+    if _FACILITY_REGISTRY_BY_CODE is not None:
+        return _FACILITY_REGISTRY_BY_CODE
+    path = os.path.join(os.getcwd(), 'data', 'geo', 'facilities_levels.json')
+    try:
+        with open(path, encoding='utf-8') as f:
+            records = json.load(f)
+        _FACILITY_REGISTRY_BY_CODE = {
+            str(r['CODE']): {'name': r.get('NAME'), 'district': r.get('DISTRICT')}
+            for r in records
+            if r.get('CODE') and r.get('NAME')
+        }
+    except Exception:
+        _FACILITY_REGISTRY_BY_CODE = {}
+    return _FACILITY_REGISTRY_BY_CODE
+
+
 def resolve_facility_level(facility_code: str | None, facility_name: str | None = None) -> str:
     """Look up a facility's Primary/Secondary/Tertiary level.
 
@@ -1249,6 +1279,22 @@ def register_facility_metadata(df: pd.DataFrame, route: str = 'default') -> None
         for code, name, district in zip(codes, names, dists):
             if code:
                 FACILITY_COORDS.setdefault(code, (None, None, name or code, district))
+
+    # Backfill from the national facility registry (data/geo/facilities_levels.json)
+    # for codes the current MAHIS sample doesn't cover -- e.g. an alternate-source
+    # aggregate (DHIS2) whose facility_code crosswalk resolves to a real facility
+    # that simply has no rows in the loaded MAHIS dataset, which would otherwise
+    # render as a raw code instead of a name in facility-performance views. MAHIS-
+    # observed names above always win; this only fills genuine gaps.
+    for code, meta in _facility_registry_by_code().items():
+        if meta.get('name') and code not in FACILITY_NAMES:
+            FACILITY_NAMES[code] = meta['name']
+            if code not in ALL_FACILITIES:
+                ALL_FACILITIES.append(code)
+        if meta.get('district') and code not in FACILITY_DISTRICT:
+            FACILITY_DISTRICT[code] = meta['district']
+            if meta['district'] not in ALL_DISTRICTS:
+                ALL_DISTRICTS.append(meta['district'])
 
 
 _MCH_PATTERN = 'Maternal|Child|Neonatal|Newborn'

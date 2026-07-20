@@ -262,18 +262,6 @@ def _build_executive_tab_view(
         _cache_view(rendered_view)
         return rendered_view
 
-    if selected == 'mnh-hmis-test':
-        module = load_dashboard_module('MNH-HMIS-Test')
-        rendered_view = module.render_mnh_hmis_test_dashboard(
-            start_date=start_date,
-            end_date=end_date,
-            scope_meta=scope_meta,
-        )
-        if store_in_views:
-            views[selected] = rendered_view
-        _cache_view(rendered_view)
-        return rendered_view
-
     if selected == 'maternal-dashboard' and network_df is not None and config is not None:
         _mat_t0 = _time.monotonic()
         bundle = _build_mnid_indicator_content(
@@ -308,7 +296,7 @@ def _build_executive_tab_view(
     return views.get('country-profile', html.Div())
 
 
-def _render_beginnings_shell(initial_tab: str, hidden_mnid_tabs: set[str], newborn_config, initial_children=None, scope_meta: dict | None = None, hmis_only: bool = False) -> html.Div:
+def _render_beginnings_shell(initial_tab: str, hidden_mnid_tabs: set[str], newborn_config, initial_children=None, scope_meta: dict | None = None) -> html.Div:
     _tab_style = {
         'padding': '10px 18px',
         'borderRadius': '12px',
@@ -327,23 +315,17 @@ def _render_beginnings_shell(initial_tab: str, hidden_mnid_tabs: set[str], newbo
     _tab_active2 = dict(_tab_active, backgroundColor='#F8FAFC')
 
     _profile_tab_label = _profile_scope_name(scope_meta)['tab_label']
-    tab_children = []
-    if not hmis_only:
-        tab_children.append(
-            dcc.Tab(label=_profile_tab_label, value='country-profile', style=_tab_style, selected_style=_tab_active)
-        )
-    if not hmis_only and 'operational-readiness' not in hidden_mnid_tabs:
+    tab_children = [
+        dcc.Tab(label=_profile_tab_label, value='country-profile', style=_tab_style, selected_style=_tab_active),
+    ]
+    if 'operational-readiness' not in hidden_mnid_tabs:
         tab_children.append(
             dcc.Tab(label='Operational Readiness', value='operational-readiness', style=_tab_style, selected_style=_tab_active2)
         )
     tab_children.append(
-        dcc.Tab(label='MNH HMIS test', value='mnh-hmis-test', style=_tab_style, selected_style=_tab_active2)
+        dcc.Tab(label='Maternal', value='maternal-dashboard', style=_tab_style, selected_style=_tab_active2)
     )
-    if not hmis_only:
-        tab_children.append(
-            dcc.Tab(label='Maternal', value='maternal-dashboard', style=_tab_style, selected_style=_tab_active2)
-        )
-    if not hmis_only and newborn_config is not None:
+    if newborn_config is not None:
         tab_children.append(
             dcc.Tab(label='Newborn', value='newborn-dashboard', style=_tab_style, selected_style=_tab_active2)
         )
@@ -364,44 +346,6 @@ def _render_beginnings_shell(initial_tab: str, hidden_mnid_tabs: set[str], newbo
                 className='mnid-executive-content',
                 children=initial_children if initial_children is not None else [_mnid_loading_placeholder()],
             ),
-        ],
-    )
-
-
-def _render_hmis_only_dashboard(start_date, end_date, scope_meta: dict | None = None) -> html.Div:
-    """Render the DHIS2 sample when the legacy MAHIS parquet is unavailable."""
-    module = load_dashboard_module('MNH-HMIS-Test')
-    rendered = module.render_mnh_hmis_test_dashboard(
-        start_date=start_date,
-        end_date=end_date,
-        scope_meta=scope_meta,
-    )
-    token_data = ('hmis-only', str(start_date), str(end_date), scope_meta or {})
-    token = hashlib.md5(pickle.dumps(token_data, protocol=4)).hexdigest()
-    views = {'mnh-hmis-test': rendered}
-    state = {
-        'start_date': start_date,
-        'end_date': end_date,
-        'scope_meta': scope_meta or {},
-        'beginnings_initial_tab': 'mnh-hmis-test',
-        'newborn_config': None,
-    }
-    shell = _render_beginnings_shell(
-        initial_tab='mnh-hmis-test',
-        hidden_mnid_tabs=set(),
-        newborn_config=None,
-        initial_children=[rendered],
-        scope_meta=scope_meta,
-        hmis_only=True,
-    )
-    views['beginnings-shell'] = shell
-    _MNID_EXECUTIVE_DISK_CACHE.set(f'ec:{token}', views, expire=_MNID_UI_CACHE_TTL_SECONDS)
-    _MNID_EXECUTIVE_DISK_CACHE.set(f'ed:{token}', state, expire=_MNID_UI_CACHE_TTL_SECONDS)
-    return html.Div(
-        className='mnid-bg',
-        children=[
-            dcc.Store(id='mnid-executive-view-store', data=token),
-            html.Div(className='mnid-shell', children=[shell]),
         ],
     )
 
@@ -492,8 +436,6 @@ def render_mnid_dashboard(filtered, data_opd, data_path, config,
         if not source_path.is_absolute():
             source_path = Path.cwd() / source_path
         if not source_path.exists():
-            if config.get('report_name') == 'Maternal Health':
-                return _render_hmis_only_dashboard(start_date, end_date, scope_meta)
             return html.Div(
                 'The local MAHIS dataset is unavailable for this dashboard.',
                 style={'padding': '24px', 'color': '#64748B'},
