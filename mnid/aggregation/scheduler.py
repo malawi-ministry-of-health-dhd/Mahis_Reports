@@ -3,7 +3,8 @@ Overnight aggregation job.
 
 Runs daily at 02:00 via APScheduler (see start_scheduler.py), or right after
 data_storage.py refreshes the parquet, by calling run_aggregation_job directly.
-Reads from demo_parquet/ or data/parquet/ depending on config.USE_DEMO_DATA.
+Route-scoped jobs read from data/<route>/parquet unless an explicit data source is
+provided.
 
 Writes indicator_aggregates.parquet + meta.json, then invalidates the in-memory
 store cache so the next dashboard request picks up fresh data. A lock file

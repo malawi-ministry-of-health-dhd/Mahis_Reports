@@ -11,12 +11,11 @@ from flask import request
 from helpers.helpers import build_charts_section, build_metrics_section
 from mnid_renderer import render_mnid_dashboard
 from dashboard_layouts import build_premium_dashboard
-from dash import ctx
 from helpers.visualizations import create_line_list_basic_modal
 from datetime import datetime
 from datetime import datetime as dt
 from data_storage import DataStorage
-from config import DATA_PATH_,CUSTOM_GENDER_MAP
+from config import CUSTOM_GENDER_MAP
 import warnings
 import duckdb
 warnings.filterwarnings("ignore")
@@ -24,7 +23,6 @@ from helpers.date_ranges import (
                     get_relative_date_range,
                     RELATIVE_PERIOD_LIST
             )
-from helpers.navigation_callbacks import DEMO_UUID, DEMO_LOCATION
 from dash_iconify import DashIconify
 
 def nav_icon(icon_name):
@@ -1338,24 +1336,25 @@ dash.clientside_callback(
 
 
 @callback(
-        Output('scrolling-menu', 'children'),
-        [Input('dashboard-interval-update-today', 'n_intervals'),
+    Output('scrolling-menu', 'children'),
+    [
+        Input('dashboard-interval-update-today', 'n_intervals'),
         Input('active-button-store', 'data'),
-        Input('url-params-store', 'data')])
-
+        Input('url-params-store', 'data'),
+    ],
+)
 def update_menu(interval, color, urlparams):
     try:
         urlparams = urlparams or {}
         data_route = urlparams.get('route', ["default"])[0]
         user_data = _load_user_registry(data_route)
-        user_row, scope = _resolve_user_scope(urlparams, user_data)
+        user_row, _scope = _resolve_user_scope(urlparams, user_data)
         if user_row is None:
             return []
 
         user_id = int(user_row.get('user_id', '0')) 
         user_uuid = user_row.get('uuid')
         user_programs_path = os.path.join(os.getcwd(), f"data/{data_route}/single_tables/user_programs.csv")
-        dashboard_path = os.path.join(os.getcwd(), f"data/visualizations/validated_dashboard.json")
         if user_uuid == DEMO_UUID or not os.path.exists(user_programs_path):
             user_programs = []
         else:
