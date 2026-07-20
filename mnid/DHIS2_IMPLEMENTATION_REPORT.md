@@ -14,9 +14,9 @@ Authenticated Analytics and Data Entry API requests have now been completed. The
 DHIS2 organisation hierarchy is available locally as discovered metadata, four source
 Data Entry forms have been identified, and their mappings have been assessed.
 A working **MNH HMIS test** dashboard now displays a controlled snapshot of real
-aggregate values retrieved from Malawi HMIS DHIS2: five verified indicators, 51,309
-rows, 866 reporting organisation units, 32 districts, and 14 monthly periods from
-April 2025 through May 2026. The dashboard does not query DHIS2 when a page opens;
+aggregate values retrieved from Malawi HMIS DHIS2: 25 verified indicators, 232,769
+calculated rows, 867 reporting organisation units, 32 districts, and 14 monthly
+periods from April 2025 through May 2026. The dashboard does not query DHIS2 when a page opens;
 it reads the last locally generated Parquet snapshot. Production publication of the
 full 52-indicator mapping remains blocked pending governance approval of the
 crosswalk, resolution of incomplete operands, and management approval of the
@@ -31,8 +31,8 @@ ingestion model.
 - Raw audit, normalized atomic data, calculated indicators, validation reports, and
   last-known-good output separated under ignored runtime folders.
 - Opt-in DHIS2 dashboard mode without render-time network access.
-- A working MNH Beginnings HMIS test view with five KPI cards, monthly trends,
-  district comparison, and facility-level filtering/table output.
+- A working MNH Beginnings HMIS test view with 25 grouped KPI cards, domain trends,
+  priority-outcome district comparison, and facility-level filtering/table output.
 - Application startup and routing support for a DHIS2-only test environment where
   the legacy `data/default/parquet` MAHIS source is unavailable.
 
@@ -184,11 +184,13 @@ freshness, and mapping version. MaHIS remains the default. There is no network c
 during import or rendering.
 
 A sample inner tab named **MNH HMIS test** is available under MNH Beginnings. It reads
-only local `hmis_test.parquet` output and currently displays five verified indicators
-through KPI cards, monthly trends, a top-district comparison, and a filterable facility
-table. Existing MNID date, district, and facility scope is applied. The sample contains
-51,309 aggregate rows across 866 DHIS2 organisation units, 32 districts, and all 14
-configured months from April 2025 through May 2026.
+only local `hmis_test.parquet` output and currently displays 25 verified indicators
+through Country Profile-inspired grouped KPI cards, recent-month movement, domain
+trends, a priority-outcome district comparison, and a filterable facility table.
+Existing MNID date, district, and facility scope is applied. The sample contains
+232,769 calculated aggregate rows across 867 DHIS2 organisation units, 32 districts,
+and all 14 configured months from April 2025 through May 2026. It retains 65,721
+explicit zero records.
 
 ### Important interpretation of the displayed data
 
@@ -207,20 +209,18 @@ Corrections or new submissions made in DHIS2 after that extraction will appear o
 after another successful synchronization. This offline-first design avoids slow page
 loads, repeated DHIS2 traffic, and exposing credentials to the visualization layer.
 
-The successful five-indicator sample and the full mapping publication are separate
+The successful 25-indicator sample and the full mapping publication are separate
 states. The sample Parquet exists and is usable by the test dashboard. The latest
 full 78-operand pipeline status remains `failed`/`published: false` because completeness
 validation rejected missing operands. Therefore, the working test tab demonstrates
 retrieval and visualization capability; it does not mean that the complete production
 indicator set has passed validation or received governance approval.
 
-The five indicators currently displayed are:
-
-1. Started ANC in first trimester.
-2. New ANC registrations.
-3. Received ITN during ANC.
-4. Maternal deaths.
-5. Live births (HIV exposed, NVP started).
+The 25 displayed indicators comprise seven birth/outcome measures, ten antenatal-care
+measures, and eight delivery/newborn-care measures. They require 36 unique atomic
+DHIS2 operands. Known incomplete anaemia and retained-products operands and the
+breastfeeding calculation awaiting clinical confirmation are not included in this
+controlled dashboard set.
 
 When the legacy MAHIS Parquet source is unavailable, selecting **MNH Program** now
 opens the HMIS-only Beginnings view instead of failing with a DuckDB catalog error.
@@ -259,7 +259,7 @@ Manual checks performed:
 - Git diffs were checked for whitespace and scope.
 - Authenticated `/api/me`, organisation-unit metadata, and controlled Analytics pilot
   requests completed with TLS verification enabled.
-- The HMIS-only application path rendered all five indicators from the local snapshot
+- The HMIS-only application path rendered all 25 indicators from the local snapshot
   without requiring `data/default/parquet`.
 - Application callback return shapes, demo-user URL initialization, missing local
   datasource handling, Python compilation, and Git whitespace checks passed.

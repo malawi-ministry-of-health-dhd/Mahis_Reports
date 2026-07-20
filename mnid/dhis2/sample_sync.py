@@ -1,62 +1,136 @@
-"""Refresh the five-indicator local dataset used by the MNH HMIS test tab."""
+"""Refresh the 25-indicator local dataset used by the MNH HMIS dashboard."""
 
 from __future__ import annotations
 
 import json
 import logging
 import uuid
+from decimal import Decimal
 from pathlib import Path
 
+from .calculations import calculate_indicators
 from .client import DHIS2Client, parse_analytics_response
+from .mappings import atomic_dx_values, load_indicator_mapping
 from .periods import monthly_periods, period_start_date
 from .settings import DHIS2Settings
 from .storage import atomic_parquet
 
 _LOG = logging.getLogger(__name__)
-SAMPLE_INDICATORS = {
-    "EVt2iC6Tn34": "Started ANC in first trimester",
-    "gLN6hOgR6ra": "Received ITN during ANC",
-    "zAvhV81SCLV": "New ANC registrations",
-    "iBBnHx1Uf50": "Live births (HIV exposed, NVP started)",
-    "WjHvEHMCyKo": "Maternal deaths",
+INDICATOR_GROUPS = {
+    "Births and outcomes": (
+        "live_births", "total_births", "fresh_stillbirths",
+        "macerated_stillbirths", "maternal_deaths", "neonatal_deaths",
+        "stillbirths",
+    ),
+    "Antenatal care": (
+        "anc_visits", "blood_pressure_measured", "tested_for_hiv",
+        "screened_for_syphilis", "at_least_4_anc_contacts",
+        "tetanus_doses_2", "new_anc_registrations",
+        "started_anc_in_first_trimester_0_12_weeks",
+        "received_120_fefo_tablets", "received_itn_during_anc",
+    ),
+    "Delivery and newborn care": (
+        "uterotonic_given_after_birth",
+        "newborns_not_breathing_at_birth_receiving_bag_mask_ventilation",
+        "vitamin_k_at_birth", "facility_deliveries",
+        "delivered_at_this_facility", "delivered_at_home_or_in_transit",
+        "delivered_by_skilled_attendant", "normal_vaginal_delivery",
+    ),
+}
+SELECTED_INDICATOR_IDS = tuple(
+    indicator_id
+    for indicator_ids in INDICATOR_GROUPS.values()
+    for indicator_id in indicator_ids
+)
+INDICATOR_GROUP_BY_ID = {
+    indicator_id: group
+    for group, indicator_ids in INDICATOR_GROUPS.items()
+    for indicator_id in indicator_ids
 }
 
 
+def _selected_mapping() -> dict:
+    mapping = load_indicator_mapping()
+    selected = set(SELECTED_INDICATOR_IDS)
+    mapping["indicators"] = [
+        indicator for indicator in mapping["indicators"]
+        if indicator["id"] in selected
+    ]
+    found = {indicator["id"] for indicator in mapping["indicators"]}
+    missing = selected - found
+    if missing:
+        raise RuntimeError(f"Missing configured HMIS indicators: {sorted(missing)}")
+    return mapping
+
+
+def _chunks(values: list[str], size: int) -> list[list[str]]:
+    return [values[index:index + size] for index in range(0, len(values), size)]
+
+
 def refresh_sample() -> dict:
-    """Pull one level-homogeneous sample and atomically publish local Parquet."""
+    """Pull one level-homogeneous sample and publish 25 calculated indicators."""
     settings = DHIS2Settings.from_env(require_credentials=True)
     periods = monthly_periods(settings.start_period, settings.end_period)
+    mapping = _selected_mapping()
+    requested_dx = atomic_dx_values(mapping)
     run_id = uuid.uuid4().hex
+    values = []
+    rejected = []
     with DHIS2Client(settings) as client:
-        payload = client.analytics(
-            list(SAMPLE_INDICATORS), periods, ["LEVEL-4"],
-            sync_run_id=run_id, request_id="mnh-hmis-test-0001",
-        )
-    values, rejected = parse_analytics_response(payload)
+        for request_number, dx_batch in enumerate(
+            _chunks(requested_dx, settings.dx_batch_size), 1
+        ):
+            payload = client.analytics(
+                dx_batch, periods, ["LEVEL-4"],
+                sync_run_id=run_id,
+                request_id=f"mnh-hmis-{request_number:04d}",
+            )
+            parsed, batch_rejected = parse_analytics_response(payload)
+            values.extend(parsed)
+            rejected.extend(batch_rejected)
     if rejected:
         raise RuntimeError(f"Sample response contained {len(rejected)} rejected rows")
+
     config_path = Path(__file__).resolve().parent / "config" / "organisation_units.json"
     units = json.loads(config_path.read_text(encoding="utf-8"))["organisation_units"]
     by_id = {unit["org_unit_id"]: unit for unit in units if unit.get("level") == "facility"}
+    seen_unit_ids = sorted({value.org_unit_id for value in values})
+    selected_units = [
+        by_id.get(unit_id, {
+            "org_unit_id": unit_id,
+            "name": unit_id,
+            "district": None,
+            "local_facility_code": None,
+        })
+        for unit_id in seen_unit_ids
+    ]
+    atomic = {
+        (value.dx, value.period, value.org_unit_id): Decimal(value.raw_value)
+        for value in values
+    }
+    calculated = calculate_indicators(mapping, atomic, periods, selected_units)
     records = []
-    for value in values:
-        unit = by_id.get(value.org_unit_id, {})
-        records.append({
-            "indicator_id": value.dx, "indicator_name": SAMPLE_INDICATORS[value.dx],
-            "period": value.period, "period_start": period_start_date(value.period).isoformat(),
-            "org_unit_id": value.org_unit_id,
-            "org_unit_name": unit.get("name", value.org_unit_id),
-            "district": unit.get("district"),
-            "facility_code": unit.get("local_facility_code"),
-            "value": value.value, "is_explicit_zero": value.value == 0,
-            "source": "Malawi HMIS DHIS2", "mapping_version": "2026-07-20",
+    for record in calculated:
+        if record["value"] is None:
+            continue
+        record.update({
+            "indicator_group": INDICATOR_GROUP_BY_ID[record["indicator_id"]],
+            "period_start": period_start_date(record["period"]).isoformat(),
+            "is_explicit_zero": record["value"] == 0,
+            "mapping_version": mapping["mapping_version"],
             "sync_run_id": run_id,
         })
+        records.append(record)
+
     output = settings.aggregate_data_dir / "hmis_test.parquet"
     atomic_parquet(output, records)
     return {
-        "rows": len(records), "facilities": len({row["org_unit_id"] for row in records}),
-        "periods": len({row["period"] for row in records}), "indicators": len(SAMPLE_INDICATORS),
+        "rows": len(records),
+        "facilities": len({row["org_unit_id"] for row in records}),
+        "periods": len({row["period"] for row in records}),
+        "indicators": len({row["indicator_id"] for row in records}),
+        "configured_indicators": len(SELECTED_INDICATOR_IDS),
+        "requested_dx": len(requested_dx),
         "output": str(output),
     }
 

@@ -46,7 +46,7 @@ KPI cards, trends, district comparison, facility table
 
 The implementation currently has two related but separate paths.
 
-### Five-indicator HMIS test path
+### Twenty-five-indicator HMIS dashboard path
 
 This is the working dashboard path currently visible to users.
 
@@ -60,16 +60,22 @@ DHIS2 Analytics API
 ```
 
 The current local snapshot contains real DHIS2 aggregate values, not generated demo
-values. It contains 51,309 rows, five indicators, 866 organisation units, 32 districts,
-and 14 monthly periods from April 2025 through May 2026.
+values. It contains 232,769 calculated aggregate rows, 25 indicators, 867 reporting
+organisation units, 32 districts, and 14 monthly periods from April 2025 through May
+2026. It preserves 65,721 explicitly reported zero values.
 
-The five displayed indicators are:
+The indicators are organized into three dashboard domains:
 
-1. Started ANC in first trimester.
-2. New ANC registrations.
-3. Received ITN during ANC.
-4. Maternal deaths.
-5. Live births (HIV exposed, NVP started).
+- **Births and outcomes (7):** Live Births, Total Births, Fresh Stillbirths,
+  Macerated Stillbirths, Maternal Deaths, Neonatal Deaths, and Stillbirths.
+- **Antenatal care (10):** ANC Visits, Blood pressure measured, Tested for HIV,
+  Screened for syphilis, At least 4 ANC contacts, Tetanus doses (2+), New ANC
+  registrations, Started ANC in first trimester, Received 120+ FeFo tablets, and
+  Received ITN during ANC.
+- **Delivery and newborn care (8):** Uterotonic given after birth, Bag-mask
+  ventilation for newborns not breathing, Vitamin K at birth, Facility deliveries,
+  Delivered at this facility, Delivered at home or in transit, Delivered by skilled
+  attendant, and Normal vaginal delivery.
 
 The snapshot is cached. It is not refreshed when a user opens or filters the page.
 New or corrected DHIS2 submissions become visible only after another successful
@@ -93,7 +99,7 @@ MNH mapping workbook
 ```
 
 The latest full publication attempt remains rejected because required operands were
-missing. This does not invalidate the five-indicator snapshot and does not overwrite
+missing. This does not invalidate the 25-indicator snapshot and does not overwrite
 any last-known-good production file.
 
 ## Main components
@@ -105,7 +111,7 @@ any last-known-good production file.
 | `mnid/dhis2/mappings.py` | Validates indicators, dependencies, operands, and organisation-unit configuration. |
 | `mnid/dhis2/ingestion.py` | Plans batches, records audit responses, parses values, calculates indicators, validates, and publishes atomically. |
 | `mnid/dhis2/storage.py` | Writes raw, normalized, calculated, and last-known-good Parquet data safely. |
-| `mnid/dhis2/sample_sync.py` | Refreshes the controlled five-indicator dashboard snapshot for all accessible facility-level units. |
+| `mnid/dhis2/sample_sync.py` | Retrieves 36 required atomic operands in bounded batches, calculates 25 dashboard indicators, and refreshes the controlled facility-level snapshot. |
 | `mnid/dashboards/MNH-HMIS-Test/layout.py` | Reads the cached sample, applies filters, and builds cards, charts, and the facility table. |
 | `mnid/views/renderer.py` | Routes MNH tabs and provides the HMIS-only fallback when legacy MAHIS data is absent. |
 | `pages/home.py` | Resolves URL/user scope, date range, district/facility filters, and selects the MNH renderer. |
@@ -130,10 +136,13 @@ The dashboard reads `hmis_test.parquet` once per render operation and applies:
 - selected facility name, DHIS2 UID, or mapped facility code; and
 - indicator grouping.
 
-KPI cards sum each indicator over the active scope. Monthly charts group by reporting
-month and indicator. District comparisons sum within district. The facility table
-retains facility, district, indicator, and value and supports client-side sorting and
-filtering.
+The visualization structure follows the MNID Country Profile design language: a dark
+scope and reporting-period header, domain section markers, grouped compact indicator
+cards, recent-month movement, separate domain trend panels, priority-outcome district
+ranking, and a facility drill-down table. KPI cards sum each indicator over the active
+scope. Monthly charts group by reporting month and indicator. District comparisons sum
+within district. The facility table retains facility, district, domain, indicator, and
+value and supports client-side sorting and filtering.
 
 Explicit zero is retained as zero. A missing facility-period row remains missing and
 is not silently converted into zero. Percentage indicators in the full pipeline are
@@ -161,7 +170,7 @@ mnid/data/dhis2/
   normalized/<sync-run-id>/          normalized values and validation report
   aggregates/current.parquet         validated full indicator publication
   aggregates/current_metadata.json   successful publication metadata
-  aggregates/hmis_test.parquet       five-indicator dashboard snapshot
+  aggregates/hmis_test.parquet       25-indicator dashboard snapshot
   status/current.json                latest full synchronization attempt
 ```
 
@@ -223,4 +232,3 @@ period range.
 6. Display last-successful-sync and validation state prominently in the HMIS test UI.
 7. Complete a controlled district backfill and obtain HMIS data-quality sign-off
    before national production publication.
-
