@@ -5,6 +5,7 @@ import plotly.express as px
 import os
 import json
 import numpy as np
+from pathlib import Path
 from dash.exceptions import PreventUpdate
 from flask import request
 from helpers.helpers import build_charts_section, build_metrics_section
@@ -170,6 +171,14 @@ def _latest_available_date(route: str = 'default') -> pd.Timestamp | None:
         max_date = pd.to_datetime(latest.loc[0, 'max_date'], errors='coerce') if len(latest) else pd.NaT
     except Exception:
         max_date = pd.NaT
+    if pd.isna(max_date):
+        hmis_path = Path(path) / 'mnid' / 'data' / 'dhis2' / 'aggregates' / 'hmis_test.parquet'
+        if hmis_path.exists():
+            try:
+                latest = pd.read_parquet(hmis_path, columns=['period_start'])['period_start'].max()
+                max_date = pd.to_datetime(latest, errors='coerce')
+            except Exception:
+                max_date = pd.NaT
     resolved = None if pd.isna(max_date) else max_date.normalize()
     _LATEST_DATA_DATE_CACHE.clear()
     _LATEST_DATA_DATE_CACHE[cache_key] = resolved
@@ -177,6 +186,18 @@ def _latest_available_date(route: str = 'default') -> pd.Timestamp | None:
 
 
 def _default_date_window(route: str = 'default'):
+    route_data_path = Path(path) / 'data' / route / 'parquet'
+    hmis_path = Path(path) / 'mnid' / 'data' / 'dhis2' / 'aggregates' / 'hmis_test.parquet'
+    if not route_data_path.exists() and hmis_path.exists():
+        try:
+            periods = pd.to_datetime(
+                pd.read_parquet(hmis_path, columns=['period_start'])['period_start'],
+                errors='coerce',
+            ).dropna()
+            if not periods.empty:
+                return periods.min().date(), periods.max().date()
+        except Exception:
+            pass
     latest = _latest_available_date(route)
     anchor = latest.date() if latest is not None else datetime.now().date()
     start = anchor - pd.Timedelta(days=29)
