@@ -228,6 +228,23 @@ Open the dashboard URL printed by the application and select **MNH Program**. In
 DHIS2-only environment, the **MNH HMIS test** Beginnings view opens using the cached
 period range.
 
+## Live reconciliation
+
+The cached dashboard can be compared with a fresh read-only DHIS2 pull without
+publishing or overwriting data:
+
+```bash
+python -m mnid.dhis2.compare_live \
+  --start-period 202601 \
+  --end-period 202605
+```
+
+The command retrieves the same atomic operands and organisation-unit level, applies
+the same calculations, compares period totals and the latest month for every indicator,
+and writes a detailed CSV under the ignored `normalized/comparisons/` runtime folder.
+The January–May 2026 reconciliation matched all 25 indicators exactly; see
+`mnid/HMIS_DHIS2_VALIDATION_202601_202605.md`.
+
 ## Production work still required
 
 1. Approve the organisation-unit crosswalk and dataset ownership.

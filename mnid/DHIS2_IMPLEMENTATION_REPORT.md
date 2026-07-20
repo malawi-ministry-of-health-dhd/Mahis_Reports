@@ -249,6 +249,15 @@ repository or written into this report.
 
 ## Tests and manual checks
 
+### January–May 2026 live reconciliation
+
+A read-only comparison against a fresh DHIS2 Analytics pull was completed for all 25
+dashboard indicators and the `202601`–`202605` period. All 25 five-month totals and all
+25 May 2026 values matched exactly. Cached and live calculation each produced 84,205
+rows across 861 reporting units, with zero indicator differences. Detailed results and
+data-quality interpretation are recorded in
+`mnid/HMIS_DHIS2_VALIDATION_202601_202605.md`.
+
 Before the final repository cleanup, 35 MNID DHIS2 tests passed using `unittest`.
 Coverage included periods/settings, workbook conversion, mapping/dependencies,
 organisation units, HTTP errors/retries, response parsing, calculations, validation,
