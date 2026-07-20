@@ -194,18 +194,18 @@ failed latest attempt does not remove the previously validated dashboard data.
 Do not hand-build API `dx` values from formula prose or silently reinterpret a count
 as a percentage.
 
-## Testing
+## Verification
 
-The integration uses standard-library `unittest` because `pytest` is not installed in
-the repository environment:
+Run Python compilation and a configuration-only dry run before synchronization:
 
 ```bash
-venv/bin/python -m unittest discover -s mnid/tests/dhis2 -p 'test_*.py' -v
 venv/bin/python -m compileall -q mnid/dhis2 mnid/dashboards/MNH-MoH/layout.py
+python -m mnid.dhis2.sync --validate-config
+python -m mnid.dhis2.sync --start-period 202504 --end-period 202605 --dry-run
 ```
 
-Tests use generated workbooks, temporary storage, mocked HTTP, and fake clients. They
-do not require or contact live DHIS2.
+These checks do not contact live DHIS2. Live retrieval should begin with a controlled
+period and organisation-unit scope and be reconciled against the source report.
 
 ## Troubleshooting
 

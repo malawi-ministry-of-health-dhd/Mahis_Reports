@@ -25,7 +25,7 @@ ingestion model.
 ## Scope completed
 
 - MNID-local settings, period handling, typed exceptions, mapping validation, client,
-  calculations, validation, ingestion, storage, status, CLI, store, tests, and docs.
+  calculations, validation, ingestion, storage, status, CLI, store, and docs.
 - Secure HTTPS-only configuration with environment credentials and verified TLS.
 - Batched `dx`, `pe`, and `ou` Analytics query planning.
 - Raw audit, normalized atomic data, calculated indicators, validation reports, and
@@ -45,8 +45,7 @@ wiring required focused changes to `pages/home.py`, `helpers/modal_functions.py`
 The previous shared DHIS2 helper was a report-specific prototype with hard-coded
 configuration, disabled TLS verification, broad exception handling, and no MNID
 connection. MNID itself used MaHIS/OpenMRS-derived Parquet and locally precomputed
-aggregates. The assessment and architecture are recorded in
-`mnid/DHIS2_IMPLEMENTATION_ASSESSMENT.md`.
+aggregates. The findings and implemented architecture are consolidated in this report.
 
 ## Architecture implemented
 
@@ -242,11 +241,13 @@ repository or written into this report.
 
 ## Tests and manual checks
 
-At the latest implementation checkpoint, 35 MNID DHIS2 tests pass using `unittest`. Coverage
-includes periods/settings, workbook conversion, mapping/dependencies, organisation
-units, HTTP errors/retries, response parsing, calculations, validation, query planning,
-idempotency, atomic/last-known-good publication, CLI dry run, local store filters,
-zero/null semantics, and no-network imports.
+Before the final repository cleanup, 35 MNID DHIS2 tests passed using `unittest`.
+Coverage included periods/settings, workbook conversion, mapping/dependencies,
+organisation units, HTTP errors/retries, response parsing, calculations, validation,
+query planning, idempotency, atomic/last-known-good publication, CLI dry run, local
+store filters, zero/null semantics, and no-network imports. The temporary implementation
+test suite was removed from the final branch at the repository owner's request; the
+passing checkpoint remains recorded here as implementation evidence.
 
 Manual checks performed:
 
@@ -294,8 +295,8 @@ used; no repository-level dependency file was modified.
 ## Files created and modified
 
 Created: `mnid/dhis2/` package and configuration, `mnid/data/dhis2/` ignored runtime
-structure, `mnid/tests/dhis2/`, `mnid/dashboards/MNH-HMIS-Test/`, assessment, and this
-report.
+structure, `mnid/dashboards/MNH-HMIS-Test/`, the HMIS/MNH architecture document, and
+this report.
 
 Modified integration points include `mnid/dashboards/MNH-MoH/layout.py`,
 `mnid/views/renderer.py`, `mnid/core/cache.py`, `mnid/aggregation/scheduler.py`,
