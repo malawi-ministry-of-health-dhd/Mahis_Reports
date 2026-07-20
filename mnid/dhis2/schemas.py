@@ -33,15 +33,21 @@ def _iter_operands(value: Any):
             yield from _iter_operands(child)
 
 
-def _indicator_references(calculation: dict[str, Any] | None) -> list[str]:
+def _indicator_references(calculation: Any) -> list[str]:
     refs: list[str] = []
     if not calculation:
+        return refs
+    if isinstance(calculation, list):
+        for value in calculation:
+            refs.extend(_indicator_references(value))
+        return refs
+    if not isinstance(calculation, dict):
         return refs
     for key, value in calculation.items():
         if key == "indicator_ids" and isinstance(value, list):
             refs.extend(str(item) for item in value)
         elif isinstance(value, (dict, list)):
-            refs.extend(_indicator_references(value if isinstance(value, dict) else {"items": value}))
+            refs.extend(_indicator_references(value))
     return refs
 
 
