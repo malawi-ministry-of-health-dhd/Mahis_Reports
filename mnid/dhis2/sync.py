@@ -24,6 +24,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--start-period")
     parser.add_argument("--end-period")
     parser.add_argument("--org-unit", action="append", default=[])
+    parser.add_argument("--org-level", action="append", choices=("national", "zone", "district", "facility", "community"), default=[])
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--validate-config", action="store_true")
     parser.add_argument("--backfill", action="store_true")
@@ -32,8 +33,10 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _selected_units(units: list[dict[str, Any]], selected: list[str]) -> list[dict[str, Any]]:
+def _selected_units(units: list[dict[str, Any]], selected: list[str], levels: list[str] | None = None) -> list[dict[str, Any]]:
     enabled = [unit for unit in units if unit.get("enabled")]
+    if levels:
+        enabled = [unit for unit in enabled if unit.get("level") in set(levels)]
     if not selected:
         return enabled
     wanted = set(selected)
@@ -52,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
         settings = DHIS2Settings.from_env(require_credentials=not (args.dry_run or args.validate_config))
         mapping = load_indicator_mapping()
         org_config = load_organisation_units(require_enabled=True)
-        units = _selected_units(org_config["organisation_units"], args.org_unit)
+        units = _selected_units(org_config["organisation_units"], args.org_unit, args.org_level)
         start = args.start_period or settings.start_period
         end = args.end_period or settings.end_period
         periods = monthly_periods(start, end)

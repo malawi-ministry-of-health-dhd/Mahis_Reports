@@ -39,7 +39,7 @@ class ClientTests(unittest.TestCase):
         self.assertNotIn("not-logged", str(kwargs))
 
     def test_permanent_errors_are_not_retried(self):
-        for status, error in ((400, DHIS2RequestError), (401, DHIS2AuthenticationError), (403, Exception)):
+        for status, error in ((400, DHIS2RequestError), (401, DHIS2AuthenticationError), (403, Exception), (409, DHIS2RequestError)):
             session = Mock(); session.headers = {}; session.get.return_value = response(status=status)
             with self.subTest(status=status), self.assertRaises(error):
                 DHIS2Client(settings(3), session=session).analytics(["iBBnHx1Uf50"], ["202504"], ["Abc12345678"], sync_run_id="run", request_id="r1")

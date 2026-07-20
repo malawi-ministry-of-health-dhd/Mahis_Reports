@@ -4,8 +4,10 @@
 Do not edit generated source references or calculation operands casually; regenerate
 with the converter and review the conversion report.
 
-`organisation_units.json` currently contains one explicitly enabled pilot facility,
-Area 25 Urban Health Centre. Its DHIS2 level, parent, code, and confirmed local match
-are preserved for audit. Entries marked `pilot` must be reviewed before a production
-rollout; use `approved` only after governance sign-off. Never copy the hard-coded
-organisation unit from the legacy shared DHIS2 prototype.
+`organisation_units.json` contains the complete DHIS2 hierarchy retrieved on
+20 July 2026: national, zone, district, facility, and community levels. Native level,
+parent, code, and discovered local facility matches are preserved. Entries marked
+`discovered` require governance review; use `approved` only after sign-off. Select a
+single level with `--org-level` during synchronization to avoid mixing parent
+aggregates with child records. Never copy the hard-coded organisation unit from the
+legacy shared DHIS2 prototype.

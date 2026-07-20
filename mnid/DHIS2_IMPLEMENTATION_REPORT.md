@@ -71,11 +71,17 @@ produce null, not zero.
 
 ## Organisation-unit status
 
-`organisation_units.json` contains one pilot entry: Area 25 Urban Health Centre,
-matched to local facility code `LL040037`. DHIS2 reports it at level 4 under
-Lilongwe-DHO. The entry preserves the DHIS2 level, code, parent, and pilot status.
-No organisation-unit IDs were invented or copied from legacy code. A production-wide
-crosswalk remains outstanding.
+`organisation_units.json` contains all 10,406 DHIS2 units retrieved through the
+authenticated metadata API: 2 national, 27 zone, 34 district, 1,215 facility, and
+9,128 community units. Native level, parent, and code metadata are retained. Exact
+name/district matching produced 255 unique proposed local facility mappings; all
+entries remain marked `discovered` pending governance approval.
+
+Analytics permission testing showed that the account can query level 3, 4, and 5
+selectors, but level 1 and 2 selectors return HTTP 409 because at least one unit at
+each level is outside the account's data-view scope. A single April 2025 Live Births
+query returned 33 district, 617 facility, and 3 community rows. Full mixed-level
+publication was not attempted.
 
 ## Client and security controls
 

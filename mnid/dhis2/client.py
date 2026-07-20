@@ -106,6 +106,8 @@ class DHIS2Client:
                 raise DHIS2RequestError("DHIS2 rejected the Analytics query (HTTP 400)")
             if response.status_code == 404:
                 raise DHIS2RequestError("DHIS2 Analytics endpoint was not found (HTTP 404)")
+            if response.status_code == 409:
+                raise DHIS2RequestError("DHIS2 could not execute the Analytics query (HTTP 409)")
             if response.status_code == 429 or 500 <= response.status_code <= 599:
                 if attempt < self.settings.max_retries:
                     retry_after = response.headers.get("Retry-After")

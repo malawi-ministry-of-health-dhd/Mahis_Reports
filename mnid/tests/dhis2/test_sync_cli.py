@@ -31,7 +31,7 @@ class SyncCliTests(unittest.TestCase):
         output = io.StringIO()
         with redirect_stdout(output):
             self.assertEqual(0, main(["--validate-config"]))
-        self.assertIn('"organisation_unit_count": 1', output.getvalue())
+        self.assertIn('"organisation_unit_count": 10406', output.getvalue())
 
 
 if __name__ == "__main__": unittest.main()

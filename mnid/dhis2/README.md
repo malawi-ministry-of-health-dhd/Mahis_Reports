@@ -102,8 +102,9 @@ every regeneration and obtain clinical approval for ambiguous calculations.
 
 ## Organisation-unit configuration
 
-`config/organisation_units.json` is the approved crosswalk. It is intentionally
-empty until HMIS supplies verified IDs. Example shape:
+`config/organisation_units.json` contains the discovered DHIS2 hierarchy and proposed
+local crosswalk. Discovered mappings are not equivalent to governance approval.
+Example shape:
 
 ```json
 {
@@ -223,10 +224,10 @@ do not require or contact live DHIS2.
 
 HMIS owns source metadata and organisation-unit approval; MNID owns dashboard meaning;
 data-quality owners approve reconciliation; infrastructure owns secrets, certificates,
-scheduling, and alerts. One facility is configured for pilot use; a production-wide
-crosswalk is still required. Authentication, TLS, and one-period Analytics retrieval
-have been verified. Clinical review of early breastfeeding as a count-based subtraction
-and two incomplete pilot mappings remains necessary.
+scheduling, and alerts. The complete DHIS2 hierarchy is configured as discovered
+metadata; governance review of the proposed crosswalk is still required.
+Authentication, TLS, and one-period Analytics retrieval have been verified. Clinical
+review of early breastfeeding and two incomplete pilot mappings remains necessary.
 
 ## Pilot result: 20 July 2026
 

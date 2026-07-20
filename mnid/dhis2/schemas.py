@@ -14,7 +14,7 @@ ID_RE = re.compile(r"^[a-z0-9]+(?:_[a-z0-9]+)*$")
 OPERATIONS = {"direct", "sum", "subtract", "percentage", "sum_indicators"}
 VALUE_TYPES = {"count", "percentage", "rate", "ratio", "measurement", "unknown"}
 VALIDATION_STATUSES = {"valid", "review_required", "rejected"}
-ORG_LEVELS = {"national", "district", "facility"}
+ORG_LEVELS = {"national", "zone", "district", "facility", "community"}
 
 
 def _fail(messages: list[str]) -> None:
