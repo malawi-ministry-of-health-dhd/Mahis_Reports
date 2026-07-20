@@ -190,6 +190,11 @@ through a Country Profile-inspired header, alert and scope bands, current-period
 summary, and one labeled monthly line-chart card per indicator. Charts are grouped as
 Births and Outcomes, Antenatal Care, and Delivery and Newborn Care, followed by a
 priority-outcome district comparison and a filterable facility table.
+Each indicator chart uses the same reusable run-chart component and grain callback as
+Country Profile, providing identical card styling, captions, and
+Weekly/Monthly/Quarterly/Yearly controls. Because the DHIS2 source is monthly,
+quarterly and yearly views are valid rollups; the weekly control does not represent a
+separately reported weekly HMIS dataset.
 Existing MNID date, district, and facility scope is applied. The sample contains
 232,769 calculated aggregate rows across 867 DHIS2 organisation units, 32 districts,
 and all 14 configured months from April 2025 through May 2026. It retains 65,721

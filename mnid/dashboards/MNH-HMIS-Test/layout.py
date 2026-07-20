@@ -8,6 +8,8 @@ import pandas as pd
 import plotly.express as px
 from dash import dash_table, dcc, html
 
+from mnid.components.run_charts import _chart_key_slug, _trend_chart_payload
+
 GREEN = "#15803D"
 BLUE = "#2563EB"
 AMBER = "#D97706"
@@ -404,111 +406,25 @@ def _chart_card(title: str, subtitle: str, figure) -> html.Div:
     )
 
 
-def _indicator_trend_figure(frame: pd.DataFrame, indicator_id: str, color: str):
-    trend = (
-        frame[frame["indicator_id"] == indicator_id]
+def _indicator_chart_card(frame: pd.DataFrame, row, color: str):
+    series = (
+        frame[frame["indicator_id"] == row.indicator_id]
         .groupby("period_start", as_index=False)["value"].sum()
         .sort_values("period_start")
+        .rename(columns={"period_start": "month"})
     )
-    figure = px.line(
-        trend, x="period_start", y="value", markers=True,
-        labels={"period_start": "Reporting month", "value": "Reported count"},
-    )
-    rgb = tuple(int(color[index:index + 2], 16) for index in (1, 3, 5))
-    figure.update_traces(
-        line={"width": 2.5, "color": color},
-        marker={"size": 6, "color": color},
-        fill="tozeroy", fillcolor=f"rgba{rgb + (0.08,)}",
-        hovertemplate="%{x|%b %Y}<br>%{y:,.0f}<extra></extra>",
-    )
-    figure.update_layout(
-        margin={"l": 42, "r": 18, "t": 18, "b": 42},
-        plot_bgcolor=SURFACE, paper_bgcolor=SURFACE,
-        hovermode="x unified", showlegend=False, font={"color": TEXT, "size": 10},
-    )
-    figure.update_xaxes(showgrid=False, tickformat="%b %Y", tickangle=-25)
-    figure.update_yaxes(gridcolor="#EEF2F7", rangemode="tozero", title="Reported count")
-    return figure
-
-
-def _change_badge(row) -> tuple[str, str, str]:
-    change = row.change
-    adverse = row.indicator_id in ADVERSE_OUTCOME_IDS
-    if pd.isna(change):
-        return "No prior comparison", MUTED, "#F1F5F9"
-    if change > 0:
-        return (
-            f"Increase {change:.1f}%", RED if adverse else GREEN,
-            "#FEE2E2" if adverse else "#DCFCE7",
-        )
-    if change < 0:
-        return (
-            f"Decrease {abs(change):.1f}%", GREEN if adverse else RED,
-            "#DCFCE7" if adverse else "#FEE2E2",
-        )
-    return "No change", MUTED, "#F1F5F9"
-
-
-def _indicator_chart_card(frame: pd.DataFrame, row, color: str) -> html.Div:
-    badge, badge_color, badge_bg = _change_badge(row)
-    indicator_frame = frame[frame["indicator_id"] == row.indicator_id]
-    period_start = indicator_frame["period_start"].min().strftime("%b %Y")
-    period_end = indicator_frame["period_start"].max().strftime("%b %Y")
-    return html.Div([
-        html.Div([
-            html.Div([
-                html.Div(row.indicator_name, style={
-                    "fontSize": "13px", "fontWeight": 850, "color": TEXT,
-                }),
-                html.Div(
-                    INDICATOR_DESCRIPTIONS.get(
-                        row.indicator_id, "Monthly facility-reported HMIS aggregate."
-                    ),
-                    style={"fontSize": "10px", "color": MUTED, "marginTop": "3px"},
-                ),
-            ], style={"flex": "1", "minWidth": "240px"}),
-            html.Span("Monthly", style={
-                "fontSize": "9px", "fontWeight": 750, "color": color,
-                "border": f"1px solid {color}55", "background": f"{color}10",
-                "borderRadius": "99px", "padding": "4px 9px",
-            }),
-        ], style={"display": "flex", "justifyContent": "space-between", "gap": "12px"}),
-        html.Div([
-            html.Div([
-                html.Div(f"{float(row.latest or 0):,.0f}", style={
-                    "fontSize": "20px", "fontWeight": 850, "color": color,
-                }),
-                html.Div("Latest month", style={"fontSize": "8px", "color": MUTED}),
-            ]),
-            html.Span(badge, style={
-                "fontSize": "9px", "fontWeight": 750, "color": badge_color,
-                "background": badge_bg, "borderRadius": "99px", "padding": "4px 8px",
-            }),
-            html.Div([
-                html.Div(f"{float(row.total):,.0f}", style={
-                    "fontSize": "14px", "fontWeight": 800, "color": TEXT,
-                }),
-                html.Div("Selected-period total", style={"fontSize": "8px", "color": MUTED}),
-            ]),
-        ], style={
-            "display": "flex", "alignItems": "center", "gap": "16px",
-            "padding": "10px 0 2px", "flexWrap": "wrap",
-        }),
-        dcc.Graph(
-            figure=_indicator_trend_figure(frame, row.indicator_id, color),
-            config={"displayModeBar": False, "responsive": True},
-            style={"height": "310px"},
+    chart_key = f"hmis-{_chart_key_slug(row.indicator_id)}"
+    return _trend_chart_payload(
+        chart_key=chart_key,
+        title=row.indicator_name,
+        subtitle=INDICATOR_DESCRIPTIONS.get(
+            row.indicator_id, "Facility-reported HMIS aggregate over time."
         ),
-        html.Div(
-            f"Showing monthly data, {period_start} to {period_end} · "
-            f"{int(row.reporting_units):,} reporting units",
-            style={"fontSize": "9px", "color": MUTED, "marginTop": "-6px"},
-        ),
-    ], style={
-        "background": SURFACE, "border": f"1px solid {BORDER}",
-        "borderTop": f"3px solid {color}", "borderRadius": "12px",
-        "padding": "15px", "boxShadow": "0 2px 8px rgba(15,23,42,.04)",
-    })
+        accent=color,
+        y_title="Reported count",
+        series_df=series[["month", "value"]],
+        multi=False,
+    )["card"]
 
 
 def _district_figure(frame: pd.DataFrame):

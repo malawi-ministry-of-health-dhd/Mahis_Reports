@@ -141,6 +141,11 @@ scope and reporting-period header, priority alert, scope band, current-period su
 cards, and a dedicated labeled monthly run-chart card for each of the 25 indicators.
 Charts are grouped under Births and Outcomes, Antenatal Care, and Delivery and Newborn
 Care, followed by priority-outcome district ranking and a facility drill-down table.
+The indicator cards reuse the same `mnid/components/run_charts.py` payload and callback
+as Country Profile, including consistent styling, captions, and time-grain controls.
+The source grain is monthly; quarterly and yearly views are rollups of monthly values,
+while a weekly selection cannot create true weekly source reporting from monthly DHIS2
+aggregates.
 KPI cards sum each indicator over the active
 scope. Monthly charts group by reporting month and indicator. District comparisons sum
 within district. The facility table retains facility, district, domain, indicator, and
