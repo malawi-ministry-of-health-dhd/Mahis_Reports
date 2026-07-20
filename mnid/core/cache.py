@@ -218,8 +218,16 @@ def _maybe_build_aggregate_on_startup(route: str = 'default') -> None:
     _out_dir = Path('data') / 'mnid_aggregates' / route
     _agg_path = _out_dir / 'indicator_aggregates.parquet'
     _lock_path = _out_dir / '.agg_running'
+    _source_path = Path('data') / route / 'parquet'
 
     if _agg_path.exists():
+        return
+    if not _source_path.exists():
+        _LOGGER.info(
+            'Startup aggregation skipped for route=%s; data source is not available: %s',
+            route,
+            _source_path,
+        )
         return
 
     def _build():

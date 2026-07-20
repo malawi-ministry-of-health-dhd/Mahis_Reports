@@ -2555,8 +2555,11 @@ def create_prog_report_modal():
 
 
     config_path = os.path.join(os.getcwd(), 'configurations.json')
-    with open(config_path, 'r') as r:
-        configurations = json.load(r)
+    try:
+        with open(config_path, 'r') as r:
+            configurations = json.load(r)
+    except (FileNotFoundError, json.JSONDecodeError):
+        configurations = []
 
     key_opts       = [{"label": k, "value": k} for k in actual_keys_in_data]
     program_opts   = [{"label": p, "value": p} for p in drop_down_programs]

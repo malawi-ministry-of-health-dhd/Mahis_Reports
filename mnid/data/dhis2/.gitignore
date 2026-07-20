@@ -1,0 +1,9 @@
+# Runtime DHIS2 data is local and may contain sensitive operational values.
+raw/*
+normalized/*
+aggregates/*
+status/*
+!raw/.gitkeep
+!normalized/.gitkeep
+!aggregates/.gitkeep
+!status/.gitkeep
