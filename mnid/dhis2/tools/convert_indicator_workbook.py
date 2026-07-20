@@ -231,6 +231,10 @@ def convert_workbook(
         },
         "indicators": indicators,
     }
+    # Validate the complete candidate before any atomic replacement. Import here
+    # keeps the standalone conversion primitives reusable without import cycles.
+    from mnid.dhis2.schemas import validate_indicator_mapping
+    validate_indicator_mapping(result)
     old_by_id = old_indicators
     new_by_id = {item["id"]: item for item in indicators}
     added = [key for key in new_by_id if key not in old_by_id]
