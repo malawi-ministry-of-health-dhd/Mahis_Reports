@@ -22,6 +22,19 @@ _LOG = logging.getLogger(__name__)
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
+def _resolve_data_source(data_source: str | None, route: str) -> str:
+    if data_source:
+        return data_source
+    return f'data/{route}/parquet'
+
+
+def _data_source_exists(data_source: str) -> bool:
+    source_path = Path(data_source)
+    if not source_path.is_absolute():
+        source_path = _PROJECT_ROOT / source_path
+    return source_path.exists()
+
+
 def _write_meta_error(output_dir: str, error: str) -> None:
     """Write a failure record to meta.json so the dashboard can surface it."""
     meta_path = Path(output_dir) / 'meta.json'
@@ -60,7 +73,15 @@ def run_aggregation_job(
     root        = _PROJECT_ROOT
     viz_dir     = viz_dir     or str(root / 'data' / 'visualizations')
     output_dir  = output_dir  or str(root / 'data' / 'mnid_aggregates' / route)
-    data_source = data_source or f'data/{route}/parquet'
+    data_source = _resolve_data_source(data_source, route)
+    if not _data_source_exists(data_source):
+        _LOG.info(
+            'Aggregation skipped for route=%s because data source does not exist: %s',
+            route,
+            data_source,
+        )
+        return False
+
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     lock_file = Path(output_dir) / '.agg_running'
 

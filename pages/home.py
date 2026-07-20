@@ -1319,21 +1319,28 @@ dash.clientside_callback(
 @callback(
         Output('scrolling-menu', 'children'),
         [Input('dashboard-interval-update-today', 'n_intervals'),
-        Input('active-button-store', 'data')],
-        State('url-params-store', 'data'))
+        Input('active-button-store', 'data'),
+        Input('url-params-store', 'data')])
 
 def update_menu(interval, color, urlparams):
     try:
+        urlparams = urlparams or {}
         data_route = urlparams.get('route', ["default"])[0]
         user_data = _load_user_registry(data_route)
         user_row, scope = _resolve_user_scope(urlparams, user_data)
+        if user_row is None:
+            return []
+
         user_id = int(user_row.get('user_id', '0')) 
         user_uuid = user_row.get('uuid')
         user_programs_path = os.path.join(os.getcwd(), f"data/{data_route}/single_tables/user_programs.csv")
         dashboard_path = os.path.join(os.getcwd(), f"data/visualizations/validated_dashboard.json")
-        user_programs = duckdb.sql(
-                                    f"SELECT name FROM '{user_programs_path}' WHERE user_id = {user_id}"
-                                ).df()['name'].to_list()
+        if user_uuid == DEMO_UUID or not os.path.exists(user_programs_path):
+            user_programs = []
+        else:
+            user_programs = duckdb.sql(
+                                        f"SELECT name FROM '{user_programs_path}' WHERE user_id = {user_id}"
+                                    ).df()['name'].to_list()
         
         user_props = next((user['properties'] for user in  _load_user_properties(data_route) if user.get('properties').get('uuid') == user_uuid), None)
         limited_dashboards = user_props.get('limited_dashboards', []) if user_props else []
