@@ -13,9 +13,14 @@ provides an opt-in local data source for the MNH-MoH dashboard.
 Authenticated Analytics and Data Entry API requests have now been completed. The full
 DHIS2 organisation hierarchy is available locally as discovered metadata, four source
 Data Entry forms have been identified, and their mappings have been assessed.
-Production publication remains blocked pending governance approval of the crosswalk,
-resolution of incomplete operands, and management approval of the ingestion model.
-Current MaHIS/OpenMRS dashboard behaviour remains the default and is not replaced.
+A working **MNH HMIS test** dashboard now displays a controlled snapshot of real
+aggregate values retrieved from Malawi HMIS DHIS2: five verified indicators, 51,309
+rows, 866 reporting organisation units, 32 districts, and 14 monthly periods from
+April 2025 through May 2026. The dashboard does not query DHIS2 when a page opens;
+it reads the last locally generated Parquet snapshot. Production publication of the
+full 52-indicator mapping remains blocked pending governance approval of the
+crosswalk, resolution of incomplete operands, and management approval of the
+ingestion model.
 
 ## Scope completed
 
@@ -26,8 +31,14 @@ Current MaHIS/OpenMRS dashboard behaviour remains the default and is not replace
 - Raw audit, normalized atomic data, calculated indicators, validation reports, and
   last-known-good output separated under ignored runtime folders.
 - Opt-in DHIS2 dashboard mode without render-time network access.
+- A working MNH Beginnings HMIS test view with five KPI cards, monthly trends,
+  district comparison, and facility-level filtering/table output.
+- Application startup and routing support for a DHIS2-only test environment where
+  the legacy `data/default/parquet` MAHIS source is unavailable.
 
-No files outside `mnid/` were modified by this implementation.
+The original integration package was contained under `mnid/`. Subsequent application
+wiring required focused changes to `pages/home.py`, `helpers/modal_functions.py`,
+`mnid/views/renderer.py`, `mnid/core/cache.py`, and `mnid/aggregation/scheduler.py`.
 
 ## Existing implementation assessed
 
@@ -165,7 +176,7 @@ Publication uses temporary files and atomic replacement. A lock prevents concurr
 syncs. Latest-attempt status is separate from last successful output, allowing a
 failed attempt and retained valid data to be shown together.
 
-## Dashboard integration
+## Current dashboard implementation
 
 The MNH-MoH dashboard can select local validated DHIS2 output with
 `scope_meta["data_source"] = "dhis2"`. It applies the current date, facility, and
@@ -177,17 +188,61 @@ A sample inner tab named **MNH HMIS test** is available under MNH Beginnings. It
 only local `hmis_test.parquet` output and currently displays five verified indicators
 through KPI cards, monthly trends, a top-district comparison, and a filterable facility
 table. Existing MNID date, district, and facility scope is applied. The sample contains
-51,309 rows across 866 facilities, 32 districts, and all 14 configured months.
+51,309 aggregate rows across 866 DHIS2 organisation units, 32 districts, and all 14
+configured months from April 2025 through May 2026.
+
+### Important interpretation of the displayed data
+
+The values currently shown are **real aggregate data retrieved from the configured
+Malawi HMIS DHIS2 instance**. They are not fabricated demo values. They are also not
+real-time values requested from DHIS2 whenever a user opens the dashboard. The current
+operating model is:
+
+```text
+DHIS2 Analytics API -> controlled synchronization -> local hmis_test.parquet
+-> MNH HMIS test visualizations
+```
+
+Consequently, the dashboard represents the latest locally generated DHIS2 snapshot.
+Corrections or new submissions made in DHIS2 after that extraction will appear only
+after another successful synchronization. This offline-first design avoids slow page
+loads, repeated DHIS2 traffic, and exposing credentials to the visualization layer.
+
+The successful five-indicator sample and the full mapping publication are separate
+states. The sample Parquet exists and is usable by the test dashboard. The latest
+full 78-operand pipeline status remains `failed`/`published: false` because completeness
+validation rejected missing operands. Therefore, the working test tab demonstrates
+retrieval and visualization capability; it does not mean that the complete production
+indicator set has passed validation or received governance approval.
+
+The five indicators currently displayed are:
+
+1. Started ANC in first trimester.
+2. New ANC registrations.
+3. Received ITN during ANC.
+4. Maternal deaths.
+5. Live births (HIV exposed, NVP started).
+
+When the legacy MAHIS Parquet source is unavailable, selecting **MNH Program** now
+opens the HMIS-only Beginnings view instead of failing with a DuckDB catalog error.
+Its initial filter range is taken from the cached DHIS2 data itself. Other legacy
+dashboards still require their normal MAHIS/OpenMRS Parquet source.
 
 Refresh the sample explicitly with:
 
 ```bash
+export MNH_DHIS2_BASE_URL="https://<approved-dhis2-host>"
+export MNH_DHIS2_USERNAME="<runtime-username>"
+export MNH_DHIS2_PASSWORD="<runtime-password>"
 python -m mnid.dhis2.sample_sync
 ```
 
+Credentials must be supplied securely at runtime and must not be committed to the
+repository or written into this report.
+
 ## Tests and manual checks
 
-At the latest implementation checkpoint, 34 MNID DHIS2 tests pass using `unittest`. Coverage
+At the latest implementation checkpoint, 35 MNID DHIS2 tests pass using `unittest`. Coverage
 includes periods/settings, workbook conversion, mapping/dependencies, organisation
 units, HTTP errors/retries, response parsing, calculations, validation, query planning,
 idempotency, atomic/last-known-good publication, CLI dry run, local store filters,
@@ -203,6 +258,10 @@ Manual checks performed:
 - Git diffs were checked for whitespace and scope.
 - Authenticated `/api/me`, organisation-unit metadata, and controlled Analytics pilot
   requests completed with TLS verification enabled.
+- The HMIS-only application path rendered all five indicators from the local snapshot
+  without requiring `data/default/parquet`.
+- Application callback return shapes, demo-user URL initialization, missing local
+  datasource handling, Python compilation, and Git whitespace checks passed.
 
 The project environment does not include `pytest`, a formatter, linter, or type checker
 configured for this package. Standard-library tests and `compileall` were therefore
@@ -225,14 +284,24 @@ used; no repository-level dependency file was modified.
 | `6767aba` | First validated facility pilot configuration |
 | `3825bd3` | Complete five-level DHIS2 hierarchy configuration |
 | `0d2e4a2` | Mixed-level synchronization protection |
+| `d5fa979` | Verified-source findings and recommended data strategy update |
+| `f9bc7e2` | MNH HMIS sample dashboard tab |
+| `4194dd5` | Startup fallback for an absent local datasource configuration |
+| `08a80d8` | Demo startup handling without local MAHIS data |
+| `aead07d` | Dashboard URL-state synchronization and callback contract fix |
+| `2241564` | HMIS test rendering without the legacy MAHIS dataset |
 
 ## Files created and modified
 
 Created: `mnid/dhis2/` package and configuration, `mnid/data/dhis2/` ignored runtime
-structure, `mnid/tests/dhis2/`, assessment, and this report.
+structure, `mnid/tests/dhis2/`, `mnid/dashboards/MNH-HMIS-Test/`, assessment, and this
+report.
 
-Modified: `mnid/dashboards/MNH-MoH/layout.py` only, to add the opt-in local DHIS2
-source path and source/freshness presentation.
+Modified integration points include `mnid/dashboards/MNH-MoH/layout.py`,
+`mnid/views/renderer.py`, `mnid/core/cache.py`, `mnid/aggregation/scheduler.py`,
+`pages/home.py`, and `helpers/modal_functions.py`. These changes connect the cached
+DHIS2 view, preserve startup without legacy data, and correct dashboard callback
+initialization.
 
 ## Known limitations and blockers
 
@@ -244,12 +313,15 @@ source path and source/freshness presentation.
 4. Early breastfeeding calculation requires clinical confirmation.
 5. Repository-level scheduler integration is outside the strict `mnid/` scope; an
    approved external scheduler must invoke the CLI.
-6. Source selection is supported by renderer scope metadata, but the wider application
-   does not yet expose a user-facing dropdown under this task's scope.
+6. The MNH HMIS test is user-visible, but there is not yet a general user-facing
+   selector for switching every dashboard between MAHIS and DHIS2 sources.
 7. The authoritative dataset for the remaining 28 base mappings is not yet identified.
 8. A resumable Data Value Set ingestion path is not yet implemented; current production
    code uses Analytics as its primary endpoint.
 9. Operational alert delivery is not configured; machine-readable status is available.
+10. The current HMIS test snapshot is refreshed manually; automated scheduling,
+    freshness alerts, and an on-screen last-successful-sync timestamp are not yet
+    configured for production operations.
 
 ## Exact operational commands
 
