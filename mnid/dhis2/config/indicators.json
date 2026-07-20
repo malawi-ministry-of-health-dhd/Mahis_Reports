@@ -1,0 +1,1710 @@
+{
+    "schema_version": "1.0",
+    "mapping_version": "2026-07-20",
+    "source": {
+        "name": "Malawi HMIS DHIS2",
+        "base_url": "https://dhis2.health.gov.mw",
+        "source_workbook": "Data Mapping - MNH dashboard - DHIS2.xlsx",
+        "worksheet": "MNH indicators"
+    },
+    "reporting_period": {
+        "period_type": "monthly",
+        "start_period": "202504",
+        "end_period": "202605"
+    },
+    "indicators": [
+        {
+            "id": "live_births",
+            "name": "Live Births",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "sum",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "iBBnHx1Uf50",
+                        "data_element_id": "iBBnHx1Uf50",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "EeywK6AHQdK",
+                        "data_element_id": "EeywK6AHQdK",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "jz793Wzon1W",
+                        "data_element_id": "jz793Wzon1W",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "q7NoDcfaciO",
+                        "data_element_id": "q7NoDcfaciO",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "kaYz6eqxqQH",
+                        "data_element_id": "kaYz6eqxqQH",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 2,
+                "original_indicator_name": "Live Births",
+                "original_mapping": "iBBnHx1Uf50, EeywK6AHQdK, jz793Wzon1W, q7NoDcfaciO, kaYz6eqxqQH"
+            }
+        },
+        {
+            "id": "total_births",
+            "name": "Total Births",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "sum_indicators",
+                "indicator_ids": [
+                    "live_births",
+                    "stillbirths"
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 3,
+                "original_indicator_name": "Total Births",
+                "original_mapping": "Live Births + Stillbirths"
+            }
+        },
+        {
+            "id": "fresh_stillbirths",
+            "name": "Fresh Stillbirths",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "YLydKJIyGFF",
+                        "data_element_id": "YLydKJIyGFF",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 4,
+                "original_indicator_name": "Fresh Stillbirths",
+                "original_mapping": "YLydKJIyGFF"
+            }
+        },
+        {
+            "id": "macerated_stillbirths",
+            "name": "Macerated Stillbirths",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "EJ0qYm1FrcH",
+                        "data_element_id": "EJ0qYm1FrcH",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 5,
+                "original_indicator_name": "Macerated Stillbirths",
+                "original_mapping": "EJ0qYm1FrcH"
+            }
+        },
+        {
+            "id": "maternal_deaths",
+            "name": "Maternal Deaths",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "WjHvEHMCyKo",
+                        "data_element_id": "WjHvEHMCyKo",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 6,
+                "original_indicator_name": "Maternal Deaths",
+                "original_mapping": "WjHvEHMCyKo"
+            }
+        },
+        {
+            "id": "neonatal_deaths",
+            "name": "Neonatal Deaths",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "sum",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "jz793Wzon1W",
+                        "data_element_id": "jz793Wzon1W",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "bZDmsHkagGA",
+                        "data_element_id": "bZDmsHkagGA",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "XO2ACv2K1aW",
+                        "data_element_id": "XO2ACv2K1aW",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "MnmCsf59HyU",
+                        "data_element_id": "MnmCsf59HyU",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 7,
+                "original_indicator_name": "Neonatal Deaths",
+                "original_mapping": "jz793Wzon1W, bZDmsHkagGA, XO2ACv2K1aW, MnmCsf59HyU"
+            }
+        },
+        {
+            "id": "stillbirths",
+            "name": "Stillbirths",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "sum",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "YLydKJIyGFF",
+                        "data_element_id": "YLydKJIyGFF",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "EJ0qYm1FrcH",
+                        "data_element_id": "EJ0qYm1FrcH",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 8,
+                "original_indicator_name": "Stillbirths",
+                "original_mapping": "YLydKJIyGFF, EJ0qYm1FrcH"
+            }
+        },
+        {
+            "id": "anc_visits",
+            "name": "ANC Visits",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "sum",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "SVC5nKhvcQr",
+                        "data_element_id": "SVC5nKhvcQr",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "ZgDrKbIPkgE",
+                        "data_element_id": "ZgDrKbIPkgE",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "Jtrq0pYsqT0",
+                        "data_element_id": "Jtrq0pYsqT0",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "Jpkh8pokAY7",
+                        "data_element_id": "Jpkh8pokAY7",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "EUvtRZSLh2F",
+                        "data_element_id": "EUvtRZSLh2F",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 9,
+                "original_indicator_name": "ANC Visits",
+                "original_mapping": "SVC5nKhvcQr, ZgDrKbIPkgE, Jtrq0pYsqT0, Jpkh8pokAY7, EUvtRZSLh2F"
+            }
+        },
+        {
+            "id": "blood_pressure_measured",
+            "name": "Blood pressure measured",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "sNlbaVoobzq",
+                        "data_element_id": "sNlbaVoobzq",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 10,
+                "original_indicator_name": "Blood pressure measured",
+                "original_mapping": "sNlbaVoobzq"
+            }
+        },
+        {
+            "id": "screened_for_anaemia",
+            "name": "Screened for anaemia",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "sum",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "AmkTUKYrM31",
+                        "data_element_id": "AmkTUKYrM31",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "QUDJ8U1O0Yl",
+                        "data_element_id": "QUDJ8U1O0Yl",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 11,
+                "original_indicator_name": "Screened for anaemia",
+                "original_mapping": "AmkTUKYrM31, QUDJ8U1O0Yl"
+            }
+        },
+        {
+            "id": "tested_for_hiv",
+            "name": "Tested for HIV",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "sum",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "qG10jihknty",
+                        "data_element_id": "qG10jihknty",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "Xr6Xa1ZnJqy",
+                        "data_element_id": "Xr6Xa1ZnJqy",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "CRhkHMKt3Ps",
+                        "data_element_id": "CRhkHMKt3Ps",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "hbFsoMQNkwe",
+                        "data_element_id": "hbFsoMQNkwe",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 12,
+                "original_indicator_name": "Tested for HIV",
+                "original_mapping": "qG10jihknty, Xr6Xa1ZnJqy, CRhkHMKt3Ps, hbFsoMQNkwe"
+            }
+        },
+        {
+            "id": "screened_for_syphilis",
+            "name": "Screened for syphilis",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "sum",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "xHSyFJc8jKX",
+                        "data_element_id": "xHSyFJc8jKX",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "H1hggbKQpZH",
+                        "data_element_id": "H1hggbKQpZH",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 13,
+                "original_indicator_name": "Screened for syphilis",
+                "original_mapping": "xHSyFJc8jKX, H1hggbKQpZH"
+            }
+        },
+        {
+            "id": "at_least_4_anc_contacts",
+            "name": "At least 4 ANC contacts",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "sum",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "Jpkh8pokAY7",
+                        "data_element_id": "Jpkh8pokAY7",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "EUvtRZSLh2F",
+                        "data_element_id": "EUvtRZSLh2F",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 14,
+                "original_indicator_name": "At least 4 ANC contacts",
+                "original_mapping": "Jpkh8pokAY7, EUvtRZSLh2F"
+            }
+        },
+        {
+            "id": "tetanus_doses_2",
+            "name": "Tetanus doses (2+)",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "WCpjbJAYTfE",
+                        "data_element_id": "WCpjbJAYTfE",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 15,
+                "original_indicator_name": "Tetanus doses (2+)",
+                "original_mapping": "WCpjbJAYTfE"
+            }
+        },
+        {
+            "id": "uterotonic_given_after_birth",
+            "name": "Uterotonic given after birth",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "FhNg0SdUMe8",
+                        "data_element_id": "FhNg0SdUMe8",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 16,
+                "original_indicator_name": "Uterotonic given after birth",
+                "original_mapping": "FhNg0SdUMe8"
+            }
+        },
+        {
+            "id": "newborns_not_breathing_at_birth_receiving_bag_mask_ventilation",
+            "name": "Newborns not breathing at birth receiving bag-mask ventilation",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "NtkuSvtY8D0",
+                        "data_element_id": "NtkuSvtY8D0",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 17,
+                "original_indicator_name": "Newborns not breathing at birth receiving bag-mask ventilation",
+                "original_mapping": "NtkuSvtY8D0"
+            }
+        },
+        {
+            "id": "pre_eclampsia_eclampsia_receiving_magnesium_sulphate",
+            "name": "Pre-eclampsia/eclampsia receiving magnesium sulphate",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "percentage",
+            "calculation": {
+                "operation": "percentage",
+                "multiplier": 100,
+                "numerator": {
+                    "operands": [
+                        {
+                            "type": "data_element",
+                            "dx": "n7XnfWv0tHo",
+                            "data_element_id": "n7XnfWv0tHo",
+                            "category_option_combo_id": null
+                        }
+                    ]
+                },
+                "denominator": {
+                    "operands": [
+                        {
+                            "type": "data_element_operand",
+                            "dx": "RS3PtRniRns.JPgETYeD4qF",
+                            "data_element_id": "RS3PtRniRns",
+                            "category_option_combo_id": "JPgETYeD4qF"
+                        }
+                    ]
+                },
+                "zero_denominator_result": null
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 18,
+                "original_indicator_name": "Pre-eclampsia/eclampsia receiving magnesium sulphate",
+                "original_mapping": "(n7XnfWv0tHo)/(RS3PtRniRns.JPgETYeD4qF)"
+            }
+        },
+        {
+            "id": "early_initiation_of_breastfeeding_within_1_hour_of_birth",
+            "name": "Early initiation of breastfeeding within 1 hour of birth",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "subtract",
+                "minuend": {
+                    "indicator_ids": [
+                        "live_births"
+                    ]
+                },
+                "subtrahend": {
+                    "operands": [
+                        {
+                            "type": "data_element",
+                            "dx": "bjLZY1FqdDJ",
+                            "data_element_id": "bjLZY1FqdDJ",
+                            "category_option_combo_id": null
+                        }
+                    ]
+                }
+            },
+            "validation": {
+                "status": "review_required",
+                "messages": [
+                    "Workbook subtraction was preserved as a count; confirm the intended dashboard value type."
+                ]
+            },
+            "source_reference": {
+                "workbook_row": 19,
+                "original_indicator_name": "Early initiation of breastfeeding within 1 hour of birth",
+                "original_mapping": "(iBBnHx1Uf50, EeywK6AHQdK, jz793Wzon1W, q7NoDcfaciO, kaYz6eqxqQH) - (bjLZY1FqdDJ)"
+            }
+        },
+        {
+            "id": "vitamin_k_at_birth",
+            "name": "Vitamin K at birth",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "zAcW94iEdXU",
+                        "data_element_id": "zAcW94iEdXU",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 20,
+                "original_indicator_name": "Vitamin K at birth",
+                "original_mapping": "zAcW94iEdXU"
+            }
+        },
+        {
+            "id": "new_anc_registrations",
+            "name": "New ANC registrations",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "zAvhV81SCLV",
+                        "data_element_id": "zAvhV81SCLV",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 21,
+                "original_indicator_name": "New ANC registrations",
+                "original_mapping": "zAvhV81SCLV"
+            }
+        },
+        {
+            "id": "started_anc_in_first_trimester_0_12_weeks",
+            "name": "Started ANC in first trimester (0-12 weeks)",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "EVt2iC6Tn34",
+                        "data_element_id": "EVt2iC6Tn34",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 22,
+                "original_indicator_name": "Started ANC in first trimester (0-12 weeks)",
+                "original_mapping": "EVt2iC6Tn34"
+            }
+        },
+        {
+            "id": "received_120_fefo_tablets",
+            "name": "Received 120+ FeFo tablets",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "Rczpg2vCvat",
+                        "data_element_id": "Rczpg2vCvat",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 23,
+                "original_indicator_name": "Received 120+ FeFo tablets",
+                "original_mapping": "Rczpg2vCvat"
+            }
+        },
+        {
+            "id": "received_itn_during_anc",
+            "name": "Received ITN during ANC",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "gLN6hOgR6ra",
+                        "data_element_id": "gLN6hOgR6ra",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 24,
+                "original_indicator_name": "Received ITN during ANC",
+                "original_mapping": "gLN6hOgR6ra"
+            }
+        },
+        {
+            "id": "women_with_imminent_preterm_birth_receiving_acs",
+            "name": "Women with imminent preterm birth receiving ACs",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "percentage",
+            "calculation": {
+                "operation": "percentage",
+                "multiplier": 100,
+                "numerator": {
+                    "operands": [
+                        {
+                            "type": "data_element",
+                            "dx": "b4WuKkuuR0W",
+                            "data_element_id": "b4WuKkuuR0W",
+                            "category_option_combo_id": null
+                        }
+                    ]
+                },
+                "denominator": {
+                    "operands": [
+                        {
+                            "type": "data_element_operand",
+                            "dx": "RS3PtRniRns.ezMtOgig3e6",
+                            "data_element_id": "RS3PtRniRns",
+                            "category_option_combo_id": "ezMtOgig3e6"
+                        }
+                    ]
+                },
+                "zero_denominator_result": null
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 25,
+                "original_indicator_name": "Women with imminent preterm birth receiving ACs",
+                "original_mapping": "(b4WuKkuuR0W)/(RS3PtRniRns.ezMtOgig3e6)"
+            }
+        },
+        {
+            "id": "facility_deliveries",
+            "name": "Facility deliveries",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "sum",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "YIP4fvYcGYQ",
+                        "data_element_id": "YIP4fvYcGYQ",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "iGYCZRe52Vy",
+                        "data_element_id": "iGYCZRe52Vy",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 26,
+                "original_indicator_name": "Facility deliveries",
+                "original_mapping": "YIP4fvYcGYQ, iGYCZRe52Vy"
+            }
+        },
+        {
+            "id": "delivered_at_this_facility",
+            "name": "Delivered at this facility",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "YIP4fvYcGYQ",
+                        "data_element_id": "YIP4fvYcGYQ",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 27,
+                "original_indicator_name": "Delivered at this facility",
+                "original_mapping": "YIP4fvYcGYQ"
+            }
+        },
+        {
+            "id": "delivered_at_home_or_in_transit",
+            "name": "Delivered at home or in transit",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "KOu770F7YOQ",
+                        "data_element_id": "KOu770F7YOQ",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 28,
+                "original_indicator_name": "Delivered at home or in transit",
+                "original_mapping": "KOu770F7YOQ"
+            }
+        },
+        {
+            "id": "delivered_by_skilled_attendant",
+            "name": "Delivered by skilled attendant",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "R9CHUW81m9o",
+                        "data_element_id": "R9CHUW81m9o",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 29,
+                "original_indicator_name": "Delivered by skilled attendant",
+                "original_mapping": "R9CHUW81m9o"
+            }
+        },
+        {
+            "id": "normal_vaginal_delivery",
+            "name": "Normal vaginal delivery",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "GwzEUK12Pqh",
+                        "data_element_id": "GwzEUK12Pqh",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 30,
+                "original_indicator_name": "Normal vaginal delivery",
+                "original_mapping": "GwzEUK12Pqh"
+            }
+        },
+        {
+            "id": "obstetric_complication_pph",
+            "name": "Obstetric complication: PPH",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element_operand",
+                        "dx": "RS3PtRniRns.ZGX8SK5P435",
+                        "data_element_id": "RS3PtRniRns",
+                        "category_option_combo_id": "ZGX8SK5P435"
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 31,
+                "original_indicator_name": "Obstetric complication: PPH",
+                "original_mapping": "RS3PtRniRns.ZGX8SK5P435"
+            }
+        },
+        {
+            "id": "obstetric_complication_eclampsia",
+            "name": "Obstetric complication: Eclampsia",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element_operand",
+                        "dx": "RS3PtRniRns.JPgETYeD4qF",
+                        "data_element_id": "RS3PtRniRns",
+                        "category_option_combo_id": "JPgETYeD4qF"
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 32,
+                "original_indicator_name": "Obstetric complication: Eclampsia",
+                "original_mapping": "RS3PtRniRns.JPgETYeD4qF"
+            }
+        },
+        {
+            "id": "obstetric_complication_obstructed_labour",
+            "name": "Obstetric complication: Obstructed labour",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element_operand",
+                        "dx": "RS3PtRniRns.Ht1Pz8Kn2k3",
+                        "data_element_id": "RS3PtRniRns",
+                        "category_option_combo_id": "Ht1Pz8Kn2k3"
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 33,
+                "original_indicator_name": "Obstetric complication: Obstructed labour",
+                "original_mapping": "RS3PtRniRns.Ht1Pz8Kn2k3"
+            }
+        },
+        {
+            "id": "obstetric_complication_maternal_sepsis",
+            "name": "Obstetric complication: Maternal sepsis",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element_operand",
+                        "dx": "RS3PtRniRns.N6Kp9pEEqSI",
+                        "data_element_id": "RS3PtRniRns",
+                        "category_option_combo_id": "N6Kp9pEEqSI"
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 34,
+                "original_indicator_name": "Obstetric complication: Maternal sepsis",
+                "original_mapping": "RS3PtRniRns.N6Kp9pEEqSI"
+            }
+        },
+        {
+            "id": "signal_parenteral_antibiotics",
+            "name": "Signal: Parenteral antibiotics",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "gXjGJoC7gDs",
+                        "data_element_id": "gXjGJoC7gDs",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 35,
+                "original_indicator_name": "Signal: Parenteral antibiotics",
+                "original_mapping": "gXjGJoC7gDs"
+            }
+        },
+        {
+            "id": "signal_anticonvulsants_mgso4",
+            "name": "Signal: Anticonvulsants (MgSO4)",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "n7XnfWv0tHo",
+                        "data_element_id": "n7XnfWv0tHo",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 36,
+                "original_indicator_name": "Signal: Anticonvulsants (MgSO4)",
+                "original_mapping": "n7XnfWv0tHo"
+            }
+        },
+        {
+            "id": "signal_oxytocics",
+            "name": "Signal: Oxytocics",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "FhNg0SdUMe8",
+                        "data_element_id": "FhNg0SdUMe8",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 37,
+                "original_indicator_name": "Signal: Oxytocics",
+                "original_mapping": "FhNg0SdUMe8"
+            }
+        },
+        {
+            "id": "signal_manual_placenta_removal",
+            "name": "Signal: Manual placenta removal",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "BbmxEK5AYaL",
+                        "data_element_id": "BbmxEK5AYaL",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 38,
+                "original_indicator_name": "Signal: Manual placenta removal",
+                "original_mapping": "BbmxEK5AYaL"
+            }
+        },
+        {
+            "id": "signal_mva_retained_products",
+            "name": "Signal: MVA / retained products",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "sum",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "VT6P1wfvaZp",
+                        "data_element_id": "VT6P1wfvaZp",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "E2TanFi22H5",
+                        "data_element_id": "E2TanFi22H5",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 39,
+                "original_indicator_name": "Signal: MVA / retained products",
+                "original_mapping": "VT6P1wfvaZp, E2TanFi22H5"
+            }
+        },
+        {
+            "id": "signal_assisted_vaginal_delivery",
+            "name": "Signal: Assisted vaginal delivery",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "LLrXje6xH8D",
+                        "data_element_id": "LLrXje6xH8D",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 40,
+                "original_indicator_name": "Signal: Assisted vaginal delivery",
+                "original_mapping": "LLrXje6xH8D"
+            }
+        },
+        {
+            "id": "signal_caesarean_section",
+            "name": "Signal: Caesarean section",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "FYDa4NcJNrq",
+                        "data_element_id": "FYDa4NcJNrq",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 41,
+                "original_indicator_name": "Signal: Caesarean section",
+                "original_mapping": "FYDa4NcJNrq"
+            }
+        },
+        {
+            "id": "signal_blood_transfusion",
+            "name": "Signal: Blood transfusion",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "vyIPU3KOFF6",
+                        "data_element_id": "vyIPU3KOFF6",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 42,
+                "original_indicator_name": "Signal: Blood transfusion",
+                "original_mapping": "vyIPU3KOFF6"
+            }
+        },
+        {
+            "id": "mothers_with_postnatal_complications",
+            "name": "Mothers with postnatal complications",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "sum",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "fVzGijnVOrs",
+                        "data_element_id": "fVzGijnVOrs",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "UcgSdalWMGa",
+                        "data_element_id": "UcgSdalWMGa",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "sjpjF9WcIf2",
+                        "data_element_id": "sjpjF9WcIf2",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "blfZXfjQ5vZ",
+                        "data_element_id": "blfZXfjQ5vZ",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "B0C73VHIXsm",
+                        "data_element_id": "B0C73VHIXsm",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "h94ppnq7695",
+                        "data_element_id": "h94ppnq7695",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 43,
+                "original_indicator_name": "Mothers with postnatal complications",
+                "original_mapping": "fVzGijnVOrs, UcgSdalWMGa, sjpjF9WcIf2, blfZXfjQ5vZ, B0C73VHIXsm, h94ppnq7695"
+            }
+        },
+        {
+            "id": "babies_with_postnatal_complications",
+            "name": "Babies with postnatal complications",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "sum",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "PsSIGk4JCAp",
+                        "data_element_id": "PsSIGk4JCAp",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "OYc0KJJSavh",
+                        "data_element_id": "OYc0KJJSavh",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "DaNydZHxar3",
+                        "data_element_id": "DaNydZHxar3",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "D6PpsB5P3fL",
+                        "data_element_id": "D6PpsB5P3fL",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "L3XKOQoukVq",
+                        "data_element_id": "L3XKOQoukVq",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "wtuN1m0Kjn5",
+                        "data_element_id": "wtuN1m0Kjn5",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "uojP8TYbL7X",
+                        "data_element_id": "uojP8TYbL7X",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "TKceP6JwglP",
+                        "data_element_id": "TKceP6JwglP",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "kFgT8mdcQjA",
+                        "data_element_id": "kFgT8mdcQjA",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 44,
+                "original_indicator_name": "Babies with postnatal complications",
+                "original_mapping": "PsSIGk4JCAp, OYc0KJJSavh, DaNydZHxar3, D6PpsB5P3fL, L3XKOQoukVq, wtuN1m0Kjn5, uojP8TYbL7X, TKceP6JwglP, kFgT8mdcQjA"
+            }
+        },
+        {
+            "id": "mothers_checked_within_7_days",
+            "name": "Mothers checked within 7 days",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "IDxBzSLUZVn",
+                        "data_element_id": "IDxBzSLUZVn",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 45,
+                "original_indicator_name": "Mothers checked within 7 days",
+                "original_mapping": "IDxBzSLUZVn"
+            }
+        },
+        {
+            "id": "babies_checked_within_7_days",
+            "name": "Babies checked within 7 days",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "jgDt2dm1QOS",
+                        "data_element_id": "jgDt2dm1QOS",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 46,
+                "original_indicator_name": "Babies checked within 7 days",
+                "original_mapping": "jgDt2dm1QOS"
+            }
+        },
+        {
+            "id": "mothers_checked_at_6_weeks",
+            "name": "Mothers checked at 6 weeks",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "cLuLPg1YMSq",
+                        "data_element_id": "cLuLPg1YMSq",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 47,
+                "original_indicator_name": "Mothers checked at 6 weeks",
+                "original_mapping": "cLuLPg1YMSq"
+            }
+        },
+        {
+            "id": "babies_checked_at_6_weeks",
+            "name": "Babies checked at 6 weeks",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "nJZsvYHkXQz",
+                        "data_element_id": "nJZsvYHkXQz",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 48,
+                "original_indicator_name": "Babies checked at 6 weeks",
+                "original_mapping": "nJZsvYHkXQz"
+            }
+        },
+        {
+            "id": "immediate_postpartum_family_planning",
+            "name": "Immediate postpartum family planning",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "sum",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "oZECAevnT9d",
+                        "data_element_id": "oZECAevnT9d",
+                        "category_option_combo_id": null
+                    },
+                    {
+                        "type": "data_element",
+                        "dx": "baBLHbjm5MP",
+                        "data_element_id": "baBLHbjm5MP",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 49,
+                "original_indicator_name": "Immediate postpartum family planning",
+                "original_mapping": "oZECAevnT9d, baBLHbjm5MP"
+            }
+        },
+        {
+            "id": "hiv_positive_postnatal_mothers",
+            "name": "HIV positive postnatal mothers",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "elif3HHWci7",
+                        "data_element_id": "elif3HHWci7",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 50,
+                "original_indicator_name": "HIV positive postnatal mothers",
+                "original_mapping": "elif3HHWci7"
+            }
+        },
+        {
+            "id": "hiv_exposed_babies_on_art_prophylaxis",
+            "name": "HIV exposed babies on ART prophylaxis",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "OmHmawnO5Ng",
+                        "data_element_id": "OmHmawnO5Ng",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 51,
+                "original_indicator_name": "HIV exposed babies on ART prophylaxis",
+                "original_mapping": "OmHmawnO5Ng"
+            }
+        },
+        {
+            "id": "babies_who_received_bcg",
+            "name": "Babies who received BCG",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "kLmi0DXLHky",
+                        "data_element_id": "kLmi0DXLHky",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 52,
+                "original_indicator_name": "Babies who received BCG",
+                "original_mapping": "kLmi0DXLHky"
+            }
+        },
+        {
+            "id": "babies_who_received_polio_0",
+            "name": "Babies who received Polio 0",
+            "description": null,
+            "source": "dhis2",
+            "enabled": true,
+            "value_type": "count",
+            "calculation": {
+                "operation": "direct",
+                "operands": [
+                    {
+                        "type": "data_element",
+                        "dx": "AzGc4TyeFKI",
+                        "data_element_id": "AzGc4TyeFKI",
+                        "category_option_combo_id": null
+                    }
+                ]
+            },
+            "validation": {
+                "status": "valid",
+                "messages": []
+            },
+            "source_reference": {
+                "workbook_row": 53,
+                "original_indicator_name": "Babies who received Polio 0",
+                "original_mapping": "AzGc4TyeFKI"
+            }
+        }
+    ]
+}

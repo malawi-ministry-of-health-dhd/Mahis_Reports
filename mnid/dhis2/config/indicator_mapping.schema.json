@@ -1,0 +1,42 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.invalid/mnid/dhis2/indicator_mapping.schema.json",
+    "title": "MNID DHIS2 indicator mapping",
+    "type": "object",
+    "required": ["schema_version", "mapping_version", "source", "reporting_period", "indicators"],
+    "properties": {
+        "schema_version": {"const": "1.0"},
+        "mapping_version": {"type": "string", "minLength": 1},
+        "source": {
+            "type": "object",
+            "required": ["name", "base_url", "source_workbook", "worksheet"]
+        },
+        "reporting_period": {
+            "type": "object",
+            "required": ["period_type", "start_period", "end_period"],
+            "properties": {
+                "period_type": {"const": "monthly"},
+                "start_period": {"type": "string", "pattern": "^[0-9]{4}(0[1-9]|1[0-2])$"},
+                "end_period": {"type": "string", "pattern": "^[0-9]{4}(0[1-9]|1[0-2])$"}
+            }
+        },
+        "indicators": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["id", "name", "source", "enabled", "value_type", "calculation", "validation", "source_reference"],
+                "properties": {
+                    "id": {"type": "string", "pattern": "^[a-z0-9]+(?:_[a-z0-9]+)*$"},
+                    "source": {"const": "dhis2"},
+                    "enabled": {"type": "boolean"},
+                    "value_type": {"enum": ["count", "percentage", "rate", "ratio", "measurement", "unknown"]},
+                    "validation": {
+                        "type": "object",
+                        "required": ["status", "messages"],
+                        "properties": {"status": {"enum": ["valid", "review_required", "rejected"]}}
+                    }
+                }
+            }
+        }
+    }
+}
