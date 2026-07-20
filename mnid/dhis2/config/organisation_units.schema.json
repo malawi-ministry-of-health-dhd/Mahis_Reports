@@ -17,6 +17,11 @@
                     "level": {"enum": ["national", "district", "facility"]},
                     "active_from": {"type": ["string", "null"], "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"},
                     "active_to": {"type": ["string", "null"], "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"},
+                    "dhis2_level": {"type": "integer", "minimum": 1},
+                    "dhis2_code": {"type": ["string", "null"]},
+                    "parent_org_unit_id": {"type": ["string", "null"], "pattern": "^[A-Za-z][A-Za-z0-9]{10}$"},
+                    "parent_org_unit_name": {"type": ["string", "null"]},
+                    "configuration_status": {"enum": ["pilot", "approved"]},
                     "enabled": {"type": "boolean"}
                 }
             }

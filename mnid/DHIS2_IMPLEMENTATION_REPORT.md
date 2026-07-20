@@ -10,9 +10,10 @@ plans and executes bounded Analytics queries, preserves audit data, normalizes a
 calculates MNH indicators, validates completeness, atomically publishes Parquet, and
 provides an opt-in local data source for the MNH-MoH dashboard.
 
-No live API request was made. Production synchronization remains deliberately blocked
-because no approved organisation-unit crosswalk was supplied. Current MaHIS/OpenMRS
-dashboard behaviour remains the default and is not replaced.
+Authenticated pilot API requests have now been completed for one facility and period.
+Production synchronization remains blocked pending a production-wide approved
+organisation-unit crosswalk and resolution of incomplete operands. Current
+MaHIS/OpenMRS dashboard behaviour remains the default and is not replaced.
 
 ## Scope completed
 
@@ -70,10 +71,11 @@ produce null, not zero.
 
 ## Organisation-unit status
 
-`organisation_units.json` is present, schema-controlled, and intentionally empty.
-No organisation-unit IDs were invented or copied from legacy code. Validation allows
-the package to import and tests to run, but configuration validation, dry run, and live
-sync fail clearly until at least one approved unit is enabled.
+`organisation_units.json` contains one pilot entry: Area 25 Urban Health Centre,
+matched to local facility code `LL040037`. DHIS2 reports it at level 4 under
+Lilongwe-DHO. The entry preserves the DHIS2 level, code, parent, and pilot status.
+No organisation-unit IDs were invented or copied from legacy code. A production-wide
+crosswalk remains outstanding.
 
 ## Client and security controls
 
@@ -121,7 +123,8 @@ Manual checks performed:
 - Validate-only conversion completed without rewriting output.
 - Real configuration validation produced the expected missing-org-unit blocker.
 - Git diffs were checked for whitespace and scope.
-- No authenticated live request was attempted.
+- Authenticated `/api/me`, organisation-unit metadata, and controlled Analytics pilot
+  requests completed with TLS verification enabled.
 
 The project environment does not include `pytest`, a formatter, linter, or type checker
 configured for this package. Standard-library tests and `compileall` were therefore
@@ -152,9 +155,10 @@ source path and source/freshness presentation.
 
 ## Known limitations and blockers
 
-1. Approved organisation-unit and facility-code mappings are missing.
-2. Credentials, permissions, network path, and TLS chain have not been validated.
-3. No live values have been independently reconciled with HMIS source reports.
+1. A production-wide approved organisation-unit and facility-code crosswalk is missing.
+2. The pilot returned 74 of 78 requested atomic rows. Missing inputs affect anaemia
+   screening and MVA/retained-products, so validation correctly rejected publication.
+3. Live values have not been independently reconciled with HMIS source reports.
 4. Early breastfeeding calculation requires clinical confirmation.
 5. Repository-level scheduler integration is outside the strict `mnid/` scope; an
    approved external scheduler must invoke the CLI.
@@ -208,11 +212,12 @@ python -m mnid.dhis2.sync
 ## Recommended next steps
 
 1. Obtain and dual-review the official organisation-unit/facility crosswalk.
-2. Approve the ambiguous early-breastfeeding definition.
-3. Provision a read-only DHIS2 service account and environment-managed secrets.
-4. Validate TLS/network access without weakening certificate checks.
-5. Run a one-unit, one-period, small-`dx` pilot and independently reconcile values.
-6. Expand gradually to 14 periods after pilot sign-off.
+2. Review the four absent pilot operands and decide whether to correct or disable the
+   two affected mappings for the approved pilot configuration.
+3. Approve the ambiguous early-breastfeeding definition.
+4. Provision/rotate a read-only service-account secret through environment management.
+5. Independently reconcile the 74 returned pilot values with HMIS source reports.
+6. Expand gradually to 14 periods after pilot sign-off and complete validation.
 7. Configure external scheduling, status monitoring, and alert ownership.
 8. Add a user-facing source selector only after governance approves how MaHIS and
    DHIS2 sources should be presented or compared.

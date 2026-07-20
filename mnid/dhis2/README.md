@@ -223,6 +223,25 @@ do not require or contact live DHIS2.
 
 HMIS owns source metadata and organisation-unit approval; MNID owns dashboard meaning;
 data-quality owners approve reconciliation; infrastructure owns secrets, certificates,
-scheduling, and alerts. Current blockers are the empty organisation-unit crosswalk,
-unvalidated live credentials/connectivity, and clinical review of early breastfeeding
-as a count-based subtraction. No authenticated live validation has been performed.
+scheduling, and alerts. One facility is configured for pilot use; a production-wide
+crosswalk is still required. Authentication, TLS, and one-period Analytics retrieval
+have been verified. Clinical review of early breastfeeding as a count-based subtraction
+and two incomplete pilot mappings remains necessary.
+
+## Pilot result: 20 July 2026
+
+Area 25 Urban Health Centre was matched by exact normalized name to local code
+`LL040037` and configured with its DHIS2 level-4 metadata. A one-period (`202504`)
+Analytics test requested all 78 atomic operands in three batches:
+
+- all three requests completed;
+- 74 atomic rows were returned;
+- no returned rows were malformed, duplicated, unknown, or outside scope;
+- four requested `dx` rows were absent; and
+- two calculated indicators were consequently incomplete.
+
+The missing inputs affect **Screened for anaemia** and **Signal: MVA / retained
+products**. The validation gate rejected publication, correctly preserving the rule
+that an absent DHIS2 row is not a numeric zero. HMIS should confirm whether those
+operands are inactive, unavailable for this facility/period, or require revised
+mappings before the first dataset is published.

@@ -4,7 +4,8 @@
 Do not edit generated source references or calculation operands casually; regenerate
 with the converter and review the conversion report.
 
-`organisation_units.json` is intentionally empty because no approved DHIS2-to-MaHIS
-crosswalk was supplied. Add reviewed entries matching the adjacent JSON Schema.
-Live synchronization refuses to run until at least one unit is enabled. Never copy
-the hard-coded organisation unit from the legacy shared DHIS2 prototype.
+`organisation_units.json` currently contains one explicitly enabled pilot facility,
+Area 25 Urban Health Centre. Its DHIS2 level, parent, code, and confirmed local match
+are preserved for audit. Entries marked `pilot` must be reviewed before a production
+rollout; use `approved` only after governance sign-off. Never copy the hard-coded
+organisation unit from the legacy shared DHIS2 prototype.

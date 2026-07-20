@@ -27,8 +27,11 @@ class SyncCliTests(unittest.TestCase):
         self.assertIn('"period_count": 14', output.getvalue())
         self.assertNotIn("password", output.getvalue().lower())
 
-    def test_real_config_reports_missing_org_units(self):
-        self.assertEqual(2, main(["--validate-config"]))
+    def test_real_pilot_config_is_valid(self):
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(0, main(["--validate-config"]))
+        self.assertIn('"organisation_unit_count": 1', output.getvalue())
 
 
 if __name__ == "__main__": unittest.main()
