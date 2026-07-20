@@ -9,6 +9,7 @@ from dash.exceptions import PreventUpdate
 from flask import request
 from helpers.helpers import build_charts_section, build_metrics_section
 from mnid_renderer import render_mnid_dashboard
+from mnid.core.data_utils import resolve_facility_level
 from dashboard_layouts import build_premium_dashboard
 from dash import ctx
 from helpers.visualizations import create_line_list_basic_modal
@@ -291,6 +292,7 @@ def _resolve_user_scope(urlparams, user_data: pd.DataFrame):
                 'level':      level,
                 'districts':  districts  or [],
                 'facilities': facilities or [],
+                'facility_code': p.get('facility_code'),
             }
             # Still return a dataframe row so callers that use row.get(...) don't break
             user_info = user_data[user_data['uuid'] == requested_uuid]
@@ -307,6 +309,7 @@ def _resolve_user_scope(urlparams, user_data: pd.DataFrame):
         'level':      level,
         'districts':  row.get('district'),
         'facilities': row.get('facility_name'),
+        'facility_code': row.get('facility_code'),
     }
     return row, scope
 
@@ -1537,7 +1540,25 @@ def update_dashboard(gen, start_date, end_date, level,
         if isinstance(all_facilities, str):
             all_facilities = [all_facilities]
 
-        # ── Shared scope & query building ────────────────────────────────────
+        # Narrow the Health Facility dropdown by the selected Facility Level,
+        # scoped to Maternal Health only (where that filter is shown). Uses the
+        # dataset's own Facility_CODE/Facility pairs (real facilities with data),
+        # not facilities_dropdowns.json's broader, code-less location list.
+        if 'Maternal Health' in selected_reports and moh_level and moh_level != 'All':
+            try:
+                _fac_level_lookup = DataStorage.query_duckdb(
+                    f"SELECT DISTINCT {FACILITY_CODE_}, {FACILITY_} FROM '{DATA_PATH_}'"
+                )
+                _level_matched = {
+                    row[FACILITY_]
+                    for _, row in _fac_level_lookup.iterrows()
+                    if resolve_facility_level(row[FACILITY_CODE_], row[FACILITY_]) == moh_level
+                }
+                all_facilities = sorted(set(all_facilities) & _level_matched)
+            except Exception:
+                pass
+
+        # Shared scope & query building
         # active_dists: at district level fall back to user's districts when
         # nothing is selected in the UI; at national level only use UI selection.
         active_dists = (districts or user_districts) if effective_level == 'district' else (districts or [])
@@ -1585,6 +1606,9 @@ def update_dashboard(gen, start_date, end_date, level,
             scope_value = 'All districts'
 
         mnid_categories = [category] if category and category != 'All' else None
+        user_facility_level = (
+            resolve_facility_level(scope.get('facility_code')) if scope.get('facility_code') else None
+        )
         scope_meta = {
             'label':               scope_label,
             'value':               scope_value,
@@ -1595,6 +1619,7 @@ def update_dashboard(gen, start_date, end_date, level,
             'data_period_note':    None,
             'dataset_version':     dataset_version,
             'route':               data_route,
+            'user_facility_level': user_facility_level,
         }
 
         rendered = []
@@ -1775,10 +1800,61 @@ def toggle_age_group_visibility(active_report):
 
 @callback(
     Output('dashboard-moh-level-filter-group', 'style'),
+    Output('dashboard-moh-level-filter', 'value'),
     Input('active-button-store', 'data'),
+    State('url-params-store', 'data'),
 )
-def toggle_moh_level_visibility(active_report):
+def toggle_moh_level_visibility(active_report, urlparams):
     report = str(active_report or '').strip().lower()
-    if report == 'maternal health':
-        return {}
-    return {'display': 'none'}
+    if report != 'maternal health':
+        return {'display': 'none'}, no_update
+
+    # Default the filter to the logged-in user's own facility level, but only
+    # for users actually scoped to a single facility — a national/district user
+    # isn't "at" any one facility, so there's nothing meaningful to default to.
+    # Not overriding a manual pick later in the session — this only re-applies
+    # each time the user switches back into the Maternal Health report.
+    default_level = 'All'
+    try:
+        data_route = (urlparams or {}).get('route', ['default'])[0]
+        user_data = _load_user_registry(data_route)
+        _, scope = _resolve_user_scope(urlparams or {}, user_data)
+        facility_code = scope.get('facility_code')
+        if scope.get('level') == 'facility' and facility_code:
+            resolved = resolve_facility_level(facility_code)
+            if resolved in ('Primary', 'Secondary', 'Tertiary'):
+                default_level = resolved
+    except Exception:
+        default_level = 'All'
+
+    return {}, default_level
+
+
+@callback(
+    Output('dashboard-moh-level-filter', 'value', allow_duplicate=True),
+    Input('dashboard-facility-filter', 'value'),
+    State('url-params-store', 'data'),
+    prevent_initial_call=True,
+)
+def reflect_selected_facility_level(selected_facilities, urlparams):
+    """When a national/district user drills down to exactly one facility, show
+    that facility's real level. Zero or multiple selected: leave the Facility
+    Level filter alone — at that point it's being used as an aggregation filter
+    (e.g. "all Secondary facilities"), not a single-facility reflection.
+    """
+    if not selected_facilities or len(selected_facilities) != 1:
+        raise PreventUpdate
+    try:
+        data_route = (urlparams or {}).get('route', ['default'])[0]
+        data_path = f'data/{data_route}/parquet'
+        lookup = DataStorage.query_duckdb(
+            f"SELECT DISTINCT {FACILITY_CODE_}, {FACILITY_} FROM '{data_path}' "
+            f"WHERE {FACILITY_} = '{selected_facilities[0]}'"
+        )
+        if lookup.empty:
+            raise PreventUpdate
+        return resolve_facility_level(lookup.iloc[0][FACILITY_CODE_], selected_facilities[0])
+    except PreventUpdate:
+        raise
+    except Exception:
+        raise PreventUpdate

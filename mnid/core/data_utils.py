@@ -1084,6 +1084,50 @@ def _normalize_encounter(row: pd.Series) -> str:
     return encounter
 
 
+_FACILITY_LEVEL_BY_CODE: dict[str, str] | None = None
+
+
+def _facility_level_by_code() -> dict[str, str]:
+    """Load data/geo/facilities_levels.json once into {Facility_CODE: level}.
+
+    This is the authoritative Primary/Secondary/Tertiary source. Facilities not
+    present in it (not every facility in the live dataset is covered) fall back
+    to the name-pattern heuristic wherever this lookup is used.
+    """
+    global _FACILITY_LEVEL_BY_CODE
+    if _FACILITY_LEVEL_BY_CODE is not None:
+        return _FACILITY_LEVEL_BY_CODE
+    path = os.path.join(os.getcwd(), 'data', 'geo', 'facilities_levels.json')
+    try:
+        with open(path, encoding='utf-8') as f:
+            records = json.load(f)
+        _FACILITY_LEVEL_BY_CODE = {
+            str(r.get('CODE')): r.get('FACILITY LEVEL')
+            for r in records
+            if r.get('CODE') and r.get('FACILITY LEVEL')
+        }
+    except Exception:
+        _FACILITY_LEVEL_BY_CODE = {}
+    return _FACILITY_LEVEL_BY_CODE
+
+
+def resolve_facility_level(facility_code: str | None, facility_name: str | None = None) -> str:
+    """Look up a facility's Primary/Secondary/Tertiary level.
+
+    Prefers the authoritative facilities_levels.json (keyed by Facility_CODE);
+    falls back to a name-pattern guess for facilities it doesn't cover.
+    """
+    level = _facility_level_by_code().get(str(facility_code)) if facility_code else None
+    if level:
+        return level
+    name_upper = str(facility_name or '').upper()
+    if 'CENTRAL HOSPITAL' in name_upper:
+        return 'Tertiary'
+    if 'DISTRICT HOSPITAL' in name_upper:
+        return 'Secondary'
+    return 'Primary'
+
+
 def _normalize_mnid_semantics(df: pd.DataFrame) -> pd.DataFrame:
     if df is None or df.empty:
         return df
@@ -1137,12 +1181,18 @@ def _normalize_mnid_semantics(df: pd.DataFrame) -> pd.DataFrame:
         mapped_enc = out['Service_Area'].map(_ENCOUNTER_LABEL_MAP)
         out['Encounter'] = mapped_enc.where(mapped_enc.notna(), out['Encounter'])
 
-    # mohupdate: derive Facility_Type from facility name if column is missing
-    if 'Facility_Type' not in out.columns and 'Facility' in out.columns:
-        fac_upper = out['Facility'].fillna('').astype(str).str.upper()
-        out['Facility_Type'] = 'Primary'
-        out.loc[fac_upper.str.contains('CENTRAL HOSPITAL', na=False), 'Facility_Type'] = 'Tertiary'
-        out.loc[fac_upper.str.contains('DISTRICT HOSPITAL', na=False), 'Facility_Type'] = 'Secondary'
+    # derive Facility_Type from facilities_levels.json (Facility_CODE),
+    # falling back to a name-pattern guess for facilities it doesn't cover.
+    if 'Facility_Type' not in out.columns and 'Facility_CODE' in out.columns:
+        code_col = out['Facility_CODE'].fillna('').astype(str)
+        name_col = out['Facility'].fillna('').astype(str) if 'Facility' in out.columns else pd.Series('', index=out.index)
+        level_map = _facility_level_by_code()
+        looked_up = code_col.map(level_map)
+        name_upper = name_col.str.upper()
+        fallback = pd.Series('Primary', index=out.index)
+        fallback[name_upper.str.contains('CENTRAL HOSPITAL', na=False)] = 'Tertiary'
+        fallback[name_upper.str.contains('DISTRICT HOSPITAL', na=False)] = 'Secondary'
+        out['Facility_Type'] = looked_up.where(looked_up.notna(), fallback)
 
     return _derive_person_level_context(out)
 
