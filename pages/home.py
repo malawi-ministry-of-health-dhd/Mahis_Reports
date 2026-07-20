@@ -1443,9 +1443,9 @@ def _save_mnid_executive_tab(tab_value):
         Input({"type": "menu-button", "name": ALL}, "n_clicks"),
         Input('url', 'pathname'),
         Input('dashboard-moh-level-filter', 'value'),
+        Input('url-params-store', 'data'),
     ],
     [
-        State('url-params-store', 'data'),
         State('dashboard-age-filter', 'value'),
         State('active-button-store', 'data'),
         State('mnid-active-tab-store', 'data'),
@@ -1489,7 +1489,8 @@ def update_dashboard(gen, start_date, end_date, level,
         if user_row is None:
             return (html.Div("Unauthorized User. Please contact system administrator."), level,
                     {'display': 'none'} if level in ['National', 'Facility'] else {},
-                    [], [], False, "", [],"", [], clicked_name)
+                    [], [], False, "", [], "", "", clicked_name,
+                    {'status': 'unauthorized'})
 
         user_level = scope['level']
         user_districts = scope.get('districts') or []
