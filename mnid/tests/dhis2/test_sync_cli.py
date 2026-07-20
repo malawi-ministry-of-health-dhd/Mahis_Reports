@@ -33,5 +33,11 @@ class SyncCliTests(unittest.TestCase):
             self.assertEqual(0, main(["--validate-config"]))
         self.assertIn('"organisation_unit_count": 10406', output.getvalue())
 
+    @patch.dict("os.environ", {"MNH_DHIS2_USERNAME": "u", "MNH_DHIS2_PASSWORD": "p"}, clear=False)
+    def test_live_sync_refuses_mixed_levels(self):
+        with patch("mnid.dhis2.sync.run_ingestion") as ingestion:
+            self.assertEqual(2, main(["--start-period", "202504", "--end-period", "202504"]))
+        ingestion.assert_not_called()
+
 
 if __name__ == "__main__": unittest.main()

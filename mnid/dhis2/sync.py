@@ -68,6 +68,14 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"status": "dry_run", **summary}, indent=2))
             return 0
 
+        selected_levels = {unit.get("level") for unit in units}
+        if len(selected_levels) > 1:
+            from .exceptions import DHIS2ConfigurationError
+            raise DHIS2ConfigurationError(
+                "Live synchronization cannot mix organisation-unit levels; "
+                "select one --org-level or explicit --org-unit values from one level"
+            )
+
         previous = load_status(settings.status_dir)
         running = {
             "source": "Malawi HMIS DHIS2", "status": "running",
