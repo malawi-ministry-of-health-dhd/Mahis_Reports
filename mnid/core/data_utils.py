@@ -34,6 +34,7 @@ def _restore_ui_dataframe(cache_key: str | None) -> pd.DataFrame:
         return obj
     return deserialize_store_df(obj)
 
+from . import constants as _constants
 from .constants import (
     ALL_DISTRICTS,
     ALL_FACILITIES,
@@ -1086,6 +1087,80 @@ def _normalize_encounter(row: pd.Series) -> str:
     return encounter
 
 
+_FACILITY_LEVEL_BY_CODE: dict[str, str] | None = None
+
+
+def _facility_level_by_code() -> dict[str, str]:
+    """Load data/geo/facilities_levels.json once into {Facility_CODE: level}.
+
+    This is the authoritative Primary/Secondary/Tertiary source. Facilities not
+    present in it (not every facility in the live dataset is covered) fall back
+    to the name-pattern heuristic wherever this lookup is used.
+    """
+    global _FACILITY_LEVEL_BY_CODE
+    if _FACILITY_LEVEL_BY_CODE is not None:
+        return _FACILITY_LEVEL_BY_CODE
+    path = os.path.join(os.getcwd(), 'data', 'geo', 'facilities_levels.json')
+    try:
+        with open(path, encoding='utf-8') as f:
+            records = json.load(f)
+        _FACILITY_LEVEL_BY_CODE = {
+            str(r.get('CODE')): r.get('FACILITY LEVEL')
+            for r in records
+            if r.get('CODE') and r.get('FACILITY LEVEL')
+        }
+    except Exception:
+        _FACILITY_LEVEL_BY_CODE = {}
+    return _FACILITY_LEVEL_BY_CODE
+
+
+_FACILITY_REGISTRY_BY_CODE: dict[str, dict] | None = None
+
+
+def _facility_registry_by_code() -> dict[str, dict]:
+    """Load data/geo/facilities_levels.json once into {Facility_CODE: {name, district}}.
+
+    Same source file as _facility_level_by_code, but keyed to name/district
+    instead of level -- used to resolve facility labels for codes that come
+    from an external source (e.g. DHIS2's crosswalk) and never appear as rows
+    in the locally-loaded MAHIS dataset, so register_facility_metadata's
+    dataset-derived FACILITY_NAMES/FACILITY_DISTRICT wouldn't otherwise know
+    them.
+    """
+    global _FACILITY_REGISTRY_BY_CODE
+    if _FACILITY_REGISTRY_BY_CODE is not None:
+        return _FACILITY_REGISTRY_BY_CODE
+    path = os.path.join(os.getcwd(), 'data', 'geo', 'facilities_levels.json')
+    try:
+        with open(path, encoding='utf-8') as f:
+            records = json.load(f)
+        _FACILITY_REGISTRY_BY_CODE = {
+            str(r['CODE']): {'name': r.get('NAME'), 'district': r.get('DISTRICT')}
+            for r in records
+            if r.get('CODE') and r.get('NAME')
+        }
+    except Exception:
+        _FACILITY_REGISTRY_BY_CODE = {}
+    return _FACILITY_REGISTRY_BY_CODE
+
+
+def resolve_facility_level(facility_code: str | None, facility_name: str | None = None) -> str:
+    """Look up a facility's Primary/Secondary/Tertiary level.
+
+    Prefers the authoritative facilities_levels.json (keyed by Facility_CODE);
+    falls back to a name-pattern guess for facilities it doesn't cover.
+    """
+    level = _facility_level_by_code().get(str(facility_code)) if facility_code else None
+    if level:
+        return level
+    name_upper = str(facility_name or '').upper()
+    if 'CENTRAL HOSPITAL' in name_upper:
+        return 'Tertiary'
+    if 'DISTRICT HOSPITAL' in name_upper:
+        return 'Secondary'
+    return 'Primary'
+
+
 def _normalize_mnid_semantics(df: pd.DataFrame) -> pd.DataFrame:
     if df is None or df.empty:
         return df
@@ -1147,20 +1222,40 @@ def _normalize_mnid_semantics(df: pd.DataFrame) -> pd.DataFrame:
         mapped_enc = out['Service_Area'].map(_ENCOUNTER_LABEL_MAP)
         out['Encounter'] = mapped_enc.where(mapped_enc.notna(), out['Encounter'])
 
-    # mohupdate: derive Facility_Type from facility name if column is missing
-    if 'Facility_Type' not in out.columns and 'Facility' in out.columns:
-        fac_upper = out['Facility'].fillna('').astype(str).str.upper()
-        out['Facility_Type'] = 'Primary'
-        out.loc[fac_upper.str.contains('CENTRAL HOSPITAL', na=False), 'Facility_Type'] = 'Tertiary'
-        out.loc[fac_upper.str.contains('DISTRICT HOSPITAL', na=False), 'Facility_Type'] = 'Secondary'
+    # derive Facility_Type from facilities_levels.json (Facility_CODE),
+    # falling back to a name-pattern guess for facilities it doesn't cover.
+    if 'Facility_Type' not in out.columns and 'Facility_CODE' in out.columns:
+        code_col = out['Facility_CODE'].fillna('').astype(str)
+        name_col = out['Facility'].fillna('').astype(str) if 'Facility' in out.columns else pd.Series('', index=out.index)
+        level_map = _facility_level_by_code()
+        looked_up = code_col.map(level_map)
+        name_upper = name_col.str.upper()
+        fallback = pd.Series('Primary', index=out.index)
+        fallback[name_upper.str.contains('CENTRAL HOSPITAL', na=False)] = 'Tertiary'
+        fallback[name_upper.str.contains('DISTRICT HOSPITAL', na=False)] = 'Secondary'
+        out['Facility_Type'] = looked_up.where(looked_up.notna(), fallback)
 
     return _derive_person_level_context(out)
 
 
-def register_facility_metadata(df: pd.DataFrame) -> None:
-    """Update live facility metadata caches from the current MNID dataframe."""
+def register_facility_metadata(df: pd.DataFrame, route: str = 'default') -> None:
+    """Update live facility metadata caches from the current MNID dataframe.
+
+    These caches are flat dicts read by dozens of chart/heatmap/dropdown call
+    sites, so instead of nesting them by route we clear and repopulate them
+    whenever the active route changes (tracked in constants._METADATA_ROUTE),
+    so one route's facility labels never linger into another route's view.
+    """
     if df is None or df.empty:
         return
+
+    if _constants._METADATA_ROUTE != route:
+        FACILITY_NAMES.clear()
+        ALL_FACILITIES.clear()
+        FACILITY_DISTRICT.clear()
+        ALL_DISTRICTS.clear()
+        FACILITY_COORDS.clear()
+        _constants._METADATA_ROUTE = route
 
     def _clean(s: pd.Series) -> pd.Series:
         return s.fillna('').astype(str).str.strip()
@@ -1196,6 +1291,22 @@ def register_facility_metadata(df: pd.DataFrame) -> None:
             if code:
                 FACILITY_COORDS.setdefault(code, (None, None, name or code, district))
 
+    # Backfill from the national facility registry (data/geo/facilities_levels.json)
+    # for codes the current MAHIS sample doesn't cover -- e.g. an alternate-source
+    # aggregate (DHIS2) whose facility_code crosswalk resolves to a real facility
+    # that simply has no rows in the loaded MAHIS dataset, which would otherwise
+    # render as a raw code instead of a name in facility-performance views. MAHIS-
+    # observed names above always win; this only fills genuine gaps.
+    for code, meta in _facility_registry_by_code().items():
+        if meta.get('name') and code not in FACILITY_NAMES:
+            FACILITY_NAMES[code] = meta['name']
+            if code not in ALL_FACILITIES:
+                ALL_FACILITIES.append(code)
+        if meta.get('district') and code not in FACILITY_DISTRICT:
+            FACILITY_DISTRICT[code] = meta['district']
+            if meta['district'] not in ALL_DISTRICTS:
+                ALL_DISTRICTS.append(meta['district'])
+
 
 _MCH_PATTERN = 'Maternal|Child|Neonatal|Newborn'
 _MCH_PROGRAMS = frozenset([
@@ -1211,7 +1322,7 @@ _MNID_COLUMNS = [
 ]
 
 
-def prepare_mnid_dataframe(df: pd.DataFrame | None) -> pd.DataFrame:
+def prepare_mnid_dataframe(df: pd.DataFrame | None, route: str = 'default') -> pd.DataFrame:
     """Normalise the live shared MAHIS dataframe used across MNID sections."""
     if df is None:
         return pd.DataFrame()
@@ -1252,12 +1363,17 @@ def prepare_mnid_dataframe(df: pd.DataFrame | None) -> pd.DataFrame:
         mch_full['Date'] = pd.to_datetime(mch_full['Date'], errors='coerce')
 
     mch_full.attrs.update(source_attrs)
-    register_facility_metadata(mch_full)
+    register_facility_metadata(mch_full, route=route)
     return mch_full
 
 
 def serialize_store_df(df: pd.DataFrame) -> list[dict]:
-    """Convert dataframe rows to JSON-safe records for Dash stores."""
+    """Convert dataframe rows to JSON-safe records for Dash stores.
+
+    Uses to_dict instead of to_json to avoid the Python recursion limit
+    that to_json hits on large DataFrames.  Datetime columns are converted
+    to ISO strings before the dict conversion.
+    """
     if df is None or df.empty:
         return []
     safe_df = df.copy()

@@ -1,0 +1,6 @@
+[
+  {
+    "sql": "SELECT obs_value_coded, COUNT(DISTINCT person_id) from data WHERE Date >= '2026-07-01' and Encounter = 'Diagnosis' and location_id=79 GROUP BY obs_value_coded",
+    "name": "query 1"
+  }
+]

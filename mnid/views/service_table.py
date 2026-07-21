@@ -559,9 +559,12 @@ def _location_trend_fig(
 
     for idx, ind in enumerate(active_inds):
         xs, ys = [], []
+        _has_filters = ind.get('numerator_filters') and ind.get('denominator_filters')
         for p in periods:
             period_df = d2[d2['_period'] == p]
-            _, den, pct = _cov(period_df, ind['numerator_filters'], ind['denominator_filters'])
+            den, pct = (0, None)
+            if _has_filters:
+                _, den, pct = _cov(period_df, ind['numerator_filters'], ind['denominator_filters'])
             xs.append(pd.Period(p, freq).to_timestamp().to_pydatetime())
             ys.append(_display_pct(pct) if den > 0 else None)
         moving_average, _ = _moving_average_values(ys, period_label)

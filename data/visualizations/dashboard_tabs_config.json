@@ -3,20 +3,5 @@
   "visible_reports": [],
   "default_report": "Maternal Health",
   "hidden_mnid_tabs": [],
-  "mnh_tabs": [
-    {
-      "id": "mnh-beginnings",
-      "label": "MNH-Beginnings"
-    },
-    {
-      "id": "mnh-moh",
-      "label": "MNH-MoH",
-      "module": "mnid/dashboards/MNH-MoH"
-    },
-    {
-      "id": "mnh-nest360",
-      "label": "MNH-Nest360",
-      "module": "mnid/dashboards/MNH-Nest360"
-    }
-  ]
+  "mnh_tabs": []
 }

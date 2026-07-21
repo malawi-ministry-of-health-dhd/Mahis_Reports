@@ -157,7 +157,7 @@ def _icon_button(label: str) -> html.Button:
     )
 
 
-def _topbar(period_text: str, active_districts: int, active_facilities: int) -> html.Div:
+def _topbar(period_text: str, active_districts: int, active_facilities: int, source_label: str = 'MaHIS') -> html.Div:
     return html.Div(
         style={
             'height': '52px',
@@ -176,7 +176,7 @@ def _topbar(period_text: str, active_districts: int, active_facilities: int) -> 
                 ],
             ),
             html.Div(style={'flex': '1'}),
-            _badge('Live', GREEN_DARK, GREEN_LIGHT, '#B7DFC8'),
+            _badge(source_label, GREEN_DARK, GREEN_LIGHT, '#B7DFC8'),
             _badge(period_text, MUTED, '#F8FAFC'),
             _badge(f'{active_districts} Districts - {active_facilities} Facilities', MUTED, '#F8FAFC'),
             _icon_button('DL'),
@@ -620,6 +620,8 @@ def render_mnh_moh_dashboard(
     scope_meta: dict | None = None,
 ) -> html.Div:
     scope_meta = scope_meta or {}
+    if scope_meta.get('data_source') == 'dhis2':
+        return _render_dhis2_dashboard(start_date, end_date, network_df, scope_meta)
     working_df = facility_df.copy() if facility_df is not None else pd.DataFrame()
     if working_df.empty:
         return html.Div('No MNH MoH data available for the selected filters.', style={'padding': '24px', 'color': MUTED})
@@ -647,7 +649,7 @@ def render_mnh_moh_dashboard(
         include_moh=True,
     )
     category_order = _resolve_category_order(source_indicators, ['ANC', 'Labour', 'PNC', 'Newborn'])
-    agg_df = _get_aggregate()
+    agg_df = _get_aggregate(route=scope_meta.get('route', 'default'))
 
     # mohupdate: filter out tertiary-only indicators when level is not Tertiary/All
     def _is_visible(ind: dict) -> bool:
@@ -778,5 +780,55 @@ def render_mnh_moh_dashboard(
         children=[
             _topbar(short_period, active_districts, active_facilities),
             _tabs(tab_defs),
+        ],
+    )
+
+
+def _render_dhis2_dashboard(start_date, end_date, network_df: pd.DataFrame, scope_meta: dict) -> html.Div:
+    """Render validated local DHIS2 output; this function never performs network I/O."""
+    from mnid.dhis2.store import query_dashboard_data, source_metadata
+
+    _, facility_codes, districts = _resolve_scope_filters(network_df, scope_meta)
+    data = query_dashboard_data(
+        start_date, end_date, facility_codes=facility_codes or None,
+        districts=None if facility_codes else (districts or None),
+    )
+    metadata = source_metadata()
+    if data.empty:
+        state = metadata.get('latest_sync_status', 'never_run')
+        return html.Div(
+            className='mnid-moh-dashboard',
+            children=[
+                _topbar(_short_period_label(start_date, end_date), 0, 0, 'Malawi HMIS DHIS2'),
+                html.Div(
+                    f'No validated DHIS2 data is available for this selection. Latest sync status: {state}.',
+                    style={'padding': '24px', 'color': MUTED},
+                ),
+            ],
+        )
+
+    latest_status = metadata.get('latest_sync_status', 'unknown')
+    freshness = 'stale' if metadata.get('stale') else 'current'
+    cards = []
+    for indicator_id, group in data.groupby('indicator_id', sort=True):
+        values = group['value'].dropna()
+        value = values.sum() if len(values) else None
+        value_type = str(group.iloc[0].get('value_type') or 'count')
+        display = 'Unavailable' if value is None else (f'{value:.1f}%' if value_type == 'percentage' else f'{value:,.0f}')
+        cards.append(_kpi_card(str(group.iloc[0].get('indicator_name') or indicator_id), display, value_type.title(), GREEN))
+    facility_count = data['facility_code'].dropna().astype(str).nunique() if 'facility_code' in data else 0
+    district_count = data['district'].dropna().astype(str).nunique() if 'district' in data else 0
+    status_line = (
+        f"Source: Malawi HMIS DHIS2 | Last successful synchronization: "
+        f"{metadata.get('last_successful_sync') or 'not available'} | Latest attempt: {latest_status} | "
+        f"Freshness: {freshness} | Mapping: {metadata.get('mapping_version') or 'unknown'}"
+    )
+    return html.Div(
+        className='mnid-moh-dashboard',
+        style={'background': BG, 'minHeight': '100vh', 'fontFamily': 'Segoe UI, system-ui, sans-serif'},
+        children=[
+            _topbar(_short_period_label(start_date, end_date), int(district_count), int(facility_count), 'Malawi HMIS DHIS2'),
+            html.Div(status_line, style={'padding': '10px 22px', 'fontSize': '11px', 'color': AMBER if metadata.get('stale') or latest_status == 'failed' else MUTED}),
+            html.Div(cards, style={'display': 'grid', 'gridTemplateColumns': 'repeat(auto-fit, minmax(230px, 1fr))', 'gap': '12px', 'padding': '20px 22px'}),
         ],
     )

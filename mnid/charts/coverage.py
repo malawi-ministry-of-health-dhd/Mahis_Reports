@@ -195,11 +195,6 @@ def _coverage_heatmap_section(
     cur_dist   = store.get('current_district', dyn_districts[0] if dyn_districts else '')
     initial_fig   = _build_heatmap_fig(store, 'by_district', 'All years', cur_dist if cur_dist else None)
     all_labels = store.get('y_labels', [])
-    years = ['All years']
-    if len(mch_full) and 'Date' in mch_full.columns:
-        years.extend(str(y) for y in sorted(mch_full['Date'].dt.year.dropna().astype(int).unique().tolist()))
-
-    year_opts     = [{'label': y, 'value': y} for y in years]
     district_opts = [{'label': 'All districts', 'value': 'All'}] + [{'label': d, 'value': d} for d in dyn_districts]
     ind_opts      = [{'label': lbl, 'value': lbl} for lbl in all_labels]
     default_perf_inds = all_labels[:8] if len(all_labels) >= 8 else all_labels
@@ -218,12 +213,12 @@ def _coverage_heatmap_section(
         dcc.Store(id='mnid-heatmap-store', data=store),
         html.Div('FACILITY PERFORMANCE', className='mnid-section-lbl'),
         html.Div(style={'fontSize': '11px', 'color': DIM, 'marginBottom': '10px'},
-                 children='Facility-level coverage heatmap. Filter by district, year, or indicators.'),
+                 children='Facility-level coverage heatmap for the selected date range. Filter by district or indicators.'),
         html.Div(className='mnid-performance-shell', children=[
             html.Div(id='mnid-performance-aggregate', className='mnid-performance-aggregate',
                      children=_build_district_gauge_row(store, 'All years')),
             html.Div(className='mnid-performance-table-card', children=[
-                html.Div(style={'display': 'grid', 'gridTemplateColumns': '1fr 1fr 1.6fr',
+                html.Div(style={'display': 'grid', 'gridTemplateColumns': '1fr 1.6fr',
                                 'gap': '8px', 'marginBottom': '10px'}, children=[
                     html.Div([
                         html.Div('Districts', style=_lbl_style),
@@ -233,16 +228,6 @@ def _coverage_heatmap_section(
                             value=perf_default_districts,
                             multi=True,
                             placeholder='All districts',
-                            style=_dd_style,
-                        ),
-                    ]),
-                    html.Div([
-                        html.Div('Year', style=_lbl_style),
-                        dcc.Dropdown(
-                            id='mnid-performance-year',
-                            options=year_opts,
-                            value='All years',
-                            clearable=False,
                             style=_dd_style,
                         ),
                     ]),
@@ -365,7 +350,10 @@ def _ind_card(ind: dict, df: pd.DataFrame) -> html.Div:
             html.Div(f'Target {ind["target"]}%', className='mnid-ind-sub'),
         ])
 
-    num, den, pct = _cov(df, ind['numerator_filters'], ind['denominator_filters'])
+    if ind.get('numerator_filters') and ind.get('denominator_filters'):
+        num, den, pct = _cov(df, ind['numerator_filters'], ind['denominator_filters'])
+    else:
+        num, den, pct = 0, 0, 0.0
     target = ind['target']
     cls = _css(pct, target)
 
@@ -428,8 +416,11 @@ def _phase_gauge_row(by_cat: dict, df: pd.DataFrame) -> html.Div:
         inds = [i for i in by_cat.get(cat_key, []) if i.get('status') == 'tracked']
         if not inds:
             continue
-        computed = [_cov(df, i['numerator_filters'], i['denominator_filters'])
-                    for i in inds]
+        computed = [
+            _cov(df, i['numerator_filters'], i['denominator_filters'])
+            if i.get('numerator_filters') and i.get('denominator_filters') else (0, 0, 0.0)
+            for i in inds
+        ]
         avg_pct = round(sum(c[2] for c in computed) / len(computed), 1) if computed else 0.0
         on_tgt  = sum(1 for c, i in zip(computed, inds) if c[2] >= i['target'])
         color   = _cov_color(avg_pct)
@@ -519,6 +510,8 @@ def _coverage_phase_fig(
                             indicator_label=ind.get('label'))
     else:
         def _get_cov(ind):
+            if not (ind.get('numerator_filters') and ind.get('denominator_filters')):
+                return 0, 0, 0.0
             return _cov(df, ind['numerator_filters'], ind['denominator_filters'])
 
     def _wrap(text, width=28):
@@ -656,6 +649,8 @@ def _coverage_charts_section(
                             indicator_label=ind.get('label'))
     else:
         def _compute(ind):
+            if not (ind.get('numerator_filters') and ind.get('denominator_filters')):
+                return 0, 0, 0.0
             return _cov(df, ind['numerator_filters'], ind['denominator_filters'])
 
     phase_map = {
@@ -726,8 +721,11 @@ def _coverage_charts_section(
 def _acc_section(sec_id, title, indicators, df, default_open=False):
     tracked  = [i for i in indicators if i.get('status') == 'tracked']
     awaiting = [i for i in indicators if i.get('status') == 'awaiting_baseline']
-    computed = [_cov(df, i['numerator_filters'], i['denominator_filters'])
-                for i in tracked]
+    computed = [
+        _cov(df, i['numerator_filters'], i['denominator_filters'])
+        if i.get('numerator_filters') and i.get('denominator_filters') else (0, 0, 0.0)
+        for i in tracked
+    ]
     avg_pct  = round(sum(c[2] for c in computed) / len(computed), 0) if computed else None
 
     pills = [html.Span(f'{len(tracked)} available', className='mnid-pill mnid-pill-green')]
@@ -1094,7 +1092,10 @@ def _system_readiness(df, supply_inds, wf_inds, dq_inds):
     def _rows(inds, tgt_key='target_pct'):
         rows = []
         for ind in inds:
-            num, den, pct = _cov(df, ind['numerator_filters'], ind['denominator_filters'])
+            if ind.get('numerator_filters') and ind.get('denominator_filters'):
+                num, den, pct = _cov(df, ind['numerator_filters'], ind['denominator_filters'])
+            else:
+                num, den, pct = 0, 0, 0.0
             rows.append(_stat_row(ind['label'], num, den, pct, ind.get(tgt_key)))
         return rows
 
@@ -1152,7 +1153,10 @@ def _compare_status_counts(df: pd.DataFrame, tracked: list) -> dict:
     below  = 0
     no_dat = 0
     for ind in tracked:
-        num, den, pct = _cov(df, ind['numerator_filters'], ind['denominator_filters'])
+        if ind.get('numerator_filters') and ind.get('denominator_filters'):
+            num, den, pct = _cov(df, ind['numerator_filters'], ind['denominator_filters'])
+        else:
+            num, den, pct = 0, 0, 0.0
         if den <= 0:
             no_dat += 1
         else:
@@ -1228,7 +1232,7 @@ def _build_compare_heatmap(title: str, df: 'pd.DataFrame', tracked: list) -> go.
     heat_palette = ['#DBEAFE', '#93C5FD', '#60A5FA', '#2563EB', '#1D4ED8']
     for ind in tracked:
         label = ind.get('label', ind.get('id', '-'))
-        if df.empty:
+        if df.empty or not (ind.get('numerator_filters') and ind.get('denominator_filters')):
             pct = 0.0
         else:
             _, _, pct = _cov(df, ind['numerator_filters'], ind['denominator_filters'])
@@ -1271,7 +1275,9 @@ def _build_compare_heatmap(title: str, df: 'pd.DataFrame', tracked: list) -> go.
 
 def _comparative_analysis_section(indicators: list, facility_code: str,
                                   mch_full: pd.DataFrame,
-                                  payload_key: str | None = None) -> html.Div:
+                                  payload_key: str | None = None,
+                                  data_path: str | None = None,
+                                  scope_meta: dict | None = None) -> html.Div:
     """Time-aware comparison across selected facilities or districts and indicators."""
     tracked = [i for i in indicators if i.get('status') == 'tracked']
     all_facs  = sorted(mch_full['Facility_CODE'].dropna().astype(str).unique().tolist()) if len(mch_full) and 'Facility_CODE' in mch_full.columns else sorted(_ALL_FACILITIES[:])
@@ -1389,6 +1395,8 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
             'current_dist': current_dist,
             'date_min': compare_date_min,
             'date_max': compare_date_max,
+            'data_path': data_path,
+            'route': (scope_meta or {}).get('route', 'default'),
         }),
         dcc.Store(id='mnid-compare-chart-type-store', data='line'),
         html.Div(className='mnid-chart-grid', children=[compare_card]),

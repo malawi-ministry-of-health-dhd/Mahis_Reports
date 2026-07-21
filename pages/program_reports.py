@@ -14,7 +14,7 @@ from data_storage import DataStorage
 import warnings
 warnings.filterwarnings("ignore")
 from config import (actual_keys_in_data, 
-                    DATA_FILE_NAME_, 
+                    DATA_PATH_, 
                     DATE_, PERSON_ID_, ENCOUNTER_ID_,
                     FACILITY_, AGE_GROUP_, AGE_,
                     GENDER_, ENCOUNTER_, PROGRAM_,
@@ -40,9 +40,6 @@ from datetime import datetime, timedelta
 from dash import html, dcc
 
 path = os.getcwd()
-path_program_reports = os.path.join(path, 'data','visualizations','validated_prog_reports.json')
-dropdowns_json_path = os.path.join(path, 'data', 'dcc_dropdown_json', 'dropdowns.json') 
-
 
 report_config_panel = html.Div(
     className="report-config-modern",
@@ -53,7 +50,7 @@ report_config_panel = html.Div(
         html.Div(
             className="config-parameters-card",
             children=[
-                html.H3("Generate a Programs Report", className="config-parameters-title"),
+                html.H3("Generate a Clinical Report", className="config-parameters-title"),
                 
                 # Controls Grid
                 html.Div(
@@ -206,14 +203,14 @@ report_config_panel = html.Div(
     style={"marginTop": "0px"}
 )
 
-def programs_report(data, programs_report_list, user_role):
-    if len(programs_report_list) == 0:
+def programs_report(filtered_query,data_route, programs_report_list, user_role):
+    """Render a single program report chart from a SQL WHERE-clause string."""
+    if not programs_report_list:
         return html.Div('')
-    else:
-        json_data = programs_report_list[0]
-        return html.Div(
-                    build_single_chart(data, data, 10, json_data, user_role, style="")
-            )
+    json_data = programs_report_list[0]
+    return html.Div(
+        build_single_chart(filtered_query, filtered_query, 10,data_route, json_data, user_role, style="")
+    )
 
 
 layout = html.Div(
@@ -237,6 +234,8 @@ layout = html.Div(
 )
 
 def update_filters(selected_program):
+    path_program_reports = os.path.join(path, 'data','visualizations','validated_prog_reports.json')
+    program_reports_progs_path = os.path.join(path, f'data/validated_prog_reports.json')
     with open(path_program_reports) as x:
         program_reports_data = json.load(x)
     filtered_reports_list = [r for r in program_reports_data["reports"] if r.get("program") == selected_program or selected_program in (r.get("programs") or [])]
@@ -277,11 +276,18 @@ def update_filters(selected_program):
     ]
 )
 def generate_chart(n_clicks, urlparams, selected_report, pathname, report_name, start_date, end_date, hf):
-    user_data_path = os.path.join(path, 'data','single_tables', 'users_data.csv')
+    location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0]
+    data_route = urlparams.get('route', ["default"])[0]
+    DATA_PATH_ = f"data/{data_route}/parquet"
+
+    path_program_reports = os.path.join(path, 'data','visualizations','validated_prog_reports.json')
+    program_reports_progs_path = os.path.join(path, f'data/visualizations/validated_prog_reports.json')
+
+    user_data_path = os.path.join(path, f'data/{data_route}','single_tables', 'users_data.csv')
     if not os.path.exists(user_data_path):
         user_data = pd.DataFrame(columns=['uuid', 'role'])
     else:
-        user_data = pd.read_csv(os.path.join(path, 'data','single_tables', 'users_data.csv'))
+        user_data = pd.read_csv(os.path.join(path, f'data/{data_route}','single_tables', 'users_data.csv'))
     test_admin = pd.DataFrame(columns=['uuid', 'role'], data=[[DEMO_UUID, 'reports_admin']])
     user_data = pd.concat([user_data, test_admin], ignore_index=True)
 
@@ -296,74 +302,60 @@ def generate_chart(n_clicks, urlparams, selected_report, pathname, report_name, 
 
     try:
         start_dt = pd.to_datetime(start_date).replace(hour=0, minute=0, second=0)
-        end_dt = pd.to_datetime(end_date).replace(hour=23, minute=59, second=59)
+        end_dt   = pd.to_datetime(end_date).replace(hour=23, minute=59, second=59)
 
-        if urlparams.get('Location', [None])[0]:
-            location = urlparams.get('Location', [None])[0]
-        else:
-            return html.Div("Missing Parameters"), no_update, no_update,0
+        if not location:
+            return html.Div("Missing Parameters"), no_update, no_update, 0
 
+        base_where = (
+            f"{DATE_} BETWEEN '{start_dt}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP"
+            f" AND {FACILITY_CODE_} = '{location}'"
+        )
 
-        SQL = f"""
-                SELECT * FROM '{DATA_FILE_NAME_}'
-                WHERE Date BETWEEN '{start_dt}' AND '{end_dt}'
-                AND {FACILITY_CODE_} = '{location}'
-               """
-        try:
-            data = DataStorage.query_duckdb(SQL)
-        except Exception as e:
-            return html.Div('Missing Data. ' \
-            'Ensure that the config file has correct database credentials'
-            ,style={'color':'red'}), [], '',0  # Empty DataFrame with expected columns
-        
-        data[DATE_] = pd.to_datetime(data[DATE_], format='mixed').dt.strftime('%Y-%m-%d')
-        data[GENDER_] = data[GENDER_].replace({"M":"Male",
-                                               "F":"Female",
-                                               '{"label"=>"Male", "value"=>"M"}':"Male",
-                                               '{"label"=>"Female", "value"=>"F"}':"Female"})
-        data["DateValue"] = pd.to_datetime(data[DATE_]).dt.date
-
-        # if data.empty:
-        #     return html.Div("No data found for these dates."), [], []
-
-        #Dropdown Logic (Calculate once)
-        facilities = sorted(data[FACILITY_].dropna().unique().tolist())
-        hf_options = facilities + (["*All health facilities"] if len(facilities) > 1 else [])
-
-        # get list of programs for dropdowns.json
-        with open(dropdowns_json_path) as x:
-            dropdowns = json.load(x)
-
-        prog_options = dropdowns['programs'] + ["+ Create a Report"]
-
-        #Chart Generation Logic (Only if Button clicked or specific report selected)
-        report_name = report_name or selected_report
-
-        if not report_name:
-             return html.Div("Please select a report name and click Generate."), hf_options, prog_options,0
-
-        #Filter by Facility Selection
         if hf and hf != "*All health facilities":
             hf_list = hf if isinstance(hf, list) else [hf]
-            data = data[data['Facility'].isin(hf_list)]
+            quoted  = ", ".join(f"'{f}'" for f in hf_list)
+            base_where += f" AND {FACILITY_} IN ({quoted})"
 
-        if data.empty:
-            return html.Div("No data for selected Date Range."), hf_options, prog_options,0
-        
+        filtered_query = base_where
+        try:
+            fac_df   = DataStorage.query_duckdb(
+                f"SELECT DISTINCT {FACILITY_} FROM '{DATA_PATH_}'"
+                f" WHERE {DATE_} BETWEEN '{start_dt}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP"
+                f" AND {FACILITY_CODE_} = '{location}'"
+                f" ORDER BY {FACILITY_}",
+            )
+            facilities = fac_df[FACILITY_].dropna().tolist()
+            hf_options = facilities + (["*All health facilities"] if len(facilities) > 1 else [])
+        except Exception:
+            hf_options = []
+        try:
+            with open(program_reports_progs_path) as x:
+                dropdowns = json.load(x)
+            prog_options = list(set([program['program'] for program in dropdowns['reports']])) + ["+ Create a Report"]
+        except Exception:
+            prog_options = []
+
+        report_name = report_name or selected_report
+        if not report_name:
+            return (
+                html.Div("Please select a report name and click Generate."),
+                hf_options, prog_options, 0,
+            )
+
         ctx = callback_context
-        # triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
         if not ctx.triggered or ctx.triggered_id != "btn-generate-report":
             return no_update, no_update, prog_options, 0
 
-        #Get Config and Render
+        # ── Load report config and render ─────────────────────────────────────
         with open(path_program_reports) as x:
             config = json.load(x)
         report_cfg = [r for r in config.get("reports", []) if r.get("report_name") == report_name]
-        return programs_report(data, report_cfg, role), hf_options, prog_options,0
+        return programs_report(filtered_query,DATA_PATH_, report_cfg, role), hf_options, prog_options, 0
 
     except Exception as e:
         traceback.print_exc()
-        return html.Div(f"Error: {str(e)}"), hf_options, prog_options,0
+        return html.Div(f"Error: {str(e)}"), [], [], 0
     
 @callback(
     [Output('prog-date-range-picker', 'start_date'),

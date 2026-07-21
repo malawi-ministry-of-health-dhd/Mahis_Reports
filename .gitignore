@@ -73,7 +73,24 @@ docs/
 # # generate_demo_parquet.py
 # scripts/generate_demo_mnid_data.py
 # data/mnid_aggregates/
+data/default/single_tables
+data/default/parquet
+data/batches
+data/local
+data/mahistest
+data/mahisdev
+data/mahis
+data/mahisuat
+data/parquet
+demo_parquet
+# data/visualizations
+configurations.json
+__pycache__/
+CLAUDE.md
 # data/visualizations/dashboard_tabs_config.json
 .mnid_exec_cache/
 /.junie/
 /.idea/
+saved_queries.json.mnid_exec_cache/
+.temp/
+logs/

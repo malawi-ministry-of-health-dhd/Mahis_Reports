@@ -1,5 +1,6 @@
 import dash
 from dash import html, dcc, dash_table, Input, Output, State, callback
+from dash_iconify import DashIconify
 import json
 import os
 import pandas as pd
@@ -10,7 +11,7 @@ import io
 import uuid
 from data_storage import DataStorage
 from config import (actual_keys_in_data, 
-                    DATA_FILE_NAME_, 
+                    DATA_PATH_, 
                     DATE_, PERSON_ID_, ENCOUNTER_ID_,
                     FACILITY_, AGE_GROUP_, AGE_,
                     GENDER_, ENCOUNTER_, PROGRAM_,
@@ -26,10 +27,21 @@ from config import (actual_keys_in_data,
                     DRUG_NAME_,
                     VALUE_NAME_)
 
+from dash_iconify import DashIconify
+def nav_icon(icon_name):
+    return DashIconify(icon=icon_name, className="nav-icon")
+
 path = os.getcwd()
-path_dcc_json = os.path.join(path, 'data', 'dcc_dropdown_json','dropdowns.json')
-with open(path_dcc_json) as r:
-    dcc_json = json.load(r)
+path_dcc_json = os.path.join(path, 'data/default', 'dcc_dropdown_json','dropdowns.json')
+if os.path.exists(path_dcc_json):
+    with open(path_dcc_json) as r:
+        dcc_json = json.load(r)
+else:
+    dcc_json = {
+        "programs": [],
+        "encounters": [],
+        "concepts": []
+    }
 
 drop_down_programs = dcc_json['programs']
 drop_down_encounters = dcc_json['encounters']
@@ -48,7 +60,7 @@ def validate_excel_file(contents):
         excel_file = pd.ExcelFile(io.BytesIO(decoded))
         
         # Check required sheets
-        required_sheets = ['VARIABLE_NAMES', 'FILTERS', 'DESIGN', 'REPORT_NAME']
+        required_sheets = ['VARIABLE_NAMES', 'FILTERS', 'REPORT_NAME']
         missing_sheets = [sheet for sheet in required_sheets if sheet not in excel_file.sheet_names]
         
         if missing_sheets:
@@ -159,8 +171,9 @@ def validate_dashboard_json(contents):
                     c["filters"],
                     ["unique", "variable1", "variable2", "variable3", "variable4", "variable5", "variable6", "variable7", "variable8"]
                 )
-                if len(selected_values) > 0:
-                    return False, f"The following filter values in counts are invalid data columns: {', '.join(selected_values)}"
+                # paused for now
+                # if len(selected_values) > 0:
+                #     return False, f"The following filter values in counts are invalid data columns: {', '.join(selected_values)}"
 
             for chart in sections:
                 for ch in chart['items']:
@@ -183,8 +196,9 @@ def validate_dashboard_json(contents):
                             "age_col", "gender_col"
                         ]
                     )
-                    if len(selected_values) > 0:
-                        return False, f"The following filter values in charts are invalid data columns: {', '.join(selected_values)}"
+                    # paused for now
+                    # if len(selected_values) > 0:
+                    #     return False, f"The following filter values in charts are invalid data columns: {', '.join(selected_values)}"
 
             for indicator in priority_indicators:
                 if not isinstance(indicator, dict):
@@ -203,8 +217,9 @@ def validate_dashboard_json(contents):
                         filter_value,
                         ["unique", "variable1", "variable2", "variable3", "variable4", "variable5", "variable6", "variable7", "variable8"]
                     )
-                    if invalid_columns:
-                        return False, f"The following MNID filter values are invalid data columns: {', '.join(invalid_columns)}"
+                    # Pause this for now
+                    # if invalid_columns:
+                    #     return False, f"The following MNID filter values are invalid data columns: {', '.join(invalid_columns)}"
         return True, "Dry run successful! JSON structure is valid."
 
     except Exception as e:
@@ -230,7 +245,7 @@ def upload_dashboard_json(contents):
 
     return "Upload successful!"
 
-# Program Reports Upload and Dry Run
+# Clinical Reports Upload and Dry Run
 def validate_prog_reports_json(contents):
     """
     Validates that the uploaded JSON file:
@@ -429,19 +444,6 @@ def archive_report(report_id):
     
     save_reports_data(data)
 
-# Preview Data
-def load_preview_data():
-    """Load preview data from parquet file"""
-    file_path = os.path.join("data", "concepts_data.csv")
-    if not os.path.exists(file_path):
-        return pd.DataFrame(), "Empty Reference"
-    
-    try:
-        df = pd.read_csv(file_path)
-        return df, None
-    except Exception as e:
-        return None, f"Error loading data: {str(e)}"
-
 # DASHBOARDS 
 def create_chart_fields(chart_type, chart_data=None, section_index=None, chart_index=None):
     chart_data = chart_data or {}
@@ -620,35 +622,120 @@ def create_chart_fields(chart_type, chart_data=None, section_index=None, chart_i
     
     return html.Div(className="chart-grid", children=grid_items)
 
+_DROPDOWN_BACKED_VARS = {
+    "Program":         ("programs",   True),
+    "Encounter":       ("encounters", True),
+    "concept_name":    ("concepts",   True),
+    "obs_value_coded": ("concept_answers", True),
+    "Gender":          ("gender",     False),
+    "DrugName":        ("DrugName",   True),
+}
+
+
+def _val_input(count_idx, fi, var, val):
+    """Return a dropdown or text input for the filter value depending on column type."""
+    backed = _DROPDOWN_BACKED_VARS.get(var)
+    if backed:
+        key, is_multi = backed
+        opts = [{"label": v, "value": v} for v in (dcc_json.get(key) or [])]
+        existing = val if isinstance(val, list) else ([val] if val else None)
+        return dcc.Dropdown(
+            id={"type": "count-val", "count": count_idx, "filter": fi},
+            value=existing,
+            options=opts,
+            placeholder="Select value(s)",
+            className="form-input",
+            multi=is_multi,
+            clearable=True,
+            style={"flex": "1"},
+        )
+    return dcc.Input(
+        id={"type": "count-val", "count": count_idx, "filter": fi},
+        value=str(val) if val not in (None, "") else "",
+        placeholder="Value (use * prefix for wildcard)",
+        className="form-input",
+        type="text",
+        style={"flex": "1"},
+    )
+
+
+def render_filter_rows(count_idx, filter_pairs):
+    """Render the dynamic variable/value filter rows for a count item."""
+    col_options = [{"label": k, "value": k} for k in actual_keys_in_data]
+    rows = []
+    for fi, (var, val) in enumerate(filter_pairs):
+        remove_btn = html.Button(
+            "×",
+            id={"type": "count-remove-filter", "count": count_idx, "filter": fi},
+            n_clicks=0,
+            className="btn-danger btn-small",
+            style={"flexShrink": "0", "height": "32px"},
+        ) if len(filter_pairs) > 1 else html.Div(style={"width": "32px"})
+
+        rows.append(html.Div(
+            style={"display": "flex", "gap": "6px", "alignItems": "center", "marginBottom": "6px"},
+            children=[
+                dcc.Dropdown(
+                    id={"type": "count-var", "count": count_idx, "filter": fi},
+                    value=var if var else None,
+                    options=col_options,
+                    placeholder="Select column",
+                    className="form-input",
+                    clearable=True,
+                    style={"flex": "1", "minWidth": "140px"},
+                ),
+                _val_input(count_idx, fi, var, val),
+                remove_btn,
+            ]
+        ))
+    return rows
+
+
 def create_count_item(count_data=None, index=None):
-    def ensure_list(value):
-        if value is None:
-            return []
-
-        if isinstance(value, list):
-            return value
-
-        if isinstance(value, str):
-            return [value]
-
-        try:
-            return list(value)
-        except TypeError:
-            return [value]
     count_data = count_data or {}
-    value1 =  ensure_list(count_data.get('filters', {}).get('value1', []))
-    value2 = ensure_list(count_data.get('filters', {}).get('value2', []))
-    value3 = ensure_list(count_data.get('filters', {}).get('value3', []))
+    filters = count_data.get("filters", {})
 
+    # Collect existing variable/value pairs from the filters dict
+    filter_pairs = []
+    for i in range(1, 11):
+        var_key = f"variable{i}"
+        val_key = f"value{i}"
+        if var_key in filters:
+            var = filters[var_key] or ""
+            val = filters.get(val_key, "")
+            if isinstance(val, list):
+                val = ", ".join(str(v) for v in val if v not in (None, ""))
+            filter_pairs.append((var, str(val) if val not in (None, "") else ""))
+    if not filter_pairs:
+        filter_pairs = [("", "")]
 
     return html.Div(className="count-item", children=[
-        html.Div(style={"display": "flex","gap":"5px"}, children=[
+        # ── Close bar ────────────────────────────────────────────────────────
+        html.Div(
+            style={"display": "flex", "justifyContent": "space-between", "alignItems": "center",
+                   "marginBottom": "8px", "paddingBottom": "6px", "borderBottom": "1px solid #e5e7eb"},
+            children=[
+                html.Span(
+                    f"Metric: {count_data.get('name', 'New Metric') or 'New Metric'}",
+                    style={"fontSize": "13px", "fontWeight": "600", "color": "#374151"},
+                ),
+                html.Button(
+                    "✕ Close",
+                    id={"type": "close-count-form", "index": index},
+                    n_clicks=0,
+                    className="btn-secondary btn-small",
+                    title="Close this form",
+                    style={"fontSize": "12px"},
+                ),
+            ],
+        ),
+        # ── Row 1: metadata ──────────────────────────────────────────────────
+        html.Div(style={"display": "flex", "gap": "5px", "flexWrap": "wrap"}, children=[
             html.Div(className="count-col", style={"display": "none"}, children=[
                 html.Label("ID *", className="form-label-disabled"),
                 dcc.Input(
                     id={"type": "count-id", "index": index},
-                    value=count_data.get('id', f'count_{uuid.uuid4().hex[:8]}'),
-                    placeholder="unique_id",
+                    value=count_data.get("id", f"count_{uuid.uuid4().hex[:8]}"),
                     disabled=True,
                     className="form-input",
                 ),
@@ -657,215 +744,116 @@ def create_count_item(count_data=None, index=None):
                 html.Label("Metric Title *", className="form-label"),
                 dcc.Input(
                     id={"type": "count-name", "index": index},
-                    value=count_data.get('name', ''),
-                    placeholder="",
-                    className="form-input"
+                    value=count_data.get("name", ""),
+                    placeholder="e.g. All Attendance",
+                    className="form-input",
                 ),
             ]),
             html.Div(className="count-col", children=[
                 html.Label("Aggregation", className="form-label"),
                 dcc.Dropdown(
                     id={"type": "count-aggregations", "index": index},
-                    value=count_data.get('filters', {}).get('measure', 'count'),
-                    options=[
-                        {'label': item, 'value': item}
-                        for item in aggregations
-                    ],
-                    className="form-input"
+                    value=filters.get("measure", "nunique"),
+                    options=[{"label": a, "value": a} for a in aggregations],
+                    className="form-input",
+                    clearable=False,
                 ),
             ]),
             html.Div(className="count-col", children=[
-                html.Label("Aggregate using", className="form-label"),
+                html.Label("Using Column", className="form-label"),
                 dcc.Dropdown(
                     id={"type": "count-unique", "index": index},
-                    value=count_data.get('filters', {}).get('unique', 'person_id'),
-                    options=[
-                        {'label': item, 'value': item}
-                        for item in actual_keys_in_data
-                    ],
-                    className="form-input"
+                    value=filters.get("unique", "person_id"),
+                    options=[{"label": k, "value": k} for k in actual_keys_in_data],
+                    className="form-input",
+                    clearable=False,
+                ),
+            ]),
+            html.Div(className="count-col", children=[
+                html.Label("Level", className="form-label"),
+                dcc.Dropdown(
+                    id={"type": "count-level", "index": index},
+                    value=count_data.get("level", "facility"),
+                    options=[{"label": v, "value": v} for v in ["facility", "district", "national"]],
+                    className="form-input",
+                    clearable=False,
+                ),
+            ]),
+            html.Div(className="count-col", children=[
+                html.Label("Flag", className="form-label"),
+                dcc.Dropdown(
+                    id={"type": "count-flag", "index": index},
+                    value=count_data.get("flag", None),
+                    options=[{"label": v, "value": v} for v in ["ok", "warn", "danger"]],
+                    className="form-input",
+                    clearable=True,
+                    placeholder="None",
+                ),
+            ]),
+            html.Div(className="count-col", children=[
+                html.Label("Display Average", className="form-label"),
+                dcc.Dropdown(
+                    id={"type": "count-display-average", "index": index},
+                    value=count_data.get("display_average", None),
+                    options=[{"label": "Yes", "value": "True"}, {"label": "No", "value": "False"}],
+                    className="form-input",
+                    clearable=True,
+                    placeholder="None",
+                ),
+            ]),
+            html.Div(className="count-col", children=[
+                html.Label("Link (href)", className="form-label"),
+                dcc.Input(
+                    id={"type": "count-href", "index": index},
+                    value=count_data.get("href", ""),
+                    placeholder="e.g. program_reports",
+                    className="form-input",
+                ),
+            ]),
+            html.Div(className="count-col", children=[
+                html.Label("Link Label", className="form-label"),
+                dcc.Input(
+                    id={"type": "count-href-name", "index": index},
+                    value=count_data.get("href_name", ""),
+                    placeholder="e.g. view patients",
+                    className="form-input",
                 ),
             ]),
             html.Div(className="count-col", children=[
                 html.Label("Actions", className="form-label"),
-                html.Button("Save", 
-                          id={"type": "save-count", "index": index},
-                          n_clicks=0,
-                          className="btn-save btn-small"),
-                html.Button("🗑️", 
-                          id={"type": "remove-count", "index": index},
-                          n_clicks=0,
-                          className="btn-danger btn-small")
+                html.Button(
+                    "Save",
+                    id={"type": "save-count", "index": index},
+                    n_clicks=0,
+                    className="btn-save btn-small",
+                ),
+                html.Button(
+                    "🗑️",
+                    id={"type": "remove-count", "index": index},
+                    n_clicks=0,
+                    className="btn-danger btn-small",
+                ),
             ]),
         ]),
 
-        # Level 1 Filters
-        html.Div(style={"display": "flex","gap":"5px"}, children=[
-            html.Div(className="count-col", style={"display": "none"},  children=[
-                html.Label("Filter Variable 1", className="form-label"),
-                dcc.Input(
-                    id={"type": "count-var1", "index": index},
-                    value=count_data.get('filters', {}).get('variable1', 'Program'),
-                    className="form-input",
-
+        # ── Row 2: dynamic filters ────────────────────────────────────────────
+        html.Div(style={"marginTop": "10px", "padding": "10px", "background": "#f9fafb",
+                         "borderRadius": "6px", "border": "1px solid #e5e7eb"}, children=[
+            html.Div(style={"display": "flex", "alignItems": "center", "marginBottom": "8px",
+                             "gap": "10px"}, children=[
+                html.Label("Filters", className="form-label",
+                           style={"margin": "0", "fontWeight": "600"}),
+                html.Button(
+                    "+ Add Filter",
+                    id={"type": "count-add-filter", "count": index},
+                    n_clicks=0,
+                    className="btn-primary btn-small",
                 ),
             ]),
-            html.Div(className="count-col", children=[
-                html.Label("Program", className="form-label"),
-                dcc.Dropdown(
-                    id={"type": "count-val1", "index": index},
-                    value=value1,
-                    multi=True,
-                    options=[
-                        {'label': item, 'value': item}
-                        for item in drop_down_programs
-                    ],
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="count-col",style={"display": "none"}, children=[
-                html.Label("Filter Variable 2",  className="form-label"),
-                dcc.Input(
-                    id={"type": "count-var2", "index": index},
-                    value=count_data.get('filters', {}).get('variable2', 'Encounter'),
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Encounter Name", className="form-label"),
-                dcc.Dropdown(
-                    id={"type": "count-val2", "index": index},
-                    value=value2,
-                    multi=True,
-                    options=[
-                        {'label': item, 'value': item}
-                        for item in drop_down_encounters
-                    ],
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="count-col",style={"display": "none"}, children=[
-                html.Label("Filter Variable 3", className="form-label"),
-                dcc.Input(
-                    id={"type": "count-var3", "index": index},
-                    value=count_data.get('filters', {}).get('variable3', 'concept_name'),
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Concept Question", className="form-label"),
-                dcc.Dropdown(
-                    id={"type": "count-val3", "index": index},
-                    value=value3,
-                    multi=True,
-                    options=[
-                        {'label': item, 'value': item}
-                        for item in drop_down_concepts
-                    ],
-                    className="form-input"
-                ),
-            ])
-            ,
-            html.Div(className="count-col",style={"display": "none"}, children=[
-                html.Label("Filter Variable 4", className="form-label"),
-                dcc.Input(
-                    id={"type": "count-var4", "index": index},
-                    value=count_data.get('filters', {}).get('variable4', 'obs_value_coded'),
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Concept (Obs Value Coded)", className="form-label"),
-                dcc.Dropdown(
-                    id={"type": "count-val4", "index": index},
-                    value=count_data.get('filters', {}).get('value4', ''),
-                    multi=True,
-                    options=[
-                        {'label': item, 'value': item}
-                        for item in dcc_json['concept_answers']
-                    ],
-                    className="form-input"
-                ),
-            ])
-        ]),
-
-        # Level 2 filters
-        html.Div(style={"display": "flex","gap":"5px"}, children=[
-            html.Div(className="count-col",style={"display": "none"}, children=[
-                html.Label("Filter Variable 6",  className="form-label"),
-                dcc.Input(
-                    id={"type": "count-var6", "index": index},
-                    value=count_data.get('filters', {}).get('variable6', 'Value'),
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Drug Name", className="form-label"),
-                dcc.Dropdown(
-                    id={"type": "count-val6", "index": index},
-                    value=count_data.get('filters', {}).get('value6', ''),
-                    multi=True,
-                    options=[
-                        {'label': item, 'value': item}
-                        for item in dcc_json['DrugName']
-                    ],
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="count-col",style={"display": "none"}, children=[
-                html.Label("Filter Variable 7", className="form-label"),
-                dcc.Input(
-                    id={"type": "count-var7", "index": index},
-                    value=count_data.get('filters', {}).get('variable7', 'Gender'),
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Gender", className="form-label"),
-                dcc.Dropdown(
-                    id={"type": "count-val7", "index": index},
-                    value=count_data.get('filters', {}).get('value7', ''),
-                    multi=True,
-                    options=[
-                        {'label': item, 'value': item}
-                        for item in dcc_json['gender']
-                    ],
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="count-col", style={"display": "none"},  children=[
-                html.Label("Filter Variable 5", className="form-label"),
-                dcc.Input(
-                    id={"type": "count-var5", "index": index},
-                    value=count_data.get('filters', {}).get('variable5', 'ValueN'),
-                    className="form-input",
-
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Obs Value Numeric", className="form-label"),
-                dcc.Input(
-                    id={"type": "count-val5", "index": index},
-                    value=count_data.get('filters', {}).get('value5', ''),
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="count-col",style={"display": "none"}, children=[
-                html.Label("Filter Variable 8", className="form-label"),
-                dcc.Input(
-                    id={"type": "count-var8", "index": index},
-                    value=count_data.get('filters', {}).get('variable8', 'Age'),
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Age", className="form-label"),
-                dcc.Input(
-                    id={"type": "count-val8", "index": index},
-                    value=count_data.get('filters', {}).get('value8', ''),
-                    className="form-input"
-                ),
-            ])
+            html.Div(
+                id={"type": "count-filters-container", "count": index},
+                children=render_filter_rows(index, filter_pairs),
+            ),
         ]),
     ])
 
@@ -905,6 +893,16 @@ def create_chart_item(chart_data=None, section_index=None, chart_index=None):
                 ),
             ]),
             html.Div(className="chart-col", children=[
+                html.Label("Level", className="form-label"),
+                dcc.Dropdown(
+                    id={"type": "chart-level", "section": section_index, "index": chart_index},
+                    value=chart_data.get('level', 'facility'),
+                    options=[{'label': v, 'value': v} for v in ['facility', 'district', 'national']],
+                    className="dropdown",
+                    clearable=False,
+                ),
+            ]),
+            html.Div(className="chart-col", children=[
                 html.Label("Actions", className="form-label"),
                 html.Button(
                     "Save", 
@@ -926,15 +924,21 @@ def create_chart_item(chart_data=None, section_index=None, chart_index=None):
         ),
     ])
 
-def create_section(section_data=None, index=None):
+def create_section(section_data=None, index=None, active_chart_index=None):
     section_data = section_data or {}
-    
-    # Create initial charts for this section
-    initial_charts = []
-    if section_data.get('items'):
-        for i, chart_data in enumerate(section_data['items']):
-            initial_charts.append(create_chart_item(chart_data, index, i))
-    
+    items = section_data.get('items', [])
+
+    # Only render the one active chart (or none)
+    if active_chart_index is not None and 0 <= active_chart_index < len(items):
+        initial_charts = [create_chart_item(items[active_chart_index], index, active_chart_index)]
+    else:
+        initial_charts = []
+
+    chart_count_label = html.Span(
+        f"{len(items)} chart(s) in section — click a chart in the list to edit",
+        style={"fontSize": "12px", "color": "#6b7280", "marginLeft": "8px"}
+    ) if items and not initial_charts else None
+
     return html.Div(className="section-item", children=[
         html.Div(className="card-header", children=[
             html.Div(className="section-header", children=[
@@ -948,20 +952,42 @@ def create_section(section_data=None, index=None):
                     ),
                 ]),
                 html.Div(className="section-col", children=[
+                    html.Label("Charts Per Row", className="form-label"),
+                    dcc.Input(
+                        id={"type": "section-chart-items-per-row", "index": index},
+                        value=section_data.get('chart_items_per_row', 2),
+                        type="number",
+                        min=1,
+                        max=6,
+                        placeholder="2",
+                        className="form-input",
+                        style={"width": "80px"},
+                    ),
+                ]),
+                html.Div(className="section-col", children=[
                     html.Label("Actions", className="form-label"),
-                    html.Button("🗑️ Remove Section", 
+                    html.Button("🗑️ Remove Section",
                               id={"type": "remove-section", "index": index},
                               n_clicks=0,
-                              className="btn-danger")
+                              className="btn-danger"),
+                    html.Button("✕ Close",
+                              id={"type": "close-section-form", "index": index},
+                              n_clicks=0,
+                              className="btn-secondary btn-small",
+                              title="Close this form",
+                              style={"marginLeft": "6px", "fontSize": "12px"}),
                 ]),
             ]),
         ]),
         html.Div(className="card-body", children=[
-            html.Button("+ Add Chart", 
-                      id={"type": "add-chart-btn", "index": index},
-                      n_clicks=0,
-                      className="btn-primary"),
-            html.Div(id={"type": "charts-container", "index": index, "section": index}, 
+            html.Div(style={"display": "flex", "alignItems": "center", "marginBottom": "8px"}, children=[
+                html.Button("+ Add Chart",
+                          id={"type": "add-chart-btn", "index": index},
+                          n_clicks=0,
+                          className="btn-primary"),
+                chart_count_label,
+            ]),
+            html.Div(id={"type": "charts-container", "index": index, "section": index},
                     className="charts-container",
                     children=initial_charts),
         ]),
@@ -1280,3 +1306,1552 @@ CHART_TEMPLATES_ORIGINAL = {
     }
 }
 
+# ---------------------------------------------------------------------------
+# UI-builder helpers moved from pages/configurations.py
+# ---------------------------------------------------------------------------
+from helpers.config_helper import load_dashboards_from_file
+
+dashboards_data = load_dashboards_from_file()
+
+
+def build_reports_table(data, page=1, page_size=10):
+    active_reports = [item for item in data if item.get("archived", "False") == "False"]
+
+    total       = len(active_reports)
+    total_pages = max(1, -(-total // page_size))
+    page        = max(1, min(page, total_pages))
+    start       = (page - 1) * page_size
+    paginated_items = active_reports[start: start + page_size]
+
+    # ── Palette ───────────────────────────────────────────────────────────────
+    TH_BG       = "#3a4252"   # dark blue-grey header
+    TH_TEXT     = "#ffffff"
+    ROW_ODD     = "transparent"
+    ROW_EVEN    = "#f7f7f5"
+    DIVIDER     = "#ececec"
+    TEXT_PRI    = "#2c2c2a"
+    TEXT_SEC    = "#5f5e5a"
+
+    th_base = {
+        "padding": "10px 12px",
+        "fontSize": "12px",
+        "fontWeight": "600",
+        "background": TH_BG,
+        "color": TH_TEXT,
+        "textAlign": "left",
+        "letterSpacing": "0.03em",
+        "whiteSpace": "nowrap",
+        "borderBottom": f"2px solid {TH_BG}",
+    }
+
+    table_header = html.Thead(
+        html.Tr([
+            html.Th("#",            style={**th_base, "width": "44px", "textAlign": "center"}),
+            html.Th("Report Name",  style=th_base),
+            html.Th("Short Name",   style=th_base),
+            html.Th("Creator",      style=th_base),
+            html.Th("Date Updated", style=th_base),
+            html.Th("Actions",      style={**th_base, "textAlign": "center", "width": "80px"}),
+        ])
+    )
+
+    td_base = {
+        "padding": "10px 12px",
+        "fontSize": "12px",
+        "color": TEXT_PRI,
+        "borderBottom": f"1px solid {DIVIDER}",
+        "whiteSpace": "nowrap",
+    }
+    td_sec = {**td_base, "color": TEXT_SEC, "fontSize": "12px"}
+
+    start_row_number = start + 1
+    table_rows = []
+    for idx, item in enumerate(paginated_items):
+        row_bg = ROW_ODD if idx % 2 == 0 else ROW_EVEN
+        row_style = {
+            "background": row_bg,
+            "transition": "background 150ms ease",
+        }
+        table_rows.append(
+            html.Tr(
+                style=row_style,
+                className="rpt-tbl-row",
+                children=[
+                    html.Td(
+                        start_row_number + idx,
+                        style={**td_base, "textAlign": "center",
+                               "color": TEXT_SEC, "fontSize": "12px"},
+                    ),
+                    html.Td(item.get("report_name", ""), style=td_base),
+                    html.Td(item.get("page_name", ""),   style=td_sec),
+                    html.Td(item.get("creator", ""),     style=td_sec),
+                    html.Td(item.get("date_updated", ""), style=td_sec),
+                    html.Td(
+                        style={**td_base, "textAlign": "center"},
+                        children=[
+                            html.Button(
+                                nav_icon("lucide:settings"),
+                                id={"type": "edit-btn", "index": item.get("report_id")},
+                                className="action-btn edit-btn",
+                                style={"marginRight": "4px"},
+                            ),
+                            html.Button(
+                                nav_icon("lucide:download"),
+                                id={"type": "download-btn", "index": item.get("report_id")},
+                                className="action-btn edit-btn",
+                            ),
+                        ],
+                    ),
+                ],
+            )
+        )
+
+    table_body = html.Tbody(table_rows)
+    #Pagination bar
+    pg_btn = {
+        "padding": "4px 12px", "fontSize": "12px", "cursor": "pointer",
+        "border": "1px solid #d5d4d0", "borderRadius": "4px",
+        "background": "#fff", "color": TEXT_PRI,
+    }
+    pg_btn_disabled = {**pg_btn, "opacity": "0.4", "cursor": "default"}
+
+    pagination = html.Div(
+        style={"display": "flex", "alignItems": "center", "justifyContent": "flex-end",
+               "padding": "8px 12px", "borderTop": f"1px solid {DIVIDER}",
+               "background": "#fafaf8", "gap": "10px"},
+        children=[
+            html.Button("‹ Prev", id="prev-page", n_clicks=0,
+                        style=pg_btn if page > 1 else pg_btn_disabled,
+                        disabled=page <= 1),
+            html.Span(
+                f"Page {page} of {total_pages}  ({total} reports)",
+                id="page-label",
+                style={"fontSize": "12px", "color": TEXT_SEC},
+            ),
+            html.Button("Next ›", id="next-page", n_clicks=0,
+                        style=pg_btn if page < total_pages else pg_btn_disabled,
+                        disabled=page >= total_pages),
+        ],
+    )
+
+    return html.Div(
+        className="reports-table-wrapper",
+        children=[
+            html.Div(
+                children=[
+                    html.H4("Dataset Reports", className="reports-title-admin"),
+                ],
+            ),
+            html.Table(
+                [table_header, table_body],
+                className="reports-table",
+                style={"width": "100%", "borderCollapse": "collapse",
+                       "tableLayout": "auto"},
+            ),
+            pagination,
+        ],
+    )
+
+
+def create_editable_table(df, sheet_name):
+    """Create an editable Dash DataTable from DataFrame"""
+    columns = [{"name": col, "id": col} for col in df.columns]
+
+    # Convert DataFrame to dictionary for DataTable
+    data = df.to_dict('records')
+
+    return html.Div([
+        html.H4(f"Sheet: {sheet_name}", style={'marginBottom': '10px'}),
+        dash_table.DataTable(
+            id={'type': 'editable-table', 'sheet': sheet_name},
+            columns=columns,
+            data=data,
+            editable=True,
+            filter_action="native",
+            sort_action="native",
+            page_action="native",
+            page_current=0,
+            page_size=10,
+            style_table={'overflowX': 'auto'},
+            style_cell={
+                'minWidth': '100px', 'width': '150px', 'maxWidth': '300px',
+                'overflow': 'hidden',
+                'textOverflow': 'ellipsis',
+            },
+            style_header={
+                'backgroundColor': 'rgb(230, 230, 230)',
+                'fontWeight': 'bold'
+            },
+        )
+    ], style={'marginBottom': '20px'})
+
+
+def create_preview_table(df):
+    """Create a Dash DataTable for preview with filters"""
+    columns = [{"name": col, "id": col} for col in df.columns]
+
+    # Convert DataFrame to dictionary for DataTable
+    data = df.to_dict('records')
+
+    return dash_table.DataTable(
+        id="preview-data-table-component",
+        columns=columns,
+        data=data,
+        filter_action="native",
+        sort_action="native",
+        page_action="native",
+        page_current=0,
+        page_size=50,
+        style_table={'overflowX': 'auto'},
+        style_cell={
+            'minWidth': '100px',
+            'width': '150px',
+            'maxWidth': '300px',
+            'overflow': 'hidden',
+            'textOverflow': 'ellipsis',
+            'textAlign': 'left'
+        },
+        style_header={
+            'backgroundColor': 'rgb(230, 230, 230)',
+            'fontWeight': 'bold',
+            'textAlign': 'left'
+        },
+        style_data={
+            'whiteSpace': 'normal',
+            'height': 'auto',
+        },
+        css=[{
+            'selector': '.dash-spreadsheet td div',
+            'rule': '''
+                line-height: 15px;
+                max-height: 30px; min-height: 30px; height: 30px;
+                display: block;
+                overflow-y: hidden;
+            '''
+        }]
+    )
+
+
+def generate_dashboard_items_list(dashboard):
+    """Generate the HTML for dashboard items list"""
+    counts = dashboard.get('visualization_types', {}).get('counts', [])
+    sections = dashboard.get('visualization_types', {}).get('charts', {}).get('sections', [])
+    priority_indicators = dashboard.get('priority_indicators', [])
+
+    if not counts and not sections and not priority_indicators:
+        return html.Div(
+            className="empty-items",
+            children=[
+                html.Div(style={"textAlign": "center", "padding": "40px", "color": "#999"}, children=[
+                    html.I(className="fas fa-chart-line", style={"fontSize": "48px"}),
+                    html.P("No dashboard items yet", style={"marginTop": "16px"}),
+                    html.P("Add counts or sections to get started", style={"fontSize": "12px"})
+                ])
+            ]
+        )
+
+    items_list = []
+
+    for idx, indicator in enumerate(priority_indicators):
+        items_list.append(
+            html.Div(
+                className="list-item",
+                key=f"mnid-indicator-{idx}",
+                children=[
+                    html.Div(className="list-item-icon", children=[html.I(className="fas fa-bullseye")]),
+                    html.Div(className="list-item-content", children=[
+                        html.Div(className="list-title", children=indicator.get("label", f"MNID Indicator {idx + 1}")),
+                        html.Div(indicator.get("category", "MNID"), style={"fontSize": "12px", "color": "#6b7280"}),
+                    ]),
+                ],
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "padding": "12px",
+                    "marginBottom": "8px",
+                    "backgroundColor": "#f4f8ff",
+                    "borderRadius": "6px",
+                    "border": "1px solid #dbeafe"
+                }
+            )
+        )
+
+    # Add counts to the list
+    for idx, count in enumerate(counts):
+        items_list.append(
+            html.Div(
+                className="list-item",
+                key=f"count-{idx}",
+                children=[
+                    html.Div(className="list-item-icon", children=[
+                        html.I(className="fas fa-calculator")
+                    ]),
+                    html.Div(className="list-item-content", children=[
+                        html.Div(className="list-title", children=count.get("name", f"{idx + 1}"))
+                    ]),
+                    html.Div(className="list-item-actions", children=[
+                        html.Button(
+                            [nav_icon("mdi:pencil"), ""],
+                            id={"type": "count-edit", "index": idx},
+                            n_clicks=0
+                        ),
+                        # html.Button(
+                        #     "🗑",
+                        #     id={"type": "count-delete", "index": idx},
+                        #     n_clicks=0
+                        # )
+                    ])
+                ],
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "padding": "12px",
+                    "marginBottom": "8px",
+                    "backgroundColor": "#f8f9fa",
+                    "borderRadius": "6px",
+                    "border": "1px solid #e9ecef"
+                }
+            )
+        )
+
+    # Add sections and their charts to the list
+    for section_idx, section in enumerate(sections):
+        # Add section header
+        items_list.append(
+            html.Div(
+                className="list-item section-item",
+                key=f"section-{section_idx}",
+                children=[
+                    html.Div(className="list-item-icon", children=[
+                        html.I(className="fas fa-folder")
+                    ]),
+                    html.Div(className="list-item-content", children=[
+                        html.Div(className="list-item-name", children=section.get("section_name", f"Section {section_idx + 1}"))
+                    ]),
+                    html.Div(className="list-item-actions", children=[
+                        html.Button(
+                            [nav_icon("mdi:pencil"), ""],
+                            id={"type": "section-edit", "index": section_idx},
+                            n_clicks=0,
+                        ),
+                        # html.Button(
+                        #     "🗑",
+                        #     id={"type": "section-delete", "index": section_idx},
+                        #     n_clicks=0,
+                        # )
+                    ])
+                ],
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "padding": "12px",
+                    "marginBottom": "8px",
+                    "backgroundColor": "#e8f4f8",
+                    "borderRadius": "6px",
+                    "border": "1px solid #cce5f0"
+                }
+            )
+        )
+
+        # Add charts within the section
+        for chart_idx, chart in enumerate(section.get("items", [])):
+            items_list.append(
+                html.Div(
+                    className="list-item chart-item",
+                    key=f"section-{section_idx}-chart-{chart_idx}",
+                    children=[
+                        html.Div(className="list-item-icon", style={"marginLeft": "24px"}, children=[
+                            html.I(className="fas fa-chart-bar")
+                        ]),
+                        html.Div(className="list-item-content", children=[
+                            html.Div(className="list-title", children=chart.get("name", f"Chart {chart_idx + 1}"))
+                        ]),
+                        html.Div(className="list-item-actions", children=[
+                            html.Button(
+                                [nav_icon("mdi:pencil"), ""],
+                                id={"type": "chart-edit", "section": section_idx, "chart": chart_idx},
+                                n_clicks=0,
+                            ),
+                            # html.Button(
+                            #     "🗑",
+                            #     id={"type": "chart-delete", "section": section_idx, "chart": chart_idx},
+                            #     n_clicks=0,
+                            # )
+                        ])
+                    ],
+                    style={
+                        "display": "flex",
+                        "alignItems": "center",
+                        "padding": "12px",
+                        "marginBottom": "8px",
+                        "marginLeft": "24px",
+                        "backgroundColor": "#ffffff",
+                        "borderRadius": "6px",
+                        "border": "1px solid #e9ecef"
+                    }
+                )
+            )
+    return html.Div(className="list-items", children=items_list)
+
+
+# FOR DASHBOARDS
+def create_edit_modal():
+    selected_dashboard_index = 0  # Default index, will be updated by callbacks
+    current_dashboard = None
+    if dashboards_data and len(dashboards_data) > selected_dashboard_index:
+        current_dashboard = dashboards_data[selected_dashboard_index]
+    else:
+        current_dashboard = {"counts": [], "sections": [], "report_name": "", "report_id": "", "date_created": ""}
+    list_items_html = generate_dashboard_items_list(current_dashboard)
+
+    return html.Div([
+        # Modal backdrop
+        html.Div(
+            id="modal-backdrop",
+            className="modal-backdrop", 
+            style={"display": "none"}
+        ),
+        # Modal content
+        html.Div(
+            id="modal-content",
+            className="modal-content",
+            style={"display": "none"},
+            children=[
+                # Modal Header with Cancel button
+                html.Div(
+                    className="modal-header",
+                    children=[
+                        html.H3("Dashboard Configuration", className="modal-title"),
+                        html.Button(
+                            DashIconify(icon="lucide:x", width=18, height=18),
+                            id="cancel-btn",
+                            n_clicks=0,
+                            className="modal-close-btn",
+                            title="Close"
+                        )
+                    ]
+                ),
+
+                # Modal Body
+                html.Div(
+                    className="modal-body",
+                    children=[
+                        html.Div(
+                            style={
+                                "display": "flex",
+                                "gap": "20px",
+                                "width": "100%",
+                                "height": "100%",
+                            },
+                            children=[
+                                # ── LEFT PANEL: Setup + Items list ──────────────
+                                html.Div(
+                                    style={
+                                        "flex": "0 0 360px",
+                                        "display": "flex",
+                                        "flexDirection": "column",
+                                        "gap": "16px",
+                                        "height": "100%",
+                                        "overflow": "hidden",
+                                    },
+                                    children=[
+                                        # Dashboard Setup Card
+                                        html.Div(className="dashboard-card", style={"flexShrink": "0"}, children=[
+                                            html.Div(className="dashboard-card-header", children=[
+                                                html.H4("Dashboard Setup", className="dashboard-card-title"),
+                                            ]),
+                                            html.Div(className="dashboard-card-body", style={"overflowY": "auto", "maxHeight": "380px"}, children=[
+                                                html.Div(className="form-group", children=[
+                                                    html.Label("Select Dashboard:", className="form-label"),
+                                                    dcc.Dropdown(
+                                                        id="dashboard-selector",
+                                                        options=[{"label": d.get("report_name", "Unnamed"),
+                                                                  "value": i} for i, d in enumerate(dashboards_data)] +
+                                                                 [{"label": "➕ Create New Dashboard", "value": "new"}],
+                                                        value="new" if not dashboards_data else 0,
+                                                        className="modern-dropdown",
+                                                        clearable=False,
+                                                    ),
+                                                ]),
+                                                html.Div(className="form-group", children=[
+                                                    html.Label("Report Name *", className="form-label"),
+                                                    dcc.Input(
+                                                        id="report-name-input",
+                                                        type="text",
+                                                        placeholder="Enter report name...",
+                                                        className="modern-input",
+                                                    ),
+                                                ]),
+                                                html.Div(className="form-row", children=[
+                                                    html.Div(className="form-group", style={"flex": "1"}, children=[
+                                                        html.Label("Report ID:", className="form-label-disabled"),
+                                                        dcc.Input(
+                                                            id="report-id-input",
+                                                            type="text",
+                                                            placeholder="auto-generated",
+                                                            disabled=True,
+                                                            className="modern-input-disabled",
+                                                        ),
+                                                    ]),
+                                                    html.Div(className="form-group", style={"flex": "1"}, children=[
+                                                        html.Label("Date Created:", className="form-label-disabled"),
+                                                        dcc.Input(
+                                                            id="date-created-input",
+                                                            type="text",
+                                                            disabled=True,
+                                                            className="modern-input-disabled",
+                                                        ),
+                                                    ]),
+                                                ]),
+                                                html.Div(style={"display": "flex", "gap": "12px"}, children=[
+                                                    html.Div(className="form-group", style={"flex": "1"}, children=[
+                                                        html.Label("Dashboard Type", className="form-label"),
+                                                        dcc.Dropdown(
+                                                            id="dashboard-type-selector",
+                                                            options=[
+                                                                {"label": "Standard", "value": "standard"},
+                                                                {"label": "MNID Outlook", "value": "mnid"},
+                                                            ],
+                                                            value="standard",
+                                                            clearable=False,
+                                                            className="modern-dropdown",
+                                                        ),
+                                                    ]),
+                                                    html.Div(className="form-group", style={"flex": "0 0 110px"}, children=[
+                                                        html.Label("Counts/Row", className="form-label"),
+                                                        dcc.Input(
+                                                            id="count-items-per-row-input",
+                                                            type="number",
+                                                            min=1, max=8,
+                                                            value=5,
+                                                            placeholder="5",
+                                                            className="modern-input",
+                                                        ),
+                                                    ]),
+                                                ]),
+                                                # lets associate dashboards with mahis programs
+                                                html.Div(style={"display": "flex", "gap": "12px"}, children=[
+                                                    html.Div(className="form-group", style={"flex": "1"}, children=[
+                                                        html.Label("Associated Program", className="form-label"),
+                                                        dcc.Dropdown(
+                                                            id="dashboard-program-selector",
+                                                            options=[
+                                                                {"label": "Standard", "value": "standard"},
+                                                                {"label": "MNID Outlook", "value": "mnid"},
+                                                            ],
+                                                            multi=True,
+                                                            value="",
+                                                            clearable=False,
+                                                            className="modern-dropdown",
+                                                        ),
+                                                    ]),
+                                                    html.Div(className="form-group", style={"flex": "0 0 110px"}, children=[
+                                                        html.Label("Access", className="form-label"),
+                                                        dcc.Dropdown(
+                                                            id="dashboard-access-selector",
+                                                            options=[
+                                                                {"label": "Global",  "value": "global"},
+                                                                {"label": "Limited", "value": "limited"},
+                                                            ],
+                                                            value="global",
+                                                            clearable=False,
+                                                            className="modern-dropdown",
+                                                        ),
+                                                    ]),
+                                                ]),
+                                                # MNID fields — hidden unless type == "mnid"
+                                                html.Div(
+                                                    id="mnid-section",
+                                                    style={"display": "none"},
+                                                    children=[
+                                                        html.Div(className="form-group", children=[
+                                                            html.Label("MNID Categories", className="form-label"),
+                                                            dcc.Dropdown(
+                                                                id="mnid-categories-selector",
+                                                                options=[{"label": item, "value": item}
+                                                                         for item in ["ANC", "Labour", "PNC", "Newborn"]],
+                                                                value=[],
+                                                                multi=True,
+                                                                placeholder="Select MNID program areas",
+                                                                className="modern-dropdown",
+                                                            ),
+                                                        ]),
+                                                        html.Div(className="form-group", children=[
+                                                            html.Label("MNID Indicators", className="form-label"),
+                                                            html.Div(
+                                                                style={"display": "flex", "justifyContent": "space-between",
+                                                                       "alignItems": "center", "marginBottom": "8px"},
+                                                                children=[
+                                                                    html.Span("Build indicators, review JSON below.",
+                                                                              style={"fontSize": "12px", "color": "#6b7280"}),
+                                                                    html.Button("➕ Add Indicator",
+                                                                                id="add-mnid-indicator-btn",
+                                                                                n_clicks=0,
+                                                                                className="btn-primary-modern"),
+                                                                ],
+                                                            ),
+                                                            html.Div(
+                                                                id="mnid-indicators-container",
+                                                                className="dashboard-card-body",
+                                                                style={"maxHeight": "260px", "overflowY": "auto",
+                                                                       "marginBottom": "8px", "padding": "8px",
+                                                                       "border": "1px solid #e5e7eb", "borderRadius": "8px",
+                                                                       "background": "#fafafa"},
+                                                            ),
+                                                            dcc.Textarea(
+                                                                id="mnid-indicators-input",
+                                                                value="",
+                                                                placeholder='[{"id":"mnid_x_001","label":"...","category":"ANC",...}]',
+                                                                className="modern-input",
+                                                                style={"minHeight": "100px", "resize": "vertical"},
+                                                            ),
+                                                        ]),
+                                                    ],
+                                                ),
+                                            ]),
+                                        ]),
+
+                                        # Dashboard Items Card (takes remaining height)
+                                        html.Div(
+                                            className="dashboard-card",
+                                            style={"flex": "1", "display": "flex", "flexDirection": "column", "minHeight": "0"},
+                                            children=[
+                                                html.Div(
+                                                    className="dashboard-card-header",
+                                                    style={"display": "flex", "alignItems": "center",
+                                                           "justifyContent": "space-between", "flexShrink": "0"},
+                                                    children=[
+                                                        html.H4("Dashboard Items", className="dashboard-card-title"),
+                                                        html.Div(style={"display": "flex", "gap": "6px"}, children=[
+                                                            html.Button([nav_icon("lucide:plus"), "Metric"],
+                                                                        id="add-count-btn",
+                                                                        n_clicks=0,
+                                                                        className="btn-primary-modern btn-small",
+                                                                        title="Add a new metric/count"),
+                                                            html.Button([nav_icon("lucide:plus"), "Charts"],
+                                                                        id="add-section-btn",
+                                                                        n_clicks=0,
+                                                                        className="btn-primary-modern btn-small",
+                                                                        title="Add a new chart section"),
+                                                        ]),
+                                                    ],
+                                                ),
+                                                html.Div(
+                                                    id="dashboard-items-container",
+                                                    className="dashboard-card-body",
+                                                    style={"overflowY": "auto", "flex": "1"},
+                                                    children=[list_items_html],
+                                                ),
+                                            ],
+                                        ),
+                                    ],
+                                ),
+
+                                # ── RIGHT PANEL: Edit Forms ──────────────────────
+                                html.Div(
+                                    style={
+                                        "flex": "1",
+                                        "display": "flex",
+                                        "flexDirection": "column",
+                                        "gap": "16px",
+                                        "height": "100%",
+                                        "overflow": "hidden",
+                                    },
+                                    children=[
+                                        # Panel header
+                                        html.Div(
+                                            className="dashboard-card",
+                                            style={"flexShrink": "0", "padding": "12px 16px"},
+                                            children=[
+                                                html.Div(style={"display": "flex", "alignItems": "center", "gap": "10px"}, children=[
+                                                    html.Span([nav_icon("mdi:pencil"), ""], style={"fontSize": "18px"}),
+                                                    html.Div(children=[
+                                                        html.H4("Edit Panel", className="dashboard-card-title",
+                                                                style={"margin": "0"}),
+                                                        html.Span("Click an item on the left to open its form here.",
+                                                                  style={"fontSize": "12px", "color": "#6b7280"}),
+                                                    ]),
+                                                ]),
+                                            ],
+                                        ),
+                                        # Count / metric edit area
+                                        html.Div(
+                                            id="counts-container",
+                                            style={
+                                                "flexShrink": "0",
+                                                "overflowY": "auto",
+                                                "maxHeight": "45%",
+                                            },
+                                        ),
+                                        # Sections / charts edit area (scrollable, vertical)
+                                        html.Div(
+                                            id="sections-container",
+                                            style={
+                                                "flex": "1",
+                                                "overflowY": "auto",
+                                                "display": "flex",
+                                                "flexDirection": "column",
+                                                "gap": "12px",
+                                                "minHeight": "0",
+                                            },
+                                        ),
+                                    ],
+                                ),
+                            ]
+                        )
+                    ]
+                ),
+
+                # Modal Footer with Action Buttons
+                html.Div(
+                    className="modal-footer",
+                    style={"display": "flex", "alignItems": "center", "gap": "10px",
+                           "flexWrap": "wrap"},
+                    children=[
+                        html.Button(
+                            "Save Dashboard",
+                            id="save-btn",
+                            n_clicks=0,
+                            className="btn-success-modern"
+                        ),
+                        html.Button(
+                            "Delete Dashboard",
+                            id="delete-btn",
+                            n_clicks=0,
+                            className="btn-danger-modern"
+                        ),
+                        html.Span(
+                            id="dashboard-save-status",
+                            style={"fontSize": "12px", "color": "#6b7280", "marginLeft": "auto"},
+                        ),
+                    ]
+                ),
+
+                # Delete Confirmation Modal
+                html.Div(
+                    id="delete-confirmation-modal",
+                    style={"display": "none"},
+                    className="confirmation-modal-overlay",
+                    children=[
+                        html.Div(className="confirmation-modal", children=[
+                            html.Div(className="confirmation-modal-header", children=[
+                                html.H4("Confirm Delete"),
+                                html.Button("×", id="close-confirmation-btn", className="confirmation-close-btn")
+                            ]),
+                            html.Div(className="confirmation-modal-body", children=[
+                                html.P("Are you sure you want to delete this dashboard?"),
+                                html.P("This action cannot be undone.", style={"color": "#dc3545", "fontSize": "14px"})
+                            ]),
+                            html.Div(className="confirmation-modal-footer", children=[
+                                html.Button("Cancel", id="cancel-delete-btn", className="btn-secondary-modern"),
+                                html.Button("Delete", id="confirm-delete-btn", className="btn-danger-modern"),
+                            ])
+                        ])
+                    ]
+                )
+            ]
+        )
+    ])
+
+
+def _build_ds_list(sources):
+    if not sources:
+        return html.Div("No data sources configured.",
+                        style={"padding": "16px", "color": "#9ca3af",
+                               "fontSize": "13px", "textAlign": "center"})
+    rows = []
+    for i, ds in enumerate(sources):
+        bg = "#f2f9f2" if i % 2 == 0 else "#ffffff"
+        rows.append(html.Div(
+            style={"display": "flex", "alignItems": "center",
+                   "padding": "10px 14px", "background": bg,
+                   "borderBottom": "1px solid #e5e7eb", "gap": "10px"},
+            children=[
+                html.Div(style={"flex": "1"}, children=[
+                    html.Div(ds.get("name", "Unnamed"),
+                             style={"fontWeight": "600", "fontSize": "13px",
+                                    "color": "#006401"}),
+                    html.Div(ds.get("date_updated", ""),
+                             style={"fontSize": "11px", "color": "#9ca3af"}),
+                ]),
+                html.Button([nav_icon("mdi:pencil"), ""], id={"type": "ds-edit-btn", "index": i},
+                            n_clicks=0, className="btn-secondary btn-small",
+                            title="Edit"),
+            ],
+        ))
+    return html.Div(rows, style={"borderRadius": "8px", "overflow": "hidden"})
+
+
+_USERS_PAGE_SIZE = 10
+
+
+def _build_users_table(users, page=1):
+    if not users:
+        return html.Div(
+            "No users configured yet.",
+            style={"padding": "16px", "color": "#9ca3af", "fontSize": "13px",
+                   "textAlign": "center"},
+        )
+
+    total       = len(users)
+    total_pages = max(1, -(-total // _USERS_PAGE_SIZE))
+    page        = max(1, min(page, total_pages))
+    start       = (page - 1) * _USERS_PAGE_SIZE
+    page_users  = users[start: start + _USERS_PAGE_SIZE]
+
+    th_style = {
+        "padding": "10px 14px", "textAlign": "left",
+        "background": "#006401", "color": "#fff",
+        "fontSize": "12px", "fontWeight": "600",
+        "whiteSpace": "nowrap",
+    }
+    header = html.Thead(html.Tr([
+        html.Th("Username",         style=th_style),
+        # html.Th("UUID",             style={**th_style, "maxWidth": "160px", "overflow": "hidden",
+        #                                    "textOverflow": "ellipsis"}),
+        html.Th("Facility Code",    style=th_style),
+        html.Th("Role",             style=th_style),
+        html.Th("Level",            style=th_style),
+        html.Th("District(s)",      style=th_style),
+        html.Th("Facility Name(s)", style=th_style),
+    ]))
+
+    body_rows = []
+    for i, u in enumerate(page_users):
+        p        = u.get("properties", {})
+        bg       = "#f2f9f2" if i % 2 == 0 else "#ffffff"
+        td       = {"padding": "8px 14px", "fontSize": "12px",
+                    "background": bg, "borderBottom": "1px solid #e5e7eb",
+                    "whiteSpace": "nowrap"}
+
+        dist     = p.get("district")      or []
+        fac      = p.get("facility_name") or []
+        dist_str = ", ".join(dist) if isinstance(dist, list) else (dist or "—")
+        fac_str  = ", ".join(fac)  if isinstance(fac,  list) else (fac  or "—")
+        uuid_val = p.get("uuid", "") or ""
+        uuid_short = (uuid_val[:18] + "…") if len(uuid_val) > 20 else uuid_val
+
+        body_rows.append(html.Tr([
+            html.Td(u.get("username", ""),         style={**td, "fontWeight": "500",
+                                                          "color": "#006401"}),
+            # html.Td(uuid_short,                    style={**td, "fontFamily": "monospace",
+            #                                               "fontSize": "11px"},
+            #         title=uuid_val),
+            html.Td(p.get("facility_code", "") or "—", style=td),
+            html.Td(p.get("role", "")          or "—", style=td),
+            html.Td(p.get("user_level", "")    or "—", style=td),
+            html.Td(dist_str,                      style=td),
+            html.Td(fac_str,                       style=td),
+        ]))
+
+    table = html.Table(
+        [header, html.Tbody(body_rows)],
+        style={"width": "100%", "borderCollapse": "collapse",
+               "fontSize": "13px", "tableLayout": "auto"},
+    )
+
+    btn = {"padding": "4px 12px", "fontSize": "12px", "cursor": "pointer",
+           "border": "1px solid #d1d5db", "borderRadius": "4px",
+           "background": "#fff", "color": "#374151"}
+    disabled_btn = {**btn, "opacity": "0.4", "cursor": "default"}
+
+    pagination = html.Div([
+        html.Button("‹ Prev", id="users-tbl-prev", n_clicks=0,
+                    style=btn if page > 1 else disabled_btn,
+                    disabled=page <= 1),
+        html.Span(
+            f"Page {page} of {total_pages}  ({total} users)",
+            style={"fontSize": "12px", "color": "#6b7280",
+                   "margin": "0 12px", "alignSelf": "center"},
+        ),
+        html.Button("Next ›", id="users-tbl-next", n_clicks=0,
+                    style=btn if page < total_pages else disabled_btn,
+                    disabled=page >= total_pages),
+    ], style={"display": "flex", "alignItems": "center",
+              "justifyContent": "flex-end", "padding": "8px 14px",
+              "borderTop": "1px solid #e5e7eb", "background": "#f9fafb"})
+
+    return html.Div([table, pagination])
+
+
+def create_html_report_modal():
+    """Full-screen modal for the Create Reports (GUI) feature."""
+
+    # --- Toolbar ---
+    btn_style = {
+        "padding": "4px 10px", "fontSize": "12px", "cursor": "pointer",
+        "border": "1px solid #d1d5db", "borderRadius": "4px",
+        "background": "#ffffff", "color": "#374151",
+    }
+    sep = html.Span("|", style={"color": "#d1d5db", "padding": "0 6px", "alignSelf": "center"})
+
+    toolbar = html.Div(
+        style={
+            "display": "flex", "flexWrap": "wrap", "gap": "4px",
+            "alignItems": "center", "padding": "8px 12px",
+            "background": "#f3f4f6", "borderBottom": "1px solid #e5e7eb",
+            "flexShrink": "0",
+        },
+        children=[
+            # Tables group
+            html.Span("Tables", style={"fontSize": "11px", "color": "#6b7280",
+                                       "fontWeight": "600", "alignSelf": "center"}),
+            html.Button([DashIconify(icon="lucide:plus", width=13), "New"],
+                        id="rpt-add-table-btn", n_clicks=0, style=btn_style),
+            html.Button([DashIconify(icon="lucide:arrow-up", width=13), " Above"],
+                        id="rpt-add-above-btn", n_clicks=0, style=btn_style),
+            html.Button([DashIconify(icon="lucide:arrow-down", width=13), " Below"],
+                        id="rpt-add-below-btn", n_clicks=0, style=btn_style),
+            html.Button([DashIconify(icon="lucide:arrow-left", width=13), " Left"],
+                        id="rpt-add-left-btn", n_clicks=0, style=btn_style),
+            html.Button([DashIconify(icon="lucide:arrow-right", width=13), " Right"],
+                        id="rpt-add-right-btn", n_clicks=0, style=btn_style),
+            sep,
+            # Rows/Cols group
+            html.Span("Rows/Cols", style={"fontSize": "11px", "color": "#6b7280",
+                                          "fontWeight": "600", "alignSelf": "center"}),
+            html.Button([DashIconify(icon="lucide:plus", width=13), "Row"],
+                        id="rpt-add-row-btn", n_clicks=0, style=btn_style),
+            html.Button([DashIconify(icon="lucide:minus", width=13), "Row"],
+                        id="rpt-del-row-btn", n_clicks=0, style=btn_style),
+            html.Button([DashIconify(icon="lucide:plus", width=13), "Col"],
+                        id="rpt-add-col-btn", n_clicks=0, style=btn_style),
+            html.Button([DashIconify(icon="lucide:minus", width=13), "Col"],
+                        id="rpt-del-col-btn", n_clicks=0, style=btn_style),
+            sep,
+            # Cells group
+            html.Span("Cells", style={"fontSize": "11px", "color": "#6b7280",
+                                      "fontWeight": "600", "alignSelf": "center"}),
+            html.Button([DashIconify(icon="lucide:merge", width=13), " Merge"],
+                        id="rpt-merge-btn", n_clicks=0, style=btn_style),
+            html.Button([DashIconify(icon="lucide:split", width=13), " Split"],
+                        id="rpt-split-btn", n_clicks=0, style=btn_style),
+            html.Button([DashIconify(icon="lucide:eraser", width=13), " Clear"],
+                        id="rpt-clear-btn", n_clicks=0, style=btn_style),
+            sep,
+            # Style group
+            html.Span("Fill:", style={"fontSize": "12px", "color": "#374151",
+                                      "alignSelf": "center"}),
+            dcc.Input(id="rpt-fill-color", type="text", value="#ffffff",
+                      placeholder="#rrggbb",
+                      style={"width": "72px", "height": "26px", "padding": "2px 4px",
+                             "border": "1px solid #d1d5db", "borderRadius": "4px",
+                             "fontSize": "12px", "fontFamily": "monospace"}),
+            html.Button("Apply", id="rpt-apply-fill-btn", n_clicks=0, style=btn_style),
+            html.Span("Font:", style={"fontSize": "12px", "color": "#374151",
+                                      "alignSelf": "center"}),
+            dcc.Input(id="rpt-font-color", type="text", value="#000000",
+                      placeholder="#rrggbb",
+                      style={"width": "72px", "height": "26px", "padding": "2px 4px",
+                             "border": "1px solid #d1d5db", "borderRadius": "4px",
+                             "fontSize": "12px", "fontFamily": "monospace"}),
+            html.Button("Apply", id="rpt-apply-font-btn", n_clicks=0, style=btn_style),
+            sep,
+            # Text style group
+            html.Span("Text", style={"fontSize": "11px", "color": "#6b7280",
+                                     "fontWeight": "600", "alignSelf": "center"}),
+            html.Button(DashIconify(icon="lucide:bold", width=13), id="rpt-bold-btn",
+                        n_clicks=0, title="Bold",
+                        style={**btn_style, "minWidth": "28px"}),
+            html.Button(DashIconify(icon="lucide:italic", width=13), id="rpt-italic-btn",
+                        n_clicks=0, title="Italic",
+                        style={**btn_style, "minWidth": "28px"}),
+            sep,
+            # Alignment group
+            html.Span("Align", style={"fontSize": "11px", "color": "#6b7280",
+                                      "fontWeight": "600", "alignSelf": "center"}),
+            html.Button(DashIconify(icon="lucide:align-left", width=13),
+                        id="rpt-align-left-btn", n_clicks=0, title="Align left",
+                        style={**btn_style, "minWidth": "34px"}),
+            html.Button(DashIconify(icon="lucide:align-center", width=13),
+                        id="rpt-align-center-btn", n_clicks=0, title="Align center",
+                        style={**btn_style, "minWidth": "34px"}),
+            html.Button(DashIconify(icon="lucide:align-right", width=13),
+                        id="rpt-align-right-btn", n_clicks=0, title="Align right",
+                        style={**btn_style, "minWidth": "34px"}),
+            sep,
+            # Indent group
+            html.Span("Indent", style={"fontSize": "11px", "color": "#6b7280",
+                                       "fontWeight": "600", "alignSelf": "center"}),
+            html.Button(DashIconify(icon="lucide:indent", width=13), id="rpt-indent-btn",
+                        n_clicks=0, title="Indent",
+                        style={**btn_style, "minWidth": "32px"}),
+            html.Button(DashIconify(icon="lucide:outdent", width=13), id="rpt-dedent-btn",
+                        n_clicks=0, title="Dedent",
+                        style={**btn_style, "minWidth": "32px"}),
+            sep,
+            # Title & remove
+            html.Button([DashIconify(icon="lucide:heading-1", width=13), " ↑"],
+                        id="rpt-title-above-btn", n_clicks=0, title="Add title above",
+                        style=btn_style),
+            html.Button([DashIconify(icon="lucide:heading-1", width=13), " ↓"],
+                        id="rpt-title-below-btn", n_clicks=0, title="Add title below",
+                        style=btn_style),
+            html.Button([DashIconify(icon="lucide:trash-2", width=13), " Table"],
+                        id="rpt-remove-table-btn", n_clicks=0,
+                        style={**btn_style, "color": "#dc2626", "borderColor": "#fca5a5"}),
+        ],
+    )
+
+    # --- Body panels ---
+    left_panel = html.Div(
+        style={
+            "width": "30%", "flexShrink": "0", "background": "#f9fafb",
+            "borderRight": "1px solid #e5e7eb", "overflowY": "auto",
+            "padding": "12px",
+        },
+        children=[
+            html.Div("Variables", style={"fontWeight": "700", "fontSize": "14px",
+                                         "color": "#374151", "marginBottom": "10px"}),
+            html.Div(
+                "Select a report to load variables.",
+                id="report-variables-panel-content",
+                style={"fontSize": "12px", "color": "#9ca3af"},
+            ),
+        ],
+    )
+
+    # --- Table editor sub-panel (default view) ---
+    table_editor = html.Div(
+        id="rpt-table-editor",
+        style={"display": "flex", "flexDirection": "column", "flex": "1", "minHeight": "0"},
+        children=[
+            toolbar,
+            html.Div(
+                id="html-report-canvas",
+                style={
+                    "flex": "1", "overflowY": "auto", "overflowX": "auto",
+                    "position": "relative",
+                    "backgroundColor": "#ffffff",
+                    "backgroundImage": (
+                        "linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px),"
+                        "linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px),"
+                        "linear-gradient(rgba(0,0,0,0.08) 1px, transparent 1px),"
+                        "linear-gradient(90deg, rgba(0,0,0,0.08) 1px, transparent 1px)"
+                    ),
+                    "backgroundSize": "8px 8px, 8px 8px, 40px 40px, 40px 40px",
+                    "backgroundPosition": "-1px -1px, -1px -1px, -1px -1px, -1px -1px",
+                    "minHeight": "400px",
+                },
+                children=[],
+            ),
+            html.Div(
+                id="html-report-status",
+                style={
+                    "flexShrink": "0", "padding": "4px 12px",
+                    "background": "#f3f4f6", "borderTop": "1px solid #e5e7eb",
+                    "fontSize": "12px", "color": "#6b7280",
+                },
+                children="No selection",
+            ),
+        ],
+    )
+
+    # --- Filter editor sub-panel (shown when a variable is clicked) ---
+    _measure_opts = [{"label": m, "value": m} for m in [
+        "count", "nunique", "sum", "count_set", "cohort_count", "cohort_count_set",
+        "cohort_sum", "cohort_count_defaulter", "count_defaulter", "count_set_defaulter",
+        "cohort_count_set_defaulter", "calculated", "calculated_intersection",
+        "calculated_union", "calculated_max", "calculated_min",
+    ]]
+    _actual_keys_opts = [{"label": k, "value": k} for k in actual_keys_in_data]
+
+    filter_editor = html.Div(
+        id="rpt-filter-editor",
+        style={"display": "none", "flex": "1", "flexDirection": "column", "minHeight": "0"},
+        children=[
+            # Header bar
+            html.Div(
+                style={
+                    "display": "flex", "alignItems": "center", "gap": "8px",
+                    "padding": "8px 12px", "background": "#f0fdf4",
+                    "borderBottom": "1px solid #d1fae5", "flexShrink": "0",
+                },
+                children=[
+                    html.Button([DashIconify(icon="lucide:arrow-left", width=13), " Back"],
+                                id="rpt-flt-close-btn", n_clicks=0,
+                                style={"padding": "4px 10px", "fontSize": "12px",
+                                       "cursor": "pointer", "background": "#e5e7eb",
+                                       "border": "1px solid #d1d5db", "borderRadius": "4px",
+                                       "color": "#374151"}),
+                    html.Span(id="rpt-flt-title", children="Edit Filter",
+                              style={"fontWeight": "700", "fontSize": "14px",
+                                     "color": "#065f46", "flex": "1"}),
+                    html.Span(id="rpt-flt-status", children="",
+                              style={"fontSize": "12px", "color": "#16a34a",
+                                     "fontStyle": "italic"}),
+                ],
+            ),
+            # Scrollable body
+            html.Div(
+                style={"flex": "1", "overflowY": "auto", "padding": "16px"},
+                children=[
+                    # Display name
+                    html.Div(style={"marginBottom": "12px"}, children=[
+                        html.Label("Display Name",
+                                   style={"fontSize": "12px", "fontWeight": "600",
+                                          "display": "block", "marginBottom": "4px",
+                                          "color": "#374151"}),
+                        dcc.Input(id="rpt-flt-filter-name-desc", value="", debounce=True,
+                                  placeholder="Display name…",disabled=True,
+                                  style={"width": "100%", "padding": "6px 8px",
+                                         "fontSize": "13px", "border": "1px solid #d1d5db",
+                                         "borderRadius": "4px", "boxSizing": "border-box"}),
+                    ]),
+                    # Measure
+                    html.Div(style={"marginBottom": "12px"}, children=[
+                        html.Label("Measure",
+                                   style={"fontSize": "12px", "fontWeight": "600",
+                                          "display": "block", "marginBottom": "4px",
+                                          "color": "#374151"}),
+                        dcc.Dropdown(id="rpt-flt-measure", options=_measure_opts, value=None,
+                                     placeholder="Select measure…", clearable=True,
+                                     style={"fontSize": "13px"}),
+                    ]),
+                    # Unique column (container swapped by callback: dropdown ↔ input)
+                    html.Div(style={"marginBottom": "12px"}, children=[
+                        html.Label("Unique Column",
+                                   style={"fontSize": "12px", "fontWeight": "600",
+                                          "display": "block", "marginBottom": "4px",
+                                          "color": "#374151"}),
+                        html.Div(
+                            id="rpt-flt-unique-col-wrap",
+                            children=[
+                                dcc.Dropdown(id="rpt-flt-unique-col",
+                                             options=_actual_keys_opts, value=None,
+                                             placeholder="Select column…", clearable=True,
+                                             style={"fontSize": "13px"}),
+                            ],
+                        ),
+                    ]),
+                    html.Hr(style={"margin": "16px 0", "borderColor": "#e5e7eb"}),
+                    # Filter rows header
+                    html.Div(
+                        style={"display": "flex", "alignItems": "center", "marginBottom": "6px"},
+                        children=[
+                            html.Span("Variable Filters",
+                                      style={"fontWeight": "600", "fontSize": "13px",
+                                             "color": "#374151", "flex": "1"}),
+                            html.Button([DashIconify(icon="lucide:plus", width=13), " Add Row"],
+                                        id="rpt-flt-add-row-btn", n_clicks=0,
+                                        style={"padding": "3px 10px", "fontSize": "12px",
+                                               "cursor": "pointer", "background": "#e0f2fe",
+                                               "border": "1px solid #38bdf8",
+                                               "borderRadius": "4px", "color": "#0c4a6e"}),
+                        ],
+                    ),
+                    # Column labels for rows
+                    html.Div(
+                        style={"display": "flex", "gap": "6px", "marginBottom": "4px",
+                               "fontSize": "11px", "color": "#6b7280", "fontWeight": "600"},
+                        children=[
+                            html.Span("Column",  style={"flex": "2", "minWidth": "120px"}),
+                            html.Span("Op",      style={"flex": "0 0 80px"}),
+                            html.Span("Type",    style={"flex": "0 0 80px"}),
+                            html.Span("Value(s)", style={"flex": "3", "minWidth": "140px"}),
+                            html.Span("",        style={"flex": "0 0 34px"}),
+                        ],
+                    ),
+                    # Dynamic filter rows
+                    html.Div(id="rpt-filter-rows-container", children=[]),
+                ],
+            ),
+            # Footer
+            html.Div(
+                style={"flexShrink": "0", "padding": "8px 16px", "background": "#f9fafb",
+                       "borderTop": "1px solid #e5e7eb", "display": "flex", "gap": "8px",
+                       "alignItems": "center"},
+                children=[
+                    html.Button([DashIconify(icon="lucide:save", width=14), " Save Filter"],
+                                id="rpt-flt-save-btn", n_clicks=0,
+                                style={"padding": "6px 18px", "background": "#16a34a",
+                                       "color": "#fff", "border": "none", "borderRadius": "5px",
+                                       "cursor": "pointer", "fontSize": "13px",
+                                       "fontWeight": "600"}),
+                ],
+            ),
+        ],
+    )
+
+    right_panel = html.Div(
+        style={"flex": "1", "display": "flex", "flexDirection": "column", "minWidth": "0"},
+        children=[table_editor, filter_editor],
+    )
+
+    # --- Modal ---
+    return html.Div(
+        id="create-reports-modal",
+        style={
+            "display": "none",
+            "position": "fixed", "top": "0", "left": "0",
+            "width": "100vw", "height": "100vh",
+            "zIndex": "2000",
+            "alignItems": "center", "justifyContent": "center",
+            "background": "rgba(0,0,0,0.45)",
+        },
+        children=[
+            html.Div(
+                style={
+                    "width": "96vw", "height": "92vh",
+                    "background": "#ffffff", "borderRadius": "10px",
+                    "display": "flex", "flexDirection": "column",
+                    "overflow": "hidden",
+                    "boxShadow": "0 20px 60px rgba(0,0,0,0.35)",
+                },
+                children=[
+                    # Header bar
+                    html.Div(
+                        style={
+                            "display": "flex", "alignItems": "center", "gap": "12px",
+                            "padding": "10px 16px",
+                            "background": "#006401", "flexShrink": "0",
+                        },
+                        children=[
+                            html.Span("Update Report",
+                                      style={"fontWeight": "700", "fontSize": "16px",
+                                             "color": "#ffffff", "marginRight": "8px"}),
+                            dcc.Dropdown(
+                                id="html-report-name",
+                                options=[],
+                                placeholder="Select report…",
+                                clearable=True,
+                                searchable=True,
+                                style={
+                                    "flex": "1", "maxWidth": "340px",
+                                    "fontSize": "13px", "color": "#111827",
+                                },
+                            ),
+                            html.Button([DashIconify(icon="lucide:save", width=15), " Save"],
+                                        id="save-html-report-btn", n_clicks=0,
+                                        style={"padding": "5px 14px", "background": "#16a34a",
+                                               "color": "#fff", "border": "none",
+                                               "borderRadius": "5px", "cursor": "pointer",
+                                               "fontSize": "13px", "fontWeight": "600"}),
+                            html.Span(id="html-report-save-status",
+                                      style={"fontSize": "12px", "color": "#d1fae5",
+                                             "fontStyle": "italic", "minWidth": "60px"}),
+                            html.Button([DashIconify(icon="lucide:x", width=13), " Close"],
+                                        id="close-create-reports-modal", n_clicks=0,
+                                        style={"marginLeft": "auto", "padding": "5px 14px",
+                                               "background": "transparent", "color": "#ffffff",
+                                               "border": "1px solid rgba(255,255,255,0.4)",
+                                               "borderRadius": "5px", "cursor": "pointer",
+                                               "fontSize": "13px"}),
+                        ],
+                    ),
+                    # Body: left + right panels
+                    html.Div(
+                        style={"display": "flex", "flex": "1", "overflow": "hidden"},
+                        children=[left_panel, right_panel],
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
+def create_prog_report_modal():
+    """Modal for creating/editing program report configs in validated_prog_reports.json."""
+
+
+    config_path = os.path.join(os.getcwd(), 'configurations.json')
+    try:
+        with open(config_path, 'r') as r:
+            configurations = json.load(r)
+    except (FileNotFoundError, json.JSONDecodeError):
+        configurations = []
+
+    key_opts       = [{"label": k, "value": k} for k in actual_keys_in_data]
+    program_opts   = [{"label": p, "value": p} for p in drop_down_programs]
+    ll_aggr_opts   = [{"label": a, "value": a} for a in
+                      ["join", "first", "last", "nunique", "sum", "count",
+                       "mean", "min", "max", "list"]]
+    piv_aggr_opts  = [{"label": a, "value": a} for a in
+                      ["sum", "count", "mean", "nunique", "min", "max", "first"]]
+    merge_opts     = [{"label": m, "value": m} for m in ["left", "inner", "right", "outer"]]
+    type_opts      = [{"label": t, "value": t} for t in ["LineList", "PivotTable", "CrossTab"]]
+    unique_opts    = [{"label": "person_id",    "value": "person_id"},
+                      {"label": "encounter_id", "value": "encounter_id"}]
+    normalize_opts = [{"label": n, "value": n} for n in ["all", "index", "columns"]]
+    role_opts      = [{"label": r, "value": r} for r in
+                      ["Any", "Clinician", "Nurse", "Admin"]]
+    role_opts      = [{"label": r, "value": r} for r in
+                      ["Any", "Clinician", "Nurse", "Admin"]]
+    
+    routes          = [{"label": r, "value": r} for r in
+                      [r['data_path'] for r in configurations]]
+
+    _i = {"width": "100%", "padding": "6px 8px", "fontSize": "12px",
+          "border": "1px solid #d1d5db", "borderRadius": "4px", "boxSizing": "border-box"}
+    _t = {**_i, "height": "54px", "resize": "vertical", "fontFamily": "monospace"}
+    _l = {"fontSize": "11px", "fontWeight": "600", "color": "#374151",
+          "display": "block", "marginBottom": "3px"}
+    _s = {"marginBottom": "12px"}
+
+    # ── LEFT PANEL ──────────────────────────────────────────────────────────
+    left_panel = html.Div(
+        style={"flex": "0 0 300px", "display": "flex", "flexDirection": "column",
+               "height": "100%", "overflowY": "auto", "padding": "14px 12px",
+               "borderRight": "1px solid #bbf7d0", "background": "#f0fdf4"},
+        children=[
+            html.Div(style=_s, children=[
+                html.Label("Select / Search Report", style=_l),
+                html.Div(style={"display": "flex", "gap": "6px"}, children=[
+                    dcc.Dropdown(id="prog-rpt-selector", options=[],
+                                 placeholder="Search…", clearable=True, searchable=True,
+                                 style={"flex": "1", "fontSize": "12px"}),
+                    html.Button([DashIconify(icon="lucide:plus", width=13), " New"],
+                                id="prog-rpt-new-btn", n_clicks=0,
+                                style={"padding": "4px 10px", "fontSize": "12px",
+                                       "background": "#15803d", "color": "#fff",
+                                       "border": "none", "borderRadius": "4px",
+                                       "cursor": "pointer", "whiteSpace": "nowrap"}),
+                ]),
+            ]),
+            html.Div(style=_s, children=[
+                html.Label("ID (auto)", style={**_l, "color": "#9ca3af"}),
+                dcc.Input(id="prog-rpt-id", type="text", disabled=True,
+                          placeholder="auto-generated",
+                          style={**_i, "background": "#f3f4f6", "color": "#9ca3af"}),
+            ]),
+            html.Div(style=_s, children=[
+                html.Label("Report Name *", style=_l),
+                dcc.Input(id="prog-rpt-name", type="text",
+                          placeholder="Enter report name…", style=_i),
+            ]),
+            html.Div(style=_s, children=[
+                html.Label("Program", style=_l),
+                dcc.Dropdown(id="prog-rpt-program", options=program_opts,
+                             placeholder="Select program…", clearable=True,
+                             style={"fontSize": "12px"}),
+            ]),
+            html.Div(style=_s, children=[
+                html.Label("Type *", style=_l),
+                dcc.Dropdown(id="prog-rpt-type", options=type_opts,
+                             placeholder="LineList / PivotTable / CrossTab…",
+                             clearable=False, style={"fontSize": "12px"}),
+            ]),
+            html.Div(style=_s, children=[
+                html.Label("Unique Value", style=_l),
+                dcc.Dropdown(id="prog-rpt-unique-col", options=unique_opts,
+                             placeholder="person_id / encounter_id",
+                             clearable=True, style={"fontSize": "12px"}),
+            ]),
+            html.Div(style=_s, children=[
+                html.Label("Authorized Users", style=_l),
+                dcc.Dropdown(id="prog-rpt-auth-user", options=role_opts,
+                             placeholder="Select roles…", multi=True, clearable=True,
+                             style={"fontSize": "12px"}),
+            ]),
+            html.Div(style=_s, children=[
+                html.Label("Message", style=_l),
+                dcc.Textarea(id="prog-rpt-message", placeholder="Optional display message…",
+                             style={**_t, "height": "48px"}),
+            ]),
+            html.Div(style=_s, children=[
+                html.Label("Enable endpoint (/api/clinicalReports)", style=_l),
+                dcc.RadioItems(
+                        id='prog-rpt-enable-endpoint',
+                        options=[
+                            {'label': 'True', 'value': 'True'},
+                            {'label': 'False', 'value': 'False'},
+                        ],
+                        value='False'  # The default selected value
+                    )
+            ]),
+            html.Div(style=_s, children=[
+                html.Label("Endpoint site", style=_l),
+                dcc.Dropdown(id="prog-rpt-endpoint-routes", options=routes,
+                             placeholder="Select route…", multi=True, clearable=True,
+                             style={"fontSize": "12px"}),
+            ]),
+        ],
+    )
+
+    # RIGHT: LineList panel
+    ll_panel = html.Div(
+        id="prog-rpt-linelist-panel",
+        style={"display": "none", "flexDirection": "column", "gap": "8px",
+               "height": "100%", "overflowY": "auto", "padding": "14px"},
+        children=[
+            html.Div(style={"display": "flex", "justifyContent": "space-between",
+                            "alignItems": "center", "flexShrink": "0",
+                            "borderBottom": "2px solid #e5e7eb", "paddingBottom": "8px",
+                            "marginBottom": "4px"}, children=[
+                html.Span("Group Columns",
+                          style={"fontSize": "13px", "fontWeight": "700", "color": "#1e293b"}),
+                html.Button([DashIconify(icon="lucide:plus", width=13), " Add Group"],
+                            id="prog-rpt-add-group-btn", n_clicks=0,
+                            style={"padding": "4px 12px", "fontSize": "12px",
+                                   "background": "#16a34a", "color": "#fff",
+                                   "border": "none", "borderRadius": "4px",
+                                   "cursor": "pointer"}),
+            ]),
+            html.Div(id="prog-rpt-groups-container", style={"flexShrink": "0"}),
+            html.Hr(style={"margin": "6px 0", "borderColor": "#e5e7eb", "flexShrink": "0"}),
+            html.Div(style={"display": "flex", "gap": "12px", "flexWrap": "wrap",
+                            "flexShrink": "0"}, children=[
+                html.Div(style={"flex": "2", "minWidth": "100px"}, children=[
+                    html.Label("Columns Order (in display order)", style={**_l, "marginBottom": "4px"}),
+                    dcc.Textarea(id="prog-rpt-cols-order",
+                                 placeholder="Separated by pipe |",
+                                 style={**_t, "height": "100px"}),
+                ]),
+                html.Div(style={"flex": "1", "minWidth": "140px"}, children=[
+                    html.Label("Merge Methods (one per join)", style={**_l, "marginBottom": "4px"}),
+                    dcc.Dropdown(id="prog-rpt-merge-methods", options=merge_opts,
+                                 multi=True, placeholder="left / inner…",
+                                 style={"fontSize": "12px","height": "100px"}),
+                ]),
+                html.Div(style={"flex": "1", "minWidth": "200px"}, children=[
+                    html.Label("Global Rename (JSON)", style={**_l, "marginBottom": "4px"}),
+                    dcc.Textarea(id="prog-rpt-rename",
+                                 placeholder='{"given_name": "First Name", …}',
+                                 style={**_t, "height": "100px"}),
+                ]),
+            ]),
+        ],
+    )
+
+    # RIGHT: PivotTable / CrossTab panel
+    piv_panel = html.Div(
+        id="prog-rpt-pivot-panel",
+        style={"display": "none", "flexDirection": "column", "gap": "10px",
+               "height": "100%", "overflowY": "auto", "padding": "14px"},
+        children=[
+            html.Div(style={"display": "grid", "gridTemplateColumns": "1fr 1fr 1fr",
+                            "gap": "12px", "flexShrink": "0"}, children=[
+                html.Div(children=[
+                    html.Label("Index Column (Rows)", style=_l),
+                    dcc.Input(id="prog-rpt-index-col", type="text",
+                              placeholder="e.g. DrugName", style=_i),
+                ]),
+                html.Div(children=[
+                    html.Label("Columns", style=_l),
+                    dcc.Input(id="prog-rpt-columns-col", type="text",
+                              placeholder="e.g. Encounter", style=_i),
+                ]),
+                html.Div(children=[
+                    html.Label("Values Column", style=_l),
+                    dcc.Input(id="prog-rpt-values-col", type="text",
+                              placeholder="e.g. ValueN", style=_i),
+                ]),
+                html.Div(children=[
+                    html.Label("Aggregation Function", style=_l),
+                    dcc.Dropdown(id="prog-rpt-aggfunc", options=piv_aggr_opts,
+                                 placeholder="sum / count…", clearable=False,
+                                 style={"fontSize": "12px"}),
+                ]),
+                html.Div(children=[
+                    html.Label("Unique Column (dedup)", style=_l),
+                    dcc.Dropdown(id="prog-rpt-pivot-unique-col", options=unique_opts,
+                                 clearable=True, placeholder="encounter_id…",
+                                 style={"fontSize": "12px"}),
+                ]),
+                html.Div(id="prog-rpt-normalize-wrap", style={"display": "none"}, children=[
+                    html.Label("Normalize (CrossTab only)", style=_l),
+                    dcc.Dropdown(id="prog-rpt-normalize", options=normalize_opts,
+                                 clearable=True, placeholder="all / index / columns",
+                                 style={"fontSize": "12px"}),
+                ]),
+            ]),
+            html.Hr(style={"margin": "4px 0", "borderColor": "#e5e7eb", "flexShrink": "0"}),
+            html.Span("Filters (up to 3)",
+                      style={"fontSize": "12px", "fontWeight": "600", "color": "#374151",
+                             "flexShrink": "0"}),
+            html.Div(style={"display": "grid", "gridTemplateColumns": "1fr 1fr",
+                            "gap": "8px 14px", "flexShrink": "0"}, children=[
+                html.Div(children=[html.Label("Filter Column 1", style=_l),
+                                   dcc.Dropdown(id="prog-rpt-filter-col1", options=key_opts,
+                                                clearable=True, style={"fontSize": "12px"})]),
+                html.Div(children=[html.Label("Filter Value 1", style=_l),
+                                   dcc.Input(id="prog-rpt-filter-val1", type="text",
+                                             placeholder="Value…", style=_i)]),
+                html.Div(children=[html.Label("Filter Column 2", style=_l),
+                                   dcc.Dropdown(id="prog-rpt-filter-col2", options=key_opts,
+                                                clearable=True, style={"fontSize": "12px"})]),
+                html.Div(children=[html.Label("Filter Value 2", style=_l),
+                                   dcc.Input(id="prog-rpt-filter-val2", type="text",
+                                             placeholder="Value…", style=_i)]),
+                html.Div(children=[html.Label("Filter Column 3", style=_l),
+                                   dcc.Dropdown(id="prog-rpt-filter-col3", options=key_opts,
+                                                clearable=True, style={"fontSize": "12px"})]),
+                html.Div(children=[html.Label("Filter Value 3", style=_l),
+                                   dcc.Input(id="prog-rpt-filter-val3", type="text",
+                                             placeholder="Value…", style=_i)]),
+            ]),
+            html.Hr(style={"margin": "4px 0", "borderColor": "#e5e7eb", "flexShrink": "0"}),
+            html.Div(style={"display": "grid", "gridTemplateColumns": "1fr 1fr",
+                            "gap": "12px", "flexShrink": "0"}, children=[
+                html.Div(children=[html.Label("Rename (JSON)", style=_l),
+                                   dcc.Textarea(id="prog-rpt-tabular-rename",
+                                                placeholder='{"DrugName": "DRUG", …}',
+                                                style=_t)]),
+                html.Div(children=[html.Label("Replace (JSON)", style=_l),
+                                   dcc.Textarea(id="prog-rpt-tabular-replace",
+                                                placeholder='{"old": "new", …}',
+                                                style=_t)]),
+            ]),
+        ],
+    )
+
+    right_panel = html.Div(
+        style={"flex": "1", "display": "flex", "flexDirection": "column",
+               "minWidth": "0"},
+        children=[ll_panel, piv_panel],
+    )
+
+    return html.Div(
+        id="prog-report-modal",
+        style={"display": "none", "position": "fixed", "top": "0", "left": "0",
+               "width": "100vw", "height": "100vh", "zIndex": "2000",
+               "alignItems": "center", "justifyContent": "center",
+               "background": "rgba(0,0,0,0.45)"},
+        children=[
+            html.Div(
+                style={"width": "96vw", "height": "92vh", "background": "#fff",
+                       "borderRadius": "10px", "display": "flex",
+                       "flexDirection": "column", "overflow": "hidden",
+                       "boxShadow": "0 20px 60px rgba(0,0,0,0.35)"},
+                children=[
+                    html.Div(
+                        style={"display": "flex", "alignItems": "center", "gap": "12px",
+                               "padding": "10px 16px", "background": "#006401",
+                               "flexShrink": "0"},
+                        children=[
+                            html.Span("Create Program Reports",
+                                      style={"fontWeight": "700", "fontSize": "16px",
+                                             "color": "#fff", "marginRight": "8px",
+                                             "whiteSpace": "nowrap"}),
+                            html.Button([DashIconify(icon="lucide:save", width=15), " Save"],
+                                        id="prog-rpt-save-btn", n_clicks=0,
+                                        style={"padding": "5px 14px", "background": "#16a34a",
+                                               "color": "#fff", "border": "none",
+                                               "borderRadius": "5px", "cursor": "pointer",
+                                               "fontSize": "13px", "fontWeight": "600"}),
+                            html.Button([DashIconify(icon="lucide:trash-2", width=14), " Delete"],
+                                        id="prog-rpt-delete-btn", n_clicks=0,
+                                        style={"padding": "5px 14px", "background": "#dc2626",
+                                               "color": "#fff", "border": "none",
+                                               "borderRadius": "5px", "cursor": "pointer",
+                                               "fontSize": "13px"}),
+                            html.Span(id="prog-rpt-status",
+                                      style={"fontSize": "12px", "color": "#d1fae5",
+                                             "fontStyle": "italic", "minWidth": "80px"}),
+                            html.Button([DashIconify(icon="lucide:x", width=13), " Close"],
+                                        id="prog-rpt-close-btn", n_clicks=0,
+                                        style={"marginLeft": "auto", "padding": "5px 14px",
+                                               "background": "transparent", "color": "#fff",
+                                               "border": "1px solid rgba(255,255,255,0.4)",
+                                               "borderRadius": "5px", "cursor": "pointer",
+                                               "fontSize": "13px"}),
+                        ],
+                    ),
+                    html.Div(
+                        style={"display": "flex", "flex": "1", "overflow": "hidden"},
+                        children=[left_panel, right_panel],
+                    ),
+                ],
+            ),
+        ],
+    )

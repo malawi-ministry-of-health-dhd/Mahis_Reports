@@ -27,7 +27,7 @@ from mnid.views.kpi_engine import (
 )
 from mnid.core.data_utils import prepare_mnid_dataframe as _prepare_mnid_dataframe
 from mnid.dashboards import load_dashboard_module
-from mnid.views.executive_views import render_country_profile, render_operational_readiness
+from mnid.views.executive_views import render_country_profile, render_operational_readiness, _profile_scope_name
 from mnid.components.run_charts import (
     bucket_multi_series, bucket_time_series,
     _multi_run_chart, _run_chart, describe_grain_window,
@@ -72,14 +72,13 @@ def _mnid_loading_placeholder() -> html.Div:
     )
 
 
-def prewarm_cache(dataset_version: str | None = None) -> bool:
+def prewarm_cache(dataset_version: str | None = None, route: str = 'default') -> bool:
     """
     Pre-compute and cache the prepared MNID network DataFrame so the first
     user request hits a warm cache instead of running the 8-9s prepare step.
     Safe to call from a background thread at server startup.
     """
     try:
-        from config import DATA_FILE_NAME_
         from data_storage import DataStorage
 
         _mnid_cols = ', '.join([
@@ -89,10 +88,11 @@ def prewarm_cache(dataset_version: str | None = None) -> bool:
             'Home_district', 'TA', 'Village', 'Age', 'Age_Group', 'Gender',
             'Source_Program',
         ])
-        full = DataStorage.query_duckdb(f"SELECT {_mnid_cols} FROM '{DATA_FILE_NAME_}'")
+        full = DataStorage.query_duckdb(f"SELECT {_mnid_cols} FROM 'data/{route}/parquet'")
         full['Date'] = pd.to_datetime(full['Date'], errors='coerce')
 
         opd_key = (
+            route,
             dataset_version,
             len(full),
             tuple(full.columns.tolist()) if not full.empty else (),
@@ -103,7 +103,7 @@ def prewarm_cache(dataset_version: str | None = None) -> bool:
             return False
 
         _LOGGER.info('MNID pre-warm: preparing %d rows...', len(full))
-        net_df = _prepare_mnid_dataframe(full)
+        net_df = _prepare_mnid_dataframe(full, route=route)
         _network_df_cache[opd_key] = net_df
         _trim_cache(_network_df_cache, _NETWORK_DF_CACHE_MAX)
         _LOGGER.info('MNID pre-warm complete: %d rows cached', len(net_df))
@@ -163,7 +163,7 @@ def _prewarm_country_profile() -> bool:
 
             _LOGGER.info('MNID country-profile pre-warm: rendering...')
             country_label = 'Maternal & Newborn' if config.get('report_name') == 'Maternal Health' else 'Maternal'
-            cp_view = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label)
+            cp_view = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label, start_date=start_date, end_date=end_date)
             _MNID_EXECUTIVE_DISK_CACHE.set(_cp_disk_key, cp_view, expire=_MNID_UI_CACHE_TTL_SECONDS)
             _worker_view_cache[_cp_disk_key] = cp_view
             _trim_cache(_worker_view_cache, _WORKER_VIEW_CACHE_MAX)
@@ -246,7 +246,7 @@ def _build_executive_tab_view(
         if cp_cached is None:
             cp_cached = _MNID_EXECUTIVE_DISK_CACHE.get(_cp_disk_key)
         if cp_cached is None:
-            cp_cached = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label)
+            cp_cached = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label, start_date=start_date, end_date=end_date)
             _MNID_EXECUTIVE_DISK_CACHE.set(_cp_disk_key, cp_cached, expire=_MNID_UI_CACHE_TTL_SECONDS)
         _worker_view_cache[_cp_disk_key] = cp_cached
         _trim_cache(_worker_view_cache, _WORKER_VIEW_CACHE_MAX)
@@ -296,7 +296,7 @@ def _build_executive_tab_view(
     return views.get('country-profile', html.Div())
 
 
-def _render_beginnings_shell(initial_tab: str, hidden_mnid_tabs: set[str], newborn_config, initial_children=None) -> html.Div:
+def _render_beginnings_shell(initial_tab: str, hidden_mnid_tabs: set[str], newborn_config, initial_children=None, scope_meta: dict | None = None) -> html.Div:
     _tab_style = {
         'padding': '10px 18px',
         'borderRadius': '12px',
@@ -314,8 +314,9 @@ def _render_beginnings_shell(initial_tab: str, hidden_mnid_tabs: set[str], newbo
     }
     _tab_active2 = dict(_tab_active, backgroundColor='#F8FAFC')
 
+    _profile_tab_label = _profile_scope_name(scope_meta)['tab_label']
     tab_children = [
-        dcc.Tab(label='Country Profile', value='country-profile', style=_tab_style, selected_style=_tab_active),
+        dcc.Tab(label=_profile_tab_label, value='country-profile', style=_tab_style, selected_style=_tab_active),
     ]
     if 'operational-readiness' not in hidden_mnid_tabs:
         tab_children.append(
@@ -359,6 +360,7 @@ def _render_mnh_dashboard_view(selected_view: str, state: dict, views: dict):
             hidden_mnid_tabs=hidden_mnid_tabs,
             newborn_config=state.get('newborn_config'),
             initial_children=[_mnid_loading_placeholder()],
+            scope_meta=state.get('scope_meta'),
         )
 
     if selected_view == 'mnh-moh':
@@ -424,17 +426,36 @@ def _render_mnh_dashboard_view(selected_view: str, state: dict, views: dict):
     return _render_mnh_placeholder(label_map.get(selected_view, selected_view))
 
 
-def render_mnid_dashboard(
-    data_opd, config, facility_code, start_date, end_date,
-    scope_meta: dict | None = None,
-    initial_tab: str | None = None,
-):
+_MNID_SQL_COLUMNS = "*" #kept all for now
+def render_mnid_dashboard(filtered, data_opd, data_path, config, 
+                          facility_code, start_date, end_date,
+                          scope_meta: dict | None = None,
+                          initial_tab: dict | None = None):
+    
+    if isinstance(filtered, str):
+        source_path = Path(data_path)
+        if not source_path.is_absolute():
+            source_path = Path.cwd() / source_path
+        if not source_path.exists():
+            return html.Div(
+                'The local MAHIS dataset is unavailable for this dashboard.',
+                style={'padding': '24px', 'color': '#64748B'},
+            )
+        from data_storage import DataStorage as _DS
+        filtered = _DS.query_duckdb(
+            f"SELECT {_MNID_SQL_COLUMNS} FROM '{data_path}' WHERE {filtered}"
+        )
+        data_opd = _DS.query_duckdb(
+            f"SELECT {_MNID_SQL_COLUMNS} FROM '{data_path}' WHERE {data_opd}"
+        )
+    route               = (scope_meta or {}).get('route', 'default')
     dataset_version     = (scope_meta or {}).get('dataset_version')
     selected_programs   = tuple(sorted((scope_meta or {}).get('mnid_categories') or []))
     selected_facilities = tuple(sorted((scope_meta or {}).get('selected_facilities') or []))
     selected_districts  = tuple(sorted((scope_meta or {}).get('selected_districts') or []))
 
     _opd_key = (
+        route,
         dataset_version,
         len(data_opd),
         tuple(data_opd.columns.tolist()) if not data_opd.empty else (),
@@ -442,7 +463,7 @@ def render_mnid_dashboard(
         selected_districts,
     )
     if _opd_key not in _network_df_cache:
-        _network_df_cache[_opd_key] = _prepare_mnid_dataframe(data_opd)
+        _network_df_cache[_opd_key] = _prepare_mnid_dataframe(data_opd, route=route)
         _trim_cache(_network_df_cache, _NETWORK_DF_CACHE_MAX)
     network_df = _network_df_cache[_opd_key]
 
@@ -477,6 +498,7 @@ def render_mnid_dashboard(
         f'ed:{executive_token}',
         {
             'opd_key':           _opd_key,
+            'route':             route,
             'config':            config,
             'facility_code':     facility_code,
             'start_date':        start_date,
@@ -514,7 +536,7 @@ def render_mnid_dashboard(
         ))
         cp_cached = _MNID_EXECUTIVE_DISK_CACHE.get(_cp_disk_key)
         if cp_cached is None:
-            cp_cached = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label)
+            cp_cached = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label, start_date=start_date, end_date=end_date)
             _MNID_EXECUTIVE_DISK_CACHE.set(_cp_disk_key, cp_cached, expire=_MNID_UI_CACHE_TTL_SECONDS)
         executive_content['country-profile'] = cp_cached
         _initial_ec = [executive_content['country-profile']]
@@ -526,6 +548,7 @@ def render_mnid_dashboard(
         hidden_mnid_tabs=_load_dashboard_tab_config().get('hidden_mnid_tabs', set()),
         newborn_config=newborn_config,
         initial_children=_initial_ec,
+        scope_meta=scope_meta,
     )
 
     mnh_tab_specs = _load_dashboard_tab_config().get('mnh_tabs', [])

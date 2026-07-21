@@ -142,20 +142,37 @@ def _filter_columns_missing(df: pd.DataFrame, cfg: dict | None) -> list[str]:
 
 # MNID data helpers
 
-def _cov(df, n_cfg, d_cfg):
+def _mask(df: pd.DataFrame, cfg: dict) -> pd.Series:
+    """Boolean row mask from a filter config dict (variable1/value1 ... variable10/value10)."""
+    mask = pd.Series(True, index=df.index)
+    for i in range(1, 11):
+        var = cfg.get(f'variable{i}')
+        val = cfg.get(f'value{i}')
+        if not var or not val:
+            break
+        if var not in df.columns:
+            return pd.Series(False, index=df.index)
+        mask &= df[var].isin(val) if isinstance(val, list) else (df[var] == val)
+    return mask
+
+
+def _cov(df, n_cfg, d_cfg, data_path=None):
     num_missing = _filter_columns_missing(df, n_cfg)
     den_missing = _filter_columns_missing(df, d_cfg)
     if num_missing:
         _warn_once(f"MNID numerator filter references missing columns: {', '.join(num_missing)}")
     if den_missing:
         _warn_once(f"MNID denominator filter references missing columns: {', '.join(den_missing)}")
+    unique_col = (n_cfg or {}).get('unique', 'person_id') or 'person_id'
     try:
-        num = int(create_count_from_config(df, n_cfg) or 0)
+        nm = _mask(df, n_cfg or {})
+        num = int(df.loc[nm, unique_col].dropna().nunique()) if unique_col in df.columns else int(nm.sum())
     except Exception as exc:
         _warn_once(f"MNID numerator count failed for config {n_cfg}: {exc}")
         num = 0
     try:
-        den = int(create_count_from_config(df, d_cfg) or 0)
+        dm = _mask(df, d_cfg or {})
+        den = int(df.loc[dm, unique_col].dropna().nunique()) if unique_col in df.columns else int(dm.sum())
     except Exception as exc:
         _warn_once(f"MNID denominator count failed for config {d_cfg}: {exc}")
         den = 0
@@ -166,13 +183,13 @@ def _cov(df, n_cfg, d_cfg):
     return num, den, pct
 
 
-def _monthly(df, n_cfg, d_cfg, n=6):
+def _monthly(df, n_cfg, d_cfg, n=6, data_path=None):
     if 'Date' not in df.columns or not len(df): return []
     try:
         periods = pd.to_datetime(df['Date'], errors='coerce').dt.to_period('M')
         months = sorted(periods.dropna().unique())[-n:]
         return [{'x': datetime(m.year, m.month, 1),
-                 'pct': _cov(df[periods == m], n_cfg, d_cfg)[2]}
+                 'pct': _cov(df[periods == m], n_cfg, d_cfg, data_path)[2]}
                 for m in months]
     except Exception as exc:
         _warn_once(f"MNID monthly series build failed for numerator {n_cfg} / denominator {d_cfg}: {exc}")

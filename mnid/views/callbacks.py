@@ -90,14 +90,16 @@ def sync_district_focus_from_treemap(click_data, stored):
     Output('mnid-performance-attention', 'children'),
     Input('mnid-performance-indicators', 'value'),
     Input('mnid-performance-district', 'value'),
-    Input('mnid-performance-year', 'value'),
     State('mnid-heatmap-store', 'data'),
     prevent_initial_call=True,
 )
-def update_performance_heatmap(sel_inds, sel_districts, sel_year, stored):
+def update_performance_heatmap(sel_inds, sel_districts, stored):
     if not stored:
         return html.Div(), html.Div(), html.Div()
-    year     = sel_year or 'All years'
+    # Sentinel key the precompute store still uses internally -- there's only
+    # ever one bucket now, scoped to the main date-range picker, not a
+    # user-selectable year.
+    year     = 'All years'
     district = sel_districts or None
     table    = _build_facility_performance_heatmap_fig(stored, year, district, sel_inds)
     gauges   = _build_district_gauge_row(stored, year)
@@ -138,8 +140,9 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
 
     store_payload = stored or {}
     tracked = store_payload.get('tracked', [])
+    compare_route = store_payload.get('route', 'default')
 
-    _compare_agg_check  = _get_aggregate()
+    _compare_agg_check  = _get_aggregate(route=compare_route)
     mch_full_fallback   = _restore_ui_dataframe(store_payload.get('data_key'))
     mch_full            = pd.DataFrame() if _compare_agg_check is not None else (mch_full_fallback if mch_full_fallback is not None else pd.DataFrame())
 
@@ -227,7 +230,7 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
     }
     period_code, period_fmt, max_periods = _grain_cfg.get(time_grain, _grain_cfg['monthly'])
 
-    _compare_agg = _get_aggregate()
+    _compare_agg = _get_aggregate(route=compare_route)
     if _compare_agg is None:
         d2 = mch_full.copy()
         d2['_period'] = pd.to_datetime(d2['Date']).dt.to_period(period_code)
@@ -258,7 +261,8 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
                     ys    = [y if (series['denominator'].iloc[i] > 0) else None for i, y in enumerate(ys)]
                     texts = [f'{y:.0f}%' if y is not None else 'No data' for y in ys]
 
-            if not xs and mch_full_fallback is not None and not mch_full_fallback.empty and 'Date' in mch_full_fallback.columns:
+            _has_filters = ind.get('numerator_filters') and ind.get('denominator_filters')
+            if not xs and _has_filters and mch_full_fallback is not None and not mch_full_fallback.empty and 'Date' in mch_full_fallback.columns:
                 _col = 'Facility_CODE' if mode == 'facility' else 'District'
                 if _col in mch_full_fallback.columns:
                     _efb = mch_full_fallback[mch_full_fallback[_col].astype(str) == str(entity)].copy()
@@ -274,7 +278,7 @@ def update_compare_charts(mode, selected_entities, time_grain, selected_ind_ids,
             # Last resort: scan raw entity df directly. Runs when the aggregate had no
             # matching rows (e.g. stale aggregate with old indicator IDs) AND the UI
             # cache was cold. mch_full contains the full scoped dataframe.
-            if not xs:
+            if not xs and _has_filters:
                 entity_df = get_df(entity)
                 if entity_df.empty:
                     continue
@@ -419,7 +423,6 @@ def register_mnid_callbacks(app) -> None:
         Output('mnid-performance-attention', 'children'),
         Input('mnid-performance-indicators', 'value'),
         Input('mnid-performance-district', 'value'),
-        Input('mnid-performance-year', 'value'),
         State('mnid-heatmap-store', 'data'),
         prevent_initial_call=True,
     )(update_performance_heatmap)

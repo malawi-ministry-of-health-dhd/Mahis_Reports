@@ -10,30 +10,27 @@ from typing import Optional, Dict, Any, Generator
 import warnings
 warnings.filterwarnings("ignore")
 from config import (BATCH_SIZE, DB_CONFIG, SSH_CONFIG, USE_LOCALHOST,
-                    DB_CONFIG_LOCAL, START_DATE, 
-                    LOAD_FRESH_DATA, DATE_, GENDER_, 
-                    ENCOUNTER_ID_, DATA_FILE_NAME_)
+                    START_DATE, LOAD_FRESH_DATA, DATA_PATH_)
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 if LOAD_FRESH_DATA:
     # drop file latest_data_opd.parquet if exists in data folder
-    file_path = os.path.join(os.getcwd(), DATA_FILE_NAME_)
+    file_path = os.path.join(os.getcwd(), DATA_PATH_)
     if os.path.exists(file_path):
         os.rename(file_path, f"{file_path}_backup")
         logger.info("Removed existing data file for fresh load.")
 
 class DataFetcher:
-    def __init__(self, use_localhost=USE_LOCALHOST, ssh_config=SSH_CONFIG, 
-                 db_config=DB_CONFIG, db_config_local=DB_CONFIG_LOCAL,start_date=START_DATE, 
+    def __init__(self, use_localhost=USE_LOCALHOST, ssh_config=SSH_CONFIG,
+                 db_config=DB_CONFIG, start_date=START_DATE,
                  load_fresh_data=LOAD_FRESH_DATA, single_tables_folder="data/single_tables",
                  batch_size=BATCH_SIZE, batch_folder="data/batches"):
         self.use_localhost = use_localhost
         self.load_fresh_data = load_fresh_data
         self.ssh_config = ssh_config
         self.db_config = db_config
-        self.db_config_local = db_config_local
         self.batch_size = batch_size
         self.batch_folder = batch_folder
         self.single_tables_folder = single_tables_folder
@@ -42,6 +39,31 @@ class DataFetcher:
         # Ensure batch folder exists
         os.makedirs(os.path.join(self.path, batch_folder), exist_ok=True)
     
+    def _build_tunnel_kwargs(self) -> dict:
+        """
+        Build SSHTunnelForwarder keyword arguments from ssh_config.
+        Handles two mutually exclusive auth modes:
+          - password auth: ssh_config contains 'ssh_password'
+          - key-file auth: ssh_config contains 'ssh_pkey'
+        """
+        cfg = self.ssh_config
+        kwargs = {
+            'ssh_username':         cfg.get('ssh_user', 'ubuntu'),
+            'remote_bind_address':  tuple(cfg['remote_bind_address']),
+        }
+        ssh_port = cfg.get('ssh_port', 22)
+
+        if cfg.get('ssh_password'):
+            kwargs['ssh_password'] = cfg['ssh_password']
+        elif cfg.get('ssh_pkey'):
+            pkey_path = cfg['ssh_pkey']
+            # Prepend the ssh/ directory if only a filename is given
+            if not os.path.isabs(pkey_path) and not pkey_path.startswith('ssh/'):
+                pkey_path = os.path.join('ssh', pkey_path)
+            kwargs['ssh_pkey'] = pkey_path
+
+        return (cfg['ssh_host'], ssh_port), kwargs
+
     def _get_db_connection(self, tunnel=None) -> pymysql.Connection:
         """
         Establish database connection with SSL support if configured
@@ -73,13 +95,13 @@ class DataFetcher:
                     read_timeout=3600,
                 )
             else:
-                # Local connection (no SSL)
+                # Local connection (no SSH, no SSL) — uses the same db_config
                 conn = pymysql.connect(
-                    host=self.db_config_local.get('host', 'localhost'),
-                    port=self.db_config_local.get('port', 3306),
-                    user=self.db_config_local['user'],
-                    password=self.db_config_local['password'],
-                    database=self.db_config_local['database'],
+                    host=self.db_config.get('host', 'localhost'),
+                    port=self.db_config.get('port', 3306),
+                    user=self.db_config['user'],
+                    password=self.db_config['password'],
+                    database=self.db_config['database'],
                     connect_timeout=30,
                     read_timeout=1800,
                 )
@@ -178,13 +200,8 @@ class DataFetcher:
                                                      id_column, start_date)
                 conn.close()
             elif self.ssh_config:
-                with SSHTunnelForwarder(
-                    (self.ssh_config['ssh_host'], 22),
-                    ssh_username=self.ssh_config['ssh_user'],
-                    ssh_password=self.ssh_config.get('ssh_password'),
-                    ssh_private_key=f"ssh/{self.ssh_config['ssh_pkey']}",
-                    remote_bind_address=self.ssh_config['remote_bind_address']
-                ) as tunnel:
+                _tunnel_host, _tunnel_kwargs = self._build_tunnel_kwargs()
+                with SSHTunnelForwarder(_tunnel_host, **_tunnel_kwargs) as tunnel:
                     logger.info(f"SSH tunnel established on port {tunnel.local_bind_port}")
                     conn = self._get_db_connection(tunnel)
                     batch_paths = self._fetch_in_batches(conn, query_template, date_column,
@@ -293,7 +310,7 @@ class DataFetcher:
         
         return batch_paths  # Return list of file paths only
     
-    def fetch_single_table(self, table_name: str, query: str, output_format: str = 'csv') -> pd.DataFrame:
+    def fetch_single_table(self, table_name: str, query: str,output_folder, output_format: str = 'csv') -> pd.DataFrame:
         """
         Fetch data from single table and save as CSV
         
@@ -312,13 +329,8 @@ class DataFetcher:
                 df = pd.read_sql(query, conn)
                 conn.close()
             elif self.ssh_config:
-                with SSHTunnelForwarder(
-                    (self.ssh_config['ssh_host'], 22),
-                    ssh_username=self.ssh_config['ssh_user'],
-                    ssh_password=self.ssh_config.get('ssh_password'),
-                    ssh_private_key=f"ssh/{self.ssh_config['ssh_pkey']}",
-                    remote_bind_address=self.ssh_config['remote_bind_address']
-                ) as tunnel:
+                _tunnel_host, _tunnel_kwargs = self._build_tunnel_kwargs()
+                with SSHTunnelForwarder(_tunnel_host, **_tunnel_kwargs) as tunnel:
                     logger.info(f"SSH tunnel established on port {tunnel.local_bind_port}")
                     conn = self._get_db_connection(tunnel)
                     df = pd.read_sql(query, conn)
@@ -328,20 +340,15 @@ class DataFetcher:
                 df = pd.read_sql(query, conn)
                 conn.close()
             
-            # Save to file
-            output_path = os.path.join(self.path, self.single_tables_folder, f"{table_name}.{output_format}")
-            os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else '.', exist_ok=True)
-            
+            output_path = os.path.join(output_folder, f"{table_name}.{output_format}")
             if output_format == 'csv':
                 df.to_csv(output_path, index=False)
             elif output_format == 'parquet':
                 df.to_parquet(output_path, index=False, engine='pyarrow')
             else:
                 raise ValueError(f"Unsupported output format: {output_format}")
-            
             logger.info(f"Saved {table_name} to {output_path} ({len(df)} rows)")
-            return df
-            
+            return
         except Exception as e:
             logger.error(f"Error fetching single table {table_name}: {e}")
             raise

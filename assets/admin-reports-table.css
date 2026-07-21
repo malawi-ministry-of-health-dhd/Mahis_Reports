@@ -90,9 +90,9 @@
     margin-bottom: 32px;
 }
 
-.reports-title {
+.reports-title-admin {
     color: #2c3e50;
-    font-size: 1.5rem;
+    font-size: 1.2rem;
     font-weight: 600;
     margin-bottom: 12px;
 }
@@ -132,6 +132,10 @@
     transform: translateX(2px);
 }
 
+.rpt-tbl-row:hover {
+    background: #efefec !important;
+}
+
 .reports-table-cell {
     padding: 14px 16px;
     color: #495057;
@@ -164,7 +168,7 @@
 }
 
 .edit-btn:hover {
-    background: #e0a800;
+    background: #218838;
     transform: scale(1.05);
     box-shadow: 0 2px 8px rgba(255, 193, 7, 0.3);
 }

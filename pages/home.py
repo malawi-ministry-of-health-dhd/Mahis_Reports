@@ -1,34 +1,41 @@
 import dash
-from dash import html, dcc, Input, Output, callback, State, no_update, ALL, callback_context
+from dash import html, dcc, Input, Output, callback, State, no_update, ALL, callback_context, ctx
 import pandas as pd
 import plotly.express as px
 import os
 import json
 import numpy as np
+from pathlib import Path
 from dash.exceptions import PreventUpdate
 from flask import request
 from helpers.helpers import build_charts_section, build_metrics_section
 from mnid_renderer import render_mnid_dashboard
+from mnid.core.data_utils import resolve_facility_level
 from dashboard_layouts import build_premium_dashboard
+from helpers.visualizations import create_line_list_basic_modal
 from datetime import datetime
 from datetime import datetime as dt
 from data_storage import DataStorage
-from config import DATA_FILE_NAME_,CUSTOM_GENDER_MAP
+from config import CUSTOM_GENDER_MAP
 import warnings
+import duckdb
 warnings.filterwarnings("ignore")
 from helpers.date_ranges import (
                     get_relative_date_range,
                     RELATIVE_PERIOD_LIST
             )
-from helpers.navigation_callbacks import DEMO_UUID, DEMO_LOCATION
+from dash_iconify import DashIconify
+
+def nav_icon(icon_name):
+    return DashIconify(icon=icon_name, className="nav-icon")
 
 # Importing parquet file path and from config
 
 # importing referential columns from config
 from config import (actual_keys_in_data, 
-                    DATA_FILE_NAME_, 
+                    DATA_PATH_, DEMO_UUID, DEMO_LOCATION,
                     DATE_, PERSON_ID_, ENCOUNTER_ID_,
-                    FACILITY_, AGE_GROUP_, AGE_,
+                    FACILITY_,DISTRICT_, AGE_GROUP_, AGE_,
                     GENDER_, ENCOUNTER_, PROGRAM_,
                     NEW_REVISIT_, 
                     HOME_DISTRICT_, 
@@ -40,7 +47,8 @@ from config import (actual_keys_in_data,
                     VALUE_,
                     VALUE_NUMERIC_,
                     DRUG_NAME_,
-                    VALUE_NAME_)
+                    VALUE_NAME_,
+                    MNID_DATA_SOURCE)
 
 dash.register_page(__name__, path="/home")
 
@@ -55,7 +63,7 @@ _mnid_full_data_cache: dict = {}
 _dashboard_data_cache: dict = {}
 _dashboard_filter_cache: dict = {}
 DEFAULT_DASHBOARD_DAYS = 7
-DEFAULT_RELATIVE_PERIOD = 'This Month'
+DEFAULT_RELATIVE_PERIOD = 'Today'
 _LATEST_DATA_DATE_CACHE: dict[str, pd.Timestamp | None] = {}
 _MNID_FULL_CACHE_MAX = 6
 _DASHBOARD_DATA_CACHE_MAX = 4
@@ -153,31 +161,52 @@ def _start_mnid_prewarm(version: str | None = None):
     _log.info('MNID pre-warm thread started')
 
 
-def _latest_available_date() -> pd.Timestamp | None:
-    cache_key = f'{DATA_FILE_NAME_}:{_dataset_version_token()}'
+def _latest_available_date(route: str = 'default') -> pd.Timestamp | None:
+    route_data_path = f'data/{route}/parquet'
+    cache_key = f'{route_data_path}:{_dataset_version_token(route)}'
     if cache_key in _LATEST_DATA_DATE_CACHE:
         return _LATEST_DATA_DATE_CACHE[cache_key]
     try:
-        latest = DataStorage.query_duckdb(f"SELECT MAX(Date) AS max_date FROM '{DATA_FILE_NAME_}'")
+        latest = DataStorage.query_duckdb(f"SELECT MAX(Date) AS max_date FROM '{route_data_path}'")
         max_date = pd.to_datetime(latest.loc[0, 'max_date'], errors='coerce') if len(latest) else pd.NaT
     except Exception:
         max_date = pd.NaT
+    if pd.isna(max_date):
+        hmis_path = Path(path) / 'mnid' / 'data' / 'dhis2' / 'aggregates' / 'hmis_test.parquet'
+        if hmis_path.exists():
+            try:
+                latest = pd.read_parquet(hmis_path, columns=['period_start'])['period_start'].max()
+                max_date = pd.to_datetime(latest, errors='coerce')
+            except Exception:
+                max_date = pd.NaT
     resolved = None if pd.isna(max_date) else max_date.normalize()
     _LATEST_DATA_DATE_CACHE.clear()
     _LATEST_DATA_DATE_CACHE[cache_key] = resolved
     return resolved
 
 
-def _default_date_window():
-    latest = _latest_available_date()
+def _default_date_window(route: str = 'default'):
+    route_data_path = Path(path) / 'data' / route / 'parquet'
+    hmis_path = Path(path) / 'mnid' / 'data' / 'dhis2' / 'aggregates' / 'hmis_test.parquet'
+    if not route_data_path.exists() and hmis_path.exists():
+        try:
+            periods = pd.to_datetime(
+                pd.read_parquet(hmis_path, columns=['period_start'])['period_start'],
+                errors='coerce',
+            ).dropna()
+            if not periods.empty:
+                return periods.min().date(), periods.max().date()
+        except Exception:
+            pass
+    latest = _latest_available_date(route)
     anchor = latest.date() if latest is not None else datetime.now().date()
     start = anchor - pd.Timedelta(days=29)
     return start, anchor
 
 
-def _dataset_version_token() -> str:
-    timestamp_path = os.path.join(path, 'data', 'TimeStamp.csv')
-    data_path = os.path.join(path, 'data', DATA_FILE_NAME_)
+def _dataset_version_token(route: str = 'default') -> str:
+    timestamp_path = os.path.join(path, f'data/{route}', 'TimeStamp.csv')
+    data_path = os.path.join(path, f'data/{route}', 'parquet')
     parts = []
     try:
         parts.append(str(os.path.getmtime(data_path)))
@@ -190,7 +219,7 @@ def _dataset_version_token() -> str:
     return '|'.join(parts)
 
 
-_start_mnid_prewarm(_dataset_version_token())
+# _start_mnid_prewarm(_dataset_version_token())
 
 
 def clear_dashboard_state_cache() -> None:
@@ -199,21 +228,22 @@ def clear_dashboard_state_cache() -> None:
     _dashboard_filter_cache.clear()
 
 
-def _load_user_registry() -> pd.DataFrame:
-    user_data_path = os.path.join(path, 'data','single_tables', 'users_data.csv')
+def _load_user_registry(route) -> pd.DataFrame:
+    user_data_path = os.path.join(path, f'data/{route}','single_tables', 'users_data.csv')
 
     if os.path.exists(user_data_path):
         user_data = pd.read_csv(user_data_path)
     else:
-        user_data = pd.DataFrame(columns=['uuid', 'role'])
-
+        user_data = pd.DataFrame(columns=['user_id','uuid', 'role','user_level','district','facility_name','facility_code'])
     demo_row = {
+        'user_id':1000000,
         'uuid': DEMO_UUID,
         'role': 'reports_admin',
         'user_level': 'national',
-        'district': None,
+        'district': ["Salima"],
         'facility_name': None,
         'facility_code': DEMO_LOCATION,
+        'assigned_facility':'Biwi Health Centre'
     }
 
     user_data = pd.concat([user_data, pd.DataFrame([demo_row])], ignore_index=True)
@@ -247,44 +277,58 @@ def _normalize_level(value: str | None) -> str:
     value = str(value or '').strip().lower()
     if value in {'national', 'district', 'facility'}:
         return value
-    return 'national'
+    return 'facility'
 
 
 def _title_level(value: str) -> str:
     return {'national': 'National', 'district': 'District', 'facility': 'Facility'}.get(value, 'Facility')
 
 
-def _districts_for_facilities(data: pd.DataFrame, facilities: list[str], district_col: str | None) -> list[str]:
-    if data is None or data.empty or not facilities or not district_col or district_col not in data.columns or FACILITY_ not in data.columns:
+def _load_user_properties(route) -> list:
+    props_path = os.path.join(os.getcwd(), f'data/{route}', 'dcc_dropdown_json', 'user_properties.json')
+    try:
+        with open(props_path) as f:
+            return json.load(f).get('users', [])
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
         return []
-    subset = data[data[FACILITY_].isin(facilities)]
-    if subset.empty:
-        return []
-    return (
-        subset[district_col]
-        .dropna()
-        .astype(str)
-        .sort_values()
-        .unique()
-        .tolist()
-    )
 
 
 def _resolve_user_scope(urlparams, user_data: pd.DataFrame):
     requested_uuid = urlparams.get('uuid', [None])[0] if urlparams else None
+    data_route = urlparams.get('route', ["default"])[0] if urlparams else None
+
+    # Check user_properties.json first (GUI-configured overrides)
+    for entry in _load_user_properties(data_route):
+        p = entry.get('properties', {})
+        if p.get('uuid') == requested_uuid:
+            level     = _normalize_level(p.get('user_level'))
+            districts = p.get('district')
+            if isinstance(districts, str):
+                districts = [districts] if districts else []
+            facilities = p.get('facility_name')
+            if isinstance(facilities, str):
+                facilities = [facilities] if facilities else []
+            scope = {
+                'level':      level,
+                'districts':  districts  or [],
+                'facilities': facilities or [],
+                'facility_code': p.get('facility_code'),
+            }
+            # Still return a dataframe row so callers that use row.get(...) don't break
+            user_info = user_data[user_data['uuid'] == requested_uuid]
+            row = user_info.iloc[0] if not user_info.empty else None
+            return row, scope
+
+    # Fall back to users_data dataframe
     user_info = user_data[user_data['uuid'] == requested_uuid]
     if user_info.empty:
         return None, {}
-    row = user_info.iloc[0]
-    districts = row.get('district')
-    facilities = row.get('facility_name')
+    row   = user_info.iloc[0]
     level = _normalize_level(row.get('user_level'))
     scope = {
-        'level': level,
-        'districts': districts,
-        'facilities': facilities,
-        'district': districts[0] if isinstance(districts, list) and districts else districts,
-        'facility_name': facilities[0] if isinstance(facilities, list) and facilities else facilities,
+        'level':      level,
+        'districts':  row.get('district'),
+        'facilities': row.get('facility_name'),
         'facility_code': row.get('facility_code'),
     }
     return row, scope
@@ -318,7 +362,8 @@ def load_dashboard_menu():
 
 def load_dashboard_tab_config():
     raw_config = {}
-    config_path = dashboard_tabs_config_path if os.path.exists(dashboard_tabs_config_path) else dashboard_tabs_example_config_path
+    config_path = json_path
+    # config_path = dashboard_tabs_config_path if os.path.exists(dashboard_tabs_config_path) else dashboard_tabs_example_config_path
     try:
         with open(config_path, 'r') as f:
             raw_config = json.load(f) or {}
@@ -385,8 +430,9 @@ def get_enabled_dashboard_menu():
     return filtered_menu, config
 
 def get_dashboard_names():
-    menu_json, _ = get_enabled_dashboard_menu()
-    return [d.get("report_name") for d in menu_json if d.get("report_name")]
+    menu_items = [d.get("report_name") for d in load_dashboard_menu() 
+                  if d.get("report_name")]
+    return menu_items
 
 def normalize_report_name(name, menu_json):
     if not name:
@@ -410,26 +456,52 @@ min_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 max_date = datetime.now().replace(hour=23, minute=59, second=59, microsecond=0)
 
 path = os.getcwd()
-try:
-    last_refreshed = pd.read_csv(f'{path}/data/TimeStamp.csv')['saving_time'].to_list()[0]
-except Exception as e:
-    last_refreshed = "Unknown"
-
 
 # BUILD CHARTS
 PREMIUM_DASHBOARD_REPORTS = {"Maternal and Child Health"}
 
+def _scope_where_parts(effective_level, location, districts, user_districts, facilities, age, is_network=False):
+    """Return SQL WHERE clause parts for the given scope and level.
 
-def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json, filter_summary=None,
-                          start_date=None, end_date=None, facility_code=None, scope_meta=None, url_object=None,
-                          initial_tab=None):
+    is_network=True omits the per-facility filter so the network query covers
+    the full district/national context for trend comparison.
+    """
+    parts = []
+    if effective_level == 'facility':
+        if not is_network and location:
+            parts.append(f"{FACILITY_CODE_} = '{location}'")
+    elif effective_level == 'district':
+        active_dists = districts or user_districts
+        if active_dists:
+            quoted_dists = ", ".join([f"'{d}'" for d in active_dists])
+            parts.append(f"{DISTRICT_} IN ({quoted_dists})")
+        if not is_network and facilities:
+            quoted_facilities = ", ".join([f"'{f}'" for f in facilities])
+            parts.append(f"{FACILITY_} IN ({quoted_facilities})")
+    elif effective_level == 'national':
+        if districts:
+            quoted_dists = ", ".join([f"'{d}'" for d in districts])
+            parts.append(f"{DISTRICT_} IN ({quoted_dists})")
+        if not is_network and facilities:
+            quoted_facilities = ", ".join([f"'{f}'" for f in facilities])
+            parts.append(f"{FACILITY_} IN ({quoted_facilities})")
+    if age:
+        parts.append(f"{AGE_GROUP_} = '{age}'")
+    return parts
+
+
+def build_charts_from_json(filtered_query, filtered_with_range_query, delta_days, dashboards_json, filter_summary=None,
+                          start_date=None, end_date=None, data_path=DATA_PATH_, facility_code=None, scope_meta=None, url_object=None, initial_tab=None):
+    
     config = dashboards_json
     count_items_per_row = config.get("count_items_per_row") or 5
 
     # Route MNID dashboard configs to the dedicated MNID renderer.
     if config.get('dashboard_type') == 'mnid':
         return render_mnid_dashboard(
-            data_opd=data_opd,
+            filtered=filtered_query,
+            data_opd=filtered_with_range_query,
+            data_path=data_path,
             config=config,
             facility_code=facility_code or 'Unknown',
             start_date=str(start_date)[:10] if start_date else '',
@@ -437,18 +509,12 @@ def build_charts_from_json(filtered, data_opd, delta_days, dashboards_json, filt
             scope_meta=scope_meta,
             initial_tab=initial_tab,
         )
-
-    # Render all non-MNID dashboards with the generic chart builder.
-    filtered = filtered
-    filtered['Residence'] = filtered[HOME_DISTRICT_] + ', TA-' + filtered[TA_] + ', ' + filtered[VILLAGE_]
-    delta_days = 7 if delta_days < 7 else delta_days
-
     if config.get("report_name") in PREMIUM_DASHBOARD_REPORTS:
-        return build_premium_dashboard(filtered, data_opd, delta_days, config, filter_summary=filter_summary)
+        return build_premium_dashboard(filtered_query, filtered_with_range_query, delta_days, config, filter_summary=filter_summary)
 
     # Build metrics from counts section
-    metrics = build_metrics_section(filtered, config["visualization_types"]["counts"], url_object)
-    charts = build_charts_section(filtered, data_opd, delta_days, config["visualization_types"]["charts"]["sections"])
+    metrics = build_metrics_section(filtered_query,filtered_with_range_query, delta_days, data_path, config["visualization_types"]["counts"], url_object)
+    charts = build_charts_section(filtered_query, filtered_with_range_query, delta_days, data_path, config["visualization_types"]["charts"]["sections"])
 
     return html.Div([
         html.Div(style={"display": "grid","gridTemplateColumns": f"repeat({count_items_per_row}, 1fr)",
@@ -477,9 +543,11 @@ def _load_scoped_dashboard_data(
     end_dt: pd.Timestamp,
     default_start_date: pd.Timestamp,
     mnid_only_request: bool,
+    route: str = 'default',
 ):
     data = None
     mnid_full_scope_data = None
+    route_data_path = f'data/{route}/parquet'
 
     if mnid_only_request:
         district_col_for_scope = "District"
@@ -499,7 +567,7 @@ def _load_scoped_dashboard_data(
                 'Home_district', 'TA', 'Village', 'Age', 'Age_Group', 'Gender',
                 'Source_Program',
             ])
-            sql_full = f"SELECT {mnid_cols} FROM '{DATA_FILE_NAME_}'"
+            sql_full = f"SELECT {mnid_cols} FROM '{route_data_path}'"
             full = DataStorage.query_duckdb(sql_full)
             full[DATE_] = pd.to_datetime(full[DATE_], errors='coerce')
             full = _apply_scope_to_data(full, scope, district_col_for_scope)
@@ -515,9 +583,9 @@ def _load_scoped_dashboard_data(
     if data is None:
         sql_comment = f"-- version:{dataset_version} scope:{user_level} level:{effective_level}"
         if user_level == 'facility':
-            sql = f"{sql_comment}\nSELECT * FROM '{DATA_FILE_NAME_}' WHERE {FACILITY_CODE_} = '{location}'"
+            sql = f"{sql_comment}\nSELECT * FROM '{route_data_path}' WHERE {FACILITY_CODE_} = '{location}'"
         else:
-            sql = f"{sql_comment}\nSELECT * FROM '{DATA_FILE_NAME_}'"
+            sql = f"{sql_comment}\nSELECT * FROM '{route_data_path}'"
         data_cache_key = (dataset_version, user_level, effective_level, location)
         if data_cache_key in _dashboard_data_cache:
             data_full = _dashboard_data_cache[data_cache_key]
@@ -543,17 +611,19 @@ def _load_filter_source_data(
     scope: dict,
     end_dt: pd.Timestamp,
     default_start_date: pd.Timestamp,
+    route: str = 'default',
 ):
     filter_cols = []
     for col in [DATE_, FACILITY_, FACILITY_CODE_, AGE_GROUP_, ENCOUNTER_, HOME_DISTRICT_, 'District']:
         if col and col not in filter_cols:
             filter_cols.append(col)
 
+    route_data_path = f'data/{route}/parquet'
     sql_comment = f"-- version:{dataset_version} scope:{user_level} level:{effective_level} filters"
     if user_level == 'facility':
-        sql = f"{sql_comment}\nSELECT {', '.join(filter_cols)} FROM '{DATA_FILE_NAME_}' WHERE {FACILITY_CODE_} = '{location}'"
+        sql = f"{sql_comment}\nSELECT {', '.join(filter_cols)} FROM '{route_data_path}' WHERE {FACILITY_CODE_} = '{location}'"
     else:
-        sql = f"{sql_comment}\nSELECT {', '.join(filter_cols)} FROM '{DATA_FILE_NAME_}'"
+        sql = f"{sql_comment}\nSELECT {', '.join(filter_cols)} FROM '{route_data_path}'"
 
     cache_key = (dataset_version, user_level, effective_level, location, 'filters')
     if cache_key in _dashboard_filter_cache:
@@ -579,232 +649,287 @@ layout = html.Div(
     children=[
         dcc.Location(id='url', refresh=False),
         dcc.Store(id='active-button-store', data='General Summary'),
+        dcc.Store(id='filter-drawer-open', data=False),
+        dcc.Store(id='scroll-watcher', data=0),
+        dcc.Store(id='kpi-modal-page', data=1),
+        dcc.Store(id='kpi-modal-data', data=None),
+
+        #Floating filter button (appears on scroll-up)
         dcc.Store(id='mnid-active-tab-store', data='country-profile', storage_type='session'),
         dcc.Store(id='dashboard-render-state'),
         
         # Left Sidebar
         html.Div(
-            className="dashboard-sidebar",
+            id="filter-float-btn-wrapper",
+            style={
+                "position":   "fixed",
+                "top":        "56px",
+                "left":       "12px",
+                "zIndex":     "900",
+                "opacity":    "0",
+                "transform":  "translateY(-8px)",
+                "transition": "opacity 0.22s ease, transform 0.22s ease",
+                "pointerEvents": "none",
+            },
             children=[
-                
-                # Filters Section
-                html.Div(
-                    className="sidebar-filters-section",
-                    children=[
-                        html.Div(
-                            className="filters-card",
-                            children=[
-                                html.H3("Filter Data", className="filters-title"),
-                                
-                                html.Div(
-                                    className="filters-container",
-                                    children=[
-                                        # Level Filter
-                                        html.Div(
-                                            className="filter-group",
-                                            children=[
-                                                html.Label("Level", className="filter-label"),
-                                                dcc.Dropdown(
-                                                    id='dashboard-level-filter',
-                                                    options=[
-                                                        {'label': 'National', 'value': 'National'},
-                                                        {'label': 'District', 'value': 'District'},
-                                                        {'label': 'Facility', 'value': 'Facility'},
-                                                    ],
-                                                    value=None,
-                                                    clearable=True,
-                                                    className="modern-dropdown",
-                                                    placeholder="Select level"
-                                                )
-                                            ]
-                                        ),
-
-                                        # District Filter
-                                        html.Div(
-                                            id="dashboard-district-filter-group",
-                                            className="filter-group",
-                                            children=[
-                                                html.Label("District", className="filter-label"),
-                                                dcc.Dropdown(
-                                                    id='dashboard-district-filter',
-                                                    options=[],
-                                                    value=[],
-                                                    multi=True,
-                                                    clearable=True,
-                                                    className="modern-dropdown",
-                                                    placeholder="Select district(s)"
-                                                ),
-                                                html.Div(
-                                                    id="dashboard-district-note",
-                                                    className="filter-note",
-                                                    style={"fontSize": "12px", "color": "#64748b", "marginTop": "6px"}
-                                                )
-                                            ]
-                                        ),
-
-                                        # Facility Filter
-                                        html.Div(
-                                            className="filter-group",
-                                            children=[
-                                                html.Label("Health Facility", className="filter-label"),
-                                                dcc.Dropdown(
-                                                    id='dashboard-facility-filter',
-                                                    options=[],
-                                                    value=[],
-                                                    multi=True,
-                                                    clearable=True,
-                                                    className="modern-dropdown",
-                                                    placeholder="Select facility(ies)"
-                                                )
-                                            ]
-                                        ),
-
-                                        # Relative Period Filter
-                                        html.Div(
-                                            className="filter-group",
-                                            children=[
-                                                html.Label("Relative Period", className="filter-label"),
-                                                dcc.Dropdown(
-                                                    id='dashboard-period-type-filter',
-                                                    options=[
-                                                        {'label': item, 'value': item}
-                                                        for item in RELATIVE_PERIOD_LIST
-                                                    ],
-                                                    value=DEFAULT_RELATIVE_PERIOD,
-                                                    clearable=True,
-                                                    className="modern-dropdown"
-                                                )
-                                            ]
-                                        ),
-                                        
-                                        # Custom Date Range
-                                        html.Div(
-                                            className="filter-group",
-                                            children=[
-                                                html.Label("Custom Date Range", className="filter-label"),
-                                                dcc.DatePickerRange(
-                                                    id='dashboard-date-range-picker',
-                                                    min_date_allowed="2023-01-01",
-                                                    max_date_allowed="2050-01-01",
-                                                    initial_visible_month=datetime.now(),
-                                                    start_date=_default_date_window()[0],
-                                                    end_date=_default_date_window()[1],
-                                                    display_format='YYYY-MM-DD',
-                                                    className="modern-datepicker"
-                                                )
-                                            ]
-                                        ),
-
-                                        html.Div(
-                                            style={"display": "none"},
-                                            children=[
-                                                dcc.Dropdown(
-                                                    id='dashboard-overview-filter',
-                                                    options=[
-                                                        {"label": name, "value": name}
-                                                        for name in get_dashboard_names()
-                                                    ],
-                                                    value=[],
-                                                    multi=True,
-                                                    clearable=True,
-                                                    className="modern-dropdown",
-                                                )
-                                            ]
-                                        ),
-
-                                        # Program Category Filter (MNID)
-                                        html.Div(
-                                            id="dashboard-category-filter-group",
-                                            className="filter-group",
-                                            children=[
-                                                html.Label("Program Category", className="filter-label"),
-                                                dcc.Dropdown(
-                                                    id='dashboard-category-filter',
-                                                    options=[
-                                                        {"label": "All", "value": "All"},
-                                                        {"label": "ANC", "value": "ANC"},
-                                                        {"label": "Labour & Delivery", "value": "Labour"},
-                                                        {"label": "PNC", "value": "PNC"},
-                                                    ],
-                                                    value="All",
-                                                    clearable=False,
-                                                    className="modern-dropdown",
-                                                )
-                                            ]
-                                        ),
-                                        
-                                        # Age Group Filter
-                                        html.Div(
-                                            id="dashboard-age-filter-group",
-                                            className="filter-group",
-                                            children=[
-                                                html.Label("Age Group", className="filter-label"),
-                                                dcc.Dropdown(
-                                                    id='dashboard-age-filter',
-                                                    options=[
-                                                        {'label': age, 'value': age}
-                                                        for age in ['Over 5', 'Under 5']
-                                                    ],
-                                                    value=None,
-                                                    clearable=True,
-                                                    className="modern-dropdown"
-                                                )
-                                            ]
-                                        ),
-
-                                        # Facility Level Filter (MOH only)
-                                        html.Div(
-                                            id="dashboard-moh-level-filter-group",
-                                            className="filter-group",
-                                            style={'display': 'none'},
-                                            children=[
-                                                html.Label("Facility Level", className="filter-label"),
-                                                dcc.Dropdown(
-                                                    id='dashboard-moh-level-filter',
-                                                    options=[
-                                                        {'label': 'All', 'value': 'All'},
-                                                        {'label': 'Primary', 'value': 'Primary'},
-                                                        {'label': 'Secondary', 'value': 'Secondary'},
-                                                        {'label': 'Tertiary', 'value': 'Tertiary'},
-                                                    ],
-                                                    value='All',
-                                                    clearable=False,
-                                                    className="modern-dropdown"
-                                                )
-                                            ]
-                                        ),
-                                    ]
-                                ),
-                                
-                                # Action Buttons
-                                html.Div(
-                                    className="filter-actions",
-                                    children=[
-                                        html.Button(
-                                            "Apply Filters", 
-                                            id="dashboard-btn-generate", 
-                                            n_clicks=0, 
-                                            className="btn-apply-modern"
-                                        ),
-                                        html.Button(
-                                            "Reset Filters", 
-                                            id="dashboard-btn-reset", 
-                                            n_clicks=0, 
-                                            className="btn-reset-modern"
-                                        ),
-                                    ]
-                                )
-                            ]
-                        )
-                    ]
+                html.Button(
+                    "⊞",
+                    id="filter-float-btn",
+                    n_clicks=0,
+                    title="Open filters",
+                    style={
+                        "background":    "#9ca3af",
+                        "color":         "#ffffff",
+                        "border":        "none",
+                        "borderRadius":  "50%",
+                        "width":         "38px",
+                        "height":        "38px",
+                        "fontSize":      "17px",
+                        "cursor":        "pointer",
+                        "boxShadow":     "0 2px 8px rgba(0,0,0,0.22)",
+                        "lineHeight":    "1",
+                    },
                 ),
-            ]
+            ],
         ),
-        
-        # Right Content Area
+
+        #Backdrop (closes drawer on click)
+        html.Div(
+            id="filter-drawer-backdrop",
+            n_clicks=0,
+            style={
+                "display":    "none",
+                "position":   "fixed",
+                "inset":      "0",
+                "background": "rgba(0,0,0,0.35)",
+                "zIndex":     "1100",
+            },
+        ),
+        html.Div(
+            id="filter-drawer",
+            style={
+                "position":        "fixed",
+                "top":             "0",
+                "left":            "0",
+                "bottom":          "0",
+                "width":           "280px",
+                "background":      "#ffffff",
+                "boxShadow":       "4px 0 16px rgba(0,0,0,0.15)",
+                "zIndex":          "1200",
+                "overflowY":       "auto",
+                "transform":       "translateX(-100%)",
+                "transition":      "transform 0.25s ease",
+                "display":         "flex",
+                "flexDirection":   "column",
+            },
+            children=[
+                # Drawer header
+                html.Div(
+                    style={
+                        "display":       "flex", "alignItems": "center",
+                        "justifyContent": "space-between",
+                        "padding":       "14px 16px 10px",
+                        "borderBottom":  "1px solid #e5e7eb",
+                        "background":    "#f9fafb",
+                        "flexShrink":    "0",
+                    },
+                    children=[
+                        html.Span("Filters", style={"fontWeight": "700", "fontSize": "15px",
+                                                     "color": "#111827"}),
+                        html.Button(
+                            "✕",
+                            id="filter-drawer-close-btn",
+                            n_clicks=0,
+                            style={
+                                "background": "none", "border": "none",
+                                "fontSize": "16px", "cursor": "pointer",
+                                "color": "#6b7280", "lineHeight": "1",
+                                "padding": "2px 6px",
+                            },
+                        ),
+                    ],
+                ),
+
+                # Filters body
+                html.Div(
+                    style={"padding": "12px 14px", "flex": "1", "overflowY": "auto"},
+                    children=[
+                        # Level Filter
+                        html.Div(className="filter-group", children=[
+                            html.Label("Level", className="filter-label"),
+                            dcc.Dropdown(
+                                id='dashboard-level-filter',
+                                options=[
+                                    {'label': 'National', 'value': 'National'},
+                                    {'label': 'District',  'value': 'District'},
+                                    {'label': 'Facility',  'value': 'Facility'},
+                                ],
+                                value=None, clearable=True,
+                                className="modern-dropdown", placeholder="Select level",
+                            ),
+                        ]),
+                        # District Filter
+                        html.Div(id="dashboard-district-filter-group", className="filter-group", children=[
+                            html.Label("District", className="filter-label"),
+                            dcc.Dropdown(
+                                id='dashboard-district-filter',
+                                options=[], value=[], multi=True, clearable=True,
+                                className="modern-dropdown", placeholder="Select district(s)",
+                            ),
+                            html.Div(id="dashboard-district-note", className="filter-note",
+                                     style={"fontSize": "12px", "color": "#64748b", "marginTop": "6px"}),
+                        ]),
+                        # Facility Filter
+                        html.Div(className="filter-group", children=[
+                            html.Label("Health Facility", className="filter-label"),
+                            dcc.Dropdown(
+                                id='dashboard-facility-filter',
+                                options=[], value=[], multi=True, clearable=True,
+                                className="modern-dropdown", placeholder="Select facility(ies)",
+                            ),
+                        ]),
+                        # Relative Period Filter
+                        html.Div(className="filter-group", children=[
+                            html.Label("Relative Period", className="filter-label"),
+                            dcc.Dropdown(
+                                id='dashboard-period-type-filter',
+                                options=[{'label': item, 'value': item} for item in RELATIVE_PERIOD_LIST],
+                                value=DEFAULT_RELATIVE_PERIOD, clearable=True,
+                                className="modern-dropdown",
+                            ),
+                        ]),
+                        # Custom Date Range
+                        html.Div(className="filter-group", children=[
+                            html.Label("Custom Date Range", className="filter-label"),
+                            dcc.DatePickerRange(
+                                id='dashboard-date-range-picker',
+                                min_date_allowed="2023-01-01",
+                                max_date_allowed="2050-01-01",
+                                initial_visible_month=datetime.now(),
+                                start_date=_default_date_window()[0],
+                                end_date=_default_date_window()[1],
+                                display_format='YYYY-MM-DD',
+                                className="modern-datepicker",
+                            ),
+                        ]),
+                        # Hidden overview filter (kept for callbacks)
+                        html.Div(style={"display": "none"}, children=[
+                            dcc.Dropdown(
+                                id='dashboard-overview-filter',
+                                options=[{"label": name, "value": name}
+                                         for name in get_dashboard_names()],
+                                value=[], multi=True, clearable=True,
+                                className="modern-dropdown",
+                            ),
+                        ]),
+                        # Program Category Filter
+                        html.Div(id="dashboard-category-filter-group", className="filter-group", children=[
+                            html.Label("Program Category", className="filter-label"),
+                            dcc.Dropdown(
+                                id='dashboard-category-filter',
+                                options=[
+                                    {"label": "All",               "value": "All"},
+                                    {"label": "ANC",               "value": "ANC"},
+                                    {"label": "Labour & Delivery", "value": "Labour"},
+                                    {"label": "PNC",               "value": "PNC"},
+                                ],
+                                value="All", clearable=False, className="modern-dropdown",
+                            ),
+                        ]),
+                        # Age Group Filter
+                        html.Div(id="dashboard-age-filter-group", className="filter-group", children=[
+                            html.Label("Age Group", className="filter-label"),
+                            dcc.Dropdown(
+                                id='dashboard-age-filter',
+                                options=[{'label': age, 'value': age} for age in ['Over 5', 'Under 5']],
+                                value=None, clearable=True, className="modern-dropdown",
+                            ),
+                        ]),
+                        # Facility Level Filter (MOH only)
+                        html.Div(
+                            id="dashboard-moh-level-filter-group",
+                            className="filter-group",
+                            style={'display': 'none'},
+                            children=[
+                                html.Label("Facility Level", className="filter-label"),
+                                dcc.Dropdown(
+                                id='dashboard-moh-level-filter',
+                                options=[
+                                    {'label': 'All', 'value': 'All'},
+                                    {'label': 'Primary', 'value': 'Primary'},
+                                    {'label': 'Secondary', 'value': 'Secondary'},
+                                    {'label': 'Tertiary', 'value': 'Tertiary'},
+                                ],
+                                value='All',
+                                clearable=False,
+                                className="modern-dropdown"
+                            )]),
+                    ],
+                ),
+
+                # Action buttons pinned to bottom of drawer
+                html.Div(
+                    className="filter-actions",
+                    style={
+                        "padding":    "10px 14px",
+                        "borderTop":  "1px solid #e5e7eb",
+                        "background": "#f9fafb",
+                        "flexShrink": "0",
+                        "display":    "flex",
+                        "gap":        "8px",
+                    },
+                    children=[
+                        html.Button("Apply Filters", id="dashboard-btn-generate", n_clicks=0,
+                                    className="btn-apply-modern", style={"flex": "1"}),
+                        html.Button("Reset Filters", id="dashboard-btn-reset", n_clicks=0,
+                                    className="btn-reset-modern", style={"flex": "1"}),
+                    ],
+                ),
+            ],
+        ),
+
+        # Main Content (full width)
         html.Div(
             className="dashboard-main",
+            style={"width": "100%"},
             children=[
+                # Filter toggle button
+                html.Div(
+                    style={
+                        "padding":       "6px 10px",
+                        "borderBottom":  "1px solid #e5e7eb",
+                        "background":    "#f9fafb",
+                        "display":       "flex",
+                        "alignItems":    "center",
+                        "gap":           "8px",
+                    },
+                    children=[
+                        html.Button(
+                            [nav_icon("lucide:filter"), " Filter"],
+                            id="filter-drawer-toggle-btn",
+                            n_clicks=0,
+                            style={
+                                "display":       "flex",
+                                "alignItems":    "center",
+                                "gap":           "5px",
+                                "padding":       "5px 12px",
+                                "fontSize":      "12px",
+                                "fontWeight":    "600",
+                                "border":        "1px solid #d1d5db",
+                                "borderRadius":  "4px",
+                                "background":    "#ffffff",
+                                "color":         "#374151",
+                                "cursor":        "pointer",
+                            },
+                        ),
+                        html.Div(
+                            id="filter-period-text",
+                            style={"fontWeight":"400",
+                                   "color":"grey",
+                                   "fontSize":"12px"}
+                            )
+                    ],
+                ),
                 # Menu Section
                 html.Div(
                     id="dashboard-menu-section",
@@ -882,38 +1007,421 @@ layout = html.Div(
             interval=10*60*1000,  # 10 minutes
             n_intervals=0
         ),
+
+        #Patient ID modal
+        html.Div(
+            id="kpi-patient-modal",
+            style={"display": "none"},
+            children=[
+                # Backdrop
+                html.Div(
+                    id="kpi-patient-modal-backdrop",
+                    n_clicks=0,
+                    style={
+                        "position": "fixed", "inset": "0",
+                        "background": "rgba(0,0,0,0.45)", "zIndex": "2000",
+                    },
+                ),
+                # Dialog
+                html.Div(
+                    style={
+                        "position":      "fixed",
+                        "top":           "50%",
+                        "left":          "50%",
+                        "transform":     "translate(-50%, -50%)",
+                        "zIndex":        "2100",
+                        "background":    "#ffffff",
+                        "borderRadius":  "8px",
+                        "boxShadow":     "0 8px 32px rgba(0,0,0,0.22)",
+                        "width":         "1200px",
+                        "maxWidth":      "92vw",
+                        "maxHeight":     "80vh",
+                        "display":       "flex",
+                        "flexDirection": "column",
+                    },
+                    children=[
+                        # Header
+                        html.Div(
+                            style={
+                                "display":       "flex",
+                                "alignItems":    "center",
+                                "justifyContent": "space-between",
+                                "padding":       "12px 16px",
+                                "borderBottom":  "1px solid #e5e7eb",
+                                "flexShrink":    "0",
+                            },
+                            children=[
+                                html.Span(id="kpi-patient-modal-title",
+                                          style={"fontWeight": "700", "fontSize": "14px",
+                                                 "color": "#111827"}),
+                                html.Button(
+                                    "✕",
+                                    id="kpi-patient-modal-close",
+                                    n_clicks=0,
+                                    style={
+                                        "background":   "#dc2626",
+                                        "color":        "#ffffff",
+                                        "border":       "none",
+                                        "borderRadius": "50%",
+                                        "width":        "26px",
+                                        "height":       "26px",
+                                        "fontSize":     "13px",
+                                        "fontWeight":   "700",
+                                        "cursor":       "pointer",
+                                        "lineHeight":   "1",
+                                        "flexShrink":   "0",
+                                    },
+                                ),
+                            ],
+                        ),
+                        # Table body (scrollable)
+                        html.Div(
+                            id="kpi-patient-modal-body",
+                            style={
+                                "overflowY": "auto",
+                                "flex":      "1",
+                                "padding":   "12px 16px",
+                            },
+                        ),
+                        # Pagination footer
+                        html.Div(
+                            style={
+                                "display":         "flex",
+                                "alignItems":      "center",
+                                "justifyContent":  "space-between",
+                                "padding":         "8px 16px",
+                                "borderTop":       "1px solid #e5e7eb",
+                                "flexShrink":      "0",
+                                "background":      "#f9fafb",
+                                "borderRadius":    "0 0 8px 8px",
+                            },
+                            children=[
+                                html.Button(
+                                    "← Prev",
+                                    id="kpi-modal-prev-btn",
+                                    n_clicks=0,
+                                    style={
+                                        "background": "#525E52", "color": "#ffffff",
+                                        "border": "none", "borderRadius": "4px",
+                                        "padding": "4px 14px", "fontSize": "12px",
+                                        "cursor": "pointer",
+                                    },
+                                ),
+                                html.Span(
+                                    id="kpi-modal-page-info",
+                                    style={"fontSize": "12px", "color": "#6b7280"},
+                                ),
+                                html.Button(
+                                    "Next →",
+                                    id="kpi-modal-next-btn",
+                                    n_clicks=0,
+                                    style={
+                                        "background": "#525E52", "color": "#ffffff",
+                                        "border": "none", "borderRadius": "4px",
+                                        "padding": "4px 14px", "fontSize": "12px",
+                                        "cursor": "pointer",
+                                    },
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        ),
     ]
 )
 
 @callback(
-        Output('scrolling-menu', 'children'),
-        Output('dashboard-menu-section', 'style'),
-        [Input('dashboard-interval-update-today', 'n_intervals'),
-        Input('active-button-store', 'data')])
+    Output("filter-drawer", "style"),
+    Output("filter-drawer-backdrop", "style"),
+    Input("filter-drawer-toggle-btn", "n_clicks"),
+    Input("filter-drawer-close-btn",  "n_clicks"),
+    Input("filter-drawer-backdrop",   "n_clicks"),
+    Input("filter-float-btn",         "n_clicks"),
+    State("filter-drawer-open", "data"),
+    prevent_initial_call=True,
+)
+def _toggle_filter_drawer(n_toggle, n_close, n_backdrop, _n_float, is_open):
+    new_open = not is_open
+    drawer_style = {
+        "position": "fixed", "top": "0", "left": "0", "bottom": "0",
+        "width": "280px", "background": "#ffffff",
+        "boxShadow": "4px 0 16px rgba(0,0,0,0.15)", "zIndex": "1200",
+        "overflowY": "auto", "display": "flex", "flexDirection": "column",
+        "transform": "translateX(0)" if new_open else "translateX(-100%)",
+        "transition": "transform 0.25s ease",
+    }
+    backdrop_style = {
+        "display": "block" if new_open else "none",
+        "position": "fixed", "inset": "0",
+        "background": "rgba(0,0,0,0.35)", "zIndex": "1100",
+    }
+    return drawer_style, backdrop_style
 
-def update_menu(interval, color):
-    ctx = callback_context
-    triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else ""
-    if 'dashboard-interval-update-today' in triggered_id:
+
+@callback(
+    Output("filter-drawer-open", "data"),
+    Input("filter-drawer-toggle-btn", "n_clicks"),
+    Input("filter-drawer-close-btn",  "n_clicks"),
+    Input("filter-drawer-backdrop",   "n_clicks"),
+    Input("filter-float-btn",         "n_clicks"),
+    State("filter-drawer-open", "data"),
+    prevent_initial_call=True,
+)
+def _sync_drawer_state(n_toggle, n_close, n_backdrop, _n_float, is_open):
+    del n_toggle, n_close, n_backdrop, _n_float  # inputs drive trigger; only state matters
+    return not is_open
+
+
+_KPI_PAGE_SIZE = 15
+
+
+# KPI modal — open/close + data fetch
+@callback(
+    Output("kpi-patient-modal",  "style"),
+    Output("kpi-patient-modal-title", "children"),
+    Output("kpi-modal-data",     "data"),
+    Output("kpi-modal-page",     "data"),
+    Input({"type": "kpi-val-click",     "index": ALL}, "n_clicks"),
+    Input("kpi-patient-modal-close",   "n_clicks"),
+    Input("kpi-patient-modal-backdrop","n_clicks"),
+    State({"type": "kpi-patient-ids",  "index": ALL}, "data"),
+    State({"type": "kpi-val-click",    "index": ALL}, "id"),
+    State({"type": "kpi-name",  "index": ALL}, "data"),
+    State("url-params-store", "data"),
+    prevent_initial_call=True,
+)
+def _kpi_patient_modal(n_clicks_list, n_close, n_backdrop, ids_list, id_list,kpi_name, urlparams):
+    triggered = ctx.triggered_id
+
+    if triggered in ("kpi-patient-modal-close", "kpi-patient-modal-backdrop"):
+        return {"display": "none"}, dash.no_update, dash.no_update, dash.no_update
+
+    if not isinstance(triggered, dict) or triggered.get("type") != "kpi-val-click":
+        raise PreventUpdate
+    if not any(n for n in (n_clicks_list or []) if n):
         raise PreventUpdate
 
-    menu_json, config = get_enabled_dashboard_menu()
-    default_report = config.get("default_report")
-    fallback_active = default_report if any(d.get("report_name") == default_report for d in menu_json) else None
-    active_name = color if any(d.get("report_name") == color for d in menu_json) else fallback_active
-    show_menu = len(menu_json) > 1
+    clicked_index = triggered["index"]
+    kpi_title = next((item[0] for item in kpi_name if item[1] == clicked_index), None)
 
-    buttons = [
-        html.Button(
-            display_report_name(d["report_name"]),
-            className="menu-btn active" if active_name == d["report_name"] else "menu-btn",
-            id={"type": "menu-button", "name": d["report_name"]}
+    store_payload = {}
+    for id_obj, payload in zip(id_list, ids_list):
+        if id_obj.get("index") == clicked_index:
+            store_payload = payload or {}
+            break
+    patient_ids = store_payload.get("ids", [])
+    unique_col  = store_payload.get("unique_col", "") or PERSON_ID_
+    if not patient_ids:
+        raise PreventUpdate
+
+    data_route = (urlparams or {}).get("route", ["default"])[0]
+    data_path  = f"data/{data_route}/parquet"
+
+    df = create_line_list_basic_modal(unique_col, data_path, patient_ids)
+    title = f"Patient List — {kpi_title} - ({len(patient_ids):,} Total Records)"
+
+    modal_data = {
+        "rows":  df.to_dict("records"),
+        "cols":  list(df.columns),
+        "total": len(df),
+    }
+    return {"display": "block"}, title, modal_data, 1
+
+
+# KPI modal — render current page
+@callback(
+    Output("kpi-patient-modal-body", "children"),
+    Output("kpi-modal-page-info",    "children"),
+    Input("kpi-modal-page", "data"),
+    Input("kpi-modal-data", "data"),
+    prevent_initial_call=True,
+)
+def _kpi_render_page(page, modal_data):
+    if not modal_data:
+        raise PreventUpdate
+
+    rows_all = modal_data.get("rows", [])
+    cols     = modal_data.get("cols", [])
+    total    = modal_data.get("total", 0)
+
+    if not rows_all:
+        body = html.Div("No records found.", style={"fontSize": "13px", "color": "#6b7280"})
+        return body, ""
+
+    page = max(1, page or 1)
+    total_pages = max(1, -(-total // _KPI_PAGE_SIZE))  # ceiling division
+    page = min(page, total_pages)
+
+    start = (page - 1) * _KPI_PAGE_SIZE
+    end   = start + _KPI_PAGE_SIZE
+    page_rows = rows_all[start:end]
+
+    th_style  = {"padding": "6px 10px", "background": "#f3f4f6", "fontWeight": "600",
+                 "fontSize": "12px", "border": "1px solid #e5e7eb", "whiteSpace": "nowrap"}
+    td_style  = {"padding": "5px 10px", "fontSize": "12px", "border": "1px solid #e5e7eb"}
+    num_style = {**td_style, "color": "#9ca3af", "textAlign": "center", "width": "40px"}
+
+    header = html.Thead(html.Tr(
+        [html.Th("#", style={**th_style, "width": "40px"})] +
+        [html.Th(col, style=th_style) for col in cols]
+    ))
+    rows = [
+        html.Tr(
+            [html.Td(start + i + 1, style=num_style)] +
+            [html.Td(str(r.get(col, "")) if r.get(col) is not None else "", style=td_style)
+             for col in cols],
+            style={"background": "#ffffff" if i % 2 == 0 else "#f9fafb"},
         )
-        for d in menu_json
-        if d.get("report_name") != "Newborn"
+        for i, r in enumerate(page_rows)
     ]
+    table = html.Table(
+        [header, html.Tbody(rows)],
+        style={"width": "100%", "borderCollapse": "collapse",
+               "fontSize": "12px", "tableLayout": "auto"},
+    )
+    page_info = f"Page {page} of {total_pages}  ({total:,} records)"
+    return table, page_info
 
-    return buttons, ({} if show_menu else {"display": "none"})
+
+# KPI modal — page navigation
+@callback(
+    Output("kpi-modal-page", "data", allow_duplicate=True),
+    Input("kpi-modal-prev-btn", "n_clicks"),
+    Input("kpi-modal-next-btn", "n_clicks"),
+    State("kpi-modal-page",    "data"),
+    State("kpi-modal-data",    "data"),
+    prevent_initial_call=True,
+)
+def _kpi_modal_nav(n_prev, n_next, page, modal_data):
+    if not modal_data:
+        raise PreventUpdate
+    total       = modal_data.get("total", 0)
+    total_pages = max(1, -(-total // _KPI_PAGE_SIZE))
+    page        = max(1, page or 1)
+    if ctx.triggered_id == "kpi-modal-prev-btn":
+        page = max(1, page - 1)
+    else:
+        page = min(total_pages, page + 1)
+    return page
+
+
+# Bind scroll listener once on page load; manipulate float-btn wrapper directly via DOM
+dash.clientside_callback(
+    """
+    function(_) {
+        var lastY = 0;
+        var bound = false;
+        function bindScroll() {
+            var wrapper = document.getElementById('filter-float-btn-wrapper');
+            if (!wrapper) { setTimeout(bindScroll, 300); return; }
+            window.addEventListener('scroll', function() {
+                var currentY = window.scrollY || document.documentElement.scrollTop;
+                if (currentY < lastY && currentY > 60) {
+                    wrapper.style.opacity = '1';
+                    wrapper.style.transform = 'translateY(0)';
+                    wrapper.style.pointerEvents = 'auto';
+                } else {
+                    wrapper.style.opacity = '0';
+                    wrapper.style.transform = 'translateY(-8px)';
+                    wrapper.style.pointerEvents = 'none';
+                }
+                lastY = currentY;
+            }, { passive: true });
+        }
+        bindScroll();
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("scroll-watcher", "data"),
+    Input("scroll-watcher", "data"),
+    prevent_initial_call=False,
+)
+
+
+@callback(
+    Output('scrolling-menu', 'children'),
+    [
+        Input('dashboard-interval-update-today', 'n_intervals'),
+        Input('active-button-store', 'data'),
+        Input('url-params-store', 'data'),
+    ],
+)
+def update_menu(interval, color, urlparams):
+    try:
+        urlparams = urlparams or {}
+        data_route = urlparams.get('route', ["default"])[0]
+        user_data = _load_user_registry(data_route)
+        user_row, _scope = _resolve_user_scope(urlparams, user_data)
+        if user_row is None:
+            return []
+
+        user_id = int(user_row.get('user_id', '0')) 
+        user_uuid = user_row.get('uuid')
+        user_programs_path = os.path.join(os.getcwd(), f"data/{data_route}/single_tables/user_programs.csv")
+        if user_uuid == DEMO_UUID or not os.path.exists(user_programs_path):
+            user_programs = []
+        else:
+            user_programs = duckdb.sql(
+                                        f"SELECT name FROM '{user_programs_path}' WHERE user_id = {user_id}"
+                                    ).df()['name'].to_list()
+        
+        user_props = next((user['properties'] for user in  _load_user_properties(data_route) if user.get('properties').get('uuid') == user_uuid), None)
+        limited_dashboards = user_props.get('limited_dashboards', []) if user_props else []
+
+        with open(json_path, 'r') as f:
+            menu_json = json.load(f)
+
+        general_summary_button = [
+                                html.Button(
+                                    "General Summary",
+                                    className="menu-btn active" if color == "General Summary" else "menu-btn",
+                                    id={"type": "menu-button", "name": "General Summary"}
+                                )
+                            ]
+        
+        filtered_buttons = [
+                            html.Button(
+                                display_report_name(d["report_name"]),
+                                className="menu-btn active" if color == d["report_name"] else "menu-btn",
+                                id={"type": "menu-button", "name": d["report_name"]}
+                            )
+                            for d in menu_json
+                            if d.get("report_name") != "Newborn" and d.get('access', 'global') =='global'
+                            and any(program in user_programs for program in d.get("associated_programs", []))
+                        ]
+        filtered_buttons_limited = [
+                            html.Button(
+                                display_report_name(d["report_name"]),
+                                className="menu-btn-alt active" if color == d["report_name"] else "menu-btn-alt",
+                                id={"type": "menu-button", "name": d["report_name"]}
+                            )
+                            for d in menu_json
+                            if (
+                                d.get("report_name") != "Newborn" 
+                                and d.get('access', 'global') == 'limited'
+                                and any(program in user_programs for program in d.get("associated_programs", []))
+                                and any(item in display_report_name(d["report_name"]) for item in limited_dashboards)
+                            )
+                        ]
+        all_buttons = [
+                            html.Button(
+                                display_report_name(d["report_name"]),
+                                className="menu-btn active" if color == d["report_name"] else "menu-btn",
+                                id={"type": "menu-button", "name": d["report_name"]}
+                            )
+                            for d in menu_json
+                            if d.get("report_name") != "Newborn"
+                        ]
+        
+        if user_uuid == DEMO_UUID:
+            return all_buttons
+        else:
+            return general_summary_button + filtered_buttons + filtered_buttons_limited
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return []
 
 
 @callback(
@@ -935,6 +1443,40 @@ def _save_mnid_executive_tab(tab_value):
 
 
 @callback(
+    Output('active-button-store', 'data'),
+    Input({"type": "menu-button", "name": ALL}, "n_clicks"),
+    prevent_initial_call=True,
+)
+def _set_active_button(menu_clicks):
+    # Split out of update_dashboard so active-button-store.data isn't written
+    # by the same callback that reads dashboard-moh-level-filter.value -- that
+    # combination is what created a Dash dependency cycle with
+    # toggle_moh_level_visibility (which writes dashboard-moh-level-filter.value
+    # from active-button-store.data). Only a menu-button click ever changes
+    # which report is active, so this mirrors update_dashboard's own
+    # clicked_name logic without needing moh_level as an input at all.
+    ctx = callback_context
+    if not ctx.triggered:
+        raise PreventUpdate
+    triggered = ctx.triggered[0]
+    triggered_id = triggered['prop_id']
+    if "menu-button" not in triggered_id:
+        raise PreventUpdate
+    # scrolling-menu's buttons are fully regenerated (fresh component
+    # instances) every time update_menu re-runs -- e.g. on the periodic
+    # dashboard-interval-update-today tick -- which re-fires this
+    # pattern-matching Input even though nothing was actually clicked. Without
+    # this guard that spurious fire (n_clicks None/0) would overwrite
+    # active-button-store with whichever button happened to report the
+    # "trigger" (in practice always General Summary, the first button built),
+    # silently kicking the user back to General Summary mid-session.
+    if not triggered.get('value'):
+        raise PreventUpdate
+    prop_dict = json.loads(triggered_id.split('.')[0])
+    return prop_dict['name']
+
+
+@callback(
     [Output('dashboard-container', 'children'),
      Output('dashboard-level-filter', 'value'),
      Output('dashboard-district-filter-group', 'style'),
@@ -944,7 +1486,7 @@ def _save_mnid_executive_tab(tab_value):
      Output('dashboard-district-note', 'children'),
      Output('dashboard-facility-filter', 'options'),
      Output('dashboard-facility-filter', 'value'),
-     Output('active-button-store', 'data'),
+     Output('filter-period-text', 'children'),
      Output('dashboard-render-state', 'data')],
     [
         Input('dashboard-btn-generate', 'n_clicks'),
@@ -958,9 +1500,9 @@ def _save_mnid_executive_tab(tab_value):
         Input({"type": "menu-button", "name": ALL}, "n_clicks"),
         Input('url', 'pathname'),
         Input('dashboard-moh-level-filter', 'value'),
+        Input('url-params-store', 'data'),
     ],
     [
-        State('url-params-store', 'data'),
         State('dashboard-age-filter', 'value'),
         State('active-button-store', 'data'),
         State('mnid-active-tab-store', 'data'),
@@ -973,96 +1515,60 @@ def update_dashboard(gen, start_date, end_date, level,
         ctx = callback_context
         triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else None
 
-        if not urlparams:
-            urlparams = {"Location": [DEMO_LOCATION], "uuid": [DEMO_UUID]}
-        if not urlparams.get("Location"):
-            urlparams["Location"] = [DEMO_LOCATION]
-        if not urlparams.get("uuid"):
-            urlparams["uuid"] = [DEMO_UUID]
+        data_route = (urlparams or {}).get('route', ["default"])[0]
+        dataset_version = _dataset_version_token(data_route)
 
-
-        # Determine which report to show
+        # Determine which report to show. scrolling-menu's buttons are fully
+        # regenerated on every update_menu re-run (e.g. the periodic
+        # dashboard-interval-update-today tick), which re-fires this
+        # pattern-matching Input with no real click behind it -- guard on a
+        # truthy n_clicks so a spurious fire doesn't silently reset the
+        # selected report back to General Summary.
         clicked_name = current_active
-        if triggered_id and "menu-button" in triggered_id:
+        if (
+            triggered_id and "menu-button" in triggered_id
+            and ctx.triggered[0].get('value')
+        ):
             prop_dict = json.loads(triggered_id.split('.')[0])
             clicked_name = prop_dict['name']
 
-        # Preserve the active MNID tab across filter/date changes; reset when switching reports
-        initial_mnid_tab = (
-            'country-profile'
-            if triggered_id and 'menu-button' in triggered_id
-            else (active_mnid_tab or 'country-profile')
-        )
-
-        menu_json, dashboard_tab_config = get_enabled_dashboard_menu()
-        if not menu_json:
-            return (
-                dash.no_update,
-                level,
-                {'display': 'none'} if level in ['National', 'Facility'] else {},
-                [],
-                [],
-                False,
-                "",
-                [],
-                [],
-                current_active or dash.no_update,
-                {'status': 'error', 'message': 'No dashboards are enabled in the dashboard tabs config.'},
-            )
-
-        config_default_report = dashboard_tab_config.get("default_report")
-        if config_default_report and not any(d.get("report_name") == config_default_report for d in menu_json):
-            config_default_report = None
-
+        menu_json = load_dashboard_menu()
         if overview:
             selected_reports = overview
         else:
-            default_report = config_default_report or menu_json[0]["report_name"]
+            default_report = "General Summary" or menu_json[0]["report_name"]
             selected_reports = [clicked_name] if clicked_name in {d.get("report_name") for d in menu_json} else [default_report]
         selected_reports = list(dict.fromkeys(normalize_report_name(r, menu_json) for r in selected_reports))
-        effective_active_report = selected_reports[0] if selected_reports else None
-        selected_dashboards = [d for d in menu_json if d.get('report_name') in selected_reports]
-        mnid_only_request = bool(selected_dashboards) and all(d.get('dashboard_type') == 'mnid' for d in selected_dashboards)
-
         # Date Logic
-        default_start, default_end = _default_date_window()
+        default_start, default_end = _default_date_window(data_route)
         start_dt = pd.to_datetime(start_date or default_start).replace(hour=0, minute=0, second=0)
         end_dt = pd.to_datetime(end_date or default_end).replace(hour=23, minute=59, second=59)
         default_start_date = start_dt - pd.Timedelta(days=DEFAULT_DASHBOARD_DAYS)
 
-        if urlparams.get('Location', [None])[0]:
-            location = urlparams.get('Location', [None])[0]
-        else:
-            location = DEMO_LOCATION
-        mnid_location = urlparams.get('Location', [None])[0] if urlparams.get('Location') else None
+        location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0]
+        DATA_PATH_ = f"data/{data_route}/parquet"
 
-        user_data = _load_user_registry()
+        user_data = _load_user_registry(data_route)
         user_row, scope = _resolve_user_scope(urlparams, user_data)
 
         if user_row is None:
-            return (
-                dash.no_update,
-                level,
-                {'display': 'none'} if level in ['National', 'Facility'] else {},
-                [],
-                [],
-                False,
-                "",
-                [],
-                [],
-                effective_active_report,
-                {'status': 'error', 'message': 'Unauthorized User. Please contact system administrator.'},
-            )
+            return (html.Div("Unauthorized User. Please contact system administrator."), level,
+                    {'display': 'none'} if level in ['National', 'Facility'] else {},
+                    [], [], False, "", [], "", "",
+                    {'status': 'unauthorized'})
 
         user_level = scope['level']
+        user_districts = scope.get('districts') or []
         if user_level == 'facility' and scope.get('facility_code'):
             location = scope['facility_code']
-            mnid_location = scope['facility_code']
 
         url_object = f"Location={location}&uuid={urlparams.get('uuid', [None])[0]}&user_level={user_level}"
 
-        # Default level based on user_level
+        # Level resolution
         requested_level = _normalize_level(level) if level else user_level
+
+        # print(user_row, scope, user_level)
+
         if user_level == 'national':
             effective_level = requested_level if requested_level in {'national', 'district', 'facility'} else 'national'
         elif user_level == 'district':
@@ -1071,153 +1577,156 @@ def update_dashboard(gen, start_date, end_date, level,
             effective_level = 'facility'
         level = _title_level(effective_level)
 
-        dataset_version = _dataset_version_token()
-        try:
-            data = _load_filter_source_data(
-                dataset_version=dataset_version,
-                user_level=user_level,
-                effective_level=effective_level,
-                location=location,
-                scope=scope,
-                end_dt=end_dt,
-                default_start_date=default_start_date,
-            )
-        except Exception:
-            import traceback
-            traceback.print_exc()
-            return (
-                dash.no_update,
-                level or dash.no_update,
-                dash.no_update,
-                [],
-                [],
-                True,
-                "",
-                [],
-                [],
-                current_active or dash.no_update,
-                {'status': 'error', 'message': 'Missing Data. Ensure that the config file has correct database credentials'},
-            )
-
-        district_col = "District" if "District" in data.columns else (HOME_DISTRICT_ if HOME_DISTRICT_ in data.columns else None)
-
-        base_mask = pd.Series(True, index=data.index)
-        if age:
-            base_mask &= (data[AGE_GROUP_] == age)
-        category = category or "All"
-        encounter_mask = pd.Series(True, index=data.index)
-        if category != "All" and "Encounter" in data.columns:
-            if category == "ANC":
-                encounter_mask = data["Encounter"].fillna('').astype(str).str.contains('ANC', case=False, na=False)
-            elif category == "Labour":
-                encounter_mask = data["Encounter"].fillna('').astype(str).str.contains('LABOUR|DELIVERY|BIRTH', case=False, na=False)
-            elif category == "PNC":
-                encounter_mask = data["Encounter"].fillna('').astype(str).str.contains('PNC|POSTNATAL|POST.NATAL', case=False, na=False)
-        base_data = data[base_mask & encounter_mask]
-
-        district_col = "District" if "District" in base_data.columns else (HOME_DISTRICT_ if HOME_DISTRICT_ in base_data.columns else None)
-        all_districts = (
-            base_data[district_col].dropna().sort_values().unique().tolist()
-            if district_col else []
-        )
-
-        requested_level_value = effective_level
-        districts = districts or []
-        facilities = facilities or []
-        overview = overview or []
-        if effective_level == 'national':
-            districts = [d for d in districts if d in all_districts]
-        elif effective_level == 'district':
-            scope_district = scope.get('district')
-            if scope_district:
-                districts = [scope_district]
-            elif districts:
-                districts = [d for d in districts if d in all_districts]
-            if facilities and district_col:
-                allowed_facilities = set(
-                    base_data[base_data[district_col].isin(districts)][FACILITY_]
-                    .dropna()
-                    .unique()
-                    .tolist()
-                ) if districts else set()
-                facilities = [f for f in facilities if f in allowed_facilities]
-        else:
-            districts = [scope.get('district')] if scope.get('district') else []
-            if FACILITY_ in base_data.columns:
-                assigned_facilities = []
-                if scope.get('facility_name'):
-                    assigned_facilities = (
-                        base_data[base_data[FACILITY_].astype(str) == str(scope['facility_name'])][FACILITY_]
-                        .dropna()
-                        .astype(str)
-                        .unique()
-                        .tolist()
-                    )
-                elif scope.get('facility_code') and FACILITY_CODE_ in base_data.columns:
-                    assigned_facilities = (
-                        base_data[base_data[FACILITY_CODE_].astype(str) == str(scope['facility_code'])][FACILITY_]
-                        .dropna()
-                        .astype(str)
-                        .unique()
-                        .tolist()
-                    )
-                facilities = assigned_facilities[:1]
-
-        inferred_districts = _districts_for_facilities(base_data, facilities, district_col)
-        if facilities and inferred_districts:
-            districts = inferred_districts
-
-        if facilities and district_col and districts:
-            allowed_facilities = set(
-                base_data[base_data[district_col].isin(districts)][FACILITY_]
-                .dropna()
-                .unique()
-                .tolist()
-            ) if districts else set()
-            facilities = [f for f in facilities if f in allowed_facilities]
-
-        if district_col and districts:
-            facilities_pool = base_data[base_data[district_col].isin(districts)]
-        elif effective_level == "district" and district_col and not districts:
-            facilities_pool = base_data.iloc[0:0]
-        else:
-            facilities_pool = base_data
-        all_facilities = (
-            facilities_pool[FACILITY_].dropna().sort_values().unique().tolist()
-            if FACILITY_ in facilities_pool.columns else []
-        )
-
-        if facilities:
-            effective_level = 'facility'
-        elif districts:
-            effective_level = 'district'
-        else:
-            effective_level = requested_level_value
-        level = _title_level(effective_level)
-
-        show_district_filter = effective_level in {"national", "district"}
+        show_district_filter = effective_level == "national"
         district_group_style = {} if show_district_filter else {"display": "none"}
-        district_disabled = effective_level == "facility"
+        district_disabled = not show_district_filter
         district_note = ""
-        if effective_level == "district":
-            district_note = "Facility selections are constrained to the selected district(s)."
-        elif effective_level == "facility" and districts:
-            district_note = f"Facility selection resolved to: {', '.join(districts)}"
+        if not show_district_filter:
+            districts = []
 
-        if district_col and districts:
-            allowed_facilities = set(
-                base_data[base_data[district_col].isin(districts)][FACILITY_]
-                .dropna()
-                .unique()
-                .tolist()
+        # Dropdown option lists
+        facilities_path = os.path.join(path, f'data/{data_route}', 'dcc_dropdown_json', 'facilities_dropdowns.json')
+        with open(facilities_path, 'r') as f:
+            facilities_dict = json.load(f)
+        if requested_level == "national":
+            all_districts = sorted(facilities_dict.keys())
+            all_facilities = sorted(set(
+                facility
+                for district in districts
+                if district in all_districts
+                for facility in facilities_dict.get(district, [])
+            ))
+        elif requested_level == "district":
+            all_districts = sorted(set(user_districts))
+            all_facilities = sorted(set(
+                facility
+                for district in user_districts
+                if district in all_districts
+                for facility in facilities_dict.get(district, [])
+            ))
+        else:
+            all_districts = sorted(set(user_districts))
+            all_facilities = scope.get('facilities') or []
+        if isinstance(all_facilities, str):
+            all_facilities = [all_facilities]
+
+        # Narrow the Health Facility dropdown by the selected Facility Level,
+        # scoped to Maternal Health only (where that filter is shown). Uses the
+        # dataset's own Facility_CODE/Facility pairs (real facilities with data),
+        # not facilities_dropdowns.json's broader, code-less location list.
+        if 'Maternal Health' in selected_reports and moh_level and moh_level != 'All':
+            try:
+                _fac_level_lookup = DataStorage.query_duckdb(
+                    f"SELECT DISTINCT {FACILITY_CODE_}, {FACILITY_} FROM '{DATA_PATH_}'"
+                )
+                _level_matched = {
+                    row[FACILITY_]
+                    for _, row in _fac_level_lookup.iterrows()
+                    if resolve_facility_level(row[FACILITY_CODE_], row[FACILITY_]) == moh_level
+                }
+                all_facilities = sorted(set(all_facilities) & _level_matched)
+            except Exception:
+                pass
+
+        # Shared scope & query building
+        # active_dists: at district level fall back to user's districts when
+        # nothing is selected in the UI; at national level only use UI selection.
+        active_dists = (districts or user_districts) if effective_level == 'district' else (districts or [])
+        delta_days = max((end_dt - start_dt).days, 1)
+
+        filtered_parts = _scope_where_parts(effective_level, location, districts, user_districts, facilities, age, is_network=False)
+        network_parts  = _scope_where_parts(effective_level, location, districts, user_districts, facilities, age, is_network=True)
+        scope_suffix   = (" AND " + " AND ".join(filtered_parts)) if filtered_parts else ""
+        network_suffix = (" AND " + " AND ".join(network_parts))  if network_parts  else ""
+
+        filtered_query = (
+            f"{DATE_} BETWEEN '{start_dt}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP"
+            + scope_suffix
+        )
+        network_query = (
+            f"{DATE_} >= '{default_start_date}'::TIMESTAMP"
+            f" AND {DATE_} <= '{end_dt}'::TIMESTAMP"
+            + scope_suffix
+        )
+
+        # Scope label (used by MNID topbar; harmless for non-MNID)
+        facility_names = []
+        if effective_level == 'facility' and location:
+            try:
+                _fac_lookup = DataStorage.query_duckdb(
+                    f"SELECT DISTINCT {FACILITY_} FROM '{DATA_PATH_}'"
+                    f" WHERE {FACILITY_CODE_} = '{location}' LIMIT 1"
+                )
+                if not _fac_lookup.empty:
+                    facility_names = _fac_lookup[FACILITY_].dropna().tolist()
+            except Exception:
+                facility_names = []
+        elif facilities:
+            facility_names = list(facilities)
+
+        active_facilities = facility_names or facilities or []
+        if active_facilities:
+            scope_label = 'Facility' if len(active_facilities) == 1 else 'Facilities'
+            scope_value = active_facilities[0] if len(active_facilities) == 1 else f'{len(active_facilities)} selected facilities'
+        elif active_dists:
+            scope_label = 'District' if len(active_dists) == 1 else 'Districts'
+            scope_value = ', '.join(active_dists)
+        else:
+            scope_label = 'Districts'
+            scope_value = 'All districts'
+
+        mnid_categories = [category] if category and category != 'All' else None
+        user_facility_level = (
+            resolve_facility_level(scope.get('facility_code')) if scope.get('facility_code') else None
+        )
+        # MNID's indicator-coverage views (get_aggregate() call sites) read from
+        # the 'dhis2' pseudo-route instead of the real MAHIS route when that data
+        # source is selected -- data_route/DATA_PATH_ elsewhere in this function
+        # (facility dropdowns, raw MAHIS queries) are untouched, since DHIS2 has no
+        # equivalent for those.
+        aggregate_route = 'dhis2' if MNID_DATA_SOURCE == 'dhis2' else data_route
+        scope_meta = {
+            'label':               scope_label,
+            'value':               scope_value,
+            'mnid_categories':     mnid_categories,
+            'level':               effective_level,
+            'selected_facilities': active_facilities,
+            'selected_districts':  active_dists,
+            'data_period_note':    None,
+            'dataset_version':     dataset_version,
+            'route':               aggregate_route,
+            'user_facility_level': user_facility_level,
+        }
+
+        rendered = []
+        for report_name in selected_reports:
+            dashboard_json = next((d for d in menu_json if d['report_name'] == report_name), None)
+            if not dashboard_json:
+                break
+
+            section = build_charts_from_json(
+                filtered_query,
+                network_query,
+                delta_days,
+                dashboard_json,
+                start_date=start_dt,
+                end_date=end_dt,
+                data_path=DATA_PATH_,
+                facility_code=location,
+                scope_meta=scope_meta,
+                url_object=url_object,
+                initial_tab=active_mnid_tab,
             )
-            facilities = [f for f in facilities if f in allowed_facilities]
-            all_facilities = sorted(allowed_facilities)
-        elif effective_level == "facility":
-            all_facilities = facilities
+            rendered.append(html.Div([
+                html.H3(report_name, style={"marginTop": "10px"}),
+                section
+            ]))
 
+        dashboard_content = html.Div(rendered) if len(rendered) > 1 else (rendered[0] if rendered else html.Div("No dashboard selected."))
+
+        
         return (
-            dash.no_update,
+            dashboard_content,
             level,
             district_group_style,
             [{'label': d, 'value': d} for d in all_districts],
@@ -1226,7 +1735,7 @@ def update_dashboard(gen, start_date, end_date, level,
             district_note,
             [{'label': f, 'value': f} for f in all_facilities],
             facilities,
-            effective_active_report,
+            f"{start_dt} - {end_dt}",
             {
                 'status': 'ok',
                 'selected_reports': selected_reports,
@@ -1239,12 +1748,12 @@ def update_dashboard(gen, start_date, end_date, level,
                 'user_level': user_level,
                 'scope': scope,
                 'location': location,
-                'mnid_location': mnid_location,
+                'mnid_location': location,
                 'url_object': url_object,
                 'start_dt': start_dt.isoformat(),
                 'end_dt': end_dt.isoformat(),
-                'initial_mnid_tab': initial_mnid_tab,
-                'mnid_only_request': mnid_only_request,
+                # 'initial_mnid_tab': initial_mnid_tab,
+                'mnid_only_request': False,
                 'facility_level': moh_level or 'All',
             },
         )
@@ -1254,6 +1763,11 @@ def update_dashboard(gen, start_date, end_date, level,
         import traceback
         traceback.print_exc()
         return (
+            html.Div([
+                html.P("Dashboard render failed.", style={"color": "#475569", "fontWeight": "600"}),
+                html.P(f"{type(e).__name__}", style={"color": "#64748b", "fontSize": "12px", "fontWeight": "600"}),
+                html.P(str(e), style={"color": "#94A3B8", "fontSize": "12px"}),
+            ]),
             dash.no_update,
             dash.no_update,
             dash.no_update,
@@ -1264,204 +1778,40 @@ def update_dashboard(gen, start_date, end_date, level,
             dash.no_update,
             dash.no_update,
             dash.no_update,
-            {
-                'status': 'error',
-                'message': 'Dashboard filter update failed.',
-                'detail': str(e),
-            },
         )
-
-
-@callback(
-    Output('dashboard-container', 'children', allow_duplicate=True),
-    Input('dashboard-render-state', 'data'),
-    prevent_initial_call=True,
-)
-def render_dashboard_content(render_state):
-    if not render_state:
-        raise PreventUpdate
-
-    if render_state.get('status') != 'ok':
-        return _error_dashboard_content(
-            render_state.get('message', 'Dashboard render failed.'),
-            render_state.get('detail'),
-        )
-
-    try:
-        selected_reports = render_state.get('selected_reports') or []
-        if not selected_reports:
-            return html.Div("No dashboard selected.")
-
-        effective_level = render_state['effective_level']
-        districts = render_state.get('districts') or []
-        facilities = render_state.get('facilities') or []
-        category = render_state.get('category') or 'All'
-        age = render_state.get('age')
-        dataset_version = render_state['dataset_version']
-        user_level = render_state['user_level']
-        scope = render_state['scope']
-        location = render_state.get('location')
-        mnid_location = render_state.get('mnid_location')
-        url_object = render_state.get('url_object')
-        start_dt = pd.to_datetime(render_state['start_dt'])
-        end_dt = pd.to_datetime(render_state['end_dt'])
-        initial_mnid_tab = render_state.get('initial_mnid_tab') or 'country-profile'
-        default_start_date = start_dt - pd.Timedelta(days=DEFAULT_DASHBOARD_DAYS)
-
-        data, mnid_full_scope_data = _load_scoped_dashboard_data(
-            dataset_version=dataset_version,
-            user_level=user_level,
-            effective_level=effective_level,
-            location=location,
-            scope=scope,
-            districts=districts,
-            facilities=facilities,
-            end_dt=end_dt,
-            default_start_date=default_start_date,
-            mnid_only_request=bool(render_state.get('mnid_only_request')),
-        )
-
-        def num_days_patient_seen(frame):
-            try:
-                visit_counts = frame.groupby(PERSON_ID_)[DATE_].nunique()
-                frame['visit_days'] = frame[PERSON_ID_].map(visit_counts)
-                frame['new_revisit'] = np.where(frame['visit_days'] == 1, 'New', 'Revisit')
-            except Exception:
-                frame['new_revisit'] = 'Unknown'
-            return frame
-
-        if 'new_revisit' not in data.columns or data['new_revisit'].isna().all():
-            data = num_days_patient_seen(data)
-
-        district_col = "District" if "District" in data.columns else (HOME_DISTRICT_ if HOME_DISTRICT_ in data.columns else None)
-        data = _apply_scope_to_data(data, scope, district_col)
-
-        base_mask = pd.Series(True, index=data.index)
-        if age:
-            base_mask &= (data[AGE_GROUP_] == age)
-        base_data_mnid = data[base_mask]
-
-        encounter_mask = pd.Series(True, index=data.index)
-        if category != "All" and "Encounter" in data.columns:
-            if category == "ANC":
-                encounter_mask = data["Encounter"].fillna('').astype(str).str.contains('ANC', case=False, na=False)
-            elif category == "Labour":
-                encounter_mask = data["Encounter"].fillna('').astype(str).str.contains('LABOUR|DELIVERY|BIRTH', case=False, na=False)
-            elif category == "PNC":
-                encounter_mask = data["Encounter"].fillna('').astype(str).str.contains('PNC|POSTNATAL|POST.NATAL', case=False, na=False)
-        base_data = data[base_mask & encounter_mask]
-
-        district_col = "District" if "District" in base_data.columns else (HOME_DISTRICT_ if HOME_DISTRICT_ in base_data.columns else None)
-
-        network_data = base_data
-        if district_col and districts:
-            network_data = network_data[network_data[district_col].isin(districts)]
-        filtered_data = network_data
-        if facilities:
-            filtered_data = filtered_data[filtered_data[FACILITY_].isin(facilities)]
-
-        network_data_mnid = base_data_mnid
-        if district_col and districts:
-            network_data_mnid = network_data_mnid[network_data_mnid[district_col].isin(districts)]
-        filtered_data_mnid = network_data_mnid
-        if facilities:
-            filtered_data_mnid = filtered_data_mnid[filtered_data_mnid[FACILITY_].isin(facilities)]
-
-        menu_json, _ = get_enabled_dashboard_menu()
-        rendered = []
-        for report_name in selected_reports:
-            try:
-                dashboard_json = next((d for d in menu_json if d['report_name'] == report_name), None)
-                if not dashboard_json:
-                    continue
-
-                is_mnid = dashboard_json.get('dashboard_type') == 'mnid'
-                filtered_data_date = (filtered_data_mnid if is_mnid else filtered_data)
-                filtered_data_date = filtered_data_date[
-                    (filtered_data_date[DATE_] >= start_dt) &
-                    (filtered_data_date[DATE_] <= end_dt)
-                ]
-                delta_days = max((end_dt - start_dt).days, 1)
-                facility_code_display = location
-
-                if is_mnid:
-                    if len(facilities) == 1 and FACILITY_ in base_data_mnid.columns and FACILITY_CODE_ in base_data_mnid.columns:
-                        fac_match = base_data_mnid[base_data_mnid[FACILITY_].astype(str) == str(facilities[0])]
-                        facility_code_display = str(fac_match[FACILITY_CODE_].dropna().astype(str).iloc[0]) if len(fac_match) else ''
-                    elif len(facilities) > 1 or effective_level in ['national', 'district']:
-                        facility_code_display = ''
-                    else:
-                        facility_code_display = mnid_location or location
-
-                if facilities:
-                    scope_label = 'Facility' if len(facilities) == 1 else 'Facilities'
-                    scope_value = facilities[0] if len(facilities) == 1 else f'{len(facilities)} selected facilities'
-                elif districts:
-                    scope_label = 'District' if len(districts) == 1 else 'Districts'
-                    scope_value = ', '.join(districts)
-                else:
-                    scope_label = 'Districts'
-                    scope_value = 'All districts'
-
-                data_period_note = None
-                if filtered_data_date.empty:
-                    data_period_note = 'No data is available for the selected date range.'
-
-                section = build_charts_from_json(
-                    filtered_data_date,
-                    mnid_full_scope_data if is_mnid else network_data,
-                    delta_days,
-                    dashboard_json,
-                    start_date=start_dt,
-                    end_date=end_dt,
-                    facility_code=facility_code_display,
-                    scope_meta={
-                        'label': scope_label,
-                        'value': scope_value,
-                        'mnid_categories': [category] if category and category != "All" else None,
-                        'level': effective_level,
-                        'selected_facilities': facilities,
-                        'selected_districts': districts,
-                        'data_period_note': data_period_note,
-                        'dataset_version': dataset_version,
-                        'facility_level': render_state.get('facility_level', 'All'),
-                    },
-                    url_object=url_object,
-                    initial_tab=initial_mnid_tab,
-                )
-                rendered.append(html.Div([
-                    html.H2(display_report_name(report_name), style={"marginTop": "10px"}),
-                    section,
-                ]))
-            except Exception as report_exc:
-                import traceback
-                traceback.print_exc()
-                rendered.append(html.Div([
-                    html.H2(display_report_name(report_name), style={"marginTop": "10px"}),
-                    html.Div([
-                        html.P("Report section failed.", style={"color": "#475569", "fontWeight": "600"}),
-                        html.P(f"{type(report_exc).__name__}", style={"color": "#64748b", "fontSize": "12px", "fontWeight": "600"}),
-                        html.P(str(report_exc), style={"color": "#94A3B8", "fontSize": "12px"}),
-                    ], style={"padding": "12px", "border": "1px solid #e2e8f0", "borderRadius": "8px", "backgroundColor": "#fff"}),
-                ]))
-
-        return html.Div(rendered) if len(rendered) > 1 else (rendered[0] if rendered else html.Div("No dashboard selected."))
-    except Exception as exc:
-        import traceback
-        traceback.print_exc()
-        return _error_dashboard_content("Dashboard render failed.", str(exc))
 
 @callback(
     [Output('dashboard-date-range-picker', 'start_date'),
      Output('dashboard-date-range-picker', 'end_date')],
     [Input('dashboard-period-type-filter', 'value'),
      Input('dashboard-interval-update-today', 'n_intervals')],
+    [State('url-params-store', 'data'),
+     State('active-button-store', 'data')],
 )
-def sync_picker_with_logic(period_type, n):
+def sync_picker_with_logic(period_type, n, urlparams, current_active):
     ctx = callback_context
     triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else ""
-    default_start, default_end = _default_date_window()
+    data_route = (urlparams or {}).get('route', ["default"])[0]
+    default_start, default_end = _default_date_window(data_route)
     anchor = default_end
+
+    # Maternal Health in DHIS2 mode: "Today" etc. should anchor to DHIS2's
+    # own latest reported month, not the local MAHIS dataset's last date --
+    # those two can drift apart by months (DHIS2 gets a fresh monthly pull,
+    # MAHIS's local parquet only updates on its own refresh schedule), and
+    # anchoring to the stale MAHIS date would hide DHIS2 data that's already
+    # available. Every other report keeps the existing MAHIS-anchored
+    # behavior unchanged.
+    if current_active == 'Maternal Health' and MNID_DATA_SOURCE == 'dhis2':
+        try:
+            from mnid.aggregation.store import get_aggregate as _get_dhis2_agg
+            dhis2_agg = _get_dhis2_agg(route='dhis2')
+            if dhis2_agg is not None and not dhis2_agg.empty:
+                dhis2_latest = dhis2_agg['period_start'].max()
+                if pd.notna(dhis2_latest) and (anchor is None or dhis2_latest.normalize() > pd.Timestamp(anchor)):
+                    anchor = dhis2_latest.normalize()
+        except Exception:
+            pass
 
     if "dashboard-interval-update-today" in triggered_id:
         if period_type == "Today":
@@ -1543,10 +1893,61 @@ def toggle_age_group_visibility(active_report):
 
 @callback(
     Output('dashboard-moh-level-filter-group', 'style'),
+    Output('dashboard-moh-level-filter', 'value'),
     Input('active-button-store', 'data'),
+    State('url-params-store', 'data'),
 )
-def toggle_moh_level_visibility(active_report):
+def toggle_moh_level_visibility(active_report, urlparams):
     report = str(active_report or '').strip().lower()
-    if report == 'maternal health':
-        return {}
-    return {'display': 'none'}
+    if report != 'maternal health':
+        return {'display': 'none'}, no_update
+
+    # Default the filter to the logged-in user's own facility level, but only
+    # for users actually scoped to a single facility — a national/district user
+    # isn't "at" any one facility, so there's nothing meaningful to default to.
+    # Not overriding a manual pick later in the session — this only re-applies
+    # each time the user switches back into the Maternal Health report.
+    default_level = 'All'
+    try:
+        data_route = (urlparams or {}).get('route', ['default'])[0]
+        user_data = _load_user_registry(data_route)
+        _, scope = _resolve_user_scope(urlparams or {}, user_data)
+        facility_code = scope.get('facility_code')
+        if scope.get('level') == 'facility' and facility_code:
+            resolved = resolve_facility_level(facility_code)
+            if resolved in ('Primary', 'Secondary', 'Tertiary'):
+                default_level = resolved
+    except Exception:
+        default_level = 'All'
+
+    return {}, default_level
+
+
+@callback(
+    Output('dashboard-moh-level-filter', 'value', allow_duplicate=True),
+    Input('dashboard-facility-filter', 'value'),
+    State('url-params-store', 'data'),
+    prevent_initial_call=True,
+)
+def reflect_selected_facility_level(selected_facilities, urlparams):
+    """When a national/district user drills down to exactly one facility, show
+    that facility's real level. Zero or multiple selected: leave the Facility
+    Level filter alone — at that point it's being used as an aggregation filter
+    (e.g. "all Secondary facilities"), not a single-facility reflection.
+    """
+    if not selected_facilities or len(selected_facilities) != 1:
+        raise PreventUpdate
+    try:
+        data_route = (urlparams or {}).get('route', ['default'])[0]
+        data_path = f'data/{data_route}/parquet'
+        lookup = DataStorage.query_duckdb(
+            f"SELECT DISTINCT {FACILITY_CODE_}, {FACILITY_} FROM '{data_path}' "
+            f"WHERE {FACILITY_} = '{selected_facilities[0]}'"
+        )
+        if lookup.empty:
+            raise PreventUpdate
+        return resolve_facility_level(lookup.iloc[0][FACILITY_CODE_], selected_facilities[0])
+    except PreventUpdate:
+        raise
+    except Exception:
+        raise PreventUpdate

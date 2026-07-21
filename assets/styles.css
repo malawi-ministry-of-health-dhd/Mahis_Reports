@@ -383,12 +383,12 @@
 /* Menu button design */
 .menu-btn {
     flex: 0 0 auto;
-    padding: 12px 16px;
+    padding: 8px 12px;
     font-size: 14px;
     background-color: #006401;
     color: white;
     border: none;
-    border-radius: 10px;
+    border-radius: 5px;
     cursor: pointer;
     transition: 0.2s ease;
 }
@@ -398,6 +398,27 @@
 }
 
 .menu-btn.active {
+    background-color: #6f6f6f; /* Grey when clicked */
+    color: white;
+}
+
+.menu-btn-alt {
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    font-size: 14px;
+    background-color: #8B0000; /* Dark red or any color you prefer */
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.menu-btn-alt:hover {
+    background-color: #6f6f6f;
+}
+
+.menu-btn-alt.active {
     background-color: #6f6f6f; /* Grey when clicked */
     color: white;
 }

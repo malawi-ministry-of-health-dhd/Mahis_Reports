@@ -140,6 +140,8 @@ def _indicator_run_fig(
         n_vals = precomputed['numerator'].tolist()
         d_vals = precomputed['denominator'].tolist()
         ys = [y if d > 0 else None for y, d in zip(ys, d_vals)]
+    elif not (ind.get('numerator_filters') and ind.get('denominator_filters')):
+        xs, ys, n_vals, d_vals = list(periods), [None] * len(periods), [0] * len(periods), [0] * len(periods)
     else:
         nm  = _mask(plot_df, ind['numerator_filters'])
         dm  = _mask(plot_df, ind['denominator_filters'])
@@ -312,6 +314,13 @@ def _run_chart_cards(
 
     date_min, date_max = dates.min(), dates.max()
 
+    if agg_df is None:
+        agg_df = _get_aggregate(route=(scope_meta or {}).get('route', 'default'))
+    if fac_filter is None and dist_filter is None and scope_meta:
+        _, fac_codes, districts = _resolve_scope_filters(plot_df, scope_meta)
+        fac_filter  = fac_codes or None
+        dist_filter = districts or None
+
     _agg_slice = None
     if agg_df is not None and not agg_df.empty:
         _ind_ids   = {_agg_resolve_id(agg_df, i['id'], i.get('label')) for i in tracked}
@@ -374,8 +383,10 @@ def _run_chart_cards(
                                         facility_codes=fac_filter,
                                         districts=dist_filter if not fac_filter else None,
                                         grain=grain, indicator_label=ind.get('label'))[2]
-            else:
+            elif ind.get('numerator_filters') and ind.get('denominator_filters'):
                 cur_pct = _cov(plot_df, ind['numerator_filters'], ind['denominator_filters'])[2]
+            else:
+                cur_pct = 0.0
             cls = _css(cur_pct, target, ind)
             badge_colors = {'ok': ('#D1FAE5', '#065F46'), 'warn': ('#FEF3C7', '#92400E'), 'danger': ('#FEE2E2', '#991B1B')}
             bg, fg = badge_colors.get(cls, ('#F1F5F9', '#475569'))
@@ -551,7 +562,7 @@ def update_trend_chart(n_clicks_list, location, selected_inds, grain, stored_tre
     ind_opts_by_cat = trend_payload.get('ind_opts_by_cat') or {}
     ind_options     = ind_opts_by_cat.get(cat, [])
 
-    _agg_now = _get_aggregate()
+    _agg_now = _get_aggregate(route=scope_meta.get('route', 'default'))
     _df_full = _restore_ui_dataframe(trend_payload.get('data_key'))
     if _agg_now is not None:
         _d_min = trend_payload.get('date_min')
