@@ -1456,8 +1456,21 @@ def _set_active_button(menu_clicks):
     # which report is active, so this mirrors update_dashboard's own
     # clicked_name logic without needing moh_level as an input at all.
     ctx = callback_context
-    triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else None
-    if not triggered_id or "menu-button" not in triggered_id:
+    if not ctx.triggered:
+        raise PreventUpdate
+    triggered = ctx.triggered[0]
+    triggered_id = triggered['prop_id']
+    if "menu-button" not in triggered_id:
+        raise PreventUpdate
+    # scrolling-menu's buttons are fully regenerated (fresh component
+    # instances) every time update_menu re-runs -- e.g. on the periodic
+    # dashboard-interval-update-today tick -- which re-fires this
+    # pattern-matching Input even though nothing was actually clicked. Without
+    # this guard that spurious fire (n_clicks None/0) would overwrite
+    # active-button-store with whichever button happened to report the
+    # "trigger" (in practice always General Summary, the first button built),
+    # silently kicking the user back to General Summary mid-session.
+    if not triggered.get('value'):
         raise PreventUpdate
     prop_dict = json.loads(triggered_id.split('.')[0])
     return prop_dict['name']
@@ -1505,9 +1518,17 @@ def update_dashboard(gen, start_date, end_date, level,
         data_route = (urlparams or {}).get('route', ["default"])[0]
         dataset_version = _dataset_version_token(data_route)
 
-        # Determine which report to show
+        # Determine which report to show. scrolling-menu's buttons are fully
+        # regenerated on every update_menu re-run (e.g. the periodic
+        # dashboard-interval-update-today tick), which re-fires this
+        # pattern-matching Input with no real click behind it -- guard on a
+        # truthy n_clicks so a spurious fire doesn't silently reset the
+        # selected report back to General Summary.
         clicked_name = current_active
-        if triggered_id and "menu-button" in triggered_id:
+        if (
+            triggered_id and "menu-button" in triggered_id
+            and ctx.triggered[0].get('value')
+        ):
             prop_dict = json.loads(triggered_id.split('.')[0])
             clicked_name = prop_dict['name']
 
