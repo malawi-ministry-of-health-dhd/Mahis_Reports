@@ -17,6 +17,11 @@
       "id": "mnh-nest360",
       "label": "MNH-Nest360",
       "module": "mnid/dashboards/MNH-Nest360"
+    },
+    {
+      "id": "mnh-hmis",
+      "label": "MNH-HMIS",
+      "module": "mnid/dashboards/MNH-HMIS-Test"
     }
   ]
 }

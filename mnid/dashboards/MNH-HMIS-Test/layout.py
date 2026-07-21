@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from dash import dash_table, dcc, html
 
 from mnid.components.run_charts import _chart_key_slug, _trend_chart_payload
@@ -31,11 +32,15 @@ GROUP_ORDER = (
     "Births and outcomes",
     "Antenatal care",
     "Delivery and newborn care",
+    "Obstetric complications and signal functions",
+    "Postnatal care",
 )
 GROUP_COLORS = {
     "Births and outcomes": RED,
     "Antenatal care": GREEN,
     "Delivery and newborn care": BLUE,
+    "Obstetric complications and signal functions": AMBER,
+    "Postnatal care": TEAL,
     "Other indicators": PURPLE,
 }
 LEGACY_GROUPS = {
@@ -67,6 +72,8 @@ INDICATOR_DESCRIPTIONS = {
     "started_anc_in_first_trimester_0_12_weeks": "Clients starting ANC within 0–12 weeks.",
     "received_120_fefo_tablets": "ANC clients receiving at least 120 FeFo tablets.",
     "received_itn_during_anc": "ANC clients receiving an insecticide-treated net.",
+    "screened_for_anaemia": "ANC clients screened for anaemia.",
+    "women_with_imminent_preterm_birth_receiving_acs": "Percentage of eligible women with imminent preterm birth receiving antenatal corticosteroids.",
     "uterotonic_given_after_birth": "Women receiving a uterotonic after birth.",
     "newborns_not_breathing_at_birth_receiving_bag_mask_ventilation": "Non-breathing newborns receiving bag-mask ventilation.",
     "vitamin_k_at_birth": "Newborns receiving Vitamin K at birth.",
@@ -75,6 +82,31 @@ INDICATOR_DESCRIPTIONS = {
     "delivered_at_home_or_in_transit": "Deliveries occurring at home or in transit.",
     "delivered_by_skilled_attendant": "Deliveries attended by a skilled provider.",
     "normal_vaginal_delivery": "Normal vaginal deliveries reported by facilities.",
+    "early_initiation_of_breastfeeding_within_1_hour_of_birth": "Provisional derived count of newborns breastfed within one hour; calculation requires clinical confirmation.",
+    "pre_eclampsia_eclampsia_receiving_magnesium_sulphate": "Percentage of women with pre-eclampsia or eclampsia receiving magnesium sulphate.",
+    "obstetric_complication_pph": "Postpartum haemorrhage complications reported by facilities.",
+    "obstetric_complication_eclampsia": "Eclampsia complications reported by facilities.",
+    "obstetric_complication_obstructed_labour": "Obstructed or prolonged labour complications reported by facilities.",
+    "obstetric_complication_maternal_sepsis": "Maternal sepsis complications reported by facilities.",
+    "signal_parenteral_antibiotics": "Facilities reporting administration of parenteral antibiotics.",
+    "signal_anticonvulsants_mgso4": "Facilities reporting administration of magnesium sulphate anticonvulsants.",
+    "signal_oxytocics": "Facilities reporting administration of uterotonic drugs.",
+    "signal_manual_placenta_removal": "Manual removal of placenta procedures reported by facilities.",
+    "signal_mva_retained_products": "Manual vacuum aspiration for retained products reported by facilities.",
+    "signal_assisted_vaginal_delivery": "Assisted vaginal deliveries reported by facilities.",
+    "signal_caesarean_section": "Caesarean sections reported by facilities.",
+    "signal_blood_transfusion": "Blood transfusions reported by facilities.",
+    "mothers_with_postnatal_complications": "Mothers with postnatal complications reported by facilities.",
+    "babies_with_postnatal_complications": "Babies with postnatal complications reported by facilities.",
+    "mothers_checked_within_7_days": "Mothers receiving a postnatal check within seven days.",
+    "babies_checked_within_7_days": "Babies receiving a postnatal check within seven days.",
+    "mothers_checked_at_6_weeks": "Mothers receiving a postnatal check at six weeks.",
+    "babies_checked_at_6_weeks": "Babies receiving a postnatal check at six weeks.",
+    "immediate_postpartum_family_planning": "Mothers receiving immediate postpartum family-planning services.",
+    "hiv_positive_postnatal_mothers": "HIV-positive mothers recorded during postnatal care.",
+    "hiv_exposed_babies_on_art_prophylaxis": "HIV-exposed babies receiving ART prophylaxis.",
+    "babies_who_received_bcg": "Babies receiving BCG vaccination.",
+    "babies_who_received_polio_0": "Babies receiving the Polio 0 dose.",
 }
 INDICATOR_COLORS = {
     "maternal_deaths": "#E11D48",
@@ -89,6 +121,49 @@ SUMMARY_INDICATOR_IDS = (
     "total_births", "live_births", "stillbirths", "fresh_stillbirths",
     "macerated_stillbirths", "maternal_deaths", "neonatal_deaths",
 )
+TREND_INDICATOR_IDS = (
+    "total_births", "live_births", "stillbirths", "maternal_deaths",
+    "neonatal_deaths", "anc_visits", "facility_deliveries",
+)
+PERCENTAGE_INDICATOR_IDS = (
+    "women_with_imminent_preterm_birth_receiving_acs",
+    "pre_eclampsia_eclampsia_receiving_magnesium_sulphate",
+)
+DOMAIN_SNAPSHOT_IDS = {
+    "Antenatal service snapshot": (
+        "blood_pressure_measured", "screened_for_anaemia", "tested_for_hiv",
+        "screened_for_syphilis", "at_least_4_anc_contacts", "tetanus_doses_2",
+        "new_anc_registrations", "started_anc_in_first_trimester_0_12_weeks",
+        "received_120_fefo_tablets", "received_itn_during_anc",
+    ),
+    "Delivery and newborn care snapshot": (
+        "uterotonic_given_after_birth",
+        "newborns_not_breathing_at_birth_receiving_bag_mask_ventilation",
+        "vitamin_k_at_birth", "delivered_at_this_facility",
+        "delivered_at_home_or_in_transit", "delivered_by_skilled_attendant",
+        "normal_vaginal_delivery",
+        "early_initiation_of_breastfeeding_within_1_hour_of_birth",
+    ),
+    "Obstetric complications": (
+        "obstetric_complication_pph", "obstetric_complication_eclampsia",
+        "obstetric_complication_obstructed_labour",
+        "obstetric_complication_maternal_sepsis",
+    ),
+    "Emergency obstetric signal functions": (
+        "signal_parenteral_antibiotics", "signal_anticonvulsants_mgso4",
+        "signal_oxytocics", "signal_manual_placenta_removal",
+        "signal_mva_retained_products", "signal_assisted_vaginal_delivery",
+        "signal_caesarean_section", "signal_blood_transfusion",
+    ),
+    "Postnatal and newborn follow-up": (
+        "mothers_with_postnatal_complications", "babies_with_postnatal_complications",
+        "mothers_checked_within_7_days", "babies_checked_within_7_days",
+        "mothers_checked_at_6_weeks", "babies_checked_at_6_weeks",
+        "immediate_postpartum_family_planning", "hiv_positive_postnatal_mothers",
+        "hiv_exposed_babies_on_art_prophylaxis", "babies_who_received_bcg",
+        "babies_who_received_polio_0",
+    ),
+}
 
 
 def _empty(message: str) -> html.Div:
@@ -115,6 +190,8 @@ def _load_sample(path: Path) -> pd.DataFrame:
     frame["value"] = pd.to_numeric(frame.get("value"), errors="coerce")
     if "indicator_group" not in frame.columns:
         frame["indicator_group"] = frame["indicator_id"].map(LEGACY_GROUPS).fillna("Other indicators")
+    if "value_type" not in frame.columns:
+        frame["value_type"] = "count"
     return frame.dropna(subset=["period_start", "value"])
 
 
@@ -225,7 +302,7 @@ def _indicator_summary(frame: pd.DataFrame) -> pd.DataFrame:
     latest_period = periods[-1]
     previous_period = periods[-2] if len(periods) > 1 else None
     total = frame.groupby(
-        ["indicator_id", "indicator_name", "indicator_group"], as_index=False
+        ["indicator_id", "indicator_name", "indicator_group", "value_type"], as_index=False
     )["value"].sum().rename(columns={"value": "total"})
     latest = (
         frame[frame["period_start"] == latest_period]
@@ -388,6 +465,7 @@ def _indicator_card(row, color: str) -> html.Div:
 
 
 def _chart_card(title: str, subtitle: str, figure) -> html.Div:
+    figure_height = getattr(getattr(figure, "layout", None), "height", None) or 370
     return html.Div(
         [
             html.Div(title, style={"fontSize": "14px", "fontWeight": 800, "color": TEXT}),
@@ -395,7 +473,7 @@ def _chart_card(title: str, subtitle: str, figure) -> html.Div:
             dcc.Graph(
                 figure=figure,
                 config={"displayModeBar": False, "responsive": True},
-                style={"height": "370px"},
+                style={"height": f"{figure_height}px"},
             ),
         ],
         style={
@@ -421,10 +499,127 @@ def _indicator_chart_card(frame: pd.DataFrame, row, color: str):
             row.indicator_id, "Facility-reported HMIS aggregate over time."
         ),
         accent=color,
-        y_title="Reported count",
+        y_title="Percentage (%)" if row.value_type == "percentage" else "Reported count",
         series_df=series[["month", "value"]],
         multi=False,
     )["card"]
+
+
+def _latest_indicator_totals(frame: pd.DataFrame, indicator_ids: tuple[str, ...]) -> pd.DataFrame:
+    selected = frame[frame["indicator_id"].isin(indicator_ids)].copy()
+    if selected.empty:
+        return pd.DataFrame(columns=["indicator_id", "indicator_name", "value"])
+    latest_period = selected["period_start"].max()
+    return (
+        selected[selected["period_start"] == latest_period]
+        .groupby(["indicator_id", "indicator_name"], as_index=False)["value"].sum()
+        .sort_values("value")
+    )
+
+
+def _indicator_comparison_figure(
+    frame: pd.DataFrame, indicator_ids: tuple[str, ...], color: str,
+) -> go.Figure:
+    values = _latest_indicator_totals(frame, indicator_ids)
+    figure = go.Figure()
+    if values.empty:
+        return figure
+    figure.add_trace(go.Bar(
+        x=values["value"], y=values["indicator_name"], orientation="h",
+        marker={"color": color, "opacity": .82, "line": {"color": color, "width": .5}},
+        text=values["value"].map(lambda value: f"{value:,.0f}"),
+        textposition="outside", cliponaxis=False,
+        hovertemplate="<b>%{y}</b><br>%{x:,.0f}<extra></extra>",
+    ))
+    height = max(340, 54 * len(values) + 90)
+    figure.update_layout(
+        height=height, margin={"l": 260, "r": 70, "t": 18, "b": 38},
+        plot_bgcolor=SURFACE, paper_bgcolor=SURFACE, showlegend=False,
+        font={"color": TEXT, "size": 10},
+        xaxis={"title": "Reported count · latest month", "gridcolor": "#EEF2F7", "zeroline": False},
+        yaxis={"title": None, "showgrid": False, "automargin": True},
+    )
+    return figure
+
+
+def _outcome_composition_figure(frame: pd.DataFrame) -> go.Figure:
+    values = _latest_indicator_totals(
+        frame, ("live_births", "fresh_stillbirths", "macerated_stillbirths")
+    )
+    color_by_id = {
+        "live_births": "#16A34A", "fresh_stillbirths": "#DB2777",
+        "macerated_stillbirths": "#8B5CF6",
+    }
+    figure = go.Figure()
+    if values.empty:
+        return figure
+    figure.add_trace(go.Pie(
+        labels=values["indicator_name"], values=values["value"], hole=.64,
+        marker={"colors": [color_by_id.get(value, BLUE) for value in values["indicator_id"]]},
+        textinfo="percent", hovertemplate="<b>%{label}</b><br>%{value:,.0f} (%{percent})<extra></extra>",
+    ))
+    figure.update_layout(
+        height=390, margin={"l": 12, "r": 12, "t": 16, "b": 45},
+        paper_bgcolor=SURFACE, plot_bgcolor=SURFACE,
+        legend={"orientation": "h", "y": -.08, "x": .5, "xanchor": "center"},
+        font={"color": TEXT, "size": 10},
+        annotations=[{"text": "Birth<br>outcomes", "x": .5, "y": .5, "showarrow": False,
+                      "font": {"size": 14, "color": TEXT}}],
+    )
+    return figure
+
+
+def _percentage_status_card(frame: pd.DataFrame, indicator_id: str, color: str) -> html.Div:
+    selected = frame[frame["indicator_id"] == indicator_id].copy()
+    if selected.empty:
+        return html.Div()
+    latest = selected[selected["period_start"] == selected["period_start"].max()]
+    median = float(latest["value"].median()) if not latest.empty else 0.0
+    reporting_units = int(latest["org_unit_id"].nunique())
+    above_100 = int((latest["value"] > 100).sum())
+    name = str(latest["indicator_name"].iloc[0])
+    bounded = max(0.0, min(median, 100.0))
+    return html.Div([
+        html.Div(name, style={
+            "fontSize": "12px", "fontWeight": 800, "color": TEXT,
+            "lineHeight": "1.4", "minHeight": "35px",
+        }),
+        html.Div([
+            html.Div(style={
+                "width": "92px", "height": "92px", "borderRadius": "50%",
+                "background": f"conic-gradient({color} {bounded:.1f}%, #E2E8F0 0)",
+                "display": "flex", "alignItems": "center", "justifyContent": "center",
+            }, children=html.Div(f"{median:,.1f}%", style={
+                "width": "68px", "height": "68px", "borderRadius": "50%",
+                "background": SURFACE, "display": "flex", "alignItems": "center",
+                "justifyContent": "center", "fontSize": "16px", "fontWeight": 850,
+                "color": color,
+            })),
+            html.Div([
+                html.Div("Median facility percentage", style={"fontSize": "10px", "color": MUTED}),
+                html.Div(f"{reporting_units:,} reporting units", style={
+                    "fontSize": "11px", "fontWeight": 750, "color": TEXT, "marginTop": "6px",
+                }),
+                html.Div(
+                    f"{above_100:,} values above 100%" if above_100 else "No values above 100%",
+                    style={
+                        "fontSize": "10px", "fontWeight": 700, "marginTop": "6px",
+                        "color": RED if above_100 else GREEN,
+                    },
+                ),
+            ], style={"flex": "1"}),
+        ], style={"display": "flex", "gap": "16px", "alignItems": "center", "marginTop": "14px"}),
+        html.Div(style={
+            "height": "6px", "borderRadius": "4px", "background": "#E2E8F0",
+            "overflow": "hidden", "marginTop": "16px",
+        }, children=html.Div(style={
+            "height": "100%", "width": f"{bounded:.1f}%", "background": color,
+        })),
+    ], style={
+        "background": SURFACE, "border": f"1px solid {BORDER}",
+        "borderTop": f"3px solid {color}", "borderRadius": "12px", "padding": "16px",
+        "boxShadow": "0 2px 8px rgba(15,23,42,.04)",
+    })
 
 
 def _district_figure(frame: pd.DataFrame):
@@ -521,38 +716,34 @@ def render_mnh_hmis_test_dashboard(
         if indicator_id in summary_lookup
     ]
 
-    chart_sections = []
-    available_groups = list(GROUP_ORDER) + [
-        group for group in summary["indicator_group"].dropna().unique()
-        if group not in GROUP_ORDER
+    trend_cards = [
+        _indicator_chart_card(
+            filtered, summary_lookup[indicator_id],
+            INDICATOR_COLORS.get(
+                indicator_id,
+                GROUP_COLORS.get(summary_lookup[indicator_id].indicator_group, BLUE),
+            ),
+        )
+        for indicator_id in TREND_INDICATOR_IDS
+        if indicator_id in summary_lookup
     ]
-    for group in available_groups:
-        group_summary = summary[summary["indicator_group"] == group]
-        if group_summary.empty:
-            continue
-        group_color = GROUP_COLORS.get(group, PURPLE)
-        chart_sections.extend([
-            _section_header(
-                group,
-                f"{len(group_summary)} monthly indicator run charts · active geographic scope",
-                group_color,
-            ),
-            html.Div(
-                [
-                    _indicator_chart_card(
-                        filtered,
-                        row,
-                        INDICATOR_COLORS.get(row.indicator_id, group_color),
-                    )
-                    for row in group_summary.itertuples(index=False)
-                ],
-                style={
-                    "display": "grid",
-                    "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
-                    "gap": "14px", "marginBottom": "8px",
-                },
-            ),
-        ])
+    percentage_cards = [
+        _percentage_status_card(
+            filtered, indicator_id,
+            GREEN if indicator_id.startswith("women_") else AMBER,
+        )
+        for indicator_id in PERCENTAGE_INDICATOR_IDS
+        if indicator_id in summary_lookup
+    ]
+    snapshot_colors = (GREEN, BLUE, RED, AMBER, TEAL)
+    snapshot_cards = [
+        _chart_card(
+            title,
+            "Latest reporting month · active geographic scope",
+            _indicator_comparison_figure(filtered, indicator_ids, snapshot_colors[index]),
+        )
+        for index, (title, indicator_ids) in enumerate(DOMAIN_SNAPSHOT_IDS.items())
+    ]
 
     district_title, district_figure = _district_figure(filtered)
     return html.Div(
@@ -577,17 +768,51 @@ def render_mnh_hmis_test_dashboard(
                 "gap": "12px", "marginBottom": "18px",
             }),
             _section_header(
-                "Indicator run charts",
-                "Every available HMIS indicator is shown in its own monthly chart and clinical domain",
+                "Priority trends",
+                "Run charts are reserved for indicators where change over time supports action",
                 BLUE,
             ),
-            *chart_sections,
-            _section_header("Geographic profile", "District comparison for priority outcomes", RED),
-            _chart_card(
-                "Top 15 districts",
-                f"Combined {district_title.lower()} in the selected reporting window.",
-                district_figure,
+            html.Div(trend_cards, style={
+                "display": "grid", "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
+                "gap": "14px", "marginBottom": "18px",
+            }),
+            _section_header(
+                "Birth outcome composition",
+                "Latest-month balance of live births, fresh stillbirths, and macerated stillbirths",
+                PURPLE,
             ),
+            html.Div([
+                _chart_card(
+                    "Birth outcome mix", "Latest reporting month · share of recorded outcomes",
+                    _outcome_composition_figure(filtered),
+                ),
+                _chart_card(
+                    "Priority outcomes by district",
+                    f"Top districts by combined {district_title.lower()} in the selected window",
+                    district_figure,
+                ),
+            ], style={
+                "display": "grid", "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
+                "gap": "14px", "marginBottom": "18px",
+            }),
+            _section_header(
+                "Clinical service snapshots",
+                "Related indicators are compared together instead of repeating identical chart forms",
+                GREEN,
+            ),
+            html.Div(snapshot_cards, style={
+                "display": "grid", "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
+                "gap": "14px", "marginBottom": "18px",
+            }),
+            _section_header(
+                "Coverage and treatment status",
+                "Median facility percentages for the latest month; out-of-range values remain visible",
+                AMBER,
+            ),
+            html.Div(percentage_cards, style={
+                "display": "grid", "gridTemplateColumns": "repeat(auto-fit, minmax(300px, 1fr))",
+                "gap": "14px", "marginBottom": "18px",
+            }),
             _section_header(
                 "Facility drill-down",
                 "Use the column filters to isolate a district, facility, domain, or indicator.",
