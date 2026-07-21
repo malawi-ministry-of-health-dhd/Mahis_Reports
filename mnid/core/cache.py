@@ -102,11 +102,13 @@ def _country_profile_cache_key(scope_meta, opd_key, start_date, end_date, report
 def _load_dashboard_tab_config() -> dict:
     root = Path(os.getcwd())
     config_path = root / 'data' / 'visualizations' / 'dashboard_tabs_config.json'
+    example_path = root / 'data' / 'visualizations' / 'dashboard_tabs_config.json.example'
     raw = {}
     try:
-        if config_path.exists():
+        selected_path = config_path if config_path.exists() else example_path
+        if selected_path.exists():
             import json as _json
-            raw = _json.loads(config_path.read_text(encoding='utf-8')) or {}
+            raw = _json.loads(selected_path.read_text(encoding='utf-8')) or {}
     except Exception:
         raw = {}
 

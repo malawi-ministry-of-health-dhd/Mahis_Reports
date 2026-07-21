@@ -36,7 +36,7 @@ Atomic local Parquet publication
 MNID local store and renderer
         |
         v
-MNH Beginnings -> MNH HMIS test
+MNH Program -> MNH-HMIS outer tab
         |
         v
 KPI cards, trends, district comparison, facility table
@@ -55,8 +55,8 @@ DHIS2 Analytics API
   -> python -m mnid.dhis2.sample_sync
   -> mnid/data/dhis2/aggregates/hmis_test.parquet
   -> MNH Program
-  -> MNH Beginnings
-  -> MNH HMIS test
+  -> MNH Program
+  -> configured MNH-HMIS outer tab
 ```
 
 The current local snapshot contains real DHIS2 aggregate values, not generated demo
@@ -116,7 +116,7 @@ governance approvals remain in place.
 | `mnid/dhis2/storage.py` | Writes raw, normalized, calculated, and last-known-good Parquet data safely. |
 | `mnid/dhis2/sample_sync.py` | Retrieves 78 required atomic operands in bounded batches, calculates all 52 dashboard indicators, and refreshes the controlled facility-level snapshot. |
 | `mnid/dashboards/MNH-HMIS-Test/layout.py` | Reads the cached sample, applies filters, and builds cards, charts, and the facility table. |
-| `mnid/views/renderer.py` | Routes MNH tabs and provides the HMIS-only fallback when legacy MAHIS data is absent. |
+| `mnid/views/renderer.py` | Routes configuration-driven MNH outer tabs and provides a source-aware HMIS path when legacy MAHIS data is absent. |
 | `pages/home.py` | Resolves URL/user scope, date range, district/facility filters, and selects the MNH renderer. |
 
 ## Organisation-unit model
@@ -167,8 +167,8 @@ In a DHIS2-only test environment that file can be absent. The application theref
 1. skips the optional legacy MNID aggregation job;
 2. initializes the date range from the HMIS snapshot;
 3. allows the demo user and URL state to resolve before rendering;
-4. routes the Maternal Health dashboard to an HMIS-only Beginnings shell; and
-5. renders the MNH HMIS test without querying the absent legacy Parquet file.
+4. routes Maternal Health through the `EneyaFrancis-main` configuration-driven outer-tab shell; and
+5. exposes only the usable MNH-HMIS tab when the legacy Parquet file is absent.
 
 Other legacy programme dashboards still require their normal MAHIS/OpenMRS source.
 
@@ -228,7 +228,7 @@ python3 app.py
 ```
 
 Open the dashboard URL printed by the application and select **MNH Program**. In a
-DHIS2-only environment, the **MNH HMIS test** Beginnings view opens using the cached
+DHIS2-only environment, the **MNH-HMIS** outer-tab view opens using the cached
 period range.
 
 ## Live reconciliation

@@ -425,6 +425,69 @@ def _render_mnh_dashboard_view(selected_view: str, state: dict, views: dict):
     label_map = {item.get('id'): item.get('label') for item in tab_specs}
     return _render_mnh_placeholder(label_map.get(selected_view, selected_view))
 
+
+def _render_dhis2_mnh_dashboard(start_date, end_date, scope_meta: dict | None = None) -> html.Div:
+    """Render the configured HMIS module through the EneyaFrancis MNH outer-tab shell."""
+    configured_tabs = _load_dashboard_tab_config().get('mnh_tabs', [])
+    hmis_spec = next(
+        (
+            item for item in configured_tabs
+            if item.get('module') == 'mnid/dashboards/MNH-HMIS-Test'
+        ),
+        {
+            'id': 'mnh-hmis',
+            'label': 'MNH-HMIS',
+            'module': 'mnid/dashboards/MNH-HMIS-Test',
+            'placeholder': False,
+        },
+    )
+    hmis_id = hmis_spec['id']
+    token_data = ('dhis2-mnh', str(start_date), str(end_date), scope_meta or {})
+    token = hashlib.md5(pickle.dumps(token_data, protocol=4)).hexdigest()
+    state = {
+        'start_date': start_date,
+        'end_date': end_date,
+        'scope_meta': scope_meta or {},
+        'mnh_tab_specs': [hmis_spec],
+    }
+    views = {}
+    rendered = _render_mnh_dashboard_view(hmis_id, state, views)
+    _MNID_EXECUTIVE_DISK_CACHE.set(f'ec:{token}', views, expire=_MNID_UI_CACHE_TTL_SECONDS)
+    _MNID_EXECUTIVE_DISK_CACHE.set(f'ed:{token}', state, expire=_MNID_UI_CACHE_TTL_SECONDS)
+
+    tab_style = {
+        'padding': '12px 18px', 'borderRadius': '14px',
+        'border': f'1px solid {BORDER}', 'backgroundColor': '#FFFFFF', 'color': TEXT,
+    }
+    active_style = {
+        **tab_style, 'backgroundColor': '#ECFDF5', 'color': '#166534', 'fontWeight': 700,
+    }
+    return html.Div(
+        className='mnid-bg',
+        children=[
+            dcc.Store(id='mnid-executive-view-store', data=token),
+            html.Div(
+                className='mnid-shell',
+                children=[
+                    dcc.Tabs(
+                        id='mnid-mnh-view-tabs', value=hmis_id,
+                        style={'marginBottom': '18px'},
+                        children=[dcc.Tab(
+                            label=hmis_spec.get('label') or 'MNH-HMIS', value=hmis_id,
+                            style=tab_style, selected_style=active_style,
+                        )],
+                    ),
+                    html.Div(id='mnid-beginnings-panel', children=[], style={'display': 'none'}),
+                    html.Div(
+                        id='mnid-mnh-view-content', className='mnid-executive-content',
+                        children=[rendered],
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
 _MNID_SQL_COLUMNS = "*" #kept all for now
 def render_mnid_dashboard(filtered, data_opd, data_path, config, 
                           facility_code, start_date, end_date,
@@ -436,6 +499,11 @@ def render_mnid_dashboard(filtered, data_opd, data_path, config,
         if not source_path.is_absolute():
             source_path = Path.cwd() / source_path
         if not source_path.exists():
+            if (
+                config.get('report_name') == 'Maternal Health'
+                and (scope_meta or {}).get('route') == 'dhis2'
+            ):
+                return _render_dhis2_mnh_dashboard(start_date, end_date, scope_meta)
             return html.Div(
                 'The local MAHIS dataset is unavailable for this dashboard.',
                 style={'padding': '24px', 'color': '#64748B'},

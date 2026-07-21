@@ -31,7 +31,7 @@ crosswalk, clinical approval of derived formulas, and management approval of the
 - Raw audit, normalized atomic data, calculated indicators, validation reports, and
   last-known-good output separated under ignored runtime folders.
 - Opt-in DHIS2 dashboard mode without render-time network access.
-- A working MNH Beginnings HMIS test view covering all 52 indicators through a mixed
+- A working configuration-driven MNH-HMIS view covering all 52 indicators through a mixed
   presentation: seven focused run charts, an outcome-composition donut, district
   ranking, five clinical comparison charts, percentage status cards, and a filterable
   facility-level table.
@@ -216,7 +216,7 @@ district filters and displays source, last successful synchronization, latest at
 freshness, and mapping version. MaHIS remains the default. There is no network call
 during import or rendering.
 
-A sample inner tab named **MNH HMIS test** is available under MNH Beginnings. It reads
+A configured outer tab named **MNH-HMIS** is available under MNH Program. It reads
 only local `hmis_test.parquet` output and currently displays 25 verified indicators
 through a Country Profile-inspired header, alert and scope bands, current-period
 summary, and one labeled monthly line-chart card per indicator. Charts are grouped as
@@ -255,7 +255,7 @@ usable by the test dashboard. This successful dashboard retrieval does not itsel
 mean the complete production pipeline has received governance or clinical approval.
 
 When the legacy MAHIS Parquet source is unavailable, selecting **MNH Program** now
-opens the HMIS-only Beginnings view instead of failing with a DuckDB catalog error.
+opens the source-aware MNH-HMIS outer-tab view instead of failing with a DuckDB catalog error.
 Its initial filter range is taken from the cached DHIS2 data itself. Other legacy
 dashboards still require their normal MAHIS/OpenMRS Parquet source.
 
