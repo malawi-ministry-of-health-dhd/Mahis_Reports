@@ -68,18 +68,56 @@ def _run_mnid_aggregation():
     t.start()
 
 
+def _run_dhis2_publish():
+    """Refresh the DHIS2 -> MNID aggregate (data/mnid_aggregates/dhis2), in a background thread.
+
+    Pulls all 52 mapped indicators from the DHIS2 Analytics API and republishes
+    indicator_aggregates.parquet -- what MNID reads from when
+    config.MNID_DATA_SOURCE = 'dhis2'. Runs on its own weekly schedule (see
+    run_scheduler) rather than at every DATA_UPDATE_INTERVAL tick, since it's a
+    live API pull (minutes, not seconds) and DHIS2 data doesn't change that often.
+    See mnid/dhis2/PUBLISH_GUIDE.md for manual runs and troubleshooting.
+    """
+    def _job():
+        import os as _os
+        from datetime import datetime as _datetime
+        log_file = "/app/logs/dhis2_publish.log"
+        timestamp = _datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        _os.environ['MNH_DHIS2_START_PERIOD'] = _os.getenv('MNH_DHIS2_START_PERIOD', '202501')
+        _os.environ['MNH_DHIS2_END_PERIOD'] = _datetime.now().strftime('%Y%m')
+        try:
+            from mnid.dhis2.mnid_publish import publish_mnid_aggregate
+            result = publish_mnid_aggregate()
+            with open(log_file, "a") as f:
+                f.write(f"[{timestamp}] DHIS2 publish OK: {result}\n")
+            print(f"DHIS2 publish complete at {timestamp}: {result}")
+        except Exception as exc:
+            with open(log_file, "a") as f:
+                f.write(f"[{timestamp}] DHIS2 publish FAILED: {exc}\n")
+            print(f"DHIS2 publish error: {exc}")
+
+    t = threading.Thread(target=_job, daemon=True)
+    t.start()
+
+
 def run_scheduler():
     """Run the scheduler in a separate thread."""
     interval = int(os.getenv('DATA_UPDATE_INTERVAL', '30'))
     agg_interval_hours = int(os.getenv('MNID_AGGREGATION_INTERVAL_HOURS', '6'))
+    dhis2_publish_days = int(os.getenv('MNID_DHIS2_PUBLISH_INTERVAL_DAYS', '7'))
+    dhis2_publish_time = os.getenv('MNID_DHIS2_PUBLISH_TIME', '03:00')
 
     print(f"Scheduler started. Data will be updated every {interval} minutes.")
     print(f"MNID aggregation scheduled every {agg_interval_hours} hours.")
+    print(f"DHIS2 publish scheduled every {dhis2_publish_days} days at {dhis2_publish_time}.")
 
     schedule.every(interval).minutes.do(run_data_storage)
 
     # Independent overnight aggregation — runs even if data_storage didn't fire
     schedule.every(agg_interval_hours).hours.do(_run_mnid_aggregation)
+
+    # Weekly DHIS2 -> MNID aggregate refresh (data/mnid_aggregates/dhis2)
+    schedule.every(dhis2_publish_days).days.at(dhis2_publish_time).do(_run_dhis2_publish)
 
     if os.getenv('INITIAL_DATA_LOAD', 'true').lower() == 'true':
         print("Running initial data load...")

@@ -1785,14 +1785,33 @@ def update_dashboard(gen, start_date, end_date, level,
      Output('dashboard-date-range-picker', 'end_date')],
     [Input('dashboard-period-type-filter', 'value'),
      Input('dashboard-interval-update-today', 'n_intervals')],
-    [State('url-params-store', 'data')],
+    [State('url-params-store', 'data'),
+     State('active-button-store', 'data')],
 )
-def sync_picker_with_logic(period_type, n, urlparams):
+def sync_picker_with_logic(period_type, n, urlparams, current_active):
     ctx = callback_context
     triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else ""
     data_route = (urlparams or {}).get('route', ["default"])[0]
     default_start, default_end = _default_date_window(data_route)
     anchor = default_end
+
+    # Maternal Health in DHIS2 mode: "Today" etc. should anchor to DHIS2's
+    # own latest reported month, not the local MAHIS dataset's last date --
+    # those two can drift apart by months (DHIS2 gets a fresh monthly pull,
+    # MAHIS's local parquet only updates on its own refresh schedule), and
+    # anchoring to the stale MAHIS date would hide DHIS2 data that's already
+    # available. Every other report keeps the existing MAHIS-anchored
+    # behavior unchanged.
+    if current_active == 'Maternal Health' and MNID_DATA_SOURCE == 'dhis2':
+        try:
+            from mnid.aggregation.store import get_aggregate as _get_dhis2_agg
+            dhis2_agg = _get_dhis2_agg(route='dhis2')
+            if dhis2_agg is not None and not dhis2_agg.empty:
+                dhis2_latest = dhis2_agg['period_start'].max()
+                if pd.notna(dhis2_latest) and (anchor is None or dhis2_latest.normalize() > pd.Timestamp(anchor)):
+                    anchor = dhis2_latest.normalize()
+        except Exception:
+            pass
 
     if "dashboard-interval-update-today" in triggered_id:
         if period_type == "Today":

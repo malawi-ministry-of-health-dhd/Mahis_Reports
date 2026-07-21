@@ -4083,12 +4083,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_outborn",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -4535,12 +4539,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_neonatal_death",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_status_recorded",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -4553,12 +4561,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_complication_at_birth",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -4570,12 +4582,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_kmc",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -4587,12 +4603,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "concept_name",
-          "value1": "Birth weight"
+          "value1": "Birth weight",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -4610,12 +4630,16 @@
             "Yes",
             "Stimulation only",
             "Bag and mask"
-          ]
+          ],
+          "variable3": "Age_Group",
+          "value3": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "concept_name",
-          "value1": "Neonatal resuscitation provided"
+          "value1": "Neonatal resuscitation provided",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -4627,12 +4651,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "concept_name",
-          "value1": "thermal care"
+          "value1": "thermal care",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -4644,12 +4672,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_kmc",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -4662,12 +4694,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_low_birthweight",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "concept_name",
-          "value1": "Birth weight"
+          "value1": "Birth weight",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "note": "Burden rate \u2014 lower is better."
       },
@@ -4681,12 +4717,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_birth_asphyxia",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "note": "Burden rate \u2014 proxied from birth asphyxia suspected and resuscitation-eligibility concepts."
       },
@@ -4700,12 +4740,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_sepsis",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "note": "Burden rate \u2014 proxied from sepsis-related observation concepts."
       },
@@ -4718,12 +4762,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_pulse_oximeter_admission",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "note": "Tracked using pulse oximeter or oxygen saturation documentation captured at neonatal admission."
       },
@@ -4736,12 +4784,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_bilirubin_measured",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "note": "Tracked from bilirubin-related measurement concepts documented in newborn care."
       },
@@ -4754,12 +4806,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_jaundice_bilirubin_measured",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_jaundice",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "note": "Uses clinical jaundice plus bilirubin-measurement documentation in the newborn record."
       },
@@ -4772,12 +4828,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_jaundice_phototherapy",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_jaundice",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "note": "Uses clinical jaundice and phototherapy treatment documentation as the newborn jaundice care pathway proxy."
       },
@@ -4790,12 +4850,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_pnc_breastfeeding_initiated",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "note": "Uses breastfeeding initiation documented around birth and carried as a person-level flag into the newborn pathway."
       },
@@ -4808,12 +4872,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_asphyxia_resuscitated",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_birth_asphyxia",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -4825,7 +4893,9 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_kmc_eligible",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
@@ -4833,7 +4903,9 @@
           "value1": [
             "1000-1499g",
             "1500-1999g"
-          ]
+          ],
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -4845,12 +4917,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_cpap_1000_1499",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "mnid_birth_weight_band",
-          "value1": "1000-1499g"
+          "value1": "1000-1499g",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -4870,12 +4946,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_jaundice_phototherapy",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_jaundice",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "note": "Jaundice identification used as phototherapy proxy (MAHIS clinical jaundice \u2192 phototherapy care pathway)."
       },
@@ -4888,12 +4968,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_sepsis_antibiotics",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_sepsis",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -4905,12 +4989,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_not_hypothermic_admission",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -4922,12 +5010,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_not_hypothermic_anytime",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "note": "Proxy from admission thermal status \u2014 longitudinal stay temperature not yet in extract."
       },
@@ -4952,6 +5044,174 @@
         "label": "Macerated Stillbirths",
         "category": "Labour",
         "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_pph",
+        "label": "Obstetric complication: PPH",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_eclampsia",
+        "label": "Obstetric complication: Eclampsia",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_obstructedlabour",
+        "label": "Obstetric complication: Obstructed labour",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_signalantibiotics",
+        "label": "Signal: Parenteral antibiotics",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_signalmgso4",
+        "label": "Signal: Anticonvulsants (MgSO4)",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_signaloxytocics",
+        "label": "Signal: Oxytocics",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_signalplacenta",
+        "label": "Signal: Manual placenta removal",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_signalmva",
+        "label": "Signal: MVA / retained products",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_signalassisted",
+        "label": "Signal: Assisted vaginal delivery",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_signalbloodtransfusion",
+        "label": "Signal: Blood transfusion",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_pnc_core_motherscomplications",
+        "label": "Mothers with postnatal complications",
+        "category": "PNC",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_nb_core_babiescomplications",
+        "label": "Babies with postnatal complications",
+        "category": "Newborn",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_pnc_core_mocheck7d",
+        "label": "Mothers checked within 7 days",
+        "category": "PNC",
+        "target": 80,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_nb_core_babycheck7d",
+        "label": "Babies checked within 7 days",
+        "category": "Newborn",
+        "target": 80,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_pnc_core_mocheck6wk",
+        "label": "Mothers checked at 6 weeks",
+        "category": "PNC",
+        "target": 80,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_nb_core_babycheck6wk",
+        "label": "Babies checked at 6 weeks",
+        "category": "Newborn",
+        "target": 80,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_pnc_core_fp",
+        "label": "Immediate postpartum family planning",
+        "category": "PNC",
+        "target": 60,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_pnc_core_hivpositive",
+        "label": "HIV positive postnatal mothers",
+        "category": "PNC",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_nb_core_hivartprophylaxis",
+        "label": "HIV exposed babies on ART prophylaxis",
+        "category": "Newborn",
+        "target": 90,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_nb_core_bcg",
+        "label": "Babies who received BCG",
+        "category": "Newborn",
+        "target": 90,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_nb_core_polio0",
+        "label": "Babies who received Polio 0",
+        "category": "Newborn",
+        "target": 90,
         "status": "tracked",
         "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
       }
@@ -5459,12 +5719,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_outborn",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -5911,12 +6175,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_neonatal_death",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_status_recorded",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -5929,12 +6197,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_complication_at_birth",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -5946,12 +6218,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_kmc",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -5963,12 +6239,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "concept_name",
-          "value1": "Birth weight"
+          "value1": "Birth weight",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -5986,12 +6266,16 @@
             "Yes",
             "Stimulation only",
             "Bag and mask"
-          ]
+          ],
+          "variable3": "Age_Group",
+          "value3": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "concept_name",
-          "value1": "Neonatal resuscitation provided"
+          "value1": "Neonatal resuscitation provided",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -6003,12 +6287,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "concept_name",
-          "value1": "thermal care"
+          "value1": "thermal care",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -6020,12 +6308,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_kmc",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -6038,12 +6330,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_low_birthweight",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "concept_name",
-          "value1": "Birth weight"
+          "value1": "Birth weight",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "note": "Burden rate \u2014 lower is better."
       },
@@ -6057,12 +6353,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_birth_asphyxia",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "note": "Burden rate \u2014 proxied from birth asphyxia suspected and resuscitation-eligibility concepts."
       },
@@ -6076,12 +6376,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_sepsis",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "note": "Burden rate \u2014 proxied from sepsis-related observation concepts."
       },
@@ -6094,12 +6398,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_pulse_oximeter_admission",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "note": "Tracked using pulse oximeter or oxygen saturation documentation captured at neonatal admission."
       },
@@ -6112,12 +6420,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_bilirubin_measured",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "note": "Tracked from bilirubin-related measurement concepts documented in newborn care."
       },
@@ -6130,12 +6442,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_jaundice_bilirubin_measured",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_jaundice",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "note": "Uses clinical jaundice plus bilirubin-measurement documentation in the newborn record."
       },
@@ -6148,12 +6464,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_jaundice_phototherapy",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_jaundice",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "note": "Uses clinical jaundice and phototherapy treatment documentation as the newborn jaundice care pathway proxy."
       },
@@ -6166,12 +6486,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_pnc_breastfeeding_initiated",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "note": "Uses breastfeeding initiation documented around birth and carried as a person-level flag into the newborn pathway."
       },
@@ -6184,12 +6508,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_asphyxia_resuscitated",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_birth_asphyxia",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -6201,7 +6529,9 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_kmc_eligible",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
@@ -6209,7 +6539,9 @@
           "value1": [
             "1000-1499g",
             "1500-1999g"
-          ]
+          ],
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -6221,12 +6553,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_cpap_1000_1499",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "mnid_birth_weight_band",
-          "value1": "1000-1499g"
+          "value1": "1000-1499g",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -6246,12 +6582,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_jaundice_phototherapy",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_jaundice",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "note": "Jaundice identification used as phototherapy proxy (MAHIS clinical jaundice \u2192 phototherapy care pathway)."
       },
@@ -6264,12 +6604,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_sepsis_antibiotics",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_sepsis",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -6281,12 +6625,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_not_hypothermic_admission",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         }
       },
       {
@@ -6298,12 +6646,16 @@
         "numerator_filters": {
           "unique": "person_id",
           "variable1": "mnid_newborn_not_hypothermic_anytime",
-          "value1": "Yes"
+          "value1": "Yes",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "denominator_filters": {
           "unique": "person_id",
           "variable1": "Service_Area",
-          "value1": "Newborn"
+          "value1": "Newborn",
+          "variable2": "Age_Group",
+          "value2": "Under 5"
         },
         "note": "Proxy from admission thermal status \u2014 longitudinal stay temperature not yet in extract."
       },
@@ -6328,6 +6680,174 @@
         "label": "Macerated Stillbirths",
         "category": "Labour",
         "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_pph",
+        "label": "Obstetric complication: PPH",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_eclampsia",
+        "label": "Obstetric complication: Eclampsia",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_obstructedlabour",
+        "label": "Obstetric complication: Obstructed labour",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_signalantibiotics",
+        "label": "Signal: Parenteral antibiotics",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_signalmgso4",
+        "label": "Signal: Anticonvulsants (MgSO4)",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_signaloxytocics",
+        "label": "Signal: Oxytocics",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_signalplacenta",
+        "label": "Signal: Manual placenta removal",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_signalmva",
+        "label": "Signal: MVA / retained products",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_signalassisted",
+        "label": "Signal: Assisted vaginal delivery",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_lab_core_signalbloodtransfusion",
+        "label": "Signal: Blood transfusion",
+        "category": "Labour",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_pnc_core_motherscomplications",
+        "label": "Mothers with postnatal complications",
+        "category": "PNC",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_nb_core_babiescomplications",
+        "label": "Babies with postnatal complications",
+        "category": "Newborn",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_pnc_core_mocheck7d",
+        "label": "Mothers checked within 7 days",
+        "category": "PNC",
+        "target": 80,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_nb_core_babycheck7d",
+        "label": "Babies checked within 7 days",
+        "category": "Newborn",
+        "target": 80,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_pnc_core_mocheck6wk",
+        "label": "Mothers checked at 6 weeks",
+        "category": "PNC",
+        "target": 80,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_nb_core_babycheck6wk",
+        "label": "Babies checked at 6 weeks",
+        "category": "Newborn",
+        "target": 80,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_pnc_core_fp",
+        "label": "Immediate postpartum family planning",
+        "category": "PNC",
+        "target": 60,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_pnc_core_hivpositive",
+        "label": "HIV positive postnatal mothers",
+        "category": "PNC",
+        "target": 0,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_nb_core_hivartprophylaxis",
+        "label": "HIV exposed babies on ART prophylaxis",
+        "category": "Newborn",
+        "target": 90,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_nb_core_bcg",
+        "label": "Babies who received BCG",
+        "category": "Newborn",
+        "target": 90,
+        "status": "tracked",
+        "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
+      },
+      {
+        "id": "mnid_nb_core_polio0",
+        "label": "Babies who received Polio 0",
+        "category": "Newborn",
+        "target": 90,
         "status": "tracked",
         "note": "DHIS2-only indicator. No MAHIS numerator/denominator filters are defined, so this shows no data in MAHIS mode."
       }

@@ -64,6 +64,43 @@ DHIS2_TO_MNID_ID = {
     'delivered_at_home_or_in_transit': 'mnid_lab_moh_002',
     'delivered_by_skilled_attendant': 'mnid_lab_moh_005',
     'normal_vaginal_delivery': 'mnid_lab_moh_006',
+
+    # Added when mnid/dhis2/sample_sync.py's INDICATOR_GROUPS grew from 25 to
+    # all 52 indicators.json entries -- these 27 were being pulled and
+    # calculated from DHIS2 on every sync but silently dropped
+    # (skipped_unmapped) before ever reaching MNID. 6 match an existing MNID
+    # indicator by label/concept; the remaining 21 (EmONC signal functions,
+    # obstetric complications, postnatal-care checks) have no MAHIS-side
+    # counterpart, so they get new MNID ids below, same pattern as the
+    # original 3 DHIS2-only births indicators.
+    'screened_for_anaemia': 'mnid_anc_core_001',
+    'women_with_imminent_preterm_birth_receiving_acs': 'mnid_lab_prog_009',
+    'early_initiation_of_breastfeeding_within_1_hour_of_birth': 'mnid_pnc_prog_007',
+    'pre_eclampsia_eclampsia_receiving_magnesium_sulphate': 'mnid_lab_prog_013',
+    'signal_caesarean_section': 'mnid_lab_prog_006',
+    'obstetric_complication_maternal_sepsis': 'mnid_lab_core_004',
+
+    'obstetric_complication_pph': 'mnid_lab_core_pph',
+    'obstetric_complication_eclampsia': 'mnid_lab_core_eclampsia',
+    'obstetric_complication_obstructed_labour': 'mnid_lab_core_obstructedlabour',
+    'signal_parenteral_antibiotics': 'mnid_lab_core_signalantibiotics',
+    'signal_anticonvulsants_mgso4': 'mnid_lab_core_signalmgso4',
+    'signal_oxytocics': 'mnid_lab_core_signaloxytocics',
+    'signal_manual_placenta_removal': 'mnid_lab_core_signalplacenta',
+    'signal_mva_retained_products': 'mnid_lab_core_signalmva',
+    'signal_assisted_vaginal_delivery': 'mnid_lab_core_signalassisted',
+    'signal_blood_transfusion': 'mnid_lab_core_signalbloodtransfusion',
+    'mothers_with_postnatal_complications': 'mnid_pnc_core_motherscomplications',
+    'babies_with_postnatal_complications': 'mnid_nb_core_babiescomplications',
+    'mothers_checked_within_7_days': 'mnid_pnc_core_mocheck7d',
+    'babies_checked_within_7_days': 'mnid_nb_core_babycheck7d',
+    'mothers_checked_at_6_weeks': 'mnid_pnc_core_mocheck6wk',
+    'babies_checked_at_6_weeks': 'mnid_nb_core_babycheck6wk',
+    'immediate_postpartum_family_planning': 'mnid_pnc_core_fp',
+    'hiv_positive_postnatal_mothers': 'mnid_pnc_core_hivpositive',
+    'hiv_exposed_babies_on_art_prophylaxis': 'mnid_nb_core_hivartprophylaxis',
+    'babies_who_received_bcg': 'mnid_nb_core_bcg',
+    'babies_who_received_polio_0': 'mnid_nb_core_polio0',
 }
 
 # (label, category, target) for each MNID id above -- category drives which
@@ -95,6 +132,45 @@ MNID_META = {
     'mnid_lab_moh_002': ('Delivered at home or in transit', 'Labour', 5),
     'mnid_lab_moh_005': ('Delivered by skilled attendant', 'Labour', 80),
     'mnid_lab_moh_006': ('Normal vaginal delivery', 'Labour', 60),
+
+    # 6 of the 27 newly-selected DHIS2 indicators (see DHIS2_TO_MNID_ID) match
+    # an existing MNID indicator -- label/category/target copied from that
+    # indicator's own MAHIS-mode definition in validated_dashboard.json so the
+    # two sources describe the same thing consistently.
+    'mnid_anc_core_001': ('Screened for anaemia', 'ANC', 80),
+    'mnid_lab_prog_009': ('Women with imminent preterm birth receiving ACs', 'Labour', 80),
+    'mnid_pnc_prog_007': ('Early initiation of breastfeeding within 1 hour of birth', 'PNC', 80),
+    'mnid_lab_prog_013': ('Pre-eclampsia/eclampsia receiving magnesium sulphate', 'Labour', 80),
+    'mnid_lab_prog_006': ('Overall caesarean section rate', 'Labour', 15),
+    'mnid_lab_core_004': ('Maternal sepsis rate', 'Labour', 10),
+
+    # 21 with no MAHIS-side counterpart (EmONC signal functions, obstetric
+    # complications, postnatal-care checks) -- new MNID entries, no MAHIS
+    # numerator_filters/denominator_filters defined, same pattern as the
+    # original 3 births indicators. Complication/signal-function rates get
+    # target=0 (monitor, no fixed threshold); genuine coverage checks get a
+    # standard MOH-style target.
+    'mnid_lab_core_pph': ('Obstetric complication: PPH', 'Labour', 0),
+    'mnid_lab_core_eclampsia': ('Obstetric complication: Eclampsia', 'Labour', 0),
+    'mnid_lab_core_obstructedlabour': ('Obstetric complication: Obstructed labour', 'Labour', 0),
+    'mnid_lab_core_signalantibiotics': ('Signal: Parenteral antibiotics', 'Labour', 0),
+    'mnid_lab_core_signalmgso4': ('Signal: Anticonvulsants (MgSO4)', 'Labour', 0),
+    'mnid_lab_core_signaloxytocics': ('Signal: Oxytocics', 'Labour', 0),
+    'mnid_lab_core_signalplacenta': ('Signal: Manual placenta removal', 'Labour', 0),
+    'mnid_lab_core_signalmva': ('Signal: MVA / retained products', 'Labour', 0),
+    'mnid_lab_core_signalassisted': ('Signal: Assisted vaginal delivery', 'Labour', 0),
+    'mnid_lab_core_signalbloodtransfusion': ('Signal: Blood transfusion', 'Labour', 0),
+    'mnid_pnc_core_motherscomplications': ('Mothers with postnatal complications', 'PNC', 0),
+    'mnid_nb_core_babiescomplications': ('Babies with postnatal complications', 'Newborn', 0),
+    'mnid_pnc_core_mocheck7d': ('Mothers checked within 7 days', 'PNC', 80),
+    'mnid_nb_core_babycheck7d': ('Babies checked within 7 days', 'Newborn', 80),
+    'mnid_pnc_core_mocheck6wk': ('Mothers checked at 6 weeks', 'PNC', 80),
+    'mnid_nb_core_babycheck6wk': ('Babies checked at 6 weeks', 'Newborn', 80),
+    'mnid_pnc_core_fp': ('Immediate postpartum family planning', 'PNC', 60),
+    'mnid_pnc_core_hivpositive': ('HIV positive postnatal mothers', 'PNC', 0),
+    'mnid_nb_core_hivartprophylaxis': ('HIV exposed babies on ART prophylaxis', 'Newborn', 90),
+    'mnid_nb_core_bcg': ('Babies who received BCG', 'Newborn', 90),
+    'mnid_nb_core_polio0': ('Babies who received Polio 0', 'Newborn', 90),
 }
 
 # Every one of the 25 indicators above is value_type='count' in DHIS2's own
@@ -133,6 +209,40 @@ PCT_DENOMINATOR = {
     'delivered_at_home_or_in_transit': 'total_births',
     'delivered_by_skilled_attendant': 'total_births',
     'normal_vaginal_delivery': 'total_births',
+
+    # 'women_with_imminent_preterm_birth_receiving_acs' and
+    # 'pre_eclampsia_eclampsia_receiving_magnesium_sulphate' are deliberately
+    # absent here -- both are value_type='percentage'/operation='percentage'
+    # in DHIS2's own config, so calculate_indicators() already gives them a
+    # real numerator/denominator; the percentage branch below handles them.
+    'screened_for_anaemia': 'new_anc_registrations',
+    'early_initiation_of_breastfeeding_within_1_hour_of_birth': 'live_births',
+    'signal_caesarean_section': 'total_births',
+    'obstetric_complication_maternal_sepsis': 'total_births',
+    'obstetric_complication_pph': 'total_births',
+    'obstetric_complication_eclampsia': 'total_births',
+    'obstetric_complication_obstructed_labour': 'total_births',
+    'signal_parenteral_antibiotics': 'total_births',
+    'signal_anticonvulsants_mgso4': 'total_births',
+    'signal_oxytocics': 'total_births',
+    'signal_manual_placenta_removal': 'total_births',
+    'signal_mva_retained_products': 'total_births',
+    'signal_assisted_vaginal_delivery': 'total_births',
+    'signal_blood_transfusion': 'total_births',
+    'mothers_with_postnatal_complications': 'live_births',
+    'babies_with_postnatal_complications': 'live_births',
+    'mothers_checked_within_7_days': 'live_births',
+    'babies_checked_within_7_days': 'live_births',
+    'mothers_checked_at_6_weeks': 'live_births',
+    'babies_checked_at_6_weeks': 'live_births',
+    'immediate_postpartum_family_planning': 'live_births',
+    'hiv_positive_postnatal_mothers': 'live_births',
+    # HIV-exposed babies are, by definition, babies born to HIV+ mothers --
+    # using that count as the denominator (rather than all live births) keeps
+    # this a true prophylaxis-coverage rate among the exposed population.
+    'hiv_exposed_babies_on_art_prophylaxis': 'hiv_positive_postnatal_mothers',
+    'babies_who_received_bcg': 'live_births',
+    'babies_who_received_polio_0': 'live_births',
 }
 
 DHIS2_ROUTE = 'dhis2'
