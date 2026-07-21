@@ -9,8 +9,8 @@ from datetime import date
 from .exceptions import DHIS2ConfigurationError
 
 PERIOD_RE = re.compile(r"^(\d{4})(0[1-9]|1[0-2])$")
-DEFAULT_START_PERIOD = "202504"
-DEFAULT_END_PERIOD = "202605"
+DEFAULT_START_PERIOD = "202501"
+DEFAULT_END_PERIOD = "202606"
 
 
 def validate_monthly_period(period: str) -> str:

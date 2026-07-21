@@ -247,6 +247,33 @@ PCT_DENOMINATOR = {
 
 DHIS2_ROUTE = 'dhis2'
 
+# DHIS2's org-unit hierarchy names districts "<Name>-DHO" and reports the four
+# central/referral hospitals as their own top-level units instead of folding
+# them into the district they physically sit in. MAHIS's district dropdown
+# (what scope_meta['selected_districts'] and every other MNID view actually
+# filter against) uses plain names, never splits a district, and has its own
+# distinct "Mzuzu Central" entry - so writing DHIS2's raw district string here
+# would make every district filter silently match nothing once this aggregate
+# is read back through the same store.py code path MAHIS routes use.
+_DHIS2_DISTRICT_TO_MAHIS = {
+    'Kamuzu Central Hospital': 'Lilongwe',
+    'Mzuzu Central Hospital': 'Mzuzu Central',
+    'Queen Elizabeth Central Hospital': 'Blantyre',
+    'Zomba Central Hospital': 'Zomba',
+    'Mzimba-North-DHO': 'Mzimba',
+    'Mzimba-South-DHO': 'Mzimba',
+    'Nkhata-Bay-DHO': 'Nkhata Bay',
+}
+
+
+def _mahis_district(dhis2_district: str) -> str:
+    value = str(dhis2_district or '').strip()
+    if value in _DHIS2_DISTRICT_TO_MAHIS:
+        return _DHIS2_DISTRICT_TO_MAHIS[value]
+    if value.endswith('-DHO'):
+        return value[:-len('-DHO')]
+    return value
+
 
 def _bridge_credentials_from_config() -> None:
     """Populate MNH_DHIS2_* env vars from config.py if not already set in the
@@ -345,7 +372,7 @@ def publish_mnid_aggregate() -> dict:
             'category': category,
             'target': target,
             'facility_code': record.get('facility_code') or '',
-            'district': record.get('district') or '',
+            'district': _mahis_district(record.get('district')),
             'grain': 'monthly',
             'period_start': pd.Timestamp(period_start_date(record['period'])),
             'numerator': numerator,

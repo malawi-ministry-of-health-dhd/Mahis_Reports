@@ -195,6 +195,33 @@ def _load_sample(path: Path) -> pd.DataFrame:
     return frame.dropna(subset=["period_start", "value"])
 
 
+# DHIS2's org-unit hierarchy names districts "<Name>-DHO" and reports the four
+# central/referral hospitals as their own top-level units rather than folding
+# them into the district they physically sit in. MAHIS's district dropdown
+# uses plain names (no "-DHO"), splits nothing, and has its own distinct
+# "Mzuzu Central" entry - so a selection like "Blantyre" must also pull in
+# Queen Elizabeth Central Hospital's rows, and "Mzimba" must pull in both the
+# North and South DHOs, or every district filter silently matches nothing.
+_DHIS2_DISTRICT_TO_MAHIS = {
+    "Kamuzu Central Hospital": "Lilongwe",
+    "Mzuzu Central Hospital": "Mzuzu Central",
+    "Queen Elizabeth Central Hospital": "Blantyre",
+    "Zomba Central Hospital": "Zomba",
+    "Mzimba-North-DHO": "Mzimba",
+    "Mzimba-South-DHO": "Mzimba",
+    "Nkhata-Bay-DHO": "Nkhata Bay",
+}
+
+
+def _mahis_district(dhis2_district: str) -> str:
+    value = str(dhis2_district or "").strip()
+    if value in _DHIS2_DISTRICT_TO_MAHIS:
+        return _DHIS2_DISTRICT_TO_MAHIS[value]
+    if value.endswith("-DHO"):
+        return value[: -len("-DHO")]
+    return value
+
+
 def _apply_scope(frame: pd.DataFrame, start_date, end_date, scope_meta: dict) -> pd.DataFrame:
     result = frame.copy()
     start = pd.to_datetime(start_date, errors="coerce")
@@ -212,7 +239,8 @@ def _apply_scope(frame: pd.DataFrame, start_date, end_date, scope_meta: dict) ->
             | result["org_unit_id"].astype(str).isin(facilities)
         ]
     elif districts:
-        result = result[result["district"].astype(str).isin(districts)]
+        mahis_district = result["district"].astype(str).map(_mahis_district)
+        result = result[mahis_district.isin(districts)]
     return result
 
 
