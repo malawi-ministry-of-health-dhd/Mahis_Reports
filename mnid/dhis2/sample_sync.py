@@ -1,4 +1,4 @@
-"""Refresh the 25-indicator local dataset used by the MNH HMIS dashboard."""
+"""Refresh the complete mapped-indicator dataset used by the MNH HMIS dashboard."""
 
 from __future__ import annotations
 
@@ -23,11 +23,12 @@ INDICATOR_GROUPS = {
         "stillbirths",
     ),
     "Antenatal care": (
-        "anc_visits", "blood_pressure_measured", "tested_for_hiv",
+        "anc_visits", "blood_pressure_measured", "screened_for_anaemia", "tested_for_hiv",
         "screened_for_syphilis", "at_least_4_anc_contacts",
         "tetanus_doses_2", "new_anc_registrations",
         "started_anc_in_first_trimester_0_12_weeks",
         "received_120_fefo_tablets", "received_itn_during_anc",
+        "women_with_imminent_preterm_birth_receiving_acs",
     ),
     "Delivery and newborn care": (
         "uterotonic_given_after_birth",
@@ -35,6 +36,25 @@ INDICATOR_GROUPS = {
         "vitamin_k_at_birth", "facility_deliveries",
         "delivered_at_this_facility", "delivered_at_home_or_in_transit",
         "delivered_by_skilled_attendant", "normal_vaginal_delivery",
+        "early_initiation_of_breastfeeding_within_1_hour_of_birth",
+    ),
+    "Obstetric complications and signal functions": (
+        "pre_eclampsia_eclampsia_receiving_magnesium_sulphate",
+        "obstetric_complication_pph", "obstetric_complication_eclampsia",
+        "obstetric_complication_obstructed_labour",
+        "obstetric_complication_maternal_sepsis",
+        "signal_parenteral_antibiotics", "signal_anticonvulsants_mgso4",
+        "signal_oxytocics", "signal_manual_placenta_removal",
+        "signal_mva_retained_products", "signal_assisted_vaginal_delivery",
+        "signal_caesarean_section", "signal_blood_transfusion",
+    ),
+    "Postnatal care": (
+        "mothers_with_postnatal_complications", "babies_with_postnatal_complications",
+        "mothers_checked_within_7_days", "babies_checked_within_7_days",
+        "mothers_checked_at_6_weeks", "babies_checked_at_6_weeks",
+        "immediate_postpartum_family_planning", "hiv_positive_postnatal_mothers",
+        "hiv_exposed_babies_on_art_prophylaxis", "babies_who_received_bcg",
+        "babies_who_received_polio_0",
     ),
 }
 SELECTED_INDICATOR_IDS = tuple(
@@ -68,7 +88,7 @@ def _chunks(values: list[str], size: int) -> list[list[str]]:
 
 
 def refresh_sample() -> dict:
-    """Pull one level-homogeneous sample and publish 25 calculated indicators."""
+    """Pull one level-homogeneous snapshot and publish every mapped indicator."""
     settings = DHIS2Settings.from_env(require_credentials=True)
     periods = monthly_periods(settings.start_period, settings.end_period)
     mapping = _selected_mapping()
