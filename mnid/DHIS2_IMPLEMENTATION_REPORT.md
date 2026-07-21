@@ -1,6 +1,6 @@
 # MNID/MNH DHIS2 Integration Implementation Report
 
-Date: 2026-07-20
+Date: 2026-07-21
 
 ## Executive summary
 
@@ -14,13 +14,13 @@ Authenticated Analytics and Data Entry API requests have now been completed. The
 DHIS2 organisation hierarchy is available locally as discovered metadata, four source
 Data Entry forms have been identified, and their mappings have been assessed.
 A working **MNH HMIS test** dashboard now displays a controlled snapshot of real
-aggregate values retrieved from Malawi HMIS DHIS2: 25 verified indicators, 232,769
-calculated rows, 867 reporting organisation units, 32 districts, and 14 monthly
+aggregate values retrieved from Malawi HMIS DHIS2: all 52 mapped indicators, 460,150
+calculated rows, 868 reporting organisation units, 33 populated district labels, and 14 monthly
 periods from April 2025 through May 2026. The dashboard does not query DHIS2 when a page opens;
-it reads the last locally generated Parquet snapshot. Production publication of the
-full 52-indicator mapping remains blocked pending governance approval of the
-crosswalk, resolution of incomplete operands, and management approval of the
-ingestion model.
+it reads the last locally generated Parquet snapshot. The 2026-07-21 expansion requested all
+78 unique operands in three bounded Analytics batches and produced data for every mapped
+indicator. Production promotion still requires governance approval of the organisation-unit
+crosswalk, clinical approval of derived formulas, and management approval of the ingestion model.
 
 ## Scope completed
 
@@ -31,11 +31,41 @@ ingestion model.
 - Raw audit, normalized atomic data, calculated indicators, validation reports, and
   last-known-good output separated under ignored runtime folders.
 - Opt-in DHIS2 dashboard mode without render-time network access.
-- A working MNH Beginnings HMIS test view with a current-period summary and 25
+- A working MNH Beginnings HMIS test view with a current-period summary and 52
   individually labeled monthly run-chart cards, grouped by clinical domain, plus
   priority-outcome district comparison and facility-level filtering/table output.
 - Application startup and routing support for a DHIS2-only test environment where
   the legacy `data/default/parquet` MAHIS source is unavailable.
+
+## 2026-07-21 full-dashboard expansion
+
+The earlier 25-indicator dashboard was a controlled first release. The synchronization
+selection now covers every indicator in the technical mapping:
+
+| Dashboard domain | Indicators |
+|---|---:|
+| Births and outcomes | 7 |
+| Antenatal care | 12 |
+| Delivery and newborn care | 9 |
+| Obstetric complications and signal functions | 13 |
+| Postnatal care | 11 |
+| **Total** | **52** |
+
+Live verification found data for 52/52 indicators, so no mapped indicators remain to
+be added. The snapshot has no null calculated values and no duplicate
+indicator-period-organisation-unit keys. It preserves 194,377 explicit zeroes rather
+than treating absent rows as zero.
+
+The expansion exposed data-quality items that require clinical and source review:
+
+- the provisional early-breastfeeding derivation produced 10 negative facility-month
+  values because its subtracted source values exceed live births in those records;
+- the two ratio indicators include facility-month percentages above 100%, with
+  observed maxima of 8,300% and 700%; and
+- the breastfeeding formula remains provisional pending clinical confirmation.
+
+These values are retained for transparent reconciliation and are not silently clamped,
+converted to zero, or removed by the dashboard.
 
 The original integration package was contained under `mnid/`. Subsequent application
 wiring required focused changes to `pages/home.py`, `helpers/modal_functions.py`,
@@ -74,9 +104,10 @@ reporting-rate products. The authoritative aggregate Data Entry forms are:
 | KMC | Kangaroo Mother Care Monthly Reporting Form | `ACmZFToDqxh` | Monthly | 12 | 1 |
 
 Together these forms contain 46 of the 74 unique base data elements in the supplied
-MNH mapping. The remaining 28 are mainly PNC follow-up, complications, immunisation,
-HIV prophylaxis, family planning, and additional newborn elements. Their authoritative
-Data Entry dataset still needs to be identified.
+MNH mapping. Another 28 are mainly PNC follow-up, complications, immunisation,
+HIV prophylaxis, family planning, and additional newborn elements. Analytics returned
+their configured operands in the full pull, but their authoritative Data Entry dataset
+ownership still needs approval.
 
 Central Hospital Maternity HDU, Maternity Operating Theatre, and Central Hospital KMC
 forms were also inspected. Their elements do not match the current workbook mappings,
@@ -217,18 +248,10 @@ Corrections or new submissions made in DHIS2 after that extraction will appear o
 after another successful synchronization. This offline-first design avoids slow page
 loads, repeated DHIS2 traffic, and exposing credentials to the visualization layer.
 
-The successful 25-indicator sample and the full mapping publication are separate
-states. The sample Parquet exists and is usable by the test dashboard. The latest
-full 78-operand pipeline status remains `failed`/`published: false` because completeness
-validation rejected missing operands. Therefore, the working test tab demonstrates
-retrieval and visualization capability; it does not mean that the complete production
-indicator set has passed validation or received governance approval.
-
-The 25 displayed indicators comprise seven birth/outcome measures, ten antenatal-care
-measures, and eight delivery/newborn-care measures. They require 36 unique atomic
-DHIS2 operands. Known incomplete anaemia and retained-products operands and the
-breastfeeding calculation awaiting clinical confirmation are not included in this
-controlled dashboard set.
+The dashboard snapshot and the production publication are separate states. The test
+snapshot now contains all 52 mapped indicators from 78 unique DHIS2 operands and is
+usable by the test dashboard. This successful dashboard retrieval does not itself
+mean the complete production pipeline has received governance or clinical approval.
 
 When the legacy MAHIS Parquet source is unavailable, selecting **MNH Program** now
 opens the HMIS-only Beginnings view instead of failing with a DuckDB catalog error.
@@ -258,6 +281,14 @@ rows across 861 reporting units, with zero indicator differences. Detailed resul
 data-quality interpretation are recorded in
 `mnid/HMIS_DHIS2_VALIDATION_202601_202605.md`.
 
+### April 2025–May 2026 full-mapping retrieval
+
+On 2026-07-21 a fresh authenticated Analytics pull requested all 78 unique operands
+for all 14 months and all level-4 organisation units. It produced 460,150 records for
+52/52 indicators and 868 reporting units. Validation found zero null calculated values
+and zero duplicate indicator-period-unit keys. The abnormal ranges listed in the
+full-dashboard expansion section remain open data-quality findings.
+
 Before the final repository cleanup, 35 MNID DHIS2 tests passed using `unittest`.
 Coverage included periods/settings, workbook conversion, mapping/dependencies,
 organisation units, HTTP errors/retries, response parsing, calculations, validation,
@@ -276,7 +307,7 @@ Manual checks performed:
 - Git diffs were checked for whitespace and scope.
 - Authenticated `/api/me`, organisation-unit metadata, and controlled Analytics pilot
   requests completed with TLS verification enabled.
-- The HMIS-only application path rendered all 25 indicators from the local snapshot
+- The HMIS-only application path rendered all 52 indicators from the local snapshot
   without requiring `data/default/parquet`.
 - Application callback return shapes, demo-user URL initialization, missing local
   datasource handling, Python compilation, and Git whitespace checks passed.
@@ -325,15 +356,16 @@ initialization.
 
 1. All DHIS2 units are present as discovered metadata, but the proposed 255 local
    facility matches still require governance approval.
-2. The pilot returned 74 of 78 requested atomic rows. Missing inputs affect anaemia
-   screening and MVA/retained-products, so validation correctly rejected publication.
+2. The full dashboard pull now returns usable calculated data for all 52 mappings, but
+   formula and source-report reconciliation is still required before certification.
 3. Live values have not been independently reconciled with HMIS source reports.
 4. Early breastfeeding calculation requires clinical confirmation.
 5. Repository-level scheduler integration is outside the strict `mnid/` scope; an
    approved external scheduler must invoke the CLI.
 6. The MNH HMIS test is user-visible, but there is not yet a general user-facing
    selector for switching every dashboard between MAHIS and DHIS2 sources.
-7. The authoritative dataset for the remaining 28 base mappings is not yet identified.
+7. Dataset ownership metadata for mappings outside the four confirmed source forms is
+   not yet approved, although Analytics currently returns their operands.
 8. A resumable Data Value Set ingestion path is not yet implemented; current production
    code uses Analytics as its primary endpoint.
 9. Operational alert delivery is not configured; machine-readable status is available.
@@ -461,12 +493,11 @@ maps, rankings, completeness views, and numerator/denominator drill-down.
   checkpoints, bounded concurrency, and server-friendly retry/backoff.
 - Never mix organisation-unit levels in one published dashboard aggregate.
 
-### Proposed first release scope
+### Current test-release scope
 
-Start with the 46 verified base elements from the four confirmed Data Entry datasets.
-Do not include the remaining 28 elements until their authoritative datasets and
-definitions are confirmed. This provides useful ANC, Maternity, Sick Neonate, and KMC
-visualizations without silently publishing unverified mappings.
+The test dashboard exposes all 52 technically pullable indicators. Indicators whose
+dataset ownership or derived definition is not yet approved remain subject to visible
+documentation and must not be presented as certified production statistics.
 
 ## Management decisions requested
 
@@ -474,16 +505,15 @@ Before continuing implementation, management/HMIS feedback is requested on:
 
 1. Approval of Analytics as the primary visualization source and Data Value Sets as
    the audit/reconciliation source.
-2. Approval to launch a controlled facility-level historical backfill for the 46
-   verified elements covering April 2025 through May 2026.
+2. Approval to promote the controlled facility-level historical snapshot covering
+   April 2025 through May 2026 after reconciliation.
 3. Whether only completed Data Entry forms should be included or whether available
    values from incomplete forms may also be displayed with a warning.
 4. Approval of the proposed 255 local facility matches, or nomination of an owner to
    review and correct the organisation-unit crosswalk.
-5. Confirmation of the authoritative PNC dataset for the remaining mappings.
+5. Confirmation of authoritative dataset ownership for the PNC and related mappings.
 6. Clinical confirmation of the early-breastfeeding calculation.
-7. Decision on the four absent pilot operands affecting anaemia screening and
-   MVA/retained-products.
+7. Review of the abnormal calculated values documented in the expansion findings.
 8. Required refresh frequency, data-retention period, and operational owner.
 9. Whether users should see DHIS2 alone, MaHIS alone, or a side-by-side reconciliation
    view when both sources are available.
@@ -491,8 +521,8 @@ Before continuing implementation, management/HMIS feedback is requested on:
 ## Recommended next steps
 
 1. Obtain management decisions on the nine items above.
-2. Identify and validate the PNC dataset for the remaining 28 base elements.
-3. Review the crosswalk, missing operands, and calculated-indicator definitions.
+2. Validate the dataset ownership of the PNC and related elements.
+3. Review the crosswalk and calculated-indicator definitions and resolve flagged values.
 4. Add dataset ownership metadata to the 46 verified mappings.
 5. Implement partitioned atomic Analytics storage and a resumable Data Value Set
    reconciliation job.

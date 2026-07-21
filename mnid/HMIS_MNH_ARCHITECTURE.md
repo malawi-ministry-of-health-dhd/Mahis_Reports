@@ -1,6 +1,6 @@
 # HMIS/DHIS2 and MNH Dashboard Architecture
 
-Date: 2026-07-20
+Date: 2026-07-21
 
 ## Purpose
 
@@ -46,7 +46,7 @@ KPI cards, trends, district comparison, facility table
 
 The implementation currently has two related but separate paths.
 
-### Twenty-five-indicator HMIS dashboard path
+### Complete mapped-indicator HMIS dashboard path
 
 This is the working dashboard path currently visible to users.
 
@@ -60,22 +60,24 @@ DHIS2 Analytics API
 ```
 
 The current local snapshot contains real DHIS2 aggregate values, not generated demo
-values. It contains 232,769 calculated aggregate rows, 25 indicators, 867 reporting
-organisation units, 32 districts, and 14 monthly periods from April 2025 through May
-2026. It preserves 65,721 explicitly reported zero values.
+values. It contains 460,150 calculated aggregate rows, all 52 mapped indicators, 868
+reporting organisation units, 33 populated district labels, and 14 monthly periods
+from April 2025 through May 2026. It preserves 194,377 explicitly reported zero values.
 
-The indicators are organized into three dashboard domains:
+The indicators are organized into five dashboard domains:
 
 - **Births and outcomes (7):** Live Births, Total Births, Fresh Stillbirths,
   Macerated Stillbirths, Maternal Deaths, Neonatal Deaths, and Stillbirths.
-- **Antenatal care (10):** ANC Visits, Blood pressure measured, Tested for HIV,
-  Screened for syphilis, At least 4 ANC contacts, Tetanus doses (2+), New ANC
-  registrations, Started ANC in first trimester, Received 120+ FeFo tablets, and
-  Received ITN during ANC.
-- **Delivery and newborn care (8):** Uterotonic given after birth, Bag-mask
+- **Antenatal care (12):** the original ten ANC measures plus anaemia screening and
+  antenatal corticosteroids for imminent preterm birth.
+- **Delivery and newborn care (9):** Uterotonic given after birth, Bag-mask
   ventilation for newborns not breathing, Vitamin K at birth, Facility deliveries,
   Delivered at this facility, Delivered at home or in transit, Delivered by skilled
-  attendant, and Normal vaginal delivery.
+  attendant, Normal vaginal delivery, and provisional early breastfeeding.
+- **Obstetric complications and signal functions (13):** magnesium sulphate coverage,
+  four complication measures, and eight emergency obstetric signal functions.
+- **Postnatal care (11):** maternal and newborn complications and checks, postpartum
+  family planning, HIV follow-up/prophylaxis, BCG, and Polio 0.
 
 The snapshot is cached. It is not refreshed when a user opens or filters the page.
 New or corrected DHIS2 submissions become visible only after another successful
@@ -98,9 +100,10 @@ MNH mapping workbook
   -> aggregates/current.parquet (only after validation succeeds)
 ```
 
-The latest full publication attempt remains rejected because required operands were
-missing. This does not invalidate the 25-indicator snapshot and does not overwrite
-any last-known-good production file.
+On 2026-07-21 the dashboard synchronization retrieved all 78 operands in three bounded
+batches and calculated non-empty data for all 52 indicators. This proves technical
+pullability for the dashboard snapshot; the separate production publication gate and
+governance approvals remain in place.
 
 ## Main components
 
@@ -111,7 +114,7 @@ any last-known-good production file.
 | `mnid/dhis2/mappings.py` | Validates indicators, dependencies, operands, and organisation-unit configuration. |
 | `mnid/dhis2/ingestion.py` | Plans batches, records audit responses, parses values, calculates indicators, validates, and publishes atomically. |
 | `mnid/dhis2/storage.py` | Writes raw, normalized, calculated, and last-known-good Parquet data safely. |
-| `mnid/dhis2/sample_sync.py` | Retrieves 36 required atomic operands in bounded batches, calculates 25 dashboard indicators, and refreshes the controlled facility-level snapshot. |
+| `mnid/dhis2/sample_sync.py` | Retrieves 78 required atomic operands in bounded batches, calculates all 52 dashboard indicators, and refreshes the controlled facility-level snapshot. |
 | `mnid/dashboards/MNH-HMIS-Test/layout.py` | Reads the cached sample, applies filters, and builds cards, charts, and the facility table. |
 | `mnid/views/renderer.py` | Routes MNH tabs and provides the HMIS-only fallback when legacy MAHIS data is absent. |
 | `pages/home.py` | Resolves URL/user scope, date range, district/facility filters, and selects the MNH renderer. |
@@ -138,9 +141,9 @@ The dashboard reads `hmis_test.parquet` once per render operation and applies:
 
 The visualization structure follows the MNID Country Profile design language: a dark
 scope and reporting-period header, priority alert, scope band, current-period summary
-cards, and a dedicated labeled monthly run-chart card for each of the 25 indicators.
-Charts are grouped under Births and Outcomes, Antenatal Care, and Delivery and Newborn
-Care, followed by priority-outcome district ranking and a facility drill-down table.
+cards, and a dedicated labeled monthly run-chart card for each of the 52 indicators.
+Charts are grouped under five clinical domains, followed by priority-outcome district
+ranking and a facility drill-down table.
 The indicator cards reuse the same `mnid/components/run_charts.py` payload and callback
 as Country Profile, including consistent styling, captions, and time-grain controls.
 The source grain is monthly; quarterly and yearly views are rollups of monthly values,
@@ -177,7 +180,7 @@ mnid/data/dhis2/
   normalized/<sync-run-id>/          normalized values and validation report
   aggregates/current.parquet         validated full indicator publication
   aggregates/current_metadata.json   successful publication metadata
-  aggregates/hmis_test.parquet       25-indicator dashboard snapshot
+  aggregates/hmis_test.parquet       52-indicator dashboard snapshot
   status/current.json                latest full synchronization attempt
 ```
 
@@ -248,8 +251,8 @@ The January–May 2026 reconciliation matched all 25 indicators exactly; see
 ## Production work still required
 
 1. Approve the organisation-unit crosswalk and dataset ownership.
-2. Resolve missing operands and clinically review derived calculations.
-3. Identify the authoritative dataset for the remaining PNC and related mappings.
+2. Clinically review derived calculations and resolve the documented abnormal values.
+3. Confirm authoritative dataset ownership for the PNC and related mappings.
 4. Reconcile approved samples against Data Entry/Data Value Sets.
 5. Automate synchronization with locking, monitoring, freshness alerts, and secret
    rotation.

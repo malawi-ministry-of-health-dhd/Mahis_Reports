@@ -31,11 +31,15 @@ GROUP_ORDER = (
     "Births and outcomes",
     "Antenatal care",
     "Delivery and newborn care",
+    "Obstetric complications and signal functions",
+    "Postnatal care",
 )
 GROUP_COLORS = {
     "Births and outcomes": RED,
     "Antenatal care": GREEN,
     "Delivery and newborn care": BLUE,
+    "Obstetric complications and signal functions": AMBER,
+    "Postnatal care": TEAL,
     "Other indicators": PURPLE,
 }
 LEGACY_GROUPS = {
@@ -67,6 +71,8 @@ INDICATOR_DESCRIPTIONS = {
     "started_anc_in_first_trimester_0_12_weeks": "Clients starting ANC within 0–12 weeks.",
     "received_120_fefo_tablets": "ANC clients receiving at least 120 FeFo tablets.",
     "received_itn_during_anc": "ANC clients receiving an insecticide-treated net.",
+    "screened_for_anaemia": "ANC clients screened for anaemia.",
+    "women_with_imminent_preterm_birth_receiving_acs": "Percentage of eligible women with imminent preterm birth receiving antenatal corticosteroids.",
     "uterotonic_given_after_birth": "Women receiving a uterotonic after birth.",
     "newborns_not_breathing_at_birth_receiving_bag_mask_ventilation": "Non-breathing newborns receiving bag-mask ventilation.",
     "vitamin_k_at_birth": "Newborns receiving Vitamin K at birth.",
@@ -75,6 +81,31 @@ INDICATOR_DESCRIPTIONS = {
     "delivered_at_home_or_in_transit": "Deliveries occurring at home or in transit.",
     "delivered_by_skilled_attendant": "Deliveries attended by a skilled provider.",
     "normal_vaginal_delivery": "Normal vaginal deliveries reported by facilities.",
+    "early_initiation_of_breastfeeding_within_1_hour_of_birth": "Provisional derived count of newborns breastfed within one hour; calculation requires clinical confirmation.",
+    "pre_eclampsia_eclampsia_receiving_magnesium_sulphate": "Percentage of women with pre-eclampsia or eclampsia receiving magnesium sulphate.",
+    "obstetric_complication_pph": "Postpartum haemorrhage complications reported by facilities.",
+    "obstetric_complication_eclampsia": "Eclampsia complications reported by facilities.",
+    "obstetric_complication_obstructed_labour": "Obstructed or prolonged labour complications reported by facilities.",
+    "obstetric_complication_maternal_sepsis": "Maternal sepsis complications reported by facilities.",
+    "signal_parenteral_antibiotics": "Facilities reporting administration of parenteral antibiotics.",
+    "signal_anticonvulsants_mgso4": "Facilities reporting administration of magnesium sulphate anticonvulsants.",
+    "signal_oxytocics": "Facilities reporting administration of uterotonic drugs.",
+    "signal_manual_placenta_removal": "Manual removal of placenta procedures reported by facilities.",
+    "signal_mva_retained_products": "Manual vacuum aspiration for retained products reported by facilities.",
+    "signal_assisted_vaginal_delivery": "Assisted vaginal deliveries reported by facilities.",
+    "signal_caesarean_section": "Caesarean sections reported by facilities.",
+    "signal_blood_transfusion": "Blood transfusions reported by facilities.",
+    "mothers_with_postnatal_complications": "Mothers with postnatal complications reported by facilities.",
+    "babies_with_postnatal_complications": "Babies with postnatal complications reported by facilities.",
+    "mothers_checked_within_7_days": "Mothers receiving a postnatal check within seven days.",
+    "babies_checked_within_7_days": "Babies receiving a postnatal check within seven days.",
+    "mothers_checked_at_6_weeks": "Mothers receiving a postnatal check at six weeks.",
+    "babies_checked_at_6_weeks": "Babies receiving a postnatal check at six weeks.",
+    "immediate_postpartum_family_planning": "Mothers receiving immediate postpartum family-planning services.",
+    "hiv_positive_postnatal_mothers": "HIV-positive mothers recorded during postnatal care.",
+    "hiv_exposed_babies_on_art_prophylaxis": "HIV-exposed babies receiving ART prophylaxis.",
+    "babies_who_received_bcg": "Babies receiving BCG vaccination.",
+    "babies_who_received_polio_0": "Babies receiving the Polio 0 dose.",
 }
 INDICATOR_COLORS = {
     "maternal_deaths": "#E11D48",
@@ -115,6 +146,8 @@ def _load_sample(path: Path) -> pd.DataFrame:
     frame["value"] = pd.to_numeric(frame.get("value"), errors="coerce")
     if "indicator_group" not in frame.columns:
         frame["indicator_group"] = frame["indicator_id"].map(LEGACY_GROUPS).fillna("Other indicators")
+    if "value_type" not in frame.columns:
+        frame["value_type"] = "count"
     return frame.dropna(subset=["period_start", "value"])
 
 
@@ -225,7 +258,7 @@ def _indicator_summary(frame: pd.DataFrame) -> pd.DataFrame:
     latest_period = periods[-1]
     previous_period = periods[-2] if len(periods) > 1 else None
     total = frame.groupby(
-        ["indicator_id", "indicator_name", "indicator_group"], as_index=False
+        ["indicator_id", "indicator_name", "indicator_group", "value_type"], as_index=False
     )["value"].sum().rename(columns={"value": "total"})
     latest = (
         frame[frame["period_start"] == latest_period]
@@ -421,7 +454,7 @@ def _indicator_chart_card(frame: pd.DataFrame, row, color: str):
             row.indicator_id, "Facility-reported HMIS aggregate over time."
         ),
         accent=color,
-        y_title="Reported count",
+        y_title="Percentage (%)" if row.value_type == "percentage" else "Reported count",
         series_df=series[["month", "value"]],
         multi=False,
     )["card"]

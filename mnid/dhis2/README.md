@@ -207,7 +207,7 @@ python -m mnid.dhis2.sync --start-period 202504 --end-period 202605 --dry-run
 These checks do not contact live DHIS2. Live retrieval should begin with a controlled
 period and organisation-unit scope and be reconciled against the source report.
 
-Compare the cached 25-indicator dashboard with a fresh read-only Analytics pull:
+Compare the complete cached 52-indicator dashboard with a fresh read-only Analytics pull:
 
 ```bash
 python -m mnid.dhis2.compare_live \
