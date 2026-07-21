@@ -139,11 +139,11 @@ The dashboard reads `hmis_test.parquet` once per render operation and applies:
 - selected facility name, DHIS2 UID, or mapped facility code; and
 - indicator grouping.
 
-The visualization structure follows the MNID Country Profile design language: a dark
-scope and reporting-period header, priority alert, scope band, current-period summary
-cards, and a dedicated labeled monthly run-chart card for each of the 52 indicators.
-Charts are grouped under five clinical domains, followed by priority-outcome district
-ranking and a facility drill-down table.
+The visualization structure follows the MNH Beginnings design language: a scope and
+reporting-period header, priority alert, current-period summary cards, seven focused
+run charts, a birth-outcome composition donut, district ranking, five domain comparison
+charts, two facility-percentage status cards, and a facility drill-down table. All 52
+indicators remain represented without forcing every measure into the same chart form.
 The indicator cards reuse the same `mnid/components/run_charts.py` payload and callback
 as Country Profile, including consistent styling, captions, and time-grain controls.
 The source grain is monthly; quarterly and yearly views are rollups of monthly values,

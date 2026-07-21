@@ -31,9 +31,10 @@ crosswalk, clinical approval of derived formulas, and management approval of the
 - Raw audit, normalized atomic data, calculated indicators, validation reports, and
   last-known-good output separated under ignored runtime folders.
 - Opt-in DHIS2 dashboard mode without render-time network access.
-- A working MNH Beginnings HMIS test view with a current-period summary and 52
-  individually labeled monthly run-chart cards, grouped by clinical domain, plus
-  priority-outcome district comparison and facility-level filtering/table output.
+- A working MNH Beginnings HMIS test view covering all 52 indicators through a mixed
+  presentation: seven focused run charts, an outcome-composition donut, district
+  ranking, five clinical comparison charts, percentage status cards, and a filterable
+  facility-level table.
 - Application startup and routing support for a DHIS2-only test environment where
   the legacy `data/default/parquet` MAHIS source is unavailable.
 
