@@ -163,7 +163,7 @@ def _prewarm_country_profile() -> bool:
 
             _LOGGER.info('MNID country-profile pre-warm: rendering...')
             country_label = 'Maternal & Newborn' if config.get('report_name') == 'Maternal Health' else 'Maternal'
-            cp_view = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label)
+            cp_view = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label, start_date=start_date, end_date=end_date)
             _MNID_EXECUTIVE_DISK_CACHE.set(_cp_disk_key, cp_view, expire=_MNID_UI_CACHE_TTL_SECONDS)
             _worker_view_cache[_cp_disk_key] = cp_view
             _trim_cache(_worker_view_cache, _WORKER_VIEW_CACHE_MAX)
@@ -246,7 +246,7 @@ def _build_executive_tab_view(
         if cp_cached is None:
             cp_cached = _MNID_EXECUTIVE_DISK_CACHE.get(_cp_disk_key)
         if cp_cached is None:
-            cp_cached = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label)
+            cp_cached = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label, start_date=start_date, end_date=end_date)
             _MNID_EXECUTIVE_DISK_CACHE.set(_cp_disk_key, cp_cached, expire=_MNID_UI_CACHE_TTL_SECONDS)
         _worker_view_cache[_cp_disk_key] = cp_cached
         _trim_cache(_worker_view_cache, _WORKER_VIEW_CACHE_MAX)
@@ -536,7 +536,7 @@ def render_mnid_dashboard(filtered, data_opd, data_path, config,
         ))
         cp_cached = _MNID_EXECUTIVE_DISK_CACHE.get(_cp_disk_key)
         if cp_cached is None:
-            cp_cached = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label)
+            cp_cached = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label, start_date=start_date, end_date=end_date)
             _MNID_EXECUTIVE_DISK_CACHE.set(_cp_disk_key, cp_cached, expire=_MNID_UI_CACHE_TTL_SECONDS)
         executive_content['country-profile'] = cp_cached
         _initial_ec = [executive_content['country-profile']]

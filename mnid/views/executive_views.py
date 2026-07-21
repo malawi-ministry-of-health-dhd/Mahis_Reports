@@ -18,6 +18,12 @@ from mnid.components.run_charts import (
 )
 from mnid.charts.coverage import _system_readiness
 from mnid.core.constants import BG, BORDER, DIM, FONT, GRID_C, MUTED, OK_C, TEXT, WARN_C
+from mnid.aggregation.store import (
+    get_aggregate as _get_aggregate,
+    query_coverage as _agg_coverage,
+    query_time_series as _agg_time_series,
+)
+from mnid.core.cache import _resolve_scope_filters
 
 PRIMARY_GREEN = "#15803D"
 SUCCESS_GREEN = "#16A34A"
@@ -463,6 +469,98 @@ def _metric_snapshot(df: pd.DataFrame) -> dict:
     }
 
 
+# DHIS2-native id for each _metric_snapshot count that has a real mapping
+# (see mnid/dhis2/mnid_publish.py::DHIS2_TO_MNID_ID) -- completeness has no
+# DHIS2 counterpart and stays None. maternal_admissions/neonatal_admissions
+# are derived separately below (see _AGG_ADMISSION_IDS), not a 1:1 indicator.
+_AGG_METRIC_IDS = {
+    "total_births": "mnid_lab_core_totalbirths",
+    "live_births": "mnid_lab_overview_004",
+    "fresh_stillbirths": "mnid_lab_core_freshstillbirths",
+    "macerated_stillbirths": "mnid_lab_core_maceratedstillbirths",
+    "stillbirths": "mnid_lab_overview_005",
+    "maternal_deaths": "mnid_pnc_overview_004",
+    "neonatal_deaths": "mnid_nb_overview_002",
+}
+
+# Maternity Unit Admissions = clients enrolled under ANC + Labour + PNC;
+# Neonatal Care Unit Admissions = clients under Newborn -- mirroring how
+# _metric_snapshot defines these via _service_mask(df, [...]) for MAHIS.
+# DHIS2 has no single "admission" indicator per category, so this is a sum
+# of the closest available count per phase: ANC enrollment, delivery volume
+# (labour), and the earliest/most common postnatal contact (PNC -- there's
+# no distinct PNC *visit-count* indicator in the current 52, so the 7-day
+# postnatal check is used as the closest proxy). Neonatal uses live births
+# as the newborn population base.
+_AGG_ADMISSION_IDS = {
+    "anc": "mnid_anc_moh_002",         # new_anc_registrations
+    "labour": "mnid_lab_core_totalbirths",
+    "pnc": "mnid_pnc_core_mocheck7d",  # mothers_checked_within_7_days
+}
+
+# 4 of the 5 maternal complications have a real DHIS2 mapping (a true
+# percentage already computed against PCT_DENOMINATOR, see
+# mnid/dhis2/mnid_publish.py); none of the 3 neonatal complications do.
+_AGG_MATERNAL_COMPLICATION_IDS = {
+    "Pre-eclampsia and Eclampsia": "mnid_lab_core_eclampsia",
+    "Postpartum Haemorrhage": "mnid_lab_core_pph",
+    "Maternal Sepsis": "mnid_lab_core_004",
+    "Obstructed or Prolonged Labour": "mnid_lab_core_obstructedlabour",
+}
+
+
+def _agg_metric_snapshot(
+    agg_df: pd.DataFrame,
+    start_date,
+    end_date,
+    facility_codes: list[str] | None = None,
+    districts: list[str] | None = None,
+) -> dict:
+    """DHIS2-aggregate equivalent of _metric_snapshot -- same return shape.
+
+    The 7 birth/death counts DHIS2 maps onto directly, plus
+    maternal_admissions/neonatal_admissions derived from _AGG_ADMISSION_IDS
+    (see its docstring). completeness has no DHIS2 counterpart and stays
+    None so the summary card can render "N/A" instead of a misleading 0.
+    """
+    counts = {}
+    for key, mnid_id in _AGG_METRIC_IDS.items():
+        num, _den, _pct = _agg_coverage(
+            agg_df, mnid_id, start_date, end_date,
+            facility_codes=facility_codes, districts=districts, grain='monthly',
+        )
+        counts[key] = num
+
+    anc_count, _den, _pct = _agg_coverage(
+        agg_df, _AGG_ADMISSION_IDS["anc"], start_date, end_date,
+        facility_codes=facility_codes, districts=districts, grain='monthly',
+    )
+    pnc_count, _den, _pct = _agg_coverage(
+        agg_df, _AGG_ADMISSION_IDS["pnc"], start_date, end_date,
+        facility_codes=facility_codes, districts=districts, grain='monthly',
+    )
+    maternal_admissions = anc_count + counts["total_births"] + pnc_count
+    neonatal_admissions = counts["live_births"]
+
+    return {
+        "maternal_admissions": maternal_admissions,
+        "neonatal_admissions": neonatal_admissions,
+        "live_births": counts["live_births"],
+        "total_births": counts["total_births"],
+        "fresh_stillbirths": counts["fresh_stillbirths"],
+        "macerated_stillbirths": counts["macerated_stillbirths"],
+        "maternal_deaths": counts["maternal_deaths"],
+        "neonatal_deaths": counts["neonatal_deaths"],
+        "stillbirths": counts["stillbirths"],
+        "institutional_mmr": _safe_div(counts["maternal_deaths"], counts["live_births"], 100000),
+        "neonatal_mortality_rate": _safe_div(counts["neonatal_deaths"], counts["live_births"], 1000),
+        "stillbirth_rate": _safe_div(counts["stillbirths"], counts["total_births"], 1000),
+        "fresh_stillbirth_pct": _safe_div(counts["fresh_stillbirths"], counts["stillbirths"], 100),
+        "macerated_stillbirth_pct": _safe_div(counts["macerated_stillbirths"], counts["stillbirths"], 100),
+        "completeness": None,
+    }
+
+
 def _monthly_series(df: pd.DataFrame, mask: pd.Series, unique_col: str = "person_id") -> pd.DataFrame:
     if df is None or df.empty or "Date" not in df.columns or unique_col not in df.columns:
         return pd.DataFrame(columns=["month", "value"])
@@ -493,6 +591,53 @@ def _monthly_multiseries(series_map: dict[str, tuple[pd.Series, str]], df: pd.Da
     frames = []
     for label, (mask, color) in series_map.items():
         series_df = _monthly_series(df, mask, unique_col)
+        if series_df.empty:
+            continue
+        frames.append(series_df.assign(series=label, color=color))
+    if not frames:
+        return pd.DataFrame(columns=["month", "value", "series", "color"])
+    return pd.concat(frames, ignore_index=True)
+
+
+def _agg_monthly_series(
+    agg_df: pd.DataFrame,
+    mnid_id: str,
+    start_date,
+    end_date,
+    facility_codes: list[str] | None = None,
+    districts: list[str] | None = None,
+    value_field: str = "numerator",
+) -> pd.DataFrame:
+    """DHIS2-aggregate equivalent of _monthly_series -- same ['month', 'value'] shape.
+
+    value_field='numerator' for count trend charts (Total Births, mortality,
+    stillbirths); 'pct' for indicators that are already a rate against their
+    PCT_DENOMINATOR pair (the mapped complication charts) -- see
+    mnid/dhis2/mnid_publish.py::PCT_DENOMINATOR.
+    """
+    series = _agg_time_series(
+        agg_df, mnid_id, grain='monthly',
+        facility_codes=facility_codes, districts=districts,
+        start_date=start_date, end_date=end_date,
+    )
+    if series.empty:
+        return pd.DataFrame(columns=["month", "value"])
+    out = series.rename(columns={"period_start": "month", value_field: "value"})
+    return out[["month", "value"]]
+
+
+def _agg_monthly_multiseries(
+    series_map: dict[str, tuple[str, str]],
+    agg_df: pd.DataFrame,
+    start_date,
+    end_date,
+    facility_codes: list[str] | None = None,
+    districts: list[str] | None = None,
+) -> pd.DataFrame:
+    """DHIS2-aggregate equivalent of _monthly_multiseries. series_map: {label: (mnid_id, color)}."""
+    frames = []
+    for label, (mnid_id, color) in series_map.items():
+        series_df = _agg_monthly_series(agg_df, mnid_id, start_date, end_date, facility_codes, districts)
         if series_df.empty:
             continue
         frames.append(series_df.assign(series=label, color=color))
@@ -826,13 +971,57 @@ def _mortality_distribution_chart(df: pd.DataFrame, title: str, color: str) -> g
     return fig
 
 
-def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, indicator_label: str = "Maternal Indicators") -> html.Div:
+def render_country_profile(
+    df: pd.DataFrame, scope_meta: dict | None = None, indicator_label: str = "Maternal Indicators",
+    start_date=None, end_date=None,
+) -> html.Div:
     profile_name = _profile_scope_name(scope_meta)
     df = _copy_df(df)
     prev_df = _prior_period_df(df)
-    current_metrics = _metric_snapshot(df)
-    previous_metrics = _metric_snapshot(prev_df)
-    start, end = _period_bounds(df)
+
+    # DHIS2 mode: source the metrics/trends that have a real DHIS2 mapping
+    # (see _AGG_METRIC_IDS / mnid/dhis2/mnid_publish.py::PCT_DENOMINATOR) from
+    # the aggregate instead of scanning raw MAHIS rows, so Country Profile
+    # actually reflects MNID_DATA_SOURCE='dhis2' like the rest of MNID
+    # already does. Falls back to the existing row-level path if the
+    # aggregate isn't published yet, so this never breaks the page.
+    agg_df = _get_aggregate(route='dhis2') if (scope_meta or {}).get('route') == 'dhis2' else None
+    use_dhis2 = agg_df is not None and not agg_df.empty
+    if use_dhis2:
+        # Narrow to just the ~11 indicators Country Profile needs, once, up
+        # front. query_coverage/query_time_series each re-filter by exact
+        # indicator_id internally (an object-dtype string comparison, slow
+        # over the full ~600K-row DHIS2 aggregate) -- with ~24 calls per
+        # render (7 metrics x current+previous period, 4 trend series, 4
+        # complications), that's 24 full-table scans instead of 1.
+        _cp_agg_ids = (
+            set(_AGG_METRIC_IDS.values())
+            | set(_AGG_MATERNAL_COMPLICATION_IDS.values())
+            | set(_AGG_ADMISSION_IDS.values())
+        )
+        agg_df = agg_df[agg_df['indicator_id'].isin(_cp_agg_ids)]
+    facility_codes = districts = None
+
+    if use_dhis2:
+        _, facility_codes, districts = _resolve_scope_filters(df, scope_meta or {})
+        start = pd.to_datetime(start_date) if start_date else None
+        end = pd.to_datetime(end_date) if end_date else None
+        if start is None or end is None:
+            start, end = _period_bounds(df)
+        if start is not None and end is not None:
+            window_days = max((end - start).days, 1)
+            prev_end = start - pd.Timedelta(days=1)
+            prev_start = prev_end - pd.Timedelta(days=window_days - 1)
+            current_metrics = _agg_metric_snapshot(agg_df, start, end, facility_codes, districts)
+            previous_metrics = _agg_metric_snapshot(agg_df, prev_start, prev_end, facility_codes, districts)
+        else:
+            current_metrics = _agg_metric_snapshot(agg_df, None, None, facility_codes, districts)
+            previous_metrics = dict(current_metrics)
+    else:
+        current_metrics = _metric_snapshot(df)
+        previous_metrics = _metric_snapshot(prev_df)
+        start, end = _period_bounds(df)
+
     period_label = f"{start.strftime('%d %b %Y') if start is not None else 'N/A'} - {end.strftime('%d %b %Y') if end is not None else 'N/A'}"
     updated_label = end.strftime("%d %b %Y, %H:%M") if end is not None else "Unavailable"
 
@@ -840,9 +1029,10 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
     facilities_reporting = int(df["Facility_CODE"].dropna().astype(str).nunique()) if "Facility_CODE" in df.columns else 0
     districts_covered = int(df["District"].dropna().astype(str).nunique()) if "District" in df.columns else 0
 
+    _fmt_count = lambda v: f"{v:,}" if v is not None else "N/A"
     summary_cards = [
-        _summary_card("Maternity Unit Admissions", f"{current_metrics['maternal_admissions']:,}", "ANC, labour, and PNC encounters", PRIMARY_GREEN),
-        _summary_card("Neonatal Care Unit Admissions", f"{current_metrics['neonatal_admissions']:,}", "Newborn care encounters", NEONATAL_ORANGE),
+        _summary_card("Maternity Unit Admissions", _fmt_count(current_metrics['maternal_admissions']), "ANC, labour, and PNC encounters", PRIMARY_GREEN),
+        _summary_card("Neonatal Care Unit Admissions", _fmt_count(current_metrics['neonatal_admissions']), "Newborn care encounters", NEONATAL_ORANGE),
         _summary_card("Total Births", f"{current_metrics['total_births']:,}", "Live births and stillbirths", STILLBIRTH_BLUE),
         _summary_card("Live Births", f"{current_metrics['live_births']:,}", "Outcome recorded as live birth", SUCCESS_GREEN),
         _summary_card("Stillbirths", f"{current_metrics['stillbirths']:,}", "Stillbirths in current reporting period", "#7C3AED"),
@@ -871,45 +1061,57 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
         ),
     ]
 
-    maternal_death_series = _monthly_series(df, _yn_mask(df, "mnid_pnc_maternal_death"), "person_id")
-    neonatal_death_series = _monthly_series(df, _contains_mask(df, "obs_value_coded", ["Died", "Dead", "Death", "Neonatal death"]), "person_id")
-    live_birth_denominator_mask = (
-        _contains_mask(df, "concept_name", ["Outcome of the delivery"])
-        & _contains_mask(df, "obs_value_coded", ["Live birth", "Live births", "Alive"])
-    )
-    total_birth_denominator_mask = (
-        _contains_mask(df, "concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"])
-        & _contains_mask(
-            df,
-            "obs_value_coded",
-            [
-                "Live birth",
-                "Live births",
-                "Alive",
-                "Stillbirth",
-                "Fresh stillbirth",
-                "Macerated stillbirth",
-                "Fresh still birth",
-                "Macerated still birth",
-            ],
+    if use_dhis2:
+        total_births_series = _agg_monthly_series(agg_df, "mnid_lab_core_totalbirths", start, end, facility_codes, districts)
+        maternal_death_series = _agg_monthly_series(agg_df, "mnid_pnc_overview_004", start, end, facility_codes, districts)
+        neonatal_death_series = _agg_monthly_series(agg_df, "mnid_nb_overview_002", start, end, facility_codes, districts)
+        stillbirth_trend_series = _agg_monthly_multiseries({
+            "Total stillbirths": ("mnid_lab_overview_005", STILLBIRTH_BLUE),
+            "Fresh stillbirths": ("mnid_lab_core_freshstillbirths", "#DB2777"),
+            "Macerated stillbirths": ("mnid_lab_core_maceratedstillbirths", "#7C3AED"),
+        }, agg_df, start, end, facility_codes, districts)
+        # Only used by the row-level maternal/neonatal complication loops below.
+        live_birth_denominator_mask = total_birth_denominator_mask = None
+    else:
+        maternal_death_series = _monthly_series(df, _yn_mask(df, "mnid_pnc_maternal_death"), "person_id")
+        neonatal_death_series = _monthly_series(df, _contains_mask(df, "obs_value_coded", ["Died", "Dead", "Death", "Neonatal death"]), "person_id")
+        live_birth_denominator_mask = (
+            _contains_mask(df, "concept_name", ["Outcome of the delivery"])
+            & _contains_mask(df, "obs_value_coded", ["Live birth", "Live births", "Alive"])
         )
-    )
-    total_births_series = _monthly_multiseries({"Total births": (
-        _contains_mask(df, "concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"]),
-        PRIMARY_GREEN,
-    )}, df)
-    total_births_series = total_births_series[["month", "value"]].copy() if not total_births_series.empty else pd.DataFrame(columns=["month", "value"])
-    stillbirth_trend_series = _monthly_multiseries({
-        "Total stillbirths": (_yn_mask(df, "mnid_labour_stillbirth"), STILLBIRTH_BLUE),
-        "Fresh stillbirths": (
-            _contains_mask(df, "obs_value_coded", ["Fresh stillbirth", "Fresh still birth"]),
-            "#DB2777",
-        ),
-        "Macerated stillbirths": (
-            _contains_mask(df, "obs_value_coded", ["Macerated stillbirth", "Macerated still birth"]),
-            "#7C3AED",
-        ),
-    }, df)
+        total_birth_denominator_mask = (
+            _contains_mask(df, "concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"])
+            & _contains_mask(
+                df,
+                "obs_value_coded",
+                [
+                    "Live birth",
+                    "Live births",
+                    "Alive",
+                    "Stillbirth",
+                    "Fresh stillbirth",
+                    "Macerated stillbirth",
+                    "Fresh still birth",
+                    "Macerated still birth",
+                ],
+            )
+        )
+        total_births_series = _monthly_multiseries({"Total births": (
+            _contains_mask(df, "concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"]),
+            PRIMARY_GREEN,
+        )}, df)
+        total_births_series = total_births_series[["month", "value"]].copy() if not total_births_series.empty else pd.DataFrame(columns=["month", "value"])
+        stillbirth_trend_series = _monthly_multiseries({
+            "Total stillbirths": (_yn_mask(df, "mnid_labour_stillbirth"), STILLBIRTH_BLUE),
+            "Fresh stillbirths": (
+                _contains_mask(df, "obs_value_coded", ["Fresh stillbirth", "Fresh still birth"]),
+                "#DB2777",
+            ),
+            "Macerated stillbirths": (
+                _contains_mask(df, "obs_value_coded", ["Macerated stillbirth", "Macerated still birth"]),
+                "#7C3AED",
+            ),
+        }, df)
 
     maternal_complication_specs = [
         ("Pre-eclampsia and Eclampsia", MORTALITY_ROSE, _yn_mask(df, "mnid_labour_eclampsia") | _contains_mask(df, "obs_value_coded", ["Pre-eclampsia", "Pre eclampsia", "Preeclampsia", "Eclampsia"])),
@@ -923,28 +1125,45 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
         ("Preterm Birth", PRIMARY_GREEN, _yn_mask(df, "mnid_labour_preterm")),
         ("Neonatal Sepsis", ADMISSIONS_BLUE, _yn_mask(df, "mnid_newborn_sepsis")),
     ]
+    # 4 of the 5 maternal complications have a real DHIS2 mapping (with a
+    # true percentage already computed against PCT_DENOMINATOR, see
+    # mnid/dhis2/mnid_publish.py); none of the 3 neonatal complications do.
+    # Unmapped ones get an empty series -- same "no data" rendering
+    # _trend_chart_payload already falls back to for sparse MAHIS periods.
     maternal_complication_cards = []
     for title, color, mask in maternal_complication_specs:
         chart_key = _chart_key_slug(title)
+        if use_dhis2:
+            mnid_id = _AGG_MATERNAL_COMPLICATION_IDS.get(title)
+            series_df = (
+                _agg_monthly_series(agg_df, mnid_id, start, end, facility_codes, districts, value_field="pct")
+                if mnid_id else pd.DataFrame(columns=["month", "value"])
+            )
+        else:
+            series_df = _monthly_rate_series(df, mask, total_birth_denominator_mask, "person_id")
         maternal_complication_cards.append(_trend_chart_payload(
             chart_key,
             title,
             _trend_subtitle(title),
             color,
             "Rate (%)",
-            _monthly_rate_series(df, mask, total_birth_denominator_mask, "person_id"),
+            series_df,
             multi=False,
         )["card"])
     neonatal_complication_cards = []
     for title, color, mask in neonatal_complication_specs:
         chart_key = _chart_key_slug(title)
+        series_df = (
+            pd.DataFrame(columns=["month", "value"]) if use_dhis2
+            else _monthly_rate_series(df, mask, live_birth_denominator_mask, "person_id")
+        )
         neonatal_complication_cards.append(_trend_chart_payload(
             chart_key,
             title,
             _trend_subtitle(title),
             color,
             "Rate (%)",
-            _monthly_rate_series(df, mask, live_birth_denominator_mask, "person_id"),
+            series_df,
             multi=False,
         )["card"])
 
@@ -1051,7 +1270,10 @@ def render_country_profile(df: pd.DataFrame, scope_meta: dict | None = None, ind
     ] + [
         html.Div([
             html.Span("Completeness", style={"fontSize": "9px", "fontWeight": "700", "color": "#94a3b8", "textTransform": "uppercase", "letterSpacing": ".07em", "display": "block", "marginBottom": "2px"}),
-            html.Span(f"{current_metrics['completeness']:.1f}%", style={"fontSize": "11px", "fontWeight": "600", "color": "#0f172a"}),
+            html.Span(
+                f"{current_metrics['completeness']:.1f}%" if current_metrics['completeness'] is not None else "N/A",
+                style={"fontSize": "11px", "fontWeight": "600", "color": "#0f172a"},
+            ),
         ], style={"padding": "8px 14px"}),
     ], style={
         "display": "flex", "flexWrap": "wrap",
