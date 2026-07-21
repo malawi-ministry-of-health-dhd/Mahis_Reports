@@ -15,6 +15,17 @@ DATA_PATH_ = "data/default"
 USE_DEMO_DATA = False
 DATA_FILE_NAME_ = "demo_parquet" if USE_DEMO_DATA else "data/parquet"
 
+# mnid/dhis2 package (MNH indicator sync) - separate host/creds from the legacy
+# DHIS2_URL/DHIS2_UNAME/DHIS2_PASSWORD above, which are unrelated and unused by it.
+MNH_DHIS2_BASE_URL = 'url'
+MNH_DHIS2_USERNAME = 'Username'
+MNH_DHIS2_PASSWORD = 'Password'
+
+# Which data source MNID's indicator-coverage views read from: 'mahis' (default,
+# computed from local MAHIS/OpenMRS parquet) or 'dhis2' (published aggregates from
+# mnid/dhis2, see mnid/dhis2/mnid_publish.py).
+MNID_DATA_SOURCE = 'mahis'
+
 # REFERENCE COLUMNS
 FIRST_NAME_ = 'given_name'
 LAST_NAME_ = 'family_name'

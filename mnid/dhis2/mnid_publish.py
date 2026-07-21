@@ -97,6 +97,44 @@ MNID_META = {
     'mnid_lab_moh_006': ('Normal vaginal delivery', 'Labour', 60),
 }
 
+# Every one of the 25 indicators above is value_type='count' in DHIS2's own
+# config (mnid/dhis2/config/indicators.json) -- none use operation='percentage',
+# so calculate_indicators() never populates a real numerator/denominator for
+# any of them. Without this map, every single indicator falls through to the
+# count-only branch below (numerator=denominator=count, pct=100%), which reads
+# as "100% coverage" for things like Stillbirths -- meaningless. Pairs each
+# count with the DHIS2-native id of the appropriate denominator indicator
+# already pulled in the same sync, using standard MNH indicator conventions
+# (birth-outcome indicators over total births, newborn-care indicators over
+# live births, ANC-service indicators over ANC registrations). The 3 indicators
+# absent from this map (total_births, new_anc_registrations, anc_visits) are
+# themselves the "whole" with no better denominator in this dataset, so they
+# keep the count-only convention (100% = fully reported, not a rate).
+PCT_DENOMINATOR = {
+    'live_births': 'total_births',
+    'fresh_stillbirths': 'total_births',
+    'macerated_stillbirths': 'total_births',
+    'stillbirths': 'total_births',
+    'maternal_deaths': 'live_births',
+    'neonatal_deaths': 'live_births',
+    'blood_pressure_measured': 'new_anc_registrations',
+    'tested_for_hiv': 'new_anc_registrations',
+    'screened_for_syphilis': 'new_anc_registrations',
+    'at_least_4_anc_contacts': 'new_anc_registrations',
+    'tetanus_doses_2': 'new_anc_registrations',
+    'started_anc_in_first_trimester_0_12_weeks': 'new_anc_registrations',
+    'received_120_fefo_tablets': 'new_anc_registrations',
+    'received_itn_during_anc': 'new_anc_registrations',
+    'uterotonic_given_after_birth': 'total_births',
+    'newborns_not_breathing_at_birth_receiving_bag_mask_ventilation': 'live_births',
+    'vitamin_k_at_birth': 'live_births',
+    'facility_deliveries': 'total_births',
+    'delivered_at_this_facility': 'total_births',
+    'delivered_at_home_or_in_transit': 'total_births',
+    'delivered_by_skilled_attendant': 'total_births',
+    'normal_vaginal_delivery': 'total_births',
+}
+
 DHIS2_ROUTE = 'dhis2'
 
 
@@ -147,6 +185,13 @@ def publish_mnid_aggregate() -> dict:
     atomic = {(v.dx, v.period, v.org_unit_id): Decimal(v.raw_value) for v in values}
     calculated = calculate_indicators(mapping, atomic, periods, selected_units)
 
+    # (dhis2_indicator_id, period, org_unit_id) -> value, so PCT_DENOMINATOR
+    # lookups can pull the paired denominator indicator's value for the same
+    # period/org unit without a second pass over the DHIS2 API.
+    value_by_key = {
+        (r['indicator_id'], r['period'], r['org_unit_id']): r['value'] for r in calculated
+    }
+
     rows = []
     skipped_unmapped = 0
     for record in calculated:
@@ -159,14 +204,28 @@ def publish_mnid_aggregate() -> dict:
             continue
         label, category, target = MNID_META[mnid_id]
         value = float(record['value'])
-        if record.get('value_type') == 'percentage' and record.get('numerator') is not None and record.get('denominator'):
+        denom_dhis2_id = PCT_DENOMINATOR.get(dhis2_id)
+        if denom_dhis2_id:
+            denom_value = value_by_key.get((denom_dhis2_id, record['period'], record['org_unit_id']))
+            numerator = int(round(value))
+            if denom_value:
+                denominator = int(round(float(denom_value)))
+                pct = round(min(numerator / denominator * 100, 100.0), 1) if denominator else 0.0
+            else:
+                # denominator indicator has no data for this period/org unit --
+                # no-data, not a fabricated 100%.
+                denominator = 0
+                pct = 0.0
+        elif record.get('value_type') == 'percentage' and record.get('numerator') is not None and record.get('denominator'):
             # true numerator/denominator pair (e.g. a screening rate)
             numerator = int(record['numerator'])
             denominator = int(record['denominator'])
             pct = round(min(numerator / denominator * 100, 100.0), 1) if denominator else 0.0
         else:
-            # count-only indicator (e.g. Live Births): the count *is* the numerator,
-            # denominator=numerator so it reads as "fully reported" rather than 0%.
+            # count-only indicator with no sensible in-dataset denominator (e.g.
+            # Total Births, the base of most ratios above): the count *is* the
+            # numerator, denominator=numerator so it reads as "fully reported"
+            # rather than a fabricated rate.
             numerator = int(round(value))
             denominator = numerator
             pct = 100.0 if numerator else 0.0

@@ -137,10 +137,12 @@ def invalidate_cache(route: str | None = None) -> None:
     if route is None:
         _AGG_DF_BY_ROUTE.clear()
         _LOADED_ROUTES.clear()
+        _RESOLVE_LOOKUP_CACHE.clear()
         _LOG.info('Aggregate cache invalidated (all routes)')
         return
     _AGG_DF_BY_ROUTE.pop(route, None)
     _LOADED_ROUTES.discard(route)
+    _RESOLVE_LOOKUP_CACHE.clear()
     _LOG.info('Aggregate cache invalidated (route=%s)', route)
 
 
@@ -166,6 +168,39 @@ def _candidate_grains(grain: str) -> list[str]:
     return _GRAIN_FALLBACKS.get(str(grain or '').strip().lower(), [grain or 'monthly'])
 
 
+# resolve_indicator_id is called once per tracked indicator (dozens of times)
+# with the *same* agg_df/slice object reused across the whole loop -- caching
+# the id-set + label->id lookup per dataframe identity turns what was a fresh
+# full-column string scan on every call (very expensive on the ~300K-row DHIS2
+# aggregate, since most MAHIS-only indicator IDs miss the exact-id check and
+# fall through to the label scan) into one scan, then dict lookups.
+_RESOLVE_LOOKUP_CACHE: dict[int, dict] = {}
+_RESOLVE_LOOKUP_CACHE_MAX = 32
+
+
+def _resolve_lookup(agg_df: pd.DataFrame) -> dict:
+    key = id(agg_df)
+    cached = _RESOLVE_LOOKUP_CACHE.get(key)
+    if cached is not None and cached['len'] == len(agg_df):
+        return cached
+
+    id_col = agg_df['indicator_id'].astype(str)
+    dedup = pd.DataFrame({
+        'label': agg_df['indicator_label'].fillna('').astype(str).str.strip(),
+        'id': id_col,
+    }).drop_duplicates(subset='label', keep='first')
+
+    entry = {
+        'len': len(agg_df),
+        'ids': set(id_col),
+        'label_map': dict(zip(dedup['label'], dedup['id'])),
+    }
+    _RESOLVE_LOOKUP_CACHE[key] = entry
+    if len(_RESOLVE_LOOKUP_CACHE) > _RESOLVE_LOOKUP_CACHE_MAX:
+        _RESOLVE_LOOKUP_CACHE.pop(next(iter(_RESOLVE_LOOKUP_CACHE)))
+    return entry
+
+
 def resolve_indicator_id(
     agg_df: pd.DataFrame,
     indicator_id: str,
@@ -182,18 +217,15 @@ def resolve_indicator_id(
         return indicator_id
 
     requested_id = str(indicator_id or '').strip()
-    if requested_id and agg_df['indicator_id'].astype(str).eq(requested_id).any():
+    lookup = _resolve_lookup(agg_df)
+    if requested_id and requested_id in lookup['ids']:
         return requested_id
 
     wanted_label = str(indicator_label or '').strip()
     if not wanted_label:
         return requested_id
 
-    label_mask = agg_df['indicator_label'].fillna('').astype(str).str.strip().eq(wanted_label)
-    matches = agg_df.loc[label_mask, 'indicator_id'].dropna().astype(str)
-    if matches.empty:
-        return requested_id
-    return matches.iloc[0]
+    return lookup['label_map'].get(wanted_label, requested_id)
 
 
 def query_coverage(
@@ -214,20 +246,25 @@ def query_coverage(
     when today is not the first of the month.
     """
     resolved_indicator_id = resolve_indicator_id(agg_df, indicator_id, indicator_label)
+    # Filter by indicator once (the expensive object-dtype string comparison
+    # over the whole table) instead of inside the grain fallback loop below --
+    # candidate grains that don't exist for this route/indicator (e.g. daily
+    # on a DHIS2 aggregate that only ever has monthly rows) would otherwise
+    # repeat that full-table comparison for nothing.
+    by_id = agg_df[agg_df['indicator_id'] == resolved_indicator_id]
     sub = pd.DataFrame()
     for candidate_grain in _candidate_grains(grain):
         period_floor = _floor_to_period(start_date, candidate_grain)
         mask = (
-            (agg_df['indicator_id'] == resolved_indicator_id)
-            & (agg_df['grain'] == candidate_grain)
-            & (agg_df['period_start'] >= period_floor)
-            & (agg_df['period_start'] <= pd.Timestamp(end_date))
+            (by_id['grain'] == candidate_grain)
+            & (by_id['period_start'] >= period_floor)
+            & (by_id['period_start'] <= pd.Timestamp(end_date))
         )
         if facility_codes:
-            mask &= agg_df['facility_code'].isin([str(f) for f in facility_codes])
+            mask &= by_id['facility_code'].isin([str(f) for f in facility_codes])
         elif districts:
-            mask &= agg_df['district'].isin([str(d) for d in districts])
-        sub = agg_df[mask]
+            mask &= by_id['district'].isin([str(d) for d in districts])
+        sub = by_id[mask]
         if not sub.empty:
             break
     if sub.empty:
@@ -258,21 +295,22 @@ def query_time_series(
     still find the enclosing period's record.
     """
     resolved_indicator_id = resolve_indicator_id(agg_df, indicator_id, indicator_label)
+    by_id = agg_df[agg_df['indicator_id'] == resolved_indicator_id]
     sub = pd.DataFrame()
     for candidate_grain in _candidate_grains(grain):
-        mask = (agg_df['indicator_id'] == resolved_indicator_id) & (agg_df['grain'] == candidate_grain)
+        mask = by_id['grain'] == candidate_grain
 
         if facility_codes:
-            mask &= agg_df['facility_code'].isin([str(f) for f in facility_codes])
+            mask &= by_id['facility_code'].isin([str(f) for f in facility_codes])
         elif districts:
-            mask &= agg_df['district'].isin([str(d) for d in districts])
+            mask &= by_id['district'].isin([str(d) for d in districts])
 
         if start_date is not None:
-            mask &= agg_df['period_start'] >= _floor_to_period(start_date, candidate_grain)
+            mask &= by_id['period_start'] >= _floor_to_period(start_date, candidate_grain)
         if end_date is not None:
-            mask &= agg_df['period_start'] <= pd.Timestamp(end_date)
+            mask &= by_id['period_start'] <= pd.Timestamp(end_date)
 
-        sub = agg_df[mask]
+        sub = by_id[mask]
         if not sub.empty:
             break
     if sub.empty:
