@@ -68,7 +68,7 @@ def _is_authorized(token: str | None, route: str | None) -> bool:
         path = os.getcwd()
         user_props = os.path.join(path, f'data/{route}', 'dcc_dropdown_json',
                                   'user_properties.json')
-        if os.path.exists(user_props):
+        if os.path.exists(user_props): 
             try:
                 with open(user_props, 'r') as f:
                     data = json.load(f)

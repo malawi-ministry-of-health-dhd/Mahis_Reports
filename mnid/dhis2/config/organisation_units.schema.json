@@ -1,0 +1,30 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.invalid/mnid/dhis2/organisation_units.schema.json",
+    "title": "MNID DHIS2 organisation-unit crosswalk",
+    "type": "object",
+    "required": ["schema_version", "organisation_units"],
+    "properties": {
+        "schema_version": {"const": "1.0"},
+        "organisation_units": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["org_unit_id", "name", "level", "district", "local_facility_code", "active_from", "active_to", "enabled"],
+                "properties": {
+                    "org_unit_id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]{10}$"},
+                    "name": {"type": "string", "minLength": 1},
+                    "level": {"enum": ["national", "zone", "district", "facility", "community"]},
+                    "active_from": {"type": ["string", "null"], "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"},
+                    "active_to": {"type": ["string", "null"], "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"},
+                    "dhis2_level": {"type": "integer", "minimum": 1},
+                    "dhis2_code": {"type": ["string", "null"]},
+                    "parent_org_unit_id": {"type": ["string", "null"], "pattern": "^[A-Za-z][A-Za-z0-9]{10}$"},
+                    "parent_org_unit_name": {"type": ["string", "null"]},
+                    "configuration_status": {"enum": ["discovered", "pilot", "approved"]},
+                    "enabled": {"type": "boolean"}
+                }
+            }
+        }
+    }
+}

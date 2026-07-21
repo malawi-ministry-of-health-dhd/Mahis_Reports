@@ -10,7 +10,7 @@ import json
 from dash.exceptions import PreventUpdate
 from helpers.reports_class import ReportTableBuilder
 from pages.home import _resolve_user_scope, _load_user_registry, _load_user_properties
-from mnid.data_utils import prepare_mnid_dataframe
+# from mnid.views.renderer import prepare_mnid_dataframe
 import warnings
 warnings.filterwarnings("ignore")
 from helpers.date_ranges import (
@@ -664,7 +664,7 @@ def update_table(clicks, urlparams, period_type, year_filter, month_filter, faci
                 WHERE {FACILITY_CODE_} = '{location}'
             """
         data = DataStorage.query_duckdb(sql)
-        data = prepare_mnid_dataframe(data)
+        # data = prepare_mnid_dataframe(data)
 
     try:
         period_map = {

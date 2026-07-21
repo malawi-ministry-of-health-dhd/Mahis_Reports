@@ -71,6 +71,63 @@ html { scroll-behavior: smooth; }
 .mnid-kpi       { animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .mnid-chart-card{ animation: fadeInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .mnid-card      { animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.mnid-executive-content { min-height: 520px; position: relative; }
+.mnid-loading-surface {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 520px;
+  padding: 8px 4px 20px;
+}
+.mnid-loading-surface-hero,
+.mnid-loading-surface-card,
+.mnid-loading-surface-wide {
+  background: linear-gradient(
+    90deg,
+    rgba(226,232,240,0.9) 0%,
+    rgba(248,250,252,0.98) 50%,
+    rgba(226,232,240,0.9) 100%
+  );
+  background-size: 220% 100%;
+  animation: dashboardSkeletonShift 1.4s ease-in-out infinite;
+  border: 1px solid rgba(226,232,240,0.85);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.72);
+}
+.mnid-loading-surface-hero {
+  height: 68px;
+  border-radius: 22px;
+}
+.mnid-loading-surface-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.mnid-loading-surface-card {
+  height: 132px;
+  border-radius: 24px;
+}
+.mnid-loading-surface-wide {
+  flex: 1 1 auto;
+  min-height: 280px;
+  border-radius: 28px;
+}
+.mnid-loading-parent { position: relative; }
+.mnid-loading-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(248,250,252,0.18);
+  backdrop-filter: blur(14px) saturate(0.96);
+  -webkit-backdrop-filter: blur(14px) saturate(0.96);
+  border-radius: 0;
+  z-index: 1250;
+}
+.mnid-loading-shell {
+  position: relative;
+  z-index: 1300;
+}
 
 /* Staggered KPI card entrance */
 .mnid-kpi-row > .mnid-kpi:nth-child(1) { animation-delay: 0.05s; }
@@ -539,7 +596,7 @@ html { scroll-behavior: smooth; }
 
 .mnid-heatmap-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.95fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   align-items: stretch;
 }
@@ -551,6 +608,7 @@ html { scroll-behavior: smooth; }
   background: #FFFFFF;
   box-shadow: 0 1px 4px rgba(15,23,42,0.06), inset 0 0 0 1px rgba(255,255,255,0.45);
   overflow: hidden;
+  min-height: 680px;
 }
 
 .mnid-heatmap-map .js-plotly-plot,
@@ -560,13 +618,7 @@ html { scroll-behavior: smooth; }
 }
 
 .mnid-heatmap-panel {
-  min-width: 0;
-  height: 560px;
-  padding: 10px 12px;
-  background: #FAFAF8;
-  border: 1px solid #E2E8F0;
-  border-radius: 12px;
-  overflow-y: auto;
+  display: none;
 }
 
 .mnid-map-controls {
@@ -1040,7 +1092,7 @@ html { scroll-behavior: smooth; }
 /* MNID analysis chart grid */
 .mnid-chart-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
   gap: 12px;
   padding: 4px 0;
 }
