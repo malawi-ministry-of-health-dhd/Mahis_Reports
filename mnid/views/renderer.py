@@ -26,6 +26,7 @@ from mnid.views.kpi_engine import (
     _load_mnid_report_config,
 )
 from mnid.core.data_utils import prepare_mnid_dataframe as _prepare_mnid_dataframe
+from mnid.core.data_source import get_mnid_data_source
 from mnid.dashboards import load_dashboard_module
 from mnid.views.executive_views import render_country_profile, render_operational_readiness, _profile_scope_name
 from mnid.components.run_charts import (
@@ -433,12 +434,13 @@ def render_mnid_dashboard(filtered, data_opd, data_path, config,
                           initial_tab: dict | None = None):
 
     route = (scope_meta or {}).get('route', 'default')
+    source = get_mnid_data_source(route, source='dhis2' if route == 'dhis2' else 'mahis')
     if isinstance(filtered, str):
         source_path = Path(data_path)
         if not source_path.is_absolute():
             source_path = Path.cwd() / source_path
         if not source_path.exists():
-            if route != 'dhis2':
+            if source.requires_raw_dataset:
                 return html.Div(
                     'The local MAHIS dataset is unavailable for this dashboard.',
                     style={'padding': '24px', 'color': '#64748B'},

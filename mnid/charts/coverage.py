@@ -40,6 +40,7 @@ from mnid.core.data_utils import (
     serialize_store_df as _serialize_store_df,
     _remember_ui_payload,
 )
+from mnid.core.data_source import get_mnid_data_source
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -1283,25 +1284,12 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
     """Time-aware comparison across selected facilities or districts and indicators."""
     tracked = [i for i in indicators if i.get('status') == 'tracked']
     compare_route = (scope_meta or {}).get('route', 'default')
-    compare_agg = None
-    if compare_route == 'dhis2':
-        try:
-            from mnid.aggregation.store import get_aggregate
-            compare_agg = get_aggregate(route=compare_route)
-        except Exception:
-            compare_agg = None
+    source = get_mnid_data_source(compare_route, source='dhis2' if compare_route == 'dhis2' else 'mahis')
+    compare_agg = source.aggregate()
+    dimensions = source.comparison_dimensions()
 
-    if compare_agg is not None and not compare_agg.empty:
-        all_facs = sorted({
-            str(value).strip()
-            for value in compare_agg['facility_code'].dropna()
-            if str(value).strip()
-        })
-        all_dists = sorted({
-            str(value).strip()
-            for value in compare_agg['district'].dropna()
-            if str(value).strip()
-        })
+    if dimensions is not None:
+        all_facs, all_dists = dimensions
     else:
         all_facs = sorted(mch_full['Facility_CODE'].dropna().astype(str).unique().tolist()) if len(mch_full) and 'Facility_CODE' in mch_full.columns else sorted(_ALL_FACILITIES[:])
         all_dists = sorted(mch_full['District'].dropna().astype(str).unique().tolist()) if len(mch_full) and 'District' in mch_full.columns else sorted(_ALL_DISTRICTS[:])

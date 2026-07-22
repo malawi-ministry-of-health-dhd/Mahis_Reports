@@ -11,6 +11,7 @@ from flask import request
 from helpers.helpers import build_charts_section, build_metrics_section
 from mnid_renderer import render_mnid_dashboard
 from mnid.core.data_utils import resolve_facility_level
+from mnid.core.data_source import get_mnid_data_source
 from dashboard_layouts import build_premium_dashboard
 from helpers.visualizations import create_line_list_basic_modal
 from datetime import datetime
@@ -47,8 +48,7 @@ from config import (actual_keys_in_data,
                     VALUE_,
                     VALUE_NUMERIC_,
                     DRUG_NAME_,
-                    VALUE_NAME_,
-                    MNID_DATA_SOURCE)
+                    VALUE_NAME_)
 
 dash.register_page(__name__, path="/home")
 
@@ -168,14 +168,8 @@ def _latest_available_date(route: str = 'default') -> pd.Timestamp | None:
         return _LATEST_DATA_DATE_CACHE[cache_key]
     if route == 'dhis2':
         try:
-            from mnid.aggregation.store import get_aggregate
-            aggregate = get_aggregate(route='dhis2')
-            periods = pd.to_datetime(aggregate['period_start'], errors='coerce').dropna()
-            if not periods.empty:
-                # Published DHIS2 values are monthly. Treat the latest record as
-                # available through the end of its reporting month so relative
-                # periods and the date picker describe the data honestly.
-                resolved = (periods.max() + pd.offsets.MonthEnd(0)).normalize()
+            _, resolved = get_mnid_data_source(source='dhis2').reporting_bounds()
+            if resolved is not None:
                 _LATEST_DATA_DATE_CACHE.clear()
                 _LATEST_DATA_DATE_CACHE[cache_key] = resolved
                 return resolved
@@ -220,7 +214,7 @@ def _default_date_window(route: str = 'default'):
 
 
 def _is_dhis2_mnid_report(selected_reports: list[str], menu_json: list[dict]) -> bool:
-    if MNID_DATA_SOURCE != 'dhis2':
+    if get_mnid_data_source().source != 'dhis2':
         return False
     selected = set(selected_reports or [])
     return any(
@@ -230,25 +224,7 @@ def _is_dhis2_mnid_report(selected_reports: list[str], menu_json: list[dict]) ->
 
 
 def _resolve_dhis2_date_window(start_date, end_date):
-    """Keep valid user ranges, but recover ranges wholly outside DHIS2 data."""
-    try:
-        from mnid.aggregation.store import get_aggregate
-        aggregate = get_aggregate(route='dhis2')
-        periods = pd.to_datetime(aggregate['period_start'], errors='coerce').dropna()
-        if periods.empty:
-            raise ValueError('DHIS2 aggregate has no reporting periods')
-        available_start = periods.min().normalize()
-        available_end = (periods.max() + pd.offsets.MonthEnd(0)).normalize()
-    except Exception:
-        return start_date, end_date
-
-    requested_start = pd.to_datetime(start_date, errors='coerce')
-    requested_end = pd.to_datetime(end_date, errors='coerce')
-    if pd.isna(requested_start) or pd.isna(requested_end):
-        return _default_date_window('dhis2')
-    if requested_end < available_start or requested_start > available_end:
-        return _default_date_window('dhis2')
-    return start_date, end_date
+    return get_mnid_data_source(source='dhis2').resolve_window(start_date, end_date)
 
 
 def _dataset_version_token(route: str = 'default') -> str:
@@ -1740,7 +1716,7 @@ def update_dashboard(gen, start_date, end_date, level,
         # source is selected -- data_route/DATA_PATH_ elsewhere in this function
         # (facility dropdowns, raw MAHIS queries) are untouched, since DHIS2 has no
         # equivalent for those.
-        aggregate_route = 'dhis2' if MNID_DATA_SOURCE == 'dhis2' else data_route
+        aggregate_route = get_mnid_data_source(data_route).route
         scope_meta = {
             'label':               scope_label,
             'value':               scope_value,
@@ -1848,7 +1824,8 @@ def sync_picker_with_logic(period_type, n, current_active, urlparams):
     ctx = callback_context
     triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else ""
     data_route = (urlparams or {}).get('route', ["default"])[0]
-    date_route = 'dhis2' if current_active == 'Maternal Health' and MNID_DATA_SOURCE == 'dhis2' else data_route
+    source = get_mnid_data_source(data_route)
+    date_route = source.route if current_active == 'Maternal Health' else data_route
     default_start, default_end = _default_date_window(date_route)
     anchor = default_end
 
