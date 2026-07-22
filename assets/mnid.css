@@ -1739,9 +1739,7 @@ html { scroll-behavior: smooth; }
 }
 
 .mnid-main {
-  width: 100%;
-  max-width: none;
-  box-sizing: border-box;
+  max-width: 1440px;
   margin: 0 auto;
   padding: 18px 20px 36px;
 }
