@@ -363,27 +363,6 @@ def _build_mnid_indicator_content(network_df: pd.DataFrame, config: dict,
         dashboard_subtitle = 'Clean view of performance, comparison, coverage, and readiness.'
         dashboard_theme    = 'default'
 
-    if dashboard_theme == 'newborn' and not (supply_inds or wf_inds or dq_inds):
-        _unavail = {'unique': 'person_id', 'variable1': 'concept_name', 'value1': '__mnid_unavailable__'}
-        wf_inds = [
-            {'label': 'SSNC competency assessed', 'target_pct': 80,
-             'numerator_filters': dict(_unavail), 'denominator_filters': dict(_unavail)},
-        ]
-        supply_inds = [
-            {'label': 'CPAP equipment available', 'target_pct': 80,
-             'numerator_filters': dict(_unavail), 'denominator_filters': dict(_unavail)},
-            {'label': 'Phototherapy unit available', 'target_pct': 80,
-             'numerator_filters': dict(_unavail), 'denominator_filters': dict(_unavail)},
-            {'label': 'Neonatal resuscitation equipment available', 'target_pct': 80,
-             'numerator_filters': dict(_unavail), 'denominator_filters': dict(_unavail)},
-        ]
-        dq_inds = [
-            {'label': 'Record completeness', 'target_pct': 95,
-             'numerator_filters': dict(_unavail), 'denominator_filters': dict(_unavail)},
-            {'label': 'Data entered within 7 days', 'target_pct': 90,
-             'numerator_filters': dict(_unavail), 'denominator_filters': dict(_unavail)},
-        ]
-
     hero_title = (
         'KEY NEONATAL INDICATORS'
         if dashboard_theme == 'newborn'

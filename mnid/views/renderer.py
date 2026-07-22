@@ -27,7 +27,8 @@ from mnid.views.kpi_engine import (
 )
 from mnid.core.data_utils import prepare_mnid_dataframe as _prepare_mnid_dataframe
 from mnid.dashboards import load_dashboard_module
-from mnid.views.executive_views import render_country_profile, render_operational_readiness, _profile_scope_name
+from mnid.views.executive_views import render_country_profile, _profile_scope_name
+from mnid.views.operational_readiness import render_operational_readiness
 from mnid.components.run_charts import (
     bucket_multi_series, bucket_time_series,
     _multi_run_chart, _run_chart, describe_grain_window,
@@ -256,6 +257,7 @@ def _build_executive_tab_view(
     if selected == 'operational-readiness' and facility_df is not None:
         rendered_view = render_operational_readiness(
             facility_df, supply_inds=supply_inds, wf_inds=wf_inds, dq_inds=dq_inds,
+            scope_meta=scope_meta, start_date=start_date, end_date=end_date,
         )
         if store_in_views:
             views[selected] = rendered_view

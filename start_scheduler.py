@@ -6,11 +6,17 @@ import time
 import os
 from datetime import datetime
 
+# Derived from this file's own location rather than hardcoded, so the same
+# script works unmodified in the Docker image (lives at /app) and in a
+# bare-metal/systemd deployment (lives wherever the repo was cloned).
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOGS_DIR = os.path.join(BASE_DIR, "logs")
+
 
 def run_data_storage():
     """Run the data_storage.py script and log output."""
     try:
-        log_file = "/app/logs/data_update.log"
+        log_file = os.path.join(LOGS_DIR, "data_update.log")
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         with open(log_file, "a") as f:
@@ -19,7 +25,7 @@ def run_data_storage():
             f.write(f"{'='*50}\n")
 
         result = subprocess.run(
-            ["python", "/app/data_storage.py"],
+            ["python", os.path.join(BASE_DIR, "data_storage.py")],
             capture_output=True,
             text=True
         )
@@ -37,7 +43,7 @@ def run_data_storage():
     except Exception as e:
         error_msg = f"Error running data_storage.py: {str(e)}"
         print(error_msg)
-        with open("/app/logs/data_update_error.log", "a") as f:
+        with open(os.path.join(LOGS_DIR, "data_update_error.log"), "a") as f:
             f.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - {error_msg}\n")
 
 
@@ -45,7 +51,7 @@ def _configured_routes():
     """Every route declared in configurations.json (falls back to 'default')."""
     import json
     try:
-        with open('/app/configurations.json') as f:
+        with open(os.path.join(BASE_DIR, 'configurations.json')) as f:
             configs = json.load(f)
         routes = [c.get('data_path') for c in configs if c.get('data_path')]
         return routes or ['default']
@@ -57,7 +63,7 @@ def _run_mnid_aggregation():
     """Run the MNID pre-aggregation pipeline for every configured route, in a background thread."""
     def _job():
         from mnid.aggregation.scheduler import run_aggregation_job, log_to_file
-        log_to_file('/app/logs')
+        log_to_file(LOGS_DIR)
         for route in _configured_routes():
             try:
                 run_aggregation_job(route=route)
@@ -81,7 +87,7 @@ def _run_dhis2_publish():
     def _job():
         import os as _os
         from datetime import datetime as _datetime
-        log_file = "/app/logs/dhis2_publish.log"
+        log_file = os.path.join(LOGS_DIR, "dhis2_publish.log")
         timestamp = _datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         _os.environ['MNH_DHIS2_START_PERIOD'] = _os.getenv('MNH_DHIS2_START_PERIOD', '202501')
         _os.environ['MNH_DHIS2_END_PERIOD'] = _datetime.now().strftime('%Y%m')
@@ -133,16 +139,22 @@ def start_dash_app():
     """Start the Dash application."""
     print("Starting Dash application...")
 
+    # GUNICORN_EXTRA_ARGS lets a deployment add flags (e.g. "--timeout 120")
+    # without forking this script - set it in the systemd unit's Environment=
+    # if your gunicorn invocation needs more than workers/bind.
+    extra_args = os.getenv("GUNICORN_EXTRA_ARGS", "").split()
+
     subprocess.run([
         "python", "-m", "gunicorn",
-        "--workers", "4",
-        "--bind", "0.0.0.0:8050",
+        "--workers", os.getenv("GUNICORN_WORKERS", "4"),
+        "--bind", os.getenv("GUNICORN_BIND", "0.0.0.0:8050"),
+        *extra_args,
         "wsgi:server"
     ])
 
 
 if __name__ == "__main__":
-    os.makedirs("/app/logs", exist_ok=True)
+    os.makedirs(LOGS_DIR, exist_ok=True)
     scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
     scheduler_thread.start()
     start_dash_app()
