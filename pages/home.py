@@ -166,6 +166,21 @@ def _latest_available_date(route: str = 'default') -> pd.Timestamp | None:
     cache_key = f'{route_data_path}:{_dataset_version_token(route)}'
     if cache_key in _LATEST_DATA_DATE_CACHE:
         return _LATEST_DATA_DATE_CACHE[cache_key]
+    if route == 'dhis2':
+        try:
+            from mnid.aggregation.store import get_aggregate
+            aggregate = get_aggregate(route='dhis2')
+            periods = pd.to_datetime(aggregate['period_start'], errors='coerce').dropna()
+            if not periods.empty:
+                # Published DHIS2 values are monthly. Treat the latest record as
+                # available through the end of its reporting month so relative
+                # periods and the date picker describe the data honestly.
+                resolved = (periods.max() + pd.offsets.MonthEnd(0)).normalize()
+                _LATEST_DATA_DATE_CACHE.clear()
+                _LATEST_DATA_DATE_CACHE[cache_key] = resolved
+                return resolved
+        except Exception:
+            pass
     try:
         latest = DataStorage.query_duckdb(f"SELECT MAX(Date) AS max_date FROM '{route_data_path}'")
         max_date = pd.to_datetime(latest.loc[0, 'max_date'], errors='coerce') if len(latest) else pd.NaT
@@ -188,7 +203,7 @@ def _latest_available_date(route: str = 'default') -> pd.Timestamp | None:
 def _default_date_window(route: str = 'default'):
     route_data_path = Path(path) / 'data' / route / 'parquet'
     hmis_path = Path(path) / 'mnid' / 'data' / 'dhis2' / 'aggregates' / 'hmis_test.parquet'
-    if not route_data_path.exists() and hmis_path.exists():
+    if route != 'dhis2' and not route_data_path.exists() and hmis_path.exists():
         try:
             periods = pd.to_datetime(
                 pd.read_parquet(hmis_path, columns=['period_start'])['period_start'],
@@ -204,6 +219,38 @@ def _default_date_window(route: str = 'default'):
     return start, anchor
 
 
+def _is_dhis2_mnid_report(selected_reports: list[str], menu_json: list[dict]) -> bool:
+    if MNID_DATA_SOURCE != 'dhis2':
+        return False
+    selected = set(selected_reports or [])
+    return any(
+        item.get('report_name') in selected and item.get('dashboard_type') == 'mnid'
+        for item in menu_json
+    )
+
+
+def _resolve_dhis2_date_window(start_date, end_date):
+    """Keep valid user ranges, but recover ranges wholly outside DHIS2 data."""
+    try:
+        from mnid.aggregation.store import get_aggregate
+        aggregate = get_aggregate(route='dhis2')
+        periods = pd.to_datetime(aggregate['period_start'], errors='coerce').dropna()
+        if periods.empty:
+            raise ValueError('DHIS2 aggregate has no reporting periods')
+        available_start = periods.min().normalize()
+        available_end = (periods.max() + pd.offsets.MonthEnd(0)).normalize()
+    except Exception:
+        return start_date, end_date
+
+    requested_start = pd.to_datetime(start_date, errors='coerce')
+    requested_end = pd.to_datetime(end_date, errors='coerce')
+    if pd.isna(requested_start) or pd.isna(requested_end):
+        return _default_date_window('dhis2')
+    if requested_end < available_start or requested_start > available_end:
+        return _default_date_window('dhis2')
+    return start_date, end_date
+
+
 def _dataset_version_token(route: str = 'default') -> str:
     timestamp_path = os.path.join(path, f'data/{route}', 'TimeStamp.csv')
     data_path = os.path.join(path, f'data/{route}', 'parquet')
@@ -216,6 +263,12 @@ def _dataset_version_token(route: str = 'default') -> str:
         parts.append(str(os.path.getmtime(timestamp_path)))
     except Exception:
         parts.append('no-timestamp')
+    if route == 'dhis2':
+        aggregate_path = os.path.join(path, 'data', 'mnid_aggregates', 'dhis2', 'indicator_aggregates.parquet')
+        try:
+            parts.append(str(os.path.getmtime(aggregate_path)))
+        except Exception:
+            parts.append('no-dhis2-aggregate')
     return '|'.join(parts)
 
 
@@ -1540,7 +1593,10 @@ def update_dashboard(gen, start_date, end_date, level,
             selected_reports = [clicked_name] if clicked_name in {d.get("report_name") for d in menu_json} else [default_report]
         selected_reports = list(dict.fromkeys(normalize_report_name(r, menu_json) for r in selected_reports))
         # Date Logic
-        default_start, default_end = _default_date_window(data_route)
+        date_route = 'dhis2' if _is_dhis2_mnid_report(selected_reports, menu_json) else data_route
+        default_start, default_end = _default_date_window(date_route)
+        if date_route == 'dhis2':
+            start_date, end_date = _resolve_dhis2_date_window(start_date, end_date)
         start_dt = pd.to_datetime(start_date or default_start).replace(hour=0, minute=0, second=0)
         end_dt = pd.to_datetime(end_date or default_end).replace(hour=23, minute=59, second=59)
         default_start_date = start_dt - pd.Timedelta(days=DEFAULT_DASHBOARD_DAYS)
@@ -1784,34 +1840,17 @@ def update_dashboard(gen, start_date, end_date, level,
     [Output('dashboard-date-range-picker', 'start_date'),
      Output('dashboard-date-range-picker', 'end_date')],
     [Input('dashboard-period-type-filter', 'value'),
-     Input('dashboard-interval-update-today', 'n_intervals')],
-    [State('url-params-store', 'data'),
-     State('active-button-store', 'data')],
+     Input('dashboard-interval-update-today', 'n_intervals'),
+     Input('active-button-store', 'data')],
+    [State('url-params-store', 'data')],
 )
-def sync_picker_with_logic(period_type, n, urlparams, current_active):
+def sync_picker_with_logic(period_type, n, current_active, urlparams):
     ctx = callback_context
     triggered_id = ctx.triggered[0]['prop_id'] if ctx.triggered else ""
     data_route = (urlparams or {}).get('route', ["default"])[0]
-    default_start, default_end = _default_date_window(data_route)
+    date_route = 'dhis2' if current_active == 'Maternal Health' and MNID_DATA_SOURCE == 'dhis2' else data_route
+    default_start, default_end = _default_date_window(date_route)
     anchor = default_end
-
-    # Maternal Health in DHIS2 mode: "Today" etc. should anchor to DHIS2's
-    # own latest reported month, not the local MAHIS dataset's last date --
-    # those two can drift apart by months (DHIS2 gets a fresh monthly pull,
-    # MAHIS's local parquet only updates on its own refresh schedule), and
-    # anchoring to the stale MAHIS date would hide DHIS2 data that's already
-    # available. Every other report keeps the existing MAHIS-anchored
-    # behavior unchanged.
-    if current_active == 'Maternal Health' and MNID_DATA_SOURCE == 'dhis2':
-        try:
-            from mnid.aggregation.store import get_aggregate as _get_dhis2_agg
-            dhis2_agg = _get_dhis2_agg(route='dhis2')
-            if dhis2_agg is not None and not dhis2_agg.empty:
-                dhis2_latest = dhis2_agg['period_start'].max()
-                if pd.notna(dhis2_latest) and (anchor is None or dhis2_latest.normalize() > pd.Timestamp(anchor)):
-                    anchor = dhis2_latest.normalize()
-        except Exception:
-            pass
 
     if "dashboard-interval-update-today" in triggered_id:
         if period_type == "Today":
