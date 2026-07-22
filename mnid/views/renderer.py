@@ -431,24 +431,30 @@ def render_mnid_dashboard(filtered, data_opd, data_path, config,
                           facility_code, start_date, end_date,
                           scope_meta: dict | None = None,
                           initial_tab: dict | None = None):
-    
+
+    route = (scope_meta or {}).get('route', 'default')
     if isinstance(filtered, str):
         source_path = Path(data_path)
         if not source_path.is_absolute():
             source_path = Path.cwd() / source_path
         if not source_path.exists():
-            return html.Div(
-                'The local MAHIS dataset is unavailable for this dashboard.',
-                style={'padding': '24px', 'color': '#64748B'},
+            if route != 'dhis2':
+                return html.Div(
+                    'The local MAHIS dataset is unavailable for this dashboard.',
+                    style={'padding': '24px', 'color': '#64748B'},
+                )
+            # DHIS2 dashboards read indicator values from the published aggregate
+            # store. They do not require encounter-level MAHIS rows to render.
+            filtered = pd.DataFrame()
+            data_opd = pd.DataFrame()
+        else:
+            from data_storage import DataStorage as _DS
+            filtered = _DS.query_duckdb(
+                f"SELECT {_MNID_SQL_COLUMNS} FROM '{data_path}' WHERE {filtered}"
             )
-        from data_storage import DataStorage as _DS
-        filtered = _DS.query_duckdb(
-            f"SELECT {_MNID_SQL_COLUMNS} FROM '{data_path}' WHERE {filtered}"
-        )
-        data_opd = _DS.query_duckdb(
-            f"SELECT {_MNID_SQL_COLUMNS} FROM '{data_path}' WHERE {data_opd}"
-        )
-    route               = (scope_meta or {}).get('route', 'default')
+            data_opd = _DS.query_duckdb(
+                f"SELECT {_MNID_SQL_COLUMNS} FROM '{data_path}' WHERE {data_opd}"
+            )
     dataset_version     = (scope_meta or {}).get('dataset_version')
     selected_programs   = tuple(sorted((scope_meta or {}).get('mnid_categories') or []))
     selected_facilities = tuple(sorted((scope_meta or {}).get('selected_facilities') or []))
