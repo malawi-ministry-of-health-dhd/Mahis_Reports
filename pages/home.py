@@ -1559,8 +1559,8 @@ def update_dashboard(gen, start_date, end_date, level,
 
         user_level = scope['level']
         user_districts = scope.get('districts') or []
-        if user_level == 'facility' and scope.get('facility_code'):
-            location = scope['facility_code']
+        # if user_level == 'facility' and scope.get('facility_code'):
+        #     location = scope['facility_code']
 
         url_object = f"Location={location}&uuid={urlparams.get('uuid', [None])[0]}&user_level={user_level}"
 
