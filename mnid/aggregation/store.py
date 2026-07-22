@@ -75,6 +75,10 @@ def _meta_source_matches(output_dir: str) -> bool:
             return True  # nothing to check against, trust the parquet
         with open(meta_path, encoding='utf-8') as f:
             meta = json.load(f)
+        # USE_DEMO_DATA selects the local MAHIS encounter source. A DHIS2
+        # publication is independent of that setting and must remain loadable.
+        if meta.get('data_source') == 'dhis2':
+            return True
         agg_is_demo = bool(meta.get('use_demo_data', True))
         if agg_is_demo != bool(USE_DEMO_DATA):
             _LOG.warning(
