@@ -262,7 +262,7 @@ def _run_chart_cards(
                          style={'color': MUTED, 'fontSize': '13px', 'padding': '24px'})]
 
     if agg_df is None:
-        agg_df = _get_aggregate()
+        agg_df = _get_aggregate(route=(scope_meta or {}).get('route', 'default'))
 
     # Raw rows can be empty for the exact scope/date window in view (a narrow
     # custom range, a district with sparse day-level data) even though the
