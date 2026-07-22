@@ -353,6 +353,17 @@ def _compute_heatmap_store_from_agg(
     agg_facs  = sorted(base['facility_code'].dropna().astype(str).unique().tolist())
     agg_dists = sorted(base['district'].dropna().astype(str).unique().tolist())
 
+    # The aggregate is authoritative for each facility's reporting district.
+    # This also normalizes registry labels such as "Salima" to the DHIS2
+    # hierarchy label ("Salima-DHO") used by district filters in this view.
+    if {'facility_code', 'district'}.issubset(base.columns):
+        fac_districts = base[['facility_code', 'district']].dropna().drop_duplicates('facility_code')
+        for code, district in fac_districts.itertuples(index=False):
+            code = str(code).strip()
+            district = str(district).strip()
+            if code and district:
+                _FACILITY_DISTRICT[code] = district
+
     all_facilities = sorted(set(agg_facs) | set(_ALL_FACILITIES))
     all_districts  = sorted(set(agg_dists) | set(_ALL_DISTRICTS))
 
