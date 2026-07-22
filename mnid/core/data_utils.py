@@ -1246,8 +1246,8 @@ def register_facility_metadata(df: pd.DataFrame, route: str = 'default') -> None
     whenever the active route changes (tracked in constants._METADATA_ROUTE),
     so one route's facility labels never linger into another route's view.
     """
-    if df is None or df.empty:
-        return
+    if df is None:
+        df = pd.DataFrame()
 
     if _constants._METADATA_ROUTE != route:
         FACILITY_NAMES.clear()
@@ -1347,6 +1347,9 @@ def prepare_mnid_dataframe(df: pd.DataFrame | None, route: str = 'default') -> p
     if df.empty:
         empty = pd.DataFrame()
         empty.attrs.update(source_attrs)
+        # DHIS2 dashboards do not load encounter-level MAHIS rows, but still
+        # need the national facility registry for code-to-name labels.
+        register_facility_metadata(empty, route=route)
         return empty
 
     mch_full = _normalize_mnid_semantics(df)
