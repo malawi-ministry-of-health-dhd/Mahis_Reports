@@ -1277,11 +1277,34 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
                                   mch_full: pd.DataFrame,
                                   payload_key: str | None = None,
                                   data_path: str | None = None,
-                                  scope_meta: dict | None = None) -> html.Div:
+                                  scope_meta: dict | None = None,
+                                  start_date=None,
+                                  end_date=None) -> html.Div:
     """Time-aware comparison across selected facilities or districts and indicators."""
     tracked = [i for i in indicators if i.get('status') == 'tracked']
-    all_facs  = sorted(mch_full['Facility_CODE'].dropna().astype(str).unique().tolist()) if len(mch_full) and 'Facility_CODE' in mch_full.columns else sorted(_ALL_FACILITIES[:])
-    all_dists = sorted(mch_full['District'].dropna().astype(str).unique().tolist()) if len(mch_full) and 'District' in mch_full.columns else sorted(_ALL_DISTRICTS[:])
+    compare_route = (scope_meta or {}).get('route', 'default')
+    compare_agg = None
+    if compare_route == 'dhis2':
+        try:
+            from mnid.aggregation.store import get_aggregate
+            compare_agg = get_aggregate(route=compare_route)
+        except Exception:
+            compare_agg = None
+
+    if compare_agg is not None and not compare_agg.empty:
+        all_facs = sorted({
+            str(value).strip()
+            for value in compare_agg['facility_code'].dropna()
+            if str(value).strip()
+        })
+        all_dists = sorted({
+            str(value).strip()
+            for value in compare_agg['district'].dropna()
+            if str(value).strip()
+        })
+    else:
+        all_facs = sorted(mch_full['Facility_CODE'].dropna().astype(str).unique().tolist()) if len(mch_full) and 'Facility_CODE' in mch_full.columns else sorted(_ALL_FACILITIES[:])
+        all_dists = sorted(mch_full['District'].dropna().astype(str).unique().tolist()) if len(mch_full) and 'District' in mch_full.columns else sorted(_ALL_DISTRICTS[:])
     current_dist = _FACILITY_DISTRICT.get(facility_code, '')
     fac_opts = [{'label': _FACILITY_NAMES.get(f, f), 'value': f} for f in all_facs]
     dist_opts = [{'label': d, 'value': d} for d in all_dists]
@@ -1289,12 +1312,22 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
     default_facs = ([facility_code] if facility_code in all_facs else all_facs[:2]) or []
     default_dists = ([current_dist] if current_dist in all_dists else all_dists[:2]) or []
     default_inds = [ind['id'] for ind in tracked[:2]]
-    try:
-        compare_dates = pd.to_datetime(mch_full['Date'], errors='coerce').dropna() if 'Date' in mch_full.columns else pd.Series([], dtype='datetime64[ns]')
-        compare_date_min = compare_dates.min().isoformat() if len(compare_dates) else None
-        compare_date_max = compare_dates.max().isoformat() if len(compare_dates) else None
-    except Exception:
-        compare_date_min = compare_date_max = None
+    compare_date_min = pd.to_datetime(start_date, errors='coerce')
+    compare_date_max = pd.to_datetime(end_date, errors='coerce')
+    if pd.isna(compare_date_min) or pd.isna(compare_date_max):
+        try:
+            source_dates = (
+                pd.to_datetime(compare_agg['period_start'], errors='coerce').dropna()
+                if compare_agg is not None and not compare_agg.empty else
+                pd.to_datetime(mch_full['Date'], errors='coerce').dropna()
+                if 'Date' in mch_full.columns else pd.Series([], dtype='datetime64[ns]')
+            )
+            compare_date_min = source_dates.min() if len(source_dates) else pd.NaT
+            compare_date_max = source_dates.max() if len(source_dates) else pd.NaT
+        except Exception:
+            compare_date_min = compare_date_max = pd.NaT
+    compare_date_min = None if pd.isna(compare_date_min) else compare_date_min.isoformat()
+    compare_date_max = None if pd.isna(compare_date_max) else compare_date_max.isoformat()
     _lbl_style = {
         'fontSize': '11px', 'fontWeight': '600', 'color': '#94A3B8',
         'textTransform': 'uppercase', 'letterSpacing': '0.05em',
@@ -1396,7 +1429,7 @@ def _comparative_analysis_section(indicators: list, facility_code: str,
             'date_min': compare_date_min,
             'date_max': compare_date_max,
             'data_path': data_path,
-            'route': (scope_meta or {}).get('route', 'default'),
+            'route': compare_route,
         }),
         dcc.Store(id='mnid-compare-chart-type-store', data='line'),
         html.Div(className='mnid-chart-grid', children=[compare_card]),
