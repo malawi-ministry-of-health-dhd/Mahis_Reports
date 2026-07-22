@@ -34,6 +34,25 @@ from mnid.charts.geo_utils import (
 _LOGGER = logging.getLogger(__name__)
 
 
+_DHIS2_GEO_DISTRICT_ALIASES = {
+    'Kamuzu Central Hospital': 'Lilongwe',
+    'Mzuzu Central Hospital': 'Mzimba',
+    'Queen Elizabeth Central Hospital': 'Blantyre',
+    'Zomba Central Hospital': 'Zomba',
+    'Mzimba North': 'Mzimba',
+    'Mzimba South': 'Mzimba',
+}
+
+
+def _geo_district_name(value) -> str:
+    """Translate DHIS2 hierarchy labels to Malawi GeoJSON district names."""
+    district = str(value or '').strip()
+    if not district:
+        return ''
+    district = district.removesuffix('-DHO').replace('-', ' ').strip()
+    return _DHIS2_GEO_DISTRICT_ALIASES.get(district, district)
+
+
 def _mask(df: pd.DataFrame, cfg: dict) -> pd.Series:
     """Build boolean row mask from a filter config dict without calling create_count."""
     mask = pd.Series(True, index=df.index)
@@ -349,6 +368,12 @@ def _compute_heatmap_store_from_agg(
             base = trial
             resolved_grain = candidate
             break
+
+    # DHIS2 hierarchy names (for example, ``Balaka-DHO``) are not the same
+    # keys used by the district GeoJSON (``Balaka``). Normalize only this
+    # map-store copy so upstream DHIS2 filtering keeps its authoritative names.
+    if not base.empty and 'district' in base.columns:
+        base['district'] = base['district'].map(_geo_district_name)
 
     agg_facs  = sorted(base['facility_code'].dropna().astype(str).unique().tolist())
     agg_dists = sorted(base['district'].dropna().astype(str).unique().tolist())
