@@ -257,9 +257,24 @@ def _run_chart_cards(
     if selected_ids:
         id_set = set(selected_ids)
         tracked = [i for i in tracked if i.get('id') in id_set] or tracked
-    if not tracked or df is None or df.empty:
+    if not tracked:
         return [html.Div('No indicators configured for this category.',
                          style={'color': MUTED, 'fontSize': '13px', 'padding': '24px'})]
+
+    # DHIS2-backed dashboards intentionally have no encounter-level MAHIS
+    # dataframe. Use the aggregate's period bounds to drive the charts instead
+    # of treating the empty raw dataframe as an unconfigured category.
+    if df is None or df.empty:
+        if agg_df is None:
+            agg_df = _get_aggregate(route=(scope_meta or {}).get('route', 'default'))
+        if agg_df is None or agg_df.empty or 'period_start' not in agg_df.columns:
+            return [html.Div('No data is available for this category.',
+                             style={'color': MUTED, 'fontSize': '13px', 'padding': '24px'})]
+        aggregate_dates = pd.to_datetime(agg_df['period_start'], errors='coerce').dropna()
+        if aggregate_dates.empty:
+            return [html.Div('No data is available for this category.',
+                             style={'color': MUTED, 'fontSize': '13px', 'padding': '24px'})]
+        df = pd.DataFrame({'Date': [aggregate_dates.min(), aggregate_dates.max()]})
 
     source_df = fallback_df if fallback_df is not None and not fallback_df.empty else df
     plot_df, fac_filter, dist_filter = _trend_scope_filters(source_df, location)
