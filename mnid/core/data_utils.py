@@ -426,7 +426,15 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
         'mnid_labour_stillbirth',
         labour_mask
         & concept.eq('Outcome of the delivery')
-        & combined_lower.isin(['fresh still birth', 'macerated still birth']),
+        & combined_lower.isin([
+            'fresh still birth', 'macerated still birth',
+            # Country Profile's stillbirth_mask also accepts the one-word
+            # spelling and a bare 'stillbirth' -- align so this flag (which
+            # feeds mnid_labour_live_birth below) can't silently miss a real
+            # stillbirth recorded with different spacing and misclassify it
+            # as a live birth.
+            'fresh stillbirth', 'macerated stillbirth', 'stillbirth',
+        ]),
     )
     _assign_flag(
         'mnid_labour_estimated_blood_loss_recorded',
@@ -440,7 +448,19 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
     )
     _assign_flag(
         'mnid_labour_visit_documented',
-        labour_mask & encounter_source_lower.eq('labour and delivery visit'),
+        labour_mask & (
+            encounter_source_lower.eq('labour and delivery visit')
+            # The exact encounter-source name above misses real deliveries
+            # logged under a differently-named encounter type -- confirmed on
+            # production data where this left mnid_labour_live_birth (and the
+            # whole Live Births KPI card, which depends on this flag as its
+            # denominator) at roughly a third of Country Profile's count,
+            # which scans 'Outcome of the delivery' directly with no
+            # encounter-name gate. Recording an actual delivery outcome is
+            # itself proof the visit was documented, so treat it as an
+            # equally valid signal.
+            | concept.eq('Outcome of the delivery')
+        ),
     )
     _assign_flag(
         'mnid_labour_maternal_sepsis',
@@ -909,10 +929,19 @@ def _derive_person_level_context(out: pd.DataFrame) -> pd.DataFrame:
             | (concept.eq('Prematurity/Kangaroo') & combined_lower.isin(['kmc', 'kangaroo mother care']))
         ),
     )
-    _assign_flag('mnid_newborn_status_recorded', newborn_mask & concept.eq('Status of baby'))
+    # Real data records this under 'Admission outcome', not 'Status of baby' --
+    # confirmed on production data where every neonatal-death row used concept
+    # 'Admission outcome', so requiring 'Status of baby' alone left this flag
+    # empty for every single row (permanent 0/0 on the Neonatal Deaths KPI
+    # card) while Country Profile's broader _metric_snapshot (which already
+    # accepts both concept names) correctly found the real deaths. Accept
+    # both, matching Country Profile's neonatal_death_mask.
+    _newborn_status_concept = concept.isin(['Status of baby', 'Admission outcome'])
+    _assign_flag('mnid_newborn_status_recorded', newborn_mask & _newborn_status_concept)
     _assign_flag(
         'mnid_newborn_neonatal_death',
-        newborn_mask & concept.eq('Status of baby') & combined_lower.isin(['death', 'died', 'dead', 'deceased']),
+        newborn_mask & _newborn_status_concept
+        & combined_lower.isin(['death', 'died', 'dead', 'deceased', 'neonatal death']),
     )
     person_ctx['mnid_labour_complication'] = (
         _ctx_series('mnid_labour_maternal_sepsis').eq('Yes')

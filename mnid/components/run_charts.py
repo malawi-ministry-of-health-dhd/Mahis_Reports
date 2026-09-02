@@ -267,6 +267,7 @@ def _run_chart(
     target: float | None = None,
     grain: str = "monthly",
     measure: str = "median",
+    scope_label: str | None = None,
 ) -> go.Figure:
     fig = go.Figure()
     if series.empty:
@@ -301,8 +302,20 @@ def _run_chart(
         else pd.to_datetime(plot_series["month"], errors="coerce").dt.strftime("%b %Y")
     )
     smooth_grain = grain if grain in {"weekly", "monthly", "quarterly", "yearly"} else "monthly"
-    smoothed, _ = _moving_average_values(plot_series["value"].tolist(), smooth_grain, method=measure)
-    measure_label = "Median" if measure == "median" else "Moving avg"
+    # "Median" mode plots the real, unsmoothed values as the line itself (so
+    # the actual trend is visible, not hidden behind a rolling median) and
+    # gets its own flat median-of-the-whole-period reference line instead --
+    # same idea as the target line. "Avg" mode keeps the original behavior:
+    # the smoothed rolling mean IS the line.
+    if measure == "median":
+        plotted = plot_series["value"].tolist()
+        _valid_for_median = [y for y in plotted if y is not None and pd.notna(y)]
+        median_value = float(pd.Series(_valid_for_median, dtype="float64").median()) if _valid_for_median else None
+    else:
+        plotted, _ = _moving_average_values(plot_series["value"].tolist(), smooth_grain, method=measure)
+        median_value = None
+    smoothed = plotted
+    measure_label = "Actual" if measure == "median" else "Moving avg"
     value_format = ".1f" if _is_percentage_axis(y_title) else ",.0f"
     has_counts = "numerator" in plot_series.columns and "denominator" in plot_series.columns
     if has_counts:
@@ -347,9 +360,30 @@ def _run_chart(
             annotation_font=dict(color="#f59e0b", size=10),
             annotation_position="right",
         )
+    if median_value is not None:
+        # A separate scatter trace (not just fig.add_hline's shape) so the
+        # median participates in hovermode="x unified" below -- shapes drawn
+        # via add_hline are static and don't respond to hover at all.
+        fig.add_trace(go.Scatter(
+            x=x_values, y=[median_value] * len(x_values), mode="lines",
+            line=dict(color="#6366f1", width=1.4, dash="dot"),
+            showlegend=False,
+            hovertemplate=f"Median: {median_value:{value_format}}<extra></extra>",
+        ))
+        # x=1 + xshift is a *fixed pixel* offset from the plot's right edge,
+        # sitting in the margin rather than right at the plot boundary
+        # (xref="x domain") -- that boundary placement was getting clipped
+        # by the previous, much narrower right margin, rendering as "Med-"
+        # instead of the full "Median 17" label.
+        fig.add_annotation(
+            x=1, xshift=8, y=median_value, xref="paper", yref="y",
+            xanchor="left", yanchor="middle",
+            text=f"Median {median_value:{value_format}}", showarrow=False,
+            font=dict(color="#6366f1", size=10),
+        )
     fig.update_layout(**_exec_chart_layout(
         height=240,
-        margin=dict(l=42, r=18, t=12, b=42),
+        margin=dict(l=42, r=92, t=12, b=42),
         xaxis=dict(
             showgrid=False,
             showline=False,
@@ -373,6 +407,12 @@ def _run_chart(
         ),
     ))
     fig.update_layout(showlegend=False, transition={"duration": 260, "easing": "cubic-in-out"})
+    if scope_label:
+        fig.add_annotation(
+            text=scope_label, x=0, y=1, xref="paper", yref="paper",
+            xanchor="left", yanchor="bottom", yshift=4, showarrow=False,
+            font=dict(size=10, color="#94a3b8"),
+        )
     return fig
 
 
@@ -383,6 +423,7 @@ def _multi_run_chart(
     target: float | None = None,
     grain: str = "monthly",
     measure: str = "median",
+    scope_label: str | None = None,
 ) -> go.Figure:
     fig = go.Figure()
     if series_df.empty:
@@ -405,19 +446,30 @@ def _multi_run_chart(
         )
         return fig
 
-    measure_label = "Median" if measure == "median" else "Moving avg"
+    measure_label = "Actual" if measure == "median" else "Moving avg"
     value_format = ".1f" if _is_percentage_axis(y_title) else ",.0f"
+    median_lines = []  # (label, color, median_value) -- one per series
     for label in series_df["series"].dropna().unique():
         trace_df = series_df[series_df["series"] == label]
         color = trace_df["color"].iloc[0] if "color" in trace_df.columns and not trace_df.empty else PRIMARY_GREEN
-        smoothed, _ = _moving_average_values(trace_df["value"].tolist(), grain, method=measure)
+        # Same "Median" vs "Avg" split as _run_chart above: median mode shows
+        # the real values as the line and gets its own flat per-series
+        # median reference line; avg mode keeps the smoothed rolling mean.
+        if measure == "median":
+            plotted = trace_df["value"].tolist()
+            _valid_for_median = [y for y in plotted if y is not None and pd.notna(y)]
+            if _valid_for_median:
+                median_lines.append((label, color, float(pd.Series(_valid_for_median, dtype="float64").median())))
+        else:
+            plotted, _ = _moving_average_values(trace_df["value"].tolist(), grain, method=measure)
+        x_values = (
+            trace_df["bucket_label"]
+            if "bucket_label" in trace_df.columns
+            else pd.to_datetime(trace_df["month"], errors="coerce").dt.strftime("%b %Y")
+        )
         fig.add_trace(go.Scatter(
-            x=(
-                trace_df["bucket_label"]
-                if "bucket_label" in trace_df.columns
-                else pd.to_datetime(trace_df["month"], errors="coerce").dt.strftime("%b %Y")
-            ),
-            y=smoothed,
+            x=x_values,
+            y=plotted,
             name=label,
             mode="lines+markers",
             line=dict(color=color, width=3.0, shape="spline", smoothing=0.45),
@@ -430,6 +482,13 @@ def _multi_run_chart(
                 "<extra></extra>"
             ),
         ))
+        if measure == "median" and _valid_for_median:
+            fig.add_trace(go.Scatter(
+                x=x_values, y=[median_lines[-1][2]] * len(x_values), mode="lines",
+                line=dict(color=color, width=1.2, dash="dot"), opacity=0.6,
+                showlegend=False,
+                hovertemplate=f"{label} median: {median_lines[-1][2]:{value_format}}<extra></extra>",
+            ))
 
     if target is not None:
         fig.add_hline(
@@ -442,7 +501,7 @@ def _multi_run_chart(
 
     fig.update_layout(**_exec_chart_layout(
         height=240,
-        margin=dict(l=42, r=18, t=12, b=42),
+        margin=dict(l=42, r=92, t=12, b=42),
         xaxis=dict(
             showgrid=False,
             showline=False,
@@ -477,6 +536,14 @@ def _multi_run_chart(
         ),
         transition={"duration": 260, "easing": "cubic-in-out"},
     )
+    if scope_label:
+        # Top-right, above the legend (which sits top-left at y=1.02 above)
+        # so the two don't overlap.
+        fig.add_annotation(
+            text=scope_label, x=1, y=1.08, xref="paper", yref="paper",
+            xanchor="right", yanchor="bottom", showarrow=False,
+            font=dict(size=10, color="#94a3b8"),
+        )
     return fig
 
 
@@ -560,8 +627,15 @@ def _trend_chart_payload(
     multi: bool = False,
     measure: str = "median",
     include_daily: bool = True,
+    scope_label: str | None = None,
+    default_grain: str | None = None,
+    refetch: dict | None = None,
 ) -> dict:
-    default_grain = _EXEC_DEFAULT_GRAINS.get(chart_key, "monthly")
+    # default_grain overrides the _EXEC_DEFAULT_GRAINS lookup when the caller
+    # already knows what grain it fetched series_df at (e.g. Country
+    # Profile's per-window _fetch_grain) -- falls back to the dict's own
+    # per-chart default otherwise, same as before this param existed.
+    default_grain = default_grain or _EXEC_DEFAULT_GRAINS.get(chart_key, "monthly")
     # DHIS2's aggregate only ever has monthly-grain rows -- offering "Daily"
     # there would silently show monthly data under a misleading label instead
     # of a real day-level view, so only offer it in MAHIS mode (include_daily
@@ -575,9 +649,9 @@ def _trend_chart_payload(
         else bucket_time_series(series_df, default_grain)
     )
     figure = (
-        _multi_run_chart(bucketed, title, y_title, grain=default_grain, measure=measure)
+        _multi_run_chart(bucketed, title, y_title, grain=default_grain, measure=measure, scope_label=scope_label)
         if multi
-        else _run_chart(bucketed, title, accent, y_title, grain=default_grain, measure=measure)
+        else _run_chart(bucketed, title, accent, y_title, grain=default_grain, measure=measure, scope_label=scope_label)
     )
     return {
         "card": _trend_chart_card(
@@ -623,6 +697,17 @@ def _trend_chart_payload(
                         "accent": accent,
                         "y_title": y_title,
                         "multi": multi,
+                        # Read back by the grain-toggle callback
+                        # (_update_country_profile_chart_grain in
+                        # renderer.py) so the re-rendered figure on a grain
+                        # change still shows the same scope annotation.
+                        "scope_label": scope_label,
+                        # Read by the grain-toggle callback to redo this
+                        # chart's exact original fetch at the newly-selected
+                        # grain (e.g. a real per-day scan for "Daily")
+                        # instead of just re-bucketing whatever series_df
+                        # already holds client-side.
+                        "refetch": refetch,
                     },
                 ),
             ], style={"display": "flex", "alignItems": "center", "gap": "8px"}),

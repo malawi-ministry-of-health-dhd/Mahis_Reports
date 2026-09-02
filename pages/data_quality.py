@@ -14,7 +14,6 @@ from config import (
     IDENTIFIER_, FIRST_NAME_, LAST_NAME_, GENDER_, HOME_DISTRICT_, TA_, VILLAGE_,
     BIRTHDATE_, CELL_, DEMO_LOCATION, DEMO_UUID, FACILITY_CODE_
 )
-
 from mnid.core.constants import BG, BORDER, TEXT
 from dq.theme import BRAND, BRAND_TINT
 import dq.theme  # noqa: F401 -- registers the "dq" Plotly template
@@ -666,7 +665,6 @@ def sync_dq_facility_options_from_scope(selected_districts, urlparams):
     urlparams = urlparams or {}
     data_route = urlparams.get("route", ["default"])[0]
     location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0]
-
     user_data = _load_user_registry(data_route)
     user_row, scope = _resolve_user_scope(urlparams, user_data)
     if user_row is None or not location:
@@ -674,8 +672,6 @@ def sync_dq_facility_options_from_scope(selected_districts, urlparams):
 
     level = scope.get("level")
     if level == "facility":
-        # Already ceilinged to a single facility -- Scope is disabled and
-        # dq-facility-filter is already fixed by initialize_data_quality_filters.
         raise PreventUpdate
 
     user_districts = scope.get("districts") or []
@@ -711,7 +707,6 @@ def render_overview_tab(urlparams, run_clicks, start_date, end_date, districts, 
     urlparams = urlparams or {}
     data_route = urlparams.get("route", ["default"])[0]
     location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0]
-
     user_data = _load_user_registry(data_route)
     user_row, scope = _resolve_user_scope(urlparams, user_data)
     if user_row is None or not location:
@@ -1314,7 +1309,6 @@ def render_completeness_tab(urlparams, run_clicks, start_date, end_date, distric
     urlparams = urlparams or {}
     data_route = urlparams.get("route", ["default"])[0]
     location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0]
-
     user_data = _load_user_registry(data_route)
     user_row, scope = _resolve_user_scope(urlparams, user_data)
     if user_row is None or not location:

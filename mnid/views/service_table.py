@@ -354,7 +354,8 @@ def _service_stack_fig(section: dict, chart_id: str | None = None) -> go.Figure:
     fig.update_layout(
         paper_bgcolor='#FFFFFF', plot_bgcolor='#FFFFFF',
         font=dict(family=FONT, color=TEXT, size=11),
-        hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
+        # Dark tooltip, matching run_charts.py/trends.py's Run Charts + Trends.
+        hoverlabel=dict(bgcolor='#0f172a', bordercolor='#0f172a', font_color='white', font_size=11, font_family=FONT),
         title=dict(
             text=(
                 f"<b>{spec.get('title', section.get('title', 'Service Snapshot'))}</b>"
@@ -465,7 +466,8 @@ def _service_stack_overview_fig(section: dict) -> go.Figure:
     fig.update_layout(
         paper_bgcolor='#FFFFFF', plot_bgcolor='#FFFFFF',
         font=dict(family=FONT, color=TEXT, size=11),
-        hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
+        # Dark tooltip, matching run_charts.py/trends.py's Run Charts + Trends.
+        hoverlabel=dict(bgcolor='#0f172a', bordercolor='#0f172a', font_color='white', font_size=11, font_family=FONT),
         title=dict(
             text=(
                 f"<b>{section.get('title', 'Service Snapshot')} Indicator Comparison</b>"
@@ -628,7 +630,8 @@ def _location_trend_fig(
     fig.update_layout(
         paper_bgcolor=BG, plot_bgcolor=BG,
         font=dict(family=FONT, color=TEXT, size=11),
-        hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
+        # Dark tooltip, matching run_charts.py/trends.py's Run Charts + Trends.
+        hoverlabel=dict(bgcolor='#0f172a', bordercolor='#0f172a', font_color='white', font_size=11, font_family=FONT),
         height=360, margin=dict(l=8, r=8, t=12, b=24),
         barmode='group' if chart_type == 'bar' else None,
         title=dict(text=f'{chart_title} ({period_label})', x=0.01, xanchor='left',

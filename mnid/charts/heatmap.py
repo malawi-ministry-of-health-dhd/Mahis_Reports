@@ -1043,7 +1043,9 @@ def _build_geo_heatmap_fig(stored: dict, view: str, year: str,
     )
     fig.update_layout(
         paper_bgcolor=BG, plot_bgcolor=BG, height=680, margin=dict(l=10, r=10, t=34, b=10),
-        font=dict(family=FONT, color=TEXT, size=11), hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
+        font=dict(family=FONT, color=TEXT, size=11),
+        # Dark tooltip, matching run_charts.py/trends.py's Run Charts + Trends.
+        hoverlabel=dict(bgcolor='#0f172a', bordercolor='#0f172a', font_color='white', font_size=11, font_family=FONT),
         hovermode='closest', dragmode='pan',
         xaxis=dict(visible=False, range=x_range, fixedrange=False),
         yaxis=dict(visible=False, range=y_range, fixedrange=False, scaleanchor='x', scaleratio=1),
