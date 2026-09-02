@@ -17,17 +17,20 @@ def _build_query(route, location, uuid, user_level):
         return ""
 
 
-def _build_nav(pathname_prefix, query, last_updated, show_admin):
+def _build_nav(pathname_prefix, query, last_updated, show_admin, pathname=None):
+    def _nav_class(page_name):
+        return "nav-link active" if pathname == f"{pathname_prefix}{page_name}" else "nav-link"
+
     items = [
-        html.Li(html.A("Dashboard", href=f"{pathname_prefix}home{query}", className="nav-link")),
-        html.Li(html.A("HMIS DataSet Reports", href=f"{pathname_prefix}hmis_reports{query}", className="nav-link")),
-        html.Li(html.A("Clinical Reports", href=f"{pathname_prefix}program_reports{query}", className="nav-link")),
-        html.Li(html.A("Data Quality", href=f"{pathname_prefix}data_quality{query}", className="nav-link")),
+        html.Li(html.A("Dashboard", href=f"{pathname_prefix}home{query}", className=_nav_class("home"))),
+        html.Li(html.A("HMIS DataSet Reports", href=f"{pathname_prefix}hmis_reports{query}", className=_nav_class("hmis_reports"))),
+        html.Li(html.A("Clinical Reports", href=f"{pathname_prefix}program_reports{query}", className=_nav_class("program_reports"))),
+        html.Li(html.A("Data Quality", href=f"{pathname_prefix}data_quality{query}", className=_nav_class("data_quality"))),
     ]
 
     if show_admin:
         items.append(
-            html.Li(html.A("Configure Reports", href=f"{pathname_prefix}reports_config{query}", className="nav-link"))
+            html.Li(html.A("Configure Reports", href=f"{pathname_prefix}reports_config{query}", className=_nav_class("reports_config")))
         )
     else:
         items.append(
@@ -53,8 +56,12 @@ def _build_nav(pathname_prefix, query, last_updated, show_admin):
 
 
 def register_navigation_callbacks(app, pathname_prefix):
-    @app.callback(Output("nav-container", "children"), Input("url-params-store", "data"))
-    def render_nav(url_params):
+    @app.callback(
+        Output("nav-container", "children"),
+        Input("url-params-store", "data"),
+        Input("url", "pathname"),
+    )
+    def render_nav(url_params, pathname):
         try:
             if not isinstance(url_params, dict):
                 url_params = {}
@@ -95,11 +102,11 @@ def register_navigation_callbacks(app, pathname_prefix):
             else:
                 is_admin = False
 
-            return _build_nav(pathname_prefix, query, last_updated, is_admin)
+            return _build_nav(pathname_prefix, query, last_updated, is_admin, pathname)
         except Exception:
             import traceback
             traceback.print_exc()
-            return _build_nav(pathname_prefix, "", "Unknown", False)
+            return _build_nav(pathname_prefix, "", "Unknown", False, pathname)
 
     @app.callback(
         Output("url-params-store", "data"),
