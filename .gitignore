@@ -87,6 +87,7 @@ data/mahisuat
 data/parquet
 demo_parquet
 # data/visualizations
+mnid/dhis2/config/source
 configurations.json
 __pycache__/
 CLAUDE.md

@@ -652,7 +652,8 @@ def _coverage_phase_fig(
                    ticksuffix='%', tickfont=dict(size=10 if wide else 9, color=MUTED)),
         yaxis=dict(showgrid=False, zeroline=False, showline=False,
                    tickfont=dict(size=11 if wide else 10, color=DIM), automargin=True),
-        hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
+        # Dark tooltip, matching run_charts.py/trends.py's Run Charts + Trends.
+        hoverlabel=dict(bgcolor='#0f172a', bordercolor='#0f172a', font_color='white', font_size=11, font_family=FONT),
         legend=dict(orientation='h', x=0, y=-0.06, xanchor='left',
                     font=dict(size=9, color=DIM)),
         bargap=0.22 if wide else 0.28,

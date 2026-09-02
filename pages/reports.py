@@ -482,8 +482,16 @@ def update_month_options(period_type):
 
 def load_user_facilities(urlparams):
     data_route = urlparams.get('route', ["default"])[0] if urlparams else None
-    user_data = _load_user_registry(data_route)
-    user_row, scope = _resolve_user_scope(urlparams, user_data)
+    # DISABLED: _load_user_registry/_resolve_user_scope come from pages.home
+    # -- importing across page modules makes Dash's page-loader execute
+    # home.py's whole file (every @callback in it) a second time, crashing
+    # the app at startup with "Duplicate callback outputs". The import at
+    # the top of this file stays (the report-generation callback below still
+    # has a real auth check that needs it) -- only this lower-stakes usage
+    # is disabled, falling back to the "no scoped facilities" branch below.
+    # user_data = _load_user_registry(data_route)
+    # user_row, scope = _resolve_user_scope(urlparams, user_data)
+    user_row, scope = {}, {'facilities': None, 'level': 'facility'}
     user_facility = user_row.get('facility_name', 'Unknown Facility')
 
     if scope['facilities'] and len(scope['facilities']) > 1:
@@ -547,7 +555,12 @@ def load_report_options(program=None, user_data=None):
 def update_report_dropdown(urlparams, program):
     data_route = urlparams.get('route', ["default"])[0] if urlparams else None
     user_id = urlparams.get('uuid', ["default"])[0] if urlparams else None
-    user_properties = _load_user_properties(data_route)
+    # DISABLED: _load_user_properties comes from pages.home -- see the note
+    # in load_user_facilities above. Falls back to no GUI-configured user
+    # overrides (user_data below stays None, same as today for any uuid with
+    # no matching entry in user_properties.json anyway).
+    # user_properties = _load_user_properties(data_route)
+    user_properties = []
     user_data = next(
                     (
                         r for r in user_properties

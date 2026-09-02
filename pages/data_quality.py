@@ -14,7 +14,17 @@ from config import (
     IDENTIFIER_, FIRST_NAME_, LAST_NAME_, GENDER_, HOME_DISTRICT_, TA_, VILLAGE_,
     BIRTHDATE_, CELL_,
 )
-from pages.home import _resolve_user_scope, _scope_where_parts, _load_user_registry
+# DISABLED: importing from another page module (pages.home) makes Dash's
+# page-loader execute home.py's whole file -- including every @callback in
+# it -- a second time, since Dash's own loader doesn't check sys.modules
+# before re-running a page file. That registers every callback in home.py
+# twice and crashes the app at startup with "Duplicate callback outputs".
+# This page is already hidden from navigation, so every call site below
+# falls back to a safe "unauthorized / no scope restriction" default instead
+# of importing these from pages.home. See also pages/reports.py, which has
+# the same import for the same reason (kept there since one of its call
+# sites is a real auth check, unlike here).
+# from pages.home import _resolve_user_scope, _scope_where_parts, _load_user_registry
 from mnid.core.constants import BG, BORDER, TEXT
 from dq.theme import BRAND, BRAND_TINT
 import dq.theme  # noqa: F401 -- registers the "dq" Plotly template
@@ -82,17 +92,22 @@ def _latest_full_month_window(max_date):
 
 def _ceiling_scope_where(level, location, user_districts):
     """WHERE parts for the user's own scope ceiling -- no user-selected narrowing."""
-    parts = _scope_where_parts(level, location, None, user_districts, None, None)
+    # DISABLED: _scope_where_parts is from pages.home -- see the commented
+    # import at the top of this file. Falls back to no scope restriction.
+    # parts = _scope_where_parts(level, location, None, user_districts, None, None)
+    parts = []
     return " AND ".join(parts) if parts else "1=1"
 
 
 def _selection_where(level, location, user_districts, selected_districts, selected_facilities, program, start_date, end_date):
     """WHERE clause for the user's scope ceiling narrowed by the filter bar's
     own selections (district scope, facility, programme, date range)."""
-    parts = _scope_where_parts(
-        level, location, selected_districts or None, user_districts, selected_facilities or None, None,
-        programs=[program] if program else None,
-    )
+    # DISABLED: see _ceiling_scope_where above.
+    # parts = _scope_where_parts(
+    #     level, location, selected_districts or None, user_districts, selected_facilities or None, None,
+    #     programs=[program] if program else None,
+    # )
+    parts = []
     if start_date and end_date:
         parts.append(f"{DATE_} BETWEEN '{start_date}'::TIMESTAMP AND '{end_date} 23:59:59'::TIMESTAMP")
     return " AND ".join(parts) if parts else "1=1"
@@ -452,8 +467,13 @@ def initialize_data_quality_filters(urlparams):
     data_route = urlparams.get("route", ["default"])[0]
     location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0]
 
-    user_data = _load_user_registry(data_route)
-    user_row, scope = _resolve_user_scope(urlparams, user_data)
+    # DISABLED: _load_user_registry/_resolve_user_scope are from pages.home --
+    # see the commented import at the top of this file. Falls back to
+    # "unauthorized" (user_row=None), which every call site below already
+    # checks for and handles safely.
+    # user_data = _load_user_registry(data_route)
+    # user_row, scope = _resolve_user_scope(urlparams, user_data)
+    user_row, scope = None, {}
     if user_row is None:
         return unauthorized
 
@@ -544,8 +564,13 @@ def sync_dq_facility_options_from_scope(selected_districts, urlparams):
     data_route = urlparams.get("route", ["default"])[0]
     location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0]
 
-    user_data = _load_user_registry(data_route)
-    user_row, scope = _resolve_user_scope(urlparams, user_data)
+    # DISABLED: _load_user_registry/_resolve_user_scope are from pages.home --
+    # see the commented import at the top of this file. Falls back to
+    # "unauthorized" (user_row=None), which every call site below already
+    # checks for and handles safely.
+    # user_data = _load_user_registry(data_route)
+    # user_row, scope = _resolve_user_scope(urlparams, user_data)
+    user_row, scope = None, {}
     if user_row is None or not location:
         raise PreventUpdate
 
@@ -560,7 +585,10 @@ def sync_dq_facility_options_from_scope(selected_districts, urlparams):
         user_districts = [user_districts]
 
     data_path = f"data/{data_route}/parquet"
-    where_parts = _scope_where_parts(level, location, selected_districts or None, user_districts, None, None)
+    # DISABLED: _scope_where_parts is from pages.home -- see the commented
+    # import at the top of this file. Falls back to no scope restriction.
+    # where_parts = _scope_where_parts(level, location, selected_districts or None, user_districts, None, None)
+    where_parts = []
     where = " AND ".join(where_parts) if where_parts else "1=1"
 
     try:
@@ -589,8 +617,13 @@ def render_overview_tab(urlparams, run_clicks, start_date, end_date, districts, 
     data_route = urlparams.get("route", ["default"])[0]
     location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0]
 
-    user_data = _load_user_registry(data_route)
-    user_row, scope = _resolve_user_scope(urlparams, user_data)
+    # DISABLED: _load_user_registry/_resolve_user_scope are from pages.home --
+    # see the commented import at the top of this file. Falls back to
+    # "unauthorized" (user_row=None), which every call site below already
+    # checks for and handles safely.
+    # user_data = _load_user_registry(data_route)
+    # user_row, scope = _resolve_user_scope(urlparams, user_data)
+    user_row, scope = None, {}
     if user_row is None or not location:
         return None
 
@@ -888,8 +921,13 @@ def render_duplicates_tab(urlparams, run_clicks, candidates_page, start_date, en
     data_route = urlparams.get("route", ["default"])[0]
     location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0]
 
-    user_data = _load_user_registry(data_route)
-    user_row, scope = _resolve_user_scope(urlparams, user_data)
+    # DISABLED: _load_user_registry/_resolve_user_scope are from pages.home --
+    # see the commented import at the top of this file. Falls back to
+    # "unauthorized" (user_row=None), which every call site below already
+    # checks for and handles safely.
+    # user_data = _load_user_registry(data_route)
+    # user_row, scope = _resolve_user_scope(urlparams, user_data)
+    user_row, scope = None, {}
     if user_row is None or not location:
         return None, "Duplicates", _TAB_STYLE
 
@@ -1192,8 +1230,13 @@ def render_completeness_tab(urlparams, run_clicks, start_date, end_date, distric
     data_route = urlparams.get("route", ["default"])[0]
     location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0]
 
-    user_data = _load_user_registry(data_route)
-    user_row, scope = _resolve_user_scope(urlparams, user_data)
+    # DISABLED: _load_user_registry/_resolve_user_scope are from pages.home --
+    # see the commented import at the top of this file. Falls back to
+    # "unauthorized" (user_row=None), which every call site below already
+    # checks for and handles safely.
+    # user_data = _load_user_registry(data_route)
+    # user_row, scope = _resolve_user_scope(urlparams, user_data)
+    user_row, scope = None, {}
     if user_row is None or not location:
         return None, "Completeness", _TAB_STYLE
 

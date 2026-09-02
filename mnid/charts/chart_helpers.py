@@ -51,7 +51,10 @@ _CHART_LAYOUT = dict(
     paper_bgcolor=BG, plot_bgcolor=BG,
     font=dict(family=FONT, color=TEXT, size=11),
     margin=dict(l=4, r=4, t=36, b=4),
-    hoverlabel=dict(bgcolor='#fff', bordercolor=BORDER, font_size=11),
+    # Dark tooltip, matching run_charts.py/trends.py's Run Charts + Trends
+    # (bgcolor #0f172a, white text) -- was a plain light tooltip here,
+    # inconsistent with the rest of the dashboard's hover styling.
+    hoverlabel=dict(bgcolor='#0f172a', bordercolor='#0f172a', font_color='white', font_size=11, font_family=FONT),
     legend=dict(font=dict(size=10, color=DIM), bgcolor='rgba(0,0,0,0)',
                 orientation='v', x=1.02, y=0.5, xanchor='left'),
 )

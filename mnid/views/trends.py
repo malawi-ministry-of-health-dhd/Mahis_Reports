@@ -161,9 +161,20 @@ def _indicator_run_fig(
             d_vals.append(d_val)
 
     period_labels = [_format_grain_label(pd.Timestamp(x), grain) for x in xs]
-    smoothed, _   = _moving_average_values(ys, grain, method=measure)
-    measure_label = 'Median' if measure == 'median' else 'Moving avg'
-    valid_ys      = [y for y in smoothed if y is not None]
+    # "Median" mode plots the real, unsmoothed values as the line itself (so
+    # the actual period-to-period trend is visible, not hidden behind a
+    # rolling median) and gets its own flat median-of-the-whole-period
+    # reference line instead -- same idea as the target line. "Avg" mode
+    # keeps the original behavior: the smoothed rolling mean IS the line.
+    if measure == 'median':
+        plotted = ys
+        _valid_for_median = [y for y in ys if y is not None]
+        median_value = float(pd.Series(_valid_for_median, dtype='float64').median()) if _valid_for_median else None
+    else:
+        plotted, _ = _moving_average_values(ys, grain, method=measure)
+        median_value = None
+    measure_label = 'Actual' if measure == 'median' else 'Moving avg'
+    valid_ys      = [y for y in plotted if y is not None]
     if not valid_ys:
         return go.Figure(layout={
             'paper_bgcolor': 'white', 'plot_bgcolor': 'white', 'height': 220,
@@ -184,8 +195,15 @@ def _indicator_run_fig(
             showlegend=False,
             hovertemplate=f'Target: {target}%<extra></extra>',
         ))
+    if median_value is not None:
+        traces.append(go.Scatter(
+            x=period_labels, y=[median_value] * len(period_labels), mode='lines',
+            line={'color': '#6366f1', 'width': 1.4, 'dash': 'dot'},
+            showlegend=False,
+            hovertemplate=f'Median: {median_value:.1f}%<extra></extra>',
+        ))
 
-    valid_pts = [(x, label, y, raw) for x, label, y, raw in zip(xs, period_labels, smoothed, ys) if y is not None]
+    valid_pts = [(x, label, y, raw) for x, label, y, raw in zip(xs, period_labels, plotted, ys) if y is not None]
     kp_set, key_pts = set(), []
     for pt in [valid_pts[0], valid_pts[-1]]:
         if pt[1] not in kp_set:
@@ -202,7 +220,7 @@ def _indicator_run_fig(
         hovertemplate='%{x}: %{y:.0f}%<extra></extra>',
     ))
     traces.append(go.Scatter(
-        x=period_labels, y=smoothed, mode='lines+markers',
+        x=period_labels, y=plotted, mode='lines+markers',
         line={'color': color, 'width': 3.2, 'shape': 'spline', 'smoothing': 0.45},
         marker={'size': 6, 'color': color, 'line': {'color': '#fff', 'width': 1.2}},
         fill='tozeroy', fillcolor=_hex_to_rgba(color, 0.08),
@@ -219,17 +237,34 @@ def _indicator_run_fig(
 
     layout_annotations = []
     if target is not None:
+        # x=1 + a fixed pixel xshift (not x=1.005, a fraction of the plot's
+        # own width) -- a width-scaling fraction gave too little real room on
+        # a narrower chart, which is what was clipping "target 80%"/"median
+        # 65%" into cut-off text. xshift is a constant pixel offset
+        # regardless of plot width, matching the same fix already applied to
+        # Country Profile's charts in run_charts.py.
         layout_annotations.append({
-            'x': 1.005, 'y': target / 112, 'xref': 'paper', 'yref': 'paper',
+            'x': 1, 'xshift': 8, 'y': target / 112, 'xref': 'paper', 'yref': 'paper',
             'text': f'target {target:.0f}%', 'showarrow': False,
             'font': {'size': 10, 'color': '#64748B', 'family': 'Geist, system-ui, sans-serif'},
+            'xanchor': 'left', 'yanchor': 'middle',
+        })
+    if median_value is not None:
+        layout_annotations.append({
+            'x': 1, 'xshift': 8, 'y': median_value / 112, 'xref': 'paper', 'yref': 'paper',
+            'text': f'median {median_value:.0f}%', 'showarrow': False,
+            'font': {'size': 10, 'color': '#6366f1', 'family': 'Geist, system-ui, sans-serif'},
             'xanchor': 'left', 'yanchor': 'middle',
         })
     tick_angle = -28 if grain in {'daily', 'weekly', 'monthly'} else 0
     return go.Figure(data=traces, layout={
         'paper_bgcolor': 'white', 'plot_bgcolor': 'white',
         'font': {'family': 'Geist, system-ui, sans-serif', 'color': '#64748b', 'size': 11},
-        'height': 220, 'margin': {'l': 42, 'r': 24, 't': 16, 'b': 44},
+        # r widened 24 -> 92: the target/median labels sit just outside the
+        # plot area (x=1.005, xref='paper') so they don't overlap the data --
+        # 24px wasn't enough room for text like "median 65%", which rendered
+        # clipped/cut off instead of the full label.
+        'height': 220, 'margin': {'l': 42, 'r': 92, 't': 16, 'b': 44},
         'showlegend': False, 'hovermode': 'x unified',
         'hoverlabel': {
             'bgcolor': '#0f172a', 'bordercolor': '#0f172a',
@@ -436,6 +471,8 @@ def _trend_switcher(
     default_cat: str | None = None,
     scope_meta: dict | None = None,
     payload_key: str | None = None,
+    start_date=None,
+    end_date=None,
 ) -> html.Div:
     tracked     = [i for i in indicators if i.get('status') == 'tracked']
     cat_order   = _resolve_category_order(tracked, categories)
@@ -450,9 +487,20 @@ def _trend_switcher(
     default_ind_values = [o['value'] for o in default_ind_opts[:_DEFAULT_TREND_INDICATOR_LIMIT]]
 
     try:
-        _dates    = pd.to_datetime(df['Date'], errors='coerce').dropna() if 'Date' in df.columns else pd.Series([], dtype='datetime64[ns]')
-        _date_min = _dates.min().isoformat() if len(_dates) else None
-        _date_max = _dates.max().isoformat() if len(_dates) else None
+        # Prefer the actually-selected window over df's own min/max -- df
+        # (facility_df) arrives already scoped by the caller's own query, but
+        # that query's lookback can extend further back than the selected
+        # start_date, so relying on df alone silently widened Run Charts'
+        # idea of "the selected window" beyond what was actually picked.
+        # Falls back to df's own range only when start_date/end_date weren't
+        # passed in at all.
+        if start_date is not None and end_date is not None:
+            _date_min = pd.Timestamp(start_date).isoformat()
+            _date_max = pd.Timestamp(end_date).isoformat()
+        else:
+            _dates    = pd.to_datetime(df['Date'], errors='coerce').dropna() if 'Date' in df.columns else pd.Series([], dtype='datetime64[ns]')
+            _date_min = _dates.min().isoformat() if len(_dates) else None
+            _date_max = _dates.max().isoformat() if len(_dates) else None
     except Exception:
         _date_min = _date_max = None
 
@@ -492,14 +540,6 @@ def _trend_switcher(
                             multi=True, clearable=True,
                             placeholder='All indicators',
                             style={'minWidth': '200px', 'maxWidth': '300px', 'fontSize': '12px'},
-                        ),
-                        dcc.Dropdown(
-                            id='mnid-trend-location',
-                            options=loc_options,
-                            value='all',
-                            clearable=False, searchable=True,
-                            placeholder='All locations',
-                            style={'minWidth': '150px', 'maxWidth': '210px', 'fontSize': '12px'},
                         ),
                         dcc.Dropdown(
                             id='mnid-trend-grain',
@@ -551,14 +591,12 @@ def _trend_switcher(
     Output('mnid-run-charts-container', 'children'),
     Output('mnid-trend-active-cat', 'data'),
     Output({'type': 'trend-cat-btn', 'index': ALL}, 'className'),
-    Output('mnid-trend-location', 'options'),
     Output('mnid-trend-ind-filter', 'options'),
     Output('mnid-trend-ind-filter', 'value'),
     Output('mnid-trend-measure-toggle', 'className'),
     Output('mnid-trend-measure-toggle-text', 'children'),
     Output('mnid-trend-measure-store', 'data'),
     Input({'type': 'trend-cat-btn', 'index': ALL}, 'n_clicks'),
-    Input('mnid-trend-location', 'value'),
     Input('mnid-trend-ind-filter', 'value'),
     Input('mnid-trend-grain', 'value'),
     Input('mnid-trend-measure-toggle', 'n_clicks'),
@@ -568,7 +606,7 @@ def _trend_switcher(
     State('mnid-trend-measure-store', 'data'),
     prevent_initial_call=False,
 )
-def update_trend_chart(n_clicks_list, location, selected_inds, grain, measure_clicks,
+def update_trend_chart(n_clicks_list, selected_inds, grain, measure_clicks,
                        stored_trend, active_cat, cat_order, stored_measure):
     grain      = (grain or 'monthly').strip().lower()
     measure    = (stored_measure or 'median').strip().lower()
@@ -595,7 +633,6 @@ def update_trend_chart(n_clicks_list, location, selected_inds, grain, measure_cl
     trend_payload   = stored_trend or {}
     tracked         = trend_payload.get('tracked', [])
     scope_meta      = trend_payload.get('scope_meta') or {}
-    loc_options     = trend_payload.get('loc_options') or [{'label': 'All locations', 'value': 'all'}]
     ind_opts_by_cat = trend_payload.get('ind_opts_by_cat') or {}
     ind_options     = ind_opts_by_cat.get(cat, [])
 
@@ -616,7 +653,10 @@ def update_trend_chart(n_clicks_list, location, selected_inds, grain, measure_cl
     ind_value_out = default_ind_values if cat_changed else no_update
 
     cards   = _run_chart_cards(
-        df, tracked, cat, location or 'all',
+        # Location filter removed -- Run Charts always show the full scope
+        # (whatever the outer Country Profile/District/Facility selection
+        # already narrowed network_df to), not a further per-chart pick.
+        df, tracked, cat, 'all',
         default_ind_values if cat_changed else selected_inds,
         scope_meta, agg_df=_agg_now, fallback_df=_df_full, grain=grain, measure=measure,
     )
@@ -625,4 +665,4 @@ def update_trend_chart(n_clicks_list, location, selected_inds, grain, measure_cl
     # — returning an empty list avoids the "Expected 0, got N" callback error.
     all_classes = ['mnid-filter-btn active' if c == cat else 'mnid-filter-btn' for c in categories]
     classes = all_classes[:len(n_clicks_list)]
-    return cards, cat, classes, loc_options, ind_options, ind_value_out, measure_class, measure_text, measure
+    return cards, cat, classes, ind_options, ind_value_out, measure_class, measure_text, measure

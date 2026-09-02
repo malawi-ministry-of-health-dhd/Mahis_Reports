@@ -22,7 +22,7 @@ def _build_nav(pathname_prefix, query, last_updated, show_admin):
         html.Li(html.A("Dashboard", href=f"{pathname_prefix}home{query}", className="nav-link")),
         html.Li(html.A("HMIS DataSet Reports", href=f"{pathname_prefix}hmis_reports{query}", className="nav-link")),
         html.Li(html.A("Clinical Reports", href=f"{pathname_prefix}program_reports{query}", className="nav-link")),
-        html.Li(html.A("Data Quality", href=f"{pathname_prefix}data_quality{query}", className="nav-link")),
+        # html.Li(html.A("Data Quality", href=f"{pathname_prefix}data_quality{query}", className="nav-link")),
     ]
 
     if show_admin:
