@@ -86,7 +86,7 @@ data/mahis
 data/mahisuat
 data/parquet
 demo_parquet
-# data/visualizations
+data/visualizations
 mnid/dhis2/config/source
 configurations.json
 __pycache__/
