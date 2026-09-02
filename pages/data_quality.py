@@ -10,21 +10,10 @@ import plotly.graph_objects as go
 from data_storage import DataStorage
 from config import (
     PROGRAM_, FACILITY_, DISTRICT_, DATE_, PERSON_ID_, ENCOUNTER_ID_, OBS_DATETIME_,
-    CONCEPT_NAME_, ENCOUNTER_,
+    CONCEPT_NAME_, ENCOUNTER_,AGE_GROUP_,
     IDENTIFIER_, FIRST_NAME_, LAST_NAME_, GENDER_, HOME_DISTRICT_, TA_, VILLAGE_,
-    BIRTHDATE_, CELL_,
+    BIRTHDATE_, CELL_, DEMO_LOCATION, DEMO_UUID, FACILITY_CODE_
 )
-# DISABLED: importing from another page module (pages.home) makes Dash's
-# page-loader execute home.py's whole file -- including every @callback in
-# it -- a second time, since Dash's own loader doesn't check sys.modules
-# before re-running a page file. That registers every callback in home.py
-# twice and crashes the app at startup with "Duplicate callback outputs".
-# This page is already hidden from navigation, so every call site below
-# falls back to a safe "unauthorized / no scope restriction" default instead
-# of importing these from pages.home. See also pages/reports.py, which has
-# the same import for the same reason (kept there since one of its call
-# sites is a real auth check, unlike here).
-# from pages.home import _resolve_user_scope, _scope_where_parts, _load_user_registry
 from mnid.core.constants import BG, BORDER, TEXT
 from dq.theme import BRAND, BRAND_TINT
 import dq.theme  # noqa: F401 -- registers the "dq" Plotly template
@@ -69,6 +58,129 @@ _TAB_SELECTED_STYLE = {
     "fontWeight": 700,
 }
 
+path = os.getcwd()
+
+def _load_user_registry(route) -> pd.DataFrame:
+    user_data_path = os.path.join(path, f'data/{route}','single_tables', 'users_data.csv')
+
+    if os.path.exists(user_data_path):
+        user_data = pd.read_csv(user_data_path)
+    else:
+        user_data = pd.DataFrame(columns=['user_id','uuid', 'role','user_level','district','facility_name','facility_code'])
+    demo_row = {
+        'user_id':1000000,
+        'uuid': DEMO_UUID,
+        'role': 'reports_admin',
+        'user_level': 'national',
+        'district': ["Salima"],
+        'facility_name': None,
+        'facility_code': DEMO_LOCATION,
+        'assigned_facility':'Biwi Health Centre'
+    }
+
+    user_data = pd.concat([user_data, pd.DataFrame([demo_row])], ignore_index=True)
+    for column in ['uuid', 'role', 'user_level', 'district', 'facility_code', 'facility_name']:
+        if column not in user_data.columns:
+            user_data[column] = pd.NA
+
+    def parse_list(val):
+        if pd.isna(val):
+            return None
+        if isinstance(val, str) and ',' in val:
+            return [x.strip() for x in val.split(',')]
+        return val
+
+    user_data['district'] = user_data['district'].apply(parse_list)
+    user_data['facility_name'] = user_data['facility_name'].apply(parse_list)
+
+    return user_data
+
+def _scope_where_parts(effective_level, location, districts, user_districts, facilities, age, programs=None, is_network=False):
+    """Return SQL WHERE clause parts for the given scope and level.
+
+    is_network=True omits the per-facility filter so the network query covers
+    the full district/national context for trend comparison.
+    """
+    parts = []
+    if effective_level == 'facility':
+        if not is_network and location:
+            parts.append(f"{FACILITY_CODE_} = '{location}'")
+    elif effective_level == 'district':
+        active_dists = districts or user_districts
+        if active_dists:
+            quoted_dists = ", ".join([f"'{d}'" for d in active_dists])
+            parts.append(f"{DISTRICT_} IN ({quoted_dists})")
+        if not is_network and facilities:
+            quoted_facilities = ", ".join([f"'{f}'" for f in facilities])
+            parts.append(f"{FACILITY_} IN ({quoted_facilities})")
+    elif effective_level == 'national':
+        if districts:
+            quoted_dists = ", ".join([f"'{d}'" for d in districts])
+            parts.append(f"{DISTRICT_} IN ({quoted_dists})")
+        if not is_network and facilities:
+            quoted_facilities = ", ".join([f"'{f}'" for f in facilities])
+            parts.append(f"{FACILITY_} IN ({quoted_facilities})")
+    if age:
+        parts.append(f"{AGE_GROUP_} = '{age}'")
+    if programs:
+        quoted_programs = ", ".join([f"'{p}'" for p in programs])
+        parts.append(f"{PROGRAM_} IN ({quoted_programs})")
+    return parts
+
+def _load_user_properties(route) -> list:
+    props_path = os.path.join(os.getcwd(), f'data/{route}', 'dcc_dropdown_json', 'user_properties.json')
+    try:
+        with open(props_path) as f:
+            return json.load(f).get('users', [])
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        return []
+
+def _normalize_level(value: str | None) -> str:
+    value = str(value or '').strip().lower()
+    if value in {'national', 'district', 'facility'}:
+        return value
+    return 'facility'
+
+
+def _resolve_user_scope(urlparams, user_data: pd.DataFrame):
+    requested_uuid = urlparams.get('uuid', [None])[0] if urlparams else None
+    data_route = urlparams.get('route', ["default"])[0] if urlparams else None
+
+    # Check user_properties.json first (GUI-configured overrides)
+    for entry in _load_user_properties(data_route):
+        p = entry.get('properties', {})
+        if p.get('uuid') == requested_uuid:
+            level     = _normalize_level(p.get('user_level'))
+            districts = p.get('district')
+            if isinstance(districts, str):
+                districts = [districts] if districts else []
+            facilities = p.get('facility_name')
+            if isinstance(facilities, str):
+                facilities = [facilities] if facilities else []
+            scope = {
+                'level':      level,
+                'districts':  districts  or [],
+                'facilities': facilities or [],
+                'facility_code': p.get('facility_code'),
+            }
+            # Still return a dataframe row so callers that use row.get(...) don't break
+            user_info = user_data[user_data['uuid'] == requested_uuid]
+            row = user_info.iloc[0] if not user_info.empty else None
+            return row, scope
+
+    # Fall back to users_data dataframe
+    user_info = user_data[user_data['uuid'] == requested_uuid]
+    if user_info.empty:
+        return None, {}
+    row   = user_info.iloc[0]
+    level = _normalize_level(row.get('user_level'))
+    scope = {
+        'level':      level,
+        'districts':  row.get('district'),
+        'facilities': row.get('facility_name'),
+        'facility_code': row.get('facility_code'),
+    }
+    return row, scope
 
 def _iso_date(value):
     if value is None or pd.isna(value):
@@ -92,22 +204,17 @@ def _latest_full_month_window(max_date):
 
 def _ceiling_scope_where(level, location, user_districts):
     """WHERE parts for the user's own scope ceiling -- no user-selected narrowing."""
-    # DISABLED: _scope_where_parts is from pages.home -- see the commented
-    # import at the top of this file. Falls back to no scope restriction.
-    # parts = _scope_where_parts(level, location, None, user_districts, None, None)
-    parts = []
+    parts = _scope_where_parts(level, location, None, user_districts, None, None)
     return " AND ".join(parts) if parts else "1=1"
 
 
 def _selection_where(level, location, user_districts, selected_districts, selected_facilities, program, start_date, end_date):
     """WHERE clause for the user's scope ceiling narrowed by the filter bar's
     own selections (district scope, facility, programme, date range)."""
-    # DISABLED: see _ceiling_scope_where above.
-    # parts = _scope_where_parts(
-    #     level, location, selected_districts or None, user_districts, selected_facilities or None, None,
-    #     programs=[program] if program else None,
-    # )
-    parts = []
+    parts = _scope_where_parts(
+        level, location, selected_districts or None, user_districts, selected_facilities or None, None,
+        programs=[program] if program else None,
+    )
     if start_date and end_date:
         parts.append(f"{DATE_} BETWEEN '{start_date}'::TIMESTAMP AND '{end_date} 23:59:59'::TIMESTAMP")
     return " AND ".join(parts) if parts else "1=1"
@@ -467,13 +574,8 @@ def initialize_data_quality_filters(urlparams):
     data_route = urlparams.get("route", ["default"])[0]
     location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0]
 
-    # DISABLED: _load_user_registry/_resolve_user_scope are from pages.home --
-    # see the commented import at the top of this file. Falls back to
-    # "unauthorized" (user_row=None), which every call site below already
-    # checks for and handles safely.
-    # user_data = _load_user_registry(data_route)
-    # user_row, scope = _resolve_user_scope(urlparams, user_data)
-    user_row, scope = None, {}
+    user_data = _load_user_registry(data_route)
+    user_row, scope = _resolve_user_scope(urlparams, user_data)
     if user_row is None:
         return unauthorized
 
@@ -563,21 +665,13 @@ def sync_dq_facility_options_from_scope(selected_districts, urlparams):
     urlparams = urlparams or {}
     data_route = urlparams.get("route", ["default"])[0]
     location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0]
-
-    # DISABLED: _load_user_registry/_resolve_user_scope are from pages.home --
-    # see the commented import at the top of this file. Falls back to
-    # "unauthorized" (user_row=None), which every call site below already
-    # checks for and handles safely.
-    # user_data = _load_user_registry(data_route)
-    # user_row, scope = _resolve_user_scope(urlparams, user_data)
-    user_row, scope = None, {}
+    user_data = _load_user_registry(data_route)
+    user_row, scope = _resolve_user_scope(urlparams, user_data)
     if user_row is None or not location:
         raise PreventUpdate
 
     level = scope.get("level")
     if level == "facility":
-        # Already ceilinged to a single facility -- Scope is disabled and
-        # dq-facility-filter is already fixed by initialize_data_quality_filters.
         raise PreventUpdate
 
     user_districts = scope.get("districts") or []
@@ -585,10 +679,7 @@ def sync_dq_facility_options_from_scope(selected_districts, urlparams):
         user_districts = [user_districts]
 
     data_path = f"data/{data_route}/parquet"
-    # DISABLED: _scope_where_parts is from pages.home -- see the commented
-    # import at the top of this file. Falls back to no scope restriction.
-    # where_parts = _scope_where_parts(level, location, selected_districts or None, user_districts, None, None)
-    where_parts = []
+    where_parts = _scope_where_parts(level, location, selected_districts or None, user_districts, None, None)
     where = " AND ".join(where_parts) if where_parts else "1=1"
 
     try:
@@ -616,14 +707,8 @@ def render_overview_tab(urlparams, run_clicks, start_date, end_date, districts, 
     urlparams = urlparams or {}
     data_route = urlparams.get("route", ["default"])[0]
     location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0]
-
-    # DISABLED: _load_user_registry/_resolve_user_scope are from pages.home --
-    # see the commented import at the top of this file. Falls back to
-    # "unauthorized" (user_row=None), which every call site below already
-    # checks for and handles safely.
-    # user_data = _load_user_registry(data_route)
-    # user_row, scope = _resolve_user_scope(urlparams, user_data)
-    user_row, scope = None, {}
+    user_data = _load_user_registry(data_route)
+    user_row, scope = _resolve_user_scope(urlparams, user_data)
     if user_row is None or not location:
         return None
 
@@ -921,13 +1006,8 @@ def render_duplicates_tab(urlparams, run_clicks, candidates_page, start_date, en
     data_route = urlparams.get("route", ["default"])[0]
     location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0]
 
-    # DISABLED: _load_user_registry/_resolve_user_scope are from pages.home --
-    # see the commented import at the top of this file. Falls back to
-    # "unauthorized" (user_row=None), which every call site below already
-    # checks for and handles safely.
-    # user_data = _load_user_registry(data_route)
-    # user_row, scope = _resolve_user_scope(urlparams, user_data)
-    user_row, scope = None, {}
+    user_data = _load_user_registry(data_route)
+    user_row, scope = _resolve_user_scope(urlparams, user_data)
     if user_row is None or not location:
         return None, "Duplicates", _TAB_STYLE
 
@@ -1229,14 +1309,8 @@ def render_completeness_tab(urlparams, run_clicks, start_date, end_date, distric
     urlparams = urlparams or {}
     data_route = urlparams.get("route", ["default"])[0]
     location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0]
-
-    # DISABLED: _load_user_registry/_resolve_user_scope are from pages.home --
-    # see the commented import at the top of this file. Falls back to
-    # "unauthorized" (user_row=None), which every call site below already
-    # checks for and handles safely.
-    # user_data = _load_user_registry(data_route)
-    # user_row, scope = _resolve_user_scope(urlparams, user_data)
-    user_row, scope = None, {}
+    user_data = _load_user_registry(data_route)
+    user_row, scope = _resolve_user_scope(urlparams, user_data)
     if user_row is None or not location:
         return None, "Completeness", _TAB_STYLE
 
