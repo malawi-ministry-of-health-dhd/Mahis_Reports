@@ -9,21 +9,24 @@ import numpy as np
 from dash.exceptions import PreventUpdate
 import os
 import traceback
-from helpers.helpers import build_single_chart, create_pivot_table_from_config, create_crosstab_from_config
+from helpers.helpers import (build_single_chart, 
+                             create_pivot_table_from_config, 
+                             create_linelist_from_config,
+                             create_crosstab_from_config)
 from datetime import datetime, timedelta
 from data_storage import DataStorage
 import warnings
 warnings.filterwarnings("ignore")
-from config import (actual_keys_in_data, 
-                    DATA_PATH_, 
+from config import (actual_keys_in_data,
+                    DATA_PATH_,
                     DATE_, PERSON_ID_, ENCOUNTER_ID_,
                     FACILITY_, AGE_GROUP_, AGE_,
                     GENDER_, ENCOUNTER_, PROGRAM_,
-                    NEW_REVISIT_, 
-                    HOME_DISTRICT_, 
-                    TA_, 
-                    VILLAGE_, 
-                    FACILITY_CODE_,
+                    DEMO_LOCATION,DEMO_UUID,
+                    NEW_REVISIT_,DISTRICT_,
+                    HOME_DISTRICT_,FACILITY_CODE_,
+                    TA_,
+                    VILLAGE_,
                     OBS_VALUE_CODED_,
                     CONCEPT_NAME_,
                     VALUE_,
@@ -31,7 +34,6 @@ from config import (actual_keys_in_data,
                     DRUG_NAME_,
                     VALUE_NAME_)
 
-from helpers.navigation_callbacks import DEMO_UUID
 
 dash.register_page(__name__, path="/program_reports")
 
@@ -41,6 +43,127 @@ from datetime import datetime, timedelta
 from dash import html, dcc
 
 path = os.getcwd()
+def _load_user_registry(route) -> pd.DataFrame:
+    user_data_path = os.path.join(path, f'data/{route}','single_tables', 'users_data.csv')
+
+    if os.path.exists(user_data_path):
+        user_data = pd.read_csv(user_data_path)
+    else:
+        user_data = pd.DataFrame(columns=['user_id','uuid', 'role','user_level','district','facility_name','facility_code'])
+    demo_row = {
+        'user_id':1000000,
+        'uuid': DEMO_UUID,
+        'role': 'reports_admin',
+        'user_level': 'national',
+        'district': ["Salima"],
+        'facility_name': None,
+        'facility_code': DEMO_LOCATION,
+        'assigned_facility':'Biwi Health Centre'
+    }
+
+    user_data = pd.concat([user_data, pd.DataFrame([demo_row])], ignore_index=True)
+    for column in ['uuid', 'role', 'user_level', 'district', 'facility_code', 'facility_name']:
+        if column not in user_data.columns:
+            user_data[column] = pd.NA
+
+    def parse_list(val):
+        if pd.isna(val):
+            return None
+        if isinstance(val, str) and ',' in val:
+            return [x.strip() for x in val.split(',')]
+        return val
+
+    user_data['district'] = user_data['district'].apply(parse_list)
+    user_data['facility_name'] = user_data['facility_name'].apply(parse_list)
+
+    return user_data
+
+def _scope_where_parts(effective_level, location, districts, user_districts, facilities, age, programs=None, is_network=False):
+    """Return SQL WHERE clause parts for the given scope and level.
+
+    is_network=True omits the per-facility filter so the network query covers
+    the full district/national context for trend comparison.
+    """
+    parts = []
+    if effective_level == 'facility':
+        if not is_network and location:
+            parts.append(f"{FACILITY_CODE_} = '{location}'")
+    elif effective_level == 'district':
+        active_dists = districts or user_districts
+        if active_dists:
+            quoted_dists = ", ".join([f"'{d}'" for d in active_dists])
+            parts.append(f"{DISTRICT_} IN ({quoted_dists})")
+        if not is_network and facilities:
+            quoted_facilities = ", ".join([f"'{f}'" for f in facilities])
+            parts.append(f"{FACILITY_} IN ({quoted_facilities})")
+    elif effective_level == 'national':
+        if districts:
+            quoted_dists = ", ".join([f"'{d}'" for d in districts])
+            parts.append(f"{DISTRICT_} IN ({quoted_dists})")
+        if not is_network and facilities:
+            quoted_facilities = ", ".join([f"'{f}'" for f in facilities])
+            parts.append(f"{FACILITY_} IN ({quoted_facilities})")
+    if age:
+        parts.append(f"{AGE_GROUP_} = '{age}'")
+    if programs:
+        quoted_programs = ", ".join([f"'{p}'" for p in programs])
+        parts.append(f"{PROGRAM_} IN ({quoted_programs})")
+    return parts
+
+def _load_user_properties(route) -> list:
+    props_path = os.path.join(os.getcwd(), f'data/{route}', 'dcc_dropdown_json', 'user_properties.json')
+    try:
+        with open(props_path) as f:
+            return json.load(f).get('users', [])
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        return []
+
+def _normalize_level(value: str | None) -> str:
+    value = str(value or '').strip().lower()
+    if value in {'national', 'district', 'facility'}:
+        return value
+    return 'facility'
+
+
+def _resolve_user_scope(urlparams, user_data: pd.DataFrame):
+    requested_uuid = urlparams.get('uuid', [None])[0] if urlparams else None
+    data_route = urlparams.get('route', ["default"])[0] if urlparams else None
+
+    # Check user_properties.json first (GUI-configured overrides)
+    for entry in _load_user_properties(data_route):
+        p = entry.get('properties', {})
+        if p.get('uuid') == requested_uuid:
+            level     = _normalize_level(p.get('user_level'))
+            districts = p.get('district')
+            if isinstance(districts, str):
+                districts = [districts] if districts else []
+            facilities = p.get('facility_name')
+            if isinstance(facilities, str):
+                facilities = [facilities] if facilities else []
+            scope = {
+                'level':      level,
+                'districts':  districts  or [],
+                'facilities': facilities or [],
+                'facility_code': p.get('facility_code'),
+            }
+            # Still return a dataframe row so callers that use row.get(...) don't break
+            user_info = user_data[user_data['uuid'] == requested_uuid]
+            row = user_info.iloc[0] if not user_info.empty else None
+            return row, scope
+
+    # Fall back to users_data dataframe
+    user_info = user_data[user_data['uuid'] == requested_uuid]
+    if user_info.empty:
+        return None, {}
+    row   = user_info.iloc[0]
+    level = _normalize_level(row.get('user_level'))
+    scope = {
+        'level':      level,
+        'districts':  row.get('district'),
+        'facilities': row.get('facility_name'),
+        'facility_code': row.get('facility_code'),
+    }
+    return row, scope
 
 report_config_panel = html.Div(
     className="report-config-modern",
@@ -116,6 +239,7 @@ report_config_panel = html.Div(
                         
                         # Health Facility Filter
                         html.Div(
+                            id="prog-hf-filter-group",
                             className="config-control-group",
                             children=[
                                 html.Label("Health Facility", className="config-label"),
@@ -227,6 +351,9 @@ def programs_report(filtered_query,data_route, programs_report_list, user_role):
     if chart_type == "CrossTab":
         table, data = create_crosstab_from_config(filtered_query, data_route, filters)
         return html.Div(table), data
+    # if chart_type == "LineList":
+    #     table, data = create_linelist_from_config(filtered_query, data_route, filters)
+    #     return html.Div(table), data
 
     return html.Div(
         build_single_chart(filtered_query, filtered_query, 10, data_route, json_data, user_role, style="")
@@ -265,8 +392,54 @@ def update_filters(selected_program):
     return program_reports, ""
 
 @callback(
+    [Output('prog-hf-filter', 'options'),
+     Output('prog-hf-filter', 'value'),
+     Output('prog-hf-filter-group', 'style')],
+    Input('url-params-store', 'data'),
+)
+def load_program_report_facilities(urlparams):
+    """Health Facility filter, scoped like reports.py's own facility-filter:
+    national users pick from every facility, district users pick from their
+    own district(s)' facilities, and facility-level users don't get a choice
+    at all -- the control is hidden and pinned to their one facility."""
+    urlparams = urlparams or {}
+    data_route = urlparams.get('route', ["default"])[0]
+    user_data = _load_user_registry(data_route)
+    user_row, scope = _resolve_user_scope(urlparams, user_data)
+    if user_row is None:
+        return [], None, {'display': 'none'}
+
+    level = scope.get('level')
+
+    assigned = scope.get('facilities')
+    if isinstance(assigned, str):
+        assigned = [assigned] if assigned else []
+    assigned = assigned or []
+
+    if level == 'facility':
+        return assigned, (assigned or None), {'display': 'none'}
+
+    facilities_path = os.path.join(path, f'data/{data_route}', 'dcc_dropdown_json', 'facilities_dropdowns.json')
+    try:
+        with open(facilities_path, 'r') as f:
+            facilities_by_district = json.load(f)
+    except Exception:
+        facilities_by_district = {}
+
+    if level == 'national':
+        hf = [f for values in facilities_by_district.values() if isinstance(values, list) for f in values]
+        return hf, None, {}
+
+    # district level -- facilities within the user's own district(s), falling
+    # back to any explicitly-assigned facility list if that lookup is empty.
+    user_districts = scope.get('districts') or []
+    if isinstance(user_districts, str):
+        user_districts = [user_districts]
+    hf = [f for d in user_districts for f in (facilities_by_district.get(d) or [])]
+    return (hf or assigned), None, {}
+
+@callback(
     [Output('program-reports-container', 'children'),
-     Output('prog-hf-filter', 'options'),
      Output("program-selector", "options"),
      Output("btn-generate-report", "n_clicks"),
      Output("prog-report-export-store", "data"),
@@ -298,6 +471,7 @@ def update_filters(selected_program):
     ]
 )
 def generate_chart(n_clicks, urlparams, selected_report, pathname, report_name, start_date, end_date, hf):
+    urlparams = urlparams or {}
     location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0]
     data_route = urlparams.get('route', ["default"])[0]
     DATA_PATH_ = f"data/{data_route}/parquet"
@@ -305,52 +479,29 @@ def generate_chart(n_clicks, urlparams, selected_report, pathname, report_name, 
     path_program_reports = os.path.join(path, 'data','visualizations','validated_prog_reports.json')
     program_reports_progs_path = os.path.join(path, f'data/visualizations/validated_prog_reports.json')
 
-    user_data_path = os.path.join(path, f'data/{data_route}','single_tables', 'users_data.csv')
-    if not os.path.exists(user_data_path):
-        user_data = pd.DataFrame(columns=['uuid', 'role'])
-    else:
-        user_data = pd.read_csv(os.path.join(path, f'data/{data_route}','single_tables', 'users_data.csv'))
-    test_admin = pd.DataFrame(columns=['uuid', 'role'], data=[[DEMO_UUID, 'reports_admin']])
-    user_data = pd.concat([user_data, test_admin], ignore_index=True)
-
-    user_info = user_data[user_data['uuid'] == urlparams.get('uuid', [None])[0]]
-    if user_info.empty:
-        return html.Div("Unauthorized User. Please contact system administrator."), no_update, no_update, 0, None, True
-    user_role = user_info['role'].to_list()
-    if user_role:
-        role = user_role[0]
-    else:
-        role = None
+    user_data = _load_user_registry(data_route)
+    user_row, scope = _resolve_user_scope(urlparams, user_data)
+    if user_row is None:
+        return html.Div("Unauthorized User. Please contact system administrator."), no_update, 0, None, True
+    role = user_row.get('role')
+    effective_level = scope.get('level')
 
     try:
         start_dt = pd.to_datetime(start_date).replace(hour=0, minute=0, second=0)
         end_dt   = pd.to_datetime(end_date).replace(hour=23, minute=59, second=59)
 
-        if not location:
-            return html.Div("Missing Parameters"), no_update, no_update, 0, None, True
+        if effective_level == 'facility' and not location:
+            return html.Div("Missing Parameters"), no_update, 0, None, True
 
-        base_where = (
-            f"{DATE_} BETWEEN '{start_dt}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP"
-            f" AND {FACILITY_CODE_} = '{location}'"
+        hf_list = hf if isinstance(hf, list) else ([hf] if hf else [])
+        scope_parts = _scope_where_parts(
+            effective_level, location, None, scope.get('districts'), hf_list, None,
         )
-
-        if hf and hf != "*All health facilities":
-            hf_list = hf if isinstance(hf, list) else [hf]
-            quoted  = ", ".join(f"'{f}'" for f in hf_list)
-            base_where += f" AND {FACILITY_} IN ({quoted})"
+        base_where = f"{DATE_} BETWEEN '{start_dt}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP"
+        if scope_parts:
+            base_where += " AND " + " AND ".join(scope_parts)
 
         filtered_query = base_where
-        try:
-            fac_df   = DataStorage.query_duckdb(
-                f"SELECT DISTINCT {FACILITY_} FROM '{DATA_PATH_}'"
-                f" WHERE {DATE_} BETWEEN '{start_dt}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP"
-                f" AND {FACILITY_CODE_} = '{location}'"
-                f" ORDER BY {FACILITY_}",
-            )
-            facilities = fac_df[FACILITY_].dropna().tolist()
-            hf_options = facilities + (["*All health facilities"] if len(facilities) > 1 else [])
-        except Exception:
-            hf_options = []
         try:
             with open(program_reports_progs_path) as x:
                 dropdowns = json.load(x)
@@ -362,12 +513,12 @@ def generate_chart(n_clicks, urlparams, selected_report, pathname, report_name, 
         if not report_name:
             return (
                 html.Div("Please select a report name and click Generate."),
-                hf_options, prog_options, 0, None, True,
+                prog_options, 0, None, True,
             )
 
         ctx = callback_context
         if not ctx.triggered or ctx.triggered_id != "btn-generate-report":
-            return no_update, no_update, prog_options, 0, no_update, no_update
+            return no_update, prog_options, 0, no_update, no_update
 
         # ── Load report config and render ─────────────────────────────────────
         with open(path_program_reports) as x:
@@ -378,11 +529,11 @@ def generate_chart(n_clicks, urlparams, selected_report, pathname, report_name, 
             {"report_name": report_name, "data": export_df.to_json(orient="split", date_format="iso")}
             if export_df is not None else None
         )
-        return content, hf_options, prog_options, 0, export_payload, export_df is None
+        return content, prog_options, 0, export_payload, export_df is None
 
     except Exception as e:
         traceback.print_exc()
-        return html.Div(f"Error: {str(e)}"), [], [], 0, None, True
+        return html.Div(f"Error: {str(e)}"), [], 0, None, True
     
 @callback(
     [Output('prog-date-range-picker', 'start_date'),
