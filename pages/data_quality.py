@@ -59,7 +59,6 @@ _TAB_SELECTED_STYLE = {
 }
 
 path = os.getcwd()
-
 def _load_user_registry(route) -> pd.DataFrame:
     user_data_path = os.path.join(path, f'data/{route}','single_tables', 'users_data.csv')
 
@@ -224,28 +223,40 @@ def _dq_prefs_path(route):
     return os.path.join(os.getcwd(), f'data/{route}', 'dcc_dropdown_json', 'dq_preferences.json')
 
 
-def _load_dq_prefs(route, uuid):
-    """Per-user Completeness rules (mandatory encounters + demographics),
-    saved under data/{route}/dcc_dropdown_json/dq_preferences.json so they're
-    already selected the next time this uuid opens the page."""
-    empty = {"encounters": [], "demographics": []}
+def _load_dq_prefs(route, uuid, program):
+    """Per-user Completeness rules, saved under
+    data/{route}/dcc_dropdown_json/dq_preferences.json. Demographics are
+    global to the uuid; encounters are mapped per-programme (this uuid can
+    have a different mandatory encounter list for each programme), stored as
+    entry["encounters"] == [{"Program": ..., "encounter_list": [...]}, ...].
+
+    Returns None when this uuid has no saved entry at all -- distinguishes
+    "never configured anything here" (the Completeness tab should stay quiet,
+    no rule => no issues) from "configured, but this particular programme has
+    no mandatory encounters yet" (encounter_list just comes back empty).
+    """
     if not uuid:
-        return empty
+        return None
     try:
         with open(_dq_prefs_path(route)) as f:
             data = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        return empty
-    for entry in data.get("users", []):
-        if entry.get("uuid") == uuid:
-            return {
-                "encounters": entry.get("encounters") or [],
-                "demographics": entry.get("demographics") or [],
-            }
-    return empty
+        return None
+    entry = next((u for u in data.get("users", []) if u.get("uuid") == uuid), None)
+    if entry is None:
+        return None
+    encounters_by_program = entry.get("encounters") or []
+    encounter_list = next(
+        (p.get("encounter_list") or [] for p in encounters_by_program if p.get("Program") == program),
+        [],
+    )
+    return {
+        "demographics": entry.get("demographics") or [],
+        "encounters": encounter_list,
+    }
 
 
-def _save_dq_prefs(route, uuid, encounters, demographics):
+def _save_dq_prefs(route, uuid, program, encounters, demographics):
     if not uuid:
         return
     prefs_path = _dq_prefs_path(route)
@@ -255,13 +266,21 @@ def _save_dq_prefs(route, uuid, encounters, demographics):
     except (FileNotFoundError, json.JSONDecodeError):
         data = {}
     users = data.setdefault("users", [])
-    for entry in users:
-        if entry.get("uuid") == uuid:
-            entry["encounters"] = encounters or []
-            entry["demographics"] = demographics or []
-            break
-    else:
-        users.append({"uuid": uuid, "encounters": encounters or [], "demographics": demographics or []})
+    entry = next((u for u in users if u.get("uuid") == uuid), None)
+    if entry is None:
+        entry = {"uuid": uuid, "demographics": [], "encounters": []}
+        users.append(entry)
+
+    entry["demographics"] = demographics or []
+
+    if program:
+        encounters_by_program = entry.setdefault("encounters", [])
+        prog_entry = next((p for p in encounters_by_program if p.get("Program") == program), None)
+        if prog_entry is None:
+            prog_entry = {"Program": program, "encounter_list": []}
+            encounters_by_program.append(prog_entry)
+        prog_entry["encounter_list"] = encounters or []
+
     os.makedirs(os.path.dirname(prefs_path), exist_ok=True)
     with open(prefs_path, 'w') as f:
         json.dump(data, f, indent=2)
@@ -310,6 +329,50 @@ def _empty_state(title, body):
         [html.Div(title, className="dq-empty-state-title"), html.Div(body)],
         className="dq-empty-state",
     )
+
+
+def _evaluate_completeness(data_path, where, mandatory_demographics, mandatory_encounters):
+    """Shared by the Overview and Completeness tabs so both report the exact
+    same numbers -- one row per person_id with facility/identifier/name
+    columns, a presence flag per mandatory field/encounter, and a derived
+    is_complete. Returns (df, demo_flag_cols, enc_flag_cols); df is empty
+    when there's no rule to evaluate (both lists empty) or nothing matched.
+    """
+    mandatory_demographics = mandatory_demographics or []
+    mandatory_encounters = mandatory_encounters or []
+    demo_flag_cols = [f"demo_{i}" for i in range(len(mandatory_demographics))]
+    enc_flag_cols = [f"enc_{i}" for i in range(len(mandatory_encounters))]
+
+    if not mandatory_demographics and not mandatory_encounters:
+        return pd.DataFrame(), demo_flag_cols, enc_flag_cols
+
+    select_parts = [
+        f"{PERSON_ID_} AS person_id",
+        f"MAX({FACILITY_}) AS facility",
+        f"MAX({IDENTIFIER_}) AS identifier",
+        f"MAX({FIRST_NAME_}) AS given_name",
+        f"MAX({LAST_NAME_}) AS family_name",
+    ]
+    for col, flag in zip(mandatory_demographics, demo_flag_cols):
+        select_parts.append(f"MAX(CASE WHEN {_presence_expr(col)} THEN 1 ELSE 0 END) AS {flag}")
+    for enc, flag in zip(mandatory_encounters, enc_flag_cols):
+        safe_enc = str(enc).replace("'", "''")
+        select_parts.append(f"MAX(CASE WHEN {ENCOUNTER_} = '{safe_enc}' THEN 1 ELSE 0 END) AS {flag}")
+
+    try:
+        df = DataStorage.query_duckdb(
+            f"SELECT {', '.join(select_parts)} FROM '{data_path}' WHERE {where} GROUP BY {PERSON_ID_}"
+        )
+    except Exception:
+        df = pd.DataFrame()
+
+    if df.empty:
+        return df, demo_flag_cols, enc_flag_cols
+
+    df["demographics_complete"] = df[demo_flag_cols].eq(1).all(axis=1) if demo_flag_cols else True
+    df["encounters_complete"] = df[enc_flag_cols].eq(1).all(axis=1) if enc_flag_cols else True
+    df["is_complete"] = df["demographics_complete"] & df["encounters_complete"]
+    return df, demo_flag_cols, enc_flag_cols
 
 
 layout = html.Div(
@@ -702,8 +765,11 @@ def sync_dq_facility_options_from_scope(selected_districts, urlparams):
     State("dq-scope", "value"),
     State("dq-facility-filter", "value"),
     State("dq-program-filter", "value"),
+    State("dq-completeness-demographics", "value"),
+    State("dq-completeness-encounters", "value"),
 )
-def render_overview_tab(urlparams, run_clicks, start_date, end_date, districts, facilities, program):
+def render_overview_tab(urlparams, run_clicks, start_date, end_date, districts, facilities, program,
+                         mandatory_demographics, mandatory_encounters):
     urlparams = urlparams or {}
     data_route = urlparams.get("route", ["default"])[0]
     location = (urlparams.get("Location") or urlparams.get("?Location") or [None])[0]
@@ -732,6 +798,22 @@ def render_overview_tab(urlparams, run_clicks, start_date, end_date, districts, 
         user_districts = [user_districts]
 
     where = _selection_where(level, location, user_districts, districts, facilities, program, start_date, end_date)
+
+    # Reuses the exact same evaluation as the Completeness tab (same
+    # mandatory-fields/encounters rule, same scope) so "Patients with
+    # complete data" and "Field completeness %" below always agree with
+    # that tab's own numbers instead of drifting out of sync.
+    completeness_df, _, _ = _evaluate_completeness(
+        data_path, where, mandatory_demographics, mandatory_encounters
+    )
+    if not completeness_df.empty:
+        completeness_rate = completeness_df["is_complete"].mean() * 100
+        facility_completeness = (
+            completeness_df.groupby("facility")["is_complete"].mean() * 100
+        ).round(1)
+    else:
+        completeness_rate = None
+        facility_completeness = pd.Series(dtype=float)
 
     try:
         kpi_df = DataStorage.query_duckdb(
@@ -772,7 +854,11 @@ def render_overview_tab(urlparams, run_clicks, start_date, end_date, districts, 
             _kpi_card("Observation rows", f"{obs_rows:,}"),
             _kpi_card("Duplicate groups", f"{len(duplicate_groups):,}"),
             _kpi_card("Records failing a rule", "—", "Needs the Validity tab"),
-            _kpi_card("Patients with complete data", "—", "Needs a completeness definition"),
+            _kpi_card(
+                "Field completeness %",
+                f"{completeness_rate:.1f}%" if completeness_rate is not None else "—",
+                "Same rule as the Completeness tab" if completeness_rate is not None else "Needs a completeness rule",
+            ),
         ],
         className="dq-kpi-row",
     )
@@ -812,7 +898,12 @@ def render_overview_tab(urlparams, run_clicks, start_date, end_date, districts, 
         fac_df = pd.DataFrame()
 
     if not fac_df.empty:
-        fac_df["Field completeness %"] = "-"
+        fac_df["Field completeness %"] = (
+            fac_df["Facility"].map(facility_completeness) if not facility_completeness.empty else pd.NA
+        )
+        fac_df["Field completeness %"] = fac_df["Field completeness %"].apply(
+            lambda v: "-" if pd.isna(v) else v
+        )
 
         try:
             dup_roster_df = DataStorage.query_duckdb(
@@ -841,9 +932,10 @@ def render_overview_tab(urlparams, run_clicks, start_date, end_date, districts, 
         [
             html.H4("Facility scorecard", className="dq-panel-title"),
             html.Div(
-                "Field completeness and % of Patients Completing Workflow are placeholders "
-                "pending a definition; Duplicate groups matches this facility's own roster "
-                "the same way the Duplicates tab does.",
+                "Field completeness % uses the same mandatory-fields/encounters rule as the "
+                "Completeness tab (shows '-' when no rule is set there); "
+                "% of Patients Completing Workflow is still a placeholder pending a definition; "
+                "Duplicate groups matches this facility's own roster the same way the Duplicates tab does.",
                 className="dq-panel-note",
             ),
             dash_table.DataTable(
@@ -1261,18 +1353,22 @@ def load_completeness_encounter_options(program, urlparams):
     Output("dq-completeness-demographics", "value"),
     Output("dq-completeness-encounters", "value"),
     Input("url-params-store", "data"),
+    Input("dq-program-filter", "value"),
 )
-def load_dq_preferences(urlparams):
-    """Restores this uuid's last saved Completeness rules -- demographics
-    default to every field the first time a user opens the page (see
-    DEMOGRAPHIC_FIELD_OPTIONS), encounters default to none since they're
-    programme-specific and there's no universally sensible default."""
+def load_dq_preferences(urlparams, program):
+    """Restores this uuid's last saved Completeness rules for the currently
+    selected programme -- encounters are mapped per-programme, so switching
+    programmes reloads that programme's own mandatory encounter list. A uuid
+    with no saved entry at all starts fully blank (not defaulted to every
+    demographic field) so a first-time user doesn't see phantom "issues" on
+    the Completeness tab before they've configured anything."""
     urlparams = urlparams or {}
     data_route = urlparams.get("route", ["default"])[0]
     uuid = (urlparams.get("uuid") or [None])[0]
-    prefs = _load_dq_prefs(data_route, uuid)
-    demographics = prefs["demographics"] or [col for col, _ in DEMOGRAPHIC_FIELD_OPTIONS]
-    return demographics, prefs["encounters"]
+    prefs = _load_dq_prefs(data_route, uuid, program)
+    if prefs is None:
+        return [], []
+    return prefs["demographics"], prefs["encounters"]
 
 
 @callback(
@@ -1280,13 +1376,14 @@ def load_dq_preferences(urlparams):
     Input("dq-completeness-demographics", "value"),
     Input("dq-completeness-encounters", "value"),
     State("url-params-store", "data"),
+    State("dq-program-filter", "value"),
     prevent_initial_call=True,
 )
-def save_dq_preferences(demographics, encounters, urlparams):
+def save_dq_preferences(demographics, encounters, urlparams, program):
     urlparams = urlparams or {}
     data_route = urlparams.get("route", ["default"])[0]
     uuid = (urlparams.get("uuid") or [None])[0]
-    _save_dq_prefs(data_route, uuid, encounters, demographics)
+    _save_dq_prefs(data_route, uuid, program, encounters, demographics)
     return ""
 
 
@@ -1351,28 +1448,9 @@ def render_completeness_tab(urlparams, run_clicks, start_date, end_date, distric
 
     where = _selection_where(level, location, user_districts, districts, facilities, program, start_date, end_date)
 
-    demo_flag_cols = [f"demo_{i}" for i in range(len(mandatory_demographics))]
-    enc_flag_cols = [f"enc_{i}" for i in range(len(mandatory_encounters))]
-
-    select_parts = [
-        f"{PERSON_ID_} AS person_id",
-        f"MAX({FACILITY_}) AS facility",
-        f"MAX({IDENTIFIER_}) AS identifier",
-        f"MAX({FIRST_NAME_}) AS given_name",
-        f"MAX({LAST_NAME_}) AS family_name",
-    ]
-    for col, flag in zip(mandatory_demographics, demo_flag_cols):
-        select_parts.append(f"MAX(CASE WHEN {_presence_expr(col)} THEN 1 ELSE 0 END) AS {flag}")
-    for enc, flag in zip(mandatory_encounters, enc_flag_cols):
-        safe_enc = str(enc).replace("'", "''")
-        select_parts.append(f"MAX(CASE WHEN {ENCOUNTER_} = '{safe_enc}' THEN 1 ELSE 0 END) AS {flag}")
-
-    try:
-        df = DataStorage.query_duckdb(
-            f"SELECT {', '.join(select_parts)} FROM '{data_path}' WHERE {where} GROUP BY {PERSON_ID_}"
-        )
-    except Exception:
-        df = pd.DataFrame()
+    df, demo_flag_cols, enc_flag_cols = _evaluate_completeness(
+        data_path, where, mandatory_demographics, mandatory_encounters
+    )
 
     if df.empty:
         return (
@@ -1384,9 +1462,6 @@ def render_completeness_tab(urlparams, run_clicks, start_date, end_date, distric
         )
 
     demo_label_map = dict(DEMOGRAPHIC_FIELD_OPTIONS)
-    df["demographics_complete"] = df[demo_flag_cols].eq(1).all(axis=1) if demo_flag_cols else True
-    df["encounters_complete"] = df[enc_flag_cols].eq(1).all(axis=1) if enc_flag_cols else True
-    df["is_complete"] = df["demographics_complete"] & df["encounters_complete"]
 
     total_patients = len(df)
     complete_count = int(df["is_complete"].sum())
@@ -1436,7 +1511,7 @@ def render_completeness_tab(urlparams, run_clicks, start_date, end_date, distric
             "identifier": "Identifier", "facility": "Facility",
             "given_name": "Given Name", "family_name": "Family Name",
         })
-        display_cols = ["Identifier", "Facility", "Given Name", "Family Name", "Missing Demographics", "Missing Encounters"]
+        display_cols = ["Facility","Identifier", "Given Name", "Family Name", "Missing Demographics", "Missing Encounters"]
         incomplete_table = dash_table.DataTable(
             columns=[{"name": c, "id": c} for c in display_cols],
             data=incomplete_df[display_cols].to_dict("records"),

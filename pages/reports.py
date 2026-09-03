@@ -9,7 +9,6 @@ import os
 import json
 from dash.exceptions import PreventUpdate
 from helpers.reports_class import ReportTableBuilder
-from pages.home import _resolve_user_scope, _load_user_registry, _load_user_properties
 # from mnid.views.renderer import prepare_mnid_dataframe
 import warnings
 warnings.filterwarnings("ignore")
@@ -35,9 +34,133 @@ from data_storage import DataStorage
 
 from config import (DATE_, FACILITY_, AGE_GROUP_, GENDER_, PROGRAM_,PERSON_ID_,ENCOUNTER_ID_,
                     NEW_REVISIT_, HOME_DISTRICT_, TA_, VILLAGE_, CONCEPT_NAME_,VALUE_DATETIME_,
-                    FACILITY_CODE_, DATA_PATH_, actual_keys_in_data)
+                    DISTRICT_,
+                    FACILITY_CODE_, DATA_PATH_, actual_keys_in_data,DEMO_LOCATION, DEMO_UUID,)
 from helpers.navigation_callbacks import DEMO_UUID
 from dash_iconify import DashIconify
+
+path = os.getcwd()
+def _load_user_registry(route) -> pd.DataFrame:
+    user_data_path = os.path.join(path, f'data/{route}','single_tables', 'users_data.csv')
+
+    if os.path.exists(user_data_path):
+        user_data = pd.read_csv(user_data_path)
+    else:
+        user_data = pd.DataFrame(columns=['user_id','uuid', 'role','user_level','district','facility_name','facility_code'])
+    demo_row = {
+        'user_id':1000000,
+        'uuid': DEMO_UUID,
+        'role': 'reports_admin',
+        'user_level': 'national',
+        'district': ["Salima"],
+        'facility_name': None,
+        'facility_code': DEMO_LOCATION,
+        'assigned_facility':'Biwi Health Centre'
+    }
+
+    user_data = pd.concat([user_data, pd.DataFrame([demo_row])], ignore_index=True)
+    for column in ['uuid', 'role', 'user_level', 'district', 'facility_code', 'facility_name']:
+        if column not in user_data.columns:
+            user_data[column] = pd.NA
+
+    def parse_list(val):
+        if pd.isna(val):
+            return None
+        if isinstance(val, str) and ',' in val:
+            return [x.strip() for x in val.split(',')]
+        return val
+
+    user_data['district'] = user_data['district'].apply(parse_list)
+    user_data['facility_name'] = user_data['facility_name'].apply(parse_list)
+
+    return user_data
+
+def _scope_where_parts(effective_level, location, districts, user_districts, facilities, age, programs=None, is_network=False):
+    """Return SQL WHERE clause parts for the given scope and level.
+
+    is_network=True omits the per-facility filter so the network query covers
+    the full district/national context for trend comparison.
+    """
+    parts = []
+    if effective_level == 'facility':
+        if not is_network and location:
+            parts.append(f"{FACILITY_CODE_} = '{location}'")
+    elif effective_level == 'district':
+        active_dists = districts or user_districts
+        if active_dists:
+            quoted_dists = ", ".join([f"'{d}'" for d in active_dists])
+            parts.append(f"{DISTRICT_} IN ({quoted_dists})")
+        if not is_network and facilities:
+            quoted_facilities = ", ".join([f"'{f}'" for f in facilities])
+            parts.append(f"{FACILITY_} IN ({quoted_facilities})")
+    elif effective_level == 'national':
+        if districts:
+            quoted_dists = ", ".join([f"'{d}'" for d in districts])
+            parts.append(f"{DISTRICT_} IN ({quoted_dists})")
+        if not is_network and facilities:
+            quoted_facilities = ", ".join([f"'{f}'" for f in facilities])
+            parts.append(f"{FACILITY_} IN ({quoted_facilities})")
+    if age:
+        parts.append(f"{AGE_GROUP_} = '{age}'")
+    if programs:
+        quoted_programs = ", ".join([f"'{p}'" for p in programs])
+        parts.append(f"{PROGRAM_} IN ({quoted_programs})")
+    return parts
+
+def _load_user_properties(route) -> list:
+    props_path = os.path.join(os.getcwd(), f'data/{route}', 'dcc_dropdown_json', 'user_properties.json')
+    try:
+        with open(props_path) as f:
+            return json.load(f).get('users', [])
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        return []
+
+def _normalize_level(value: str | None) -> str:
+    value = str(value or '').strip().lower()
+    if value in {'national', 'district', 'facility'}:
+        return value
+    return 'facility'
+
+
+def _resolve_user_scope(urlparams, user_data: pd.DataFrame):
+    requested_uuid = urlparams.get('uuid', [None])[0] if urlparams else None
+    data_route = urlparams.get('route', ["default"])[0] if urlparams else None
+
+    # Check user_properties.json first (GUI-configured overrides)
+    for entry in _load_user_properties(data_route):
+        p = entry.get('properties', {})
+        if p.get('uuid') == requested_uuid:
+            level     = _normalize_level(p.get('user_level'))
+            districts = p.get('district')
+            if isinstance(districts, str):
+                districts = [districts] if districts else []
+            facilities = p.get('facility_name')
+            if isinstance(facilities, str):
+                facilities = [facilities] if facilities else []
+            scope = {
+                'level':      level,
+                'districts':  districts  or [],
+                'facilities': facilities or [],
+                'facility_code': p.get('facility_code'),
+            }
+            # Still return a dataframe row so callers that use row.get(...) don't break
+            user_info = user_data[user_data['uuid'] == requested_uuid]
+            row = user_info.iloc[0] if not user_info.empty else None
+            return row, scope
+
+    # Fall back to users_data dataframe
+    user_info = user_data[user_data['uuid'] == requested_uuid]
+    if user_info.empty:
+        return None, {}
+    row   = user_info.iloc[0]
+    level = _normalize_level(row.get('user_level'))
+    scope = {
+        'level':      level,
+        'districts':  row.get('district'),
+        'facilities': row.get('facility_name'),
+        'facility_code': row.get('facility_code'),
+    }
+    return row, scope
 
 def nav_icon(icon_name):
     return DashIconify(icon=icon_name, className="nav-icon")
@@ -482,16 +605,8 @@ def update_month_options(period_type):
 
 def load_user_facilities(urlparams):
     data_route = urlparams.get('route', ["default"])[0] if urlparams else None
-    # DISABLED: _load_user_registry/_resolve_user_scope come from pages.home
-    # -- importing across page modules makes Dash's page-loader execute
-    # home.py's whole file (every @callback in it) a second time, crashing
-    # the app at startup with "Duplicate callback outputs". The import at
-    # the top of this file stays (the report-generation callback below still
-    # has a real auth check that needs it) -- only this lower-stakes usage
-    # is disabled, falling back to the "no scoped facilities" branch below.
-    # user_data = _load_user_registry(data_route)
-    # user_row, scope = _resolve_user_scope(urlparams, user_data)
-    user_row, scope = {}, {'facilities': None, 'level': 'facility'}
+    user_data = _load_user_registry(data_route)
+    user_row, scope = _resolve_user_scope(urlparams, user_data)
     user_facility = user_row.get('facility_name', 'Unknown Facility')
 
     if scope['facilities'] and len(scope['facilities']) > 1:
@@ -555,12 +670,7 @@ def load_report_options(program=None, user_data=None):
 def update_report_dropdown(urlparams, program):
     data_route = urlparams.get('route', ["default"])[0] if urlparams else None
     user_id = urlparams.get('uuid', ["default"])[0] if urlparams else None
-    # DISABLED: _load_user_properties comes from pages.home -- see the note
-    # in load_user_facilities above. Falls back to no GUI-configured user
-    # overrides (user_data below stays None, same as today for any uuid with
-    # no matching entry in user_properties.json anyway).
-    # user_properties = _load_user_properties(data_route)
-    user_properties = []
+    user_properties = _load_user_properties(data_route)
     user_data = next(
                     (
                         r for r in user_properties
