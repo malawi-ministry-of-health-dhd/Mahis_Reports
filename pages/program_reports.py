@@ -4,11 +4,12 @@ import pandas as pd
 import plotly.express as px
 import os
 import json
+import io
 import numpy as np
 from dash.exceptions import PreventUpdate
 import os
 import traceback
-from helpers.helpers import build_single_chart
+from helpers.helpers import build_single_chart, create_pivot_table_from_config, create_crosstab_from_config
 from datetime import datetime, timedelta
 from data_storage import DataStorage
 import warnings
@@ -107,7 +108,7 @@ report_config_panel = html.Div(
                                         "width": "100%",
                                         "border": "1px solid #ced4da",
                                         "borderRadius": "10px",
-                                        "padding": "8px"
+                                        "padding": "2px"
                                     }
                                 ),
                             ]
@@ -169,6 +170,8 @@ report_config_panel = html.Div(
                                     "XLSX",
                                     id="btn-excel",
                                     n_clicks=0,
+                                    disabled=True,
+                                    title="Available for Pivot Table and Cross Tab reports",
                                     className="btn-download-excel"
                                 ),
                                 html.Button(
@@ -199,18 +202,35 @@ report_config_panel = html.Div(
                 className="reports-output-container"
             )
         ),
+        dcc.Store(id="prog-report-export-store"),
+        dcc.Download(id="download-prog-report"),
     ],
     style={"marginTop": "0px"}
 )
 
 def programs_report(filtered_query,data_route, programs_report_list, user_role):
-    """Render a single program report chart from a SQL WHERE-clause string."""
+    """Render a single program report chart from a SQL WHERE-clause string.
+
+    Returns (component, export_df) -- export_df is the underlying DataFrame
+    for PivotTable/CrossTab reports (the only types the XLSX button supports
+    downloading for now), otherwise None.
+    """
     if not programs_report_list:
-        return html.Div('')
+        return html.Div(''), None
     json_data = programs_report_list[0]
+    chart_type = json_data.get("type")
+    filters = json_data.get("filters", {})
+
+    if chart_type == "PivotTable":
+        table, data = create_pivot_table_from_config(filtered_query, data_route, filters)
+        return html.Div(table), data
+    if chart_type == "CrossTab":
+        table, data = create_crosstab_from_config(filtered_query, data_route, filters)
+        return html.Div(table), data
+
     return html.Div(
-        build_single_chart(filtered_query, filtered_query, 10,data_route, json_data, user_role, style="")
-    )
+        build_single_chart(filtered_query, filtered_query, 10, data_route, json_data, user_role, style="")
+    ), None
 
 
 layout = html.Div(
@@ -248,7 +268,9 @@ def update_filters(selected_program):
     [Output('program-reports-container', 'children'),
      Output('prog-hf-filter', 'options'),
      Output("program-selector", "options"),
-     Output("btn-generate-report", "n_clicks")],
+     Output("btn-generate-report", "n_clicks"),
+     Output("prog-report-export-store", "data"),
+     Output("btn-excel", "disabled")],
     [Input("btn-generate-report", "n_clicks"),
      Input('url-params-store', 'data'),
      Input("report-selector", "value"),
@@ -293,7 +315,7 @@ def generate_chart(n_clicks, urlparams, selected_report, pathname, report_name, 
 
     user_info = user_data[user_data['uuid'] == urlparams.get('uuid', [None])[0]]
     if user_info.empty:
-        return html.Div("Unauthorized User. Please contact system administrator."), no_update,no_update,0
+        return html.Div("Unauthorized User. Please contact system administrator."), no_update, no_update, 0, None, True
     user_role = user_info['role'].to_list()
     if user_role:
         role = user_role[0]
@@ -305,7 +327,7 @@ def generate_chart(n_clicks, urlparams, selected_report, pathname, report_name, 
         end_dt   = pd.to_datetime(end_date).replace(hour=23, minute=59, second=59)
 
         if not location:
-            return html.Div("Missing Parameters"), no_update, no_update, 0
+            return html.Div("Missing Parameters"), no_update, no_update, 0, None, True
 
         base_where = (
             f"{DATE_} BETWEEN '{start_dt}'::TIMESTAMP AND '{end_dt}'::TIMESTAMP"
@@ -340,22 +362,27 @@ def generate_chart(n_clicks, urlparams, selected_report, pathname, report_name, 
         if not report_name:
             return (
                 html.Div("Please select a report name and click Generate."),
-                hf_options, prog_options, 0,
+                hf_options, prog_options, 0, None, True,
             )
 
         ctx = callback_context
         if not ctx.triggered or ctx.triggered_id != "btn-generate-report":
-            return no_update, no_update, prog_options, 0
+            return no_update, no_update, prog_options, 0, no_update, no_update
 
         # ── Load report config and render ─────────────────────────────────────
         with open(path_program_reports) as x:
             config = json.load(x)
         report_cfg = [r for r in config.get("reports", []) if r.get("report_name") == report_name]
-        return programs_report(filtered_query,DATA_PATH_, report_cfg, role), hf_options, prog_options, 0
+        content, export_df = programs_report(filtered_query, DATA_PATH_, report_cfg, role)
+        export_payload = (
+            {"report_name": report_name, "data": export_df.to_json(orient="split", date_format="iso")}
+            if export_df is not None else None
+        )
+        return content, hf_options, prog_options, 0, export_payload, export_df is None
 
     except Exception as e:
         traceback.print_exc()
-        return html.Div(f"Error: {str(e)}"), [], [], 0
+        return html.Div(f"Error: {str(e)}"), [], [], 0, None, True
     
 @callback(
     [Output('prog-date-range-picker', 'start_date'),
@@ -367,3 +394,24 @@ def update_date_range(n):
     start = today.replace(hour=0, minute=0, second=0, microsecond=0)
     end = today.replace(hour=23, minute=59, second=59, microsecond=0)
     return start, end
+
+
+@callback(
+    Output("download-prog-report", "data"),
+    Input("btn-excel", "n_clicks"),
+    State("prog-report-export-store", "data"),
+    prevent_initial_call=True,
+)
+def download_excel(n_clicks, export_payload):
+    if not n_clicks or not export_payload:
+        raise PreventUpdate
+
+    df = pd.read_json(io.StringIO(export_payload["data"]), orient="split")
+    report_name = export_payload.get("report_name") or "report"
+    safe_name = "".join(c if c.isalnum() or c in " _-" else "_" for c in report_name).strip() or "report"
+
+    xlsx_buffer = io.BytesIO()
+    with pd.ExcelWriter(xlsx_buffer, engine="openpyxl") as writer:
+        df.to_excel(writer, sheet_name=safe_name[:31], index=False)
+    xlsx_buffer.seek(0)
+    return dcc.send_bytes(xlsx_buffer.getvalue(), filename=f"{safe_name}.xlsx")
