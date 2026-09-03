@@ -840,13 +840,17 @@ def create_linelist_from_config(query_fiter,data_path, filters,user_role=None, a
     if message:
         message = message + str(authorized_user)
 
-    # Resolve whether this user should have name columns masked
+    # Resolve whether this user should have name columns masked.
+    # "Any" means unrestricted -- every item stays visible/unmasked. A list
+    # of roles restricts name visibility to just those roles; anyone else
+    # gets the masked columns. A bare role string (legacy data, pre-dating
+    # the "Any"/list schema) still compares directly against that one role.
     mask_names = False
-    if authorized_user:
-        if isinstance(authorized_user, list):
+    if isinstance(authorized_user, list):
+        if authorized_user:
             mask_names = user_role not in authorized_user
-        elif isinstance(authorized_user, str):
-            mask_names = user_role != authorized_user
+    elif isinstance(authorized_user, str) and authorized_user.strip().lower() != "any":
+        mask_names = user_role != authorized_user
 
     group_kwargs = {}
     for i in range(1, 30 + 1):

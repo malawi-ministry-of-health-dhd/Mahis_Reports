@@ -2269,7 +2269,16 @@ def sync_picker_with_logic(period_type, n, current_active, urlparams):
         s, e = get_relative_date_range('Last 6 Months', current_date=anchor)
         return (s or default_start), (e or default_end), 'Last 6 Months'
 
-    if triggered_id == "dashboard-interval-update-today":
+    # dashboard-interval-update-today ticks specifically so relative periods
+    # ("Today", "Yesterday", "This Week", ...) stay correct as the real
+    # calendar date moves on -- falling through to the same recompute below
+    # (not PreventUpdate) is what actually re-anchors them; a long-lived
+    # server process or a browser tab left open across midnight would
+    # otherwise keep "Today" pinned to whatever date it first resolved to.
+    # A cleared period_type means the user is on a custom date range, though
+    # -- the interval must leave that alone rather than snapping it back to
+    # the default window every 10 minutes.
+    if triggered_id == "dashboard-interval-update-today" and not period_type:
         raise PreventUpdate
     if triggered_id == "active-button-store":
         raise PreventUpdate
