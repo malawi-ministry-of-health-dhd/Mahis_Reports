@@ -519,6 +519,20 @@ path = os.getcwd()
 # BUILD CHARTS
 PREMIUM_DASHBOARD_REPORTS = {"Maternal and Child Health"}
 
+_DASHBOARD_TAB_STYLE = {
+    "padding": "8px 8px",
+    "border": "1px solid #e9ecef",
+    "backgroundColor": "#f8f9fa",
+    "color": "#495057",
+}
+_DASHBOARD_TAB_SELECTED_STYLE = {
+    "padding": "8px 8px",
+    "border": "1px solid #006401",
+    "backgroundColor": "#ffffff",
+    "color": "#006401",
+    "fontWeight": 500,
+}
+
 def _scope_where_parts(effective_level, location, districts, user_districts, facilities, age, programs=None, is_network=False):
     """Return SQL WHERE clause parts for the given scope and level.
 
@@ -702,17 +716,49 @@ def build_charts_from_json(filtered_query, filtered_with_range_query, delta_days
         if config.get("report_name") in PREMIUM_DASHBOARD_REPORTS:
             return build_premium_dashboard(filtered_query, filtered_with_range_query, delta_days, config, filter_summary=filter_summary)
 
-        # Build metrics from counts section
-        metrics = build_metrics_section(filtered_query,filtered_with_range_query, delta_days, 
-                                        data_path, config["visualization_types"]["counts"], url_object,
-                                        start_date=start_date, end_date=end_date)
-        charts = build_charts_section(filtered_query, filtered_with_range_query, delta_days, data_path, config["visualization_types"]["charts"]["sections"])
+        def render_visualization_types(viz_types):
+            """Build the metrics grid + chart sections for one visualization_types block."""
+            metrics = build_metrics_section(filtered_query, filtered_with_range_query, delta_days,
+                                            data_path, viz_types.get("counts", []), url_object,
+                                            start_date=start_date, end_date=end_date)
+            charts = build_charts_section(filtered_query, filtered_with_range_query, delta_days,
+                                          data_path, viz_types.get("charts", {}).get("sections", []))
+            return html.Div([
+                html.Div(style={"display": "grid", "gridTemplateColumns": f"repeat({count_items_per_row}, 1fr)",
+                                "gap": "15px", "marginBottom": "30px","marginTop": "10px", "overflowX": "auto"}, children=metrics),
+                charts
+            ])
 
-        return html.Div([
-            html.Div(style={"display": "grid","gridTemplateColumns": f"repeat({count_items_per_row}, 1fr)",
-                            "gap": "15px", "marginBottom": "30px","overflowX": "auto"}, children=metrics),
-            charts
-        ])
+        # visualization_types (single page) takes priority over visualization_tabs when both are present.
+        # The editor always creates an empty {"counts": [], "charts": {"sections": []}} skeleton on every
+        # dashboard, so presence alone isn't enough — only prefer it when it actually has content.
+        visualization_types = config.get("visualization_types")
+        has_viz_content = visualization_types and (
+            visualization_types.get("counts") or visualization_types.get("charts", {}).get("sections")
+        )
+        if has_viz_content:
+            return render_visualization_types(visualization_types)
+
+        visualization_tabs = config.get("visualization_tabs")
+        if visualization_tabs:
+            tabs = []
+            for idx, tab_config in enumerate(visualization_tabs):
+                if tab_config.get("display") == "False":
+                    continue
+                tab_id = tab_config.get("tab_id") or f"tab_{idx}"
+                tab_name = tab_config.get("tab_name") or f"Tab {idx + 1}"
+                tabs.append(dcc.Tab(
+                    label=tab_name, value=tab_id,
+                    style=_DASHBOARD_TAB_STYLE, selected_style=_DASHBOARD_TAB_SELECTED_STYLE,
+                    children=render_visualization_types(tab_config.get("visualization_types", {})),
+                ))
+            if not tabs:
+                return html.Div("No dashboard tabs are set to display.", style={"color": "#94A3B8"})
+            active_tab = initial_tab if initial_tab in [t.value for t in tabs] else tabs[0].value
+            return dcc.Tabs(value=active_tab, children=tabs)
+
+        return html.Div("No visualization_types or visualization_tabs configured for this dashboard.",
+                         style={"color": "red"})
     except Exception as e:
         import traceback
         traceback.print_exc()

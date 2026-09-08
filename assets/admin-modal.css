@@ -508,6 +508,43 @@ body.modal-open {
     overflow: hidden;
 }
 
+/* mnid.css forces `'Geist', ... !important` on every element via a `*` selector.
+   Ace positions the caret/columns assuming a fixed monospace character width, so a
+   proportional font makes the caret drift from the real edit position. `.ace_editor *`
+   outranks a bare `*` in specificity, so this wins despite both being !important. */
+.ace_editor, .ace_editor * {
+    font-family: 'Courier New', Consolas, Monaco, monospace !important;
+}
+
+.icon-toolbar-btn {
+    background: transparent;
+    border: none;
+    padding: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+}
+
+.icon-toolbar-btn .nav-icon {
+    color: #6c757d;
+}
+
+.suggestion-chip {
+    background: #f1f3f5;
+    color: #495057;
+    border: 1px solid #e2e6ea;
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.suggestion-chip:hover {
+    background: #e9ecef;
+}
+
 /* .modal-content {
     animation: fadeIn 0.3s ease-out;
 } */

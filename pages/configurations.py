@@ -15,8 +15,8 @@ warnings.filterwarnings("ignore")
 from helpers.modal_functions import (validate_excel_file, load_reports_data, save_reports_data,
                         check_existing_report, get_next_report_id, update_or_create_report,load_excel_file,
                         save_excel_file, update_report_metadata, archive_report,
-                        create_count_item,create_chart_item, create_section,create_chart_fields, create_mnid_indicator_item, validate_dashboard_json,
-                        upload_dashboard_json,validate_prog_reports_json,upload_prog_reports_json,CHART_TEMPLATES,render_filter_rows,
+                        create_mnid_indicator_item, validate_dashboard_json,
+                        upload_dashboard_json,validate_prog_reports_json,upload_prog_reports_json,
                         build_reports_table, create_editable_table, create_preview_table,
                         generate_dashboard_items_list, create_edit_modal,
                         _build_ds_list, _build_users_table, create_html_report_modal,
@@ -27,7 +27,10 @@ from helpers.config_helper import (load_dashboards_from_file, save_dashboards_to
                         _ensure_dashboard_for_edit, _dashboard_selector_options,
                         _load_datasources, _save_datasources, _list_ssh_keys,
                         _load_user_csv, _load_user_props, _save_user_props,_ssh_dir,
-                        _load_facilities, _extract_identifiers, dashboards_json_path)
+                        _load_facilities, _extract_identifiers, dashboards_json_path,
+                        DEFAULT_METRIC_PAYLOAD, discover_metric_keys,
+                        DEFAULT_CHART_PAYLOAD, discover_chart_keys,
+                        _get_active_viz_types, _dashboard_tab_options)
 from config import actual_keys_in_data
 from helpers.navigation_callbacks import DEMO_UUID
 
@@ -1246,10 +1249,14 @@ layout = html.Div(
 @callback(
     Output("dashboard-items-container", "children"),
     [Input("dashboard-selector", "value"),
-     Input("refresh-interval", "n_intervals")
-     ]
+     Input("refresh-interval", "n_intervals"),
+     Input("metric-editor-save-btn", "n_clicks"),
+     Input("metric-editor-delete-btn", "n_clicks"),
+     Input("dashboard-tab-selector", "value"),
+     ],
+    State("dashboard-type-selector", "value"),
 )
-def update_dashboard_items(selected_dashboard, refresh):
+def update_dashboard_items(selected_dashboard, refresh, metric_saved, metric_deleted, tab_id, dashboard_type):
     """Update the list of dashboard items when selection changes"""
     def load_dashboards_from_file():
         try:
@@ -1263,10 +1270,120 @@ def update_dashboard_items(selected_dashboard, refresh):
         dashboard = {"counts": [], "sections": [], "report_name": "", "report_id": "", "date_created": ""}
     else:
         dashboard = dashboards_data[selected_dashboard]
+    active_tab = tab_id if dashboard_type == "tabs" else None
     return [
         html.H4("Dashboard Items", style={"font-weight": "bold"}),
-        generate_dashboard_items_list(dashboard)
+        generate_dashboard_items_list(dashboard, active_tab)
     ]
+
+# Keep the "Select Dashboard" options in sync with the file — it was previously built once
+# when the app started, so a dashboard added since then wouldn't appear until a restart.
+@callback(
+    Output("dashboard-selector", "options", allow_duplicate=True),
+    Input("refresh-interval", "n_intervals"),
+    Input("metric-editor-save-btn", "n_clicks"),
+    Input("metric-editor-delete-btn", "n_clicks"),
+    prevent_initial_call='initial_duplicate',
+)
+def refresh_dashboard_selector_options(_n_intervals, _metric_saved, _metric_deleted):
+    return _dashboard_selector_options(load_dashboards_from_file())
+
+
+_TABS_SECTION_VISIBLE = {"display": "block", "flexShrink": "0", "padding": "10px 16px",
+                          "borderBottom": "1px solid #e9ecef", "background": "#fafafa"}
+_TABS_SECTION_HIDDEN = {"display": "none"}
+
+
+# ── Tab Outlook: manage the list of tabs ──────────────────────────────────────
+@callback(
+    Output("dashboard-tab-selector", "options"),
+    Output("dashboard-tab-selector", "value"),
+    Output("tabs-management-section", "style"),
+    Input("dashboard-type-selector", "value"),
+    Input("dashboard-selector", "value"),
+    Input("add-tab-btn", "n_clicks"),
+    State("report-id-input", "value"),
+    State("report-name-input", "value"),
+    State("date-created-input", "value"),
+    prevent_initial_call=True,
+)
+def manage_dashboard_tabs(dashboard_type, selector_value, add_tab_clicks, report_id, report_name, date_created):
+    triggered_id = ctx.triggered_id
+    style = _TABS_SECTION_VISIBLE if dashboard_type == "tabs" else _TABS_SECTION_HIDDEN
+
+    if triggered_id == "add-tab-btn":
+        if not add_tab_clicks:
+            raise PreventUpdate
+        dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
+            selector_value, report_id, report_name, date_created
+        )
+        tabs = dashboard.setdefault("visualization_tabs", [])
+        new_tab_id = f"tab_{uuid.uuid4().hex[:8]}"
+        tabs.append({
+            "tab_id": new_tab_id,
+            "display": "True",
+            "tab_name": f"Tab {len(tabs) + 1}",
+            "visualization_types": {"counts": [], "charts": {"sections": []}},
+        })
+        dashboards_data[dashboard_index] = dashboard
+        save_dashboards_to_file(dashboards_data)
+        return _dashboard_tab_options(dashboard), new_tab_id, style
+
+    # dashboard-type-selector or dashboard-selector changed — just refresh, no writes
+    dashboards_data = load_dashboards_from_file()
+    dashboard_index = _find_dashboard_index(dashboards_data, selector_value, report_id)
+    dashboard = dashboards_data[dashboard_index] if dashboard_index is not None else {}
+    options = _dashboard_tab_options(dashboard)
+    value = options[0]["value"] if options else None
+    return options, value, style
+
+
+@callback(
+    Output("tab-name-input", "value"),
+    Input("dashboard-tab-selector", "value"),
+    State("dashboard-tab-selector", "options"),
+    prevent_initial_call=True,
+)
+def load_tab_name_input(tab_id, options):
+    if not tab_id or not options:
+        return ""
+    match = next((o for o in options if o["value"] == tab_id), None)
+    return match["label"] if match else ""
+
+
+@callback(
+    Output("dashboard-tab-selector", "options", allow_duplicate=True),
+    Input("rename-tab-btn", "n_clicks"),
+    State("dashboard-tab-selector", "value"),
+    State("tab-name-input", "value"),
+    State("dashboard-selector", "value"),
+    State("report-id-input", "value"),
+    State("report-name-input", "value"),
+    State("date-created-input", "value"),
+    prevent_initial_call=True,
+)
+def rename_dashboard_tab(n_clicks, tab_id, new_name, selector_value, report_id, report_name, date_created):
+    if not n_clicks or not tab_id:
+        raise PreventUpdate
+    new_name = (new_name or "").strip()
+    if not new_name:
+        raise PreventUpdate
+
+    dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
+        selector_value, report_id, report_name, date_created
+    )
+    tabs = dashboard.get("visualization_tabs", [])
+    for tab in tabs:
+        if tab.get("tab_id") == tab_id:
+            tab["tab_name"] = new_name
+            break
+    else:
+        raise PreventUpdate
+
+    dashboards_data[dashboard_index] = dashboard
+    save_dashboards_to_file(dashboards_data)
+    return _dashboard_tab_options(dashboard)
+
 
 @callback(
     Output("current-dashboard-index", "data", allow_duplicate=True),
@@ -2061,8 +2178,6 @@ def toggle_preview_popup(preview_clicks, close_clicks):
      Output("mnid-categories-selector", "value", allow_duplicate=True),
      Output("mnid-indicators-container", "children", allow_duplicate=True),
      Output("mnid-indicators-input", "value", allow_duplicate=True),
-     Output("counts-container", "children", allow_duplicate=True),
-     Output("sections-container", "children", allow_duplicate=True),
      Output("count-items-per-row-input", "value", allow_duplicate=True)],
     [Input("add-dashboard", "n_clicks"),
      Input("cancel-btn", "n_clicks"),
@@ -2109,18 +2224,16 @@ def toggle_modal(open_clicks, cancel_clicks, save_clicks, n_intervals):
             [],
             [],
             "",
-            [],  # Empty counts
-            [],  # Empty sections
             5    # Default counts per row
         )
 
     elif trigger == "cancel-btn":
         # Just close the modal
-        return {"display": "none"}, {"display": "none"}, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+        return {"display": "none"}, {"display": "none"}, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
     elif trigger == "save-btn":
         # Just close the modal
-        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
     return dash.no_update
 
@@ -2133,24 +2246,12 @@ def toggle_modal(open_clicks, cancel_clicks, save_clicks, n_intervals):
      Output("mnid-categories-selector", "value", allow_duplicate=True),
      Output("mnid-indicators-container", "children", allow_duplicate=True),
      Output("mnid-indicators-input", "value", allow_duplicate=True),
-     Output("counts-container", "children", allow_duplicate=True),
-     Output("sections-container", "children", allow_duplicate=True),
      Output("count-items-per-row-input", "value", allow_duplicate=True)],
-    [Input("dashboard-selector", "value"),
-     Input({"type": "count-edit", "index": dash.ALL}, "n_clicks"),
-     Input({"type": "section-edit", "index": dash.ALL}, "n_clicks"),
-     Input({"type": "chart-edit", "section": dash.ALL, "chart": dash.ALL}, "n_clicks"),
-     ],
+    Input("dashboard-selector", "value"),
     prevent_initial_call=True
 )
-def load_dashboard(selector_value, count_clicks, section_clicks, chart_clicks):
-    """Load dashboard data when selector changes, or show a single edit form when an edit button is clicked."""
-    if not ctx.triggered:
-        raise PreventUpdate
-
-    triggered_id = ctx.triggered_id
-
-
+def load_dashboard(selector_value):
+    """Load dashboard data into the Setup form when the selector changes."""
     def load_dashboards_from_file():
         try:
             with open(dashboards_json_path, 'r') as f:
@@ -2159,289 +2260,660 @@ def load_dashboard(selector_value, count_clicks, section_clicks, chart_clicks):
         except (FileNotFoundError, json.JSONDecodeError):
             return []
 
-
-    # ── 1. Selector changed ───────────────────────────────────────────────────
-    if triggered_id == "dashboard-selector":
-        if selector_value == "new":
-            return (
-                f"report_{uuid.uuid4().hex[:8]}",
-                "New Dashboard",
-                datetime.now().strftime("%Y-%m-%d"),
-                "standard",
-                [],
-                [],
-                "",
-                [],
-                [],
-                5,
-            )
-        dashboards_data = load_dashboards_from_file()
-        if isinstance(selector_value, int) and 0 <= selector_value < len(dashboards_data):
-            dashboard = dashboards_data[selector_value]
-            priority_indicators = dashboard.get("priority_indicators", [])
-            return (
-                dashboard.get("report_id", ""),
-                dashboard.get("report_name", ""),
-                dashboard.get("date_created", ""),
-                dashboard.get("dashboard_type", "standard"),
-                dashboard.get("mnid_categories", []),
-                [create_mnid_indicator_item(ind, i) for i, ind in enumerate(priority_indicators)],
-                json.dumps(priority_indicators, indent=2) if priority_indicators else "",
-                [],  # clear containers on dashboard switch
-                [],
-                dashboard.get("count_items_per_row", 5),
-            )
-        return (dash.no_update, dash.no_update, dash.no_update, dash.no_update,
-                dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update)
-
-    # ── 2. An edit button was clicked ────────────────────────────────────────
+    if selector_value == "new":
+        return (
+            f"report_{uuid.uuid4().hex[:8]}",
+            "New Dashboard",
+            datetime.now().strftime("%Y-%m-%d"),
+            "standard",
+            [],
+            [],
+            "",
+            5,
+        )
     dashboards_data = load_dashboards_from_file()
+    if isinstance(selector_value, int) and 0 <= selector_value < len(dashboards_data):
+        dashboard = dashboards_data[selector_value]
+        priority_indicators = dashboard.get("priority_indicators", [])
+        return (
+            dashboard.get("report_id", ""),
+            dashboard.get("report_name", ""),
+            dashboard.get("date_created", ""),
+            dashboard.get("dashboard_type", "standard"),
+            dashboard.get("mnid_categories", []),
+            [create_mnid_indicator_item(ind, i) for i, ind in enumerate(priority_indicators)],
+            json.dumps(priority_indicators, indent=2) if priority_indicators else "",
+            dashboard.get("count_items_per_row", 5),
+        )
+    return (dash.no_update,) * 8
 
-    if not (isinstance(selector_value, int) and 0 <= selector_value < len(dashboards_data)):
-        raise PreventUpdate
 
-    dashboard = dashboards_data[selector_value]
-    counts   = dashboard.get("visualization_types", {}).get("counts", [])
-    sections = dashboard.get("visualization_types", {}).get("charts", {}).get("sections", [])
-    meta = (
-        dashboard.get("report_id", ""),
-        dashboard.get("report_name", ""),
-        dashboard.get("date_created", ""),
-        dashboard.get("dashboard_type", "standard"),
-        dashboard.get("mnid_categories", []),
-        [create_mnid_indicator_item(ind, i) for i, ind in enumerate(dashboard.get("priority_indicators", []))],
-        json.dumps(dashboard.get("priority_indicators", []), indent=2) if dashboard.get("priority_indicators") else "",
-    )
+# ── Metric (counts) JSON editor ───────────────────────────────────────────────
+@callback(
+    Output("metric-json-editor-panel", "style"),
+    Output("metric-form-editor-panel", "style"),
+    Input("metric-editor-mode-toggle", "value"),
+)
+def toggle_metric_editor_mode(mode_value):
+    json_on = "json" in (mode_value or [])
+    json_style = {"flex": "1", "display": "flex", "flexDirection": "column",
+                  "gap": "10px", "minHeight": "0"} if json_on else {"display": "none"}
+    form_style = {"display": "none"} if json_on else {}
+    return json_style, form_style
 
-    # ── count-edit ────────────────────────────────────────────────────────────
+
+def _new_metric_payload():
+    """A fresh copy of the default metric payload with a real generated id."""
+    payload = dict(DEFAULT_METRIC_PAYLOAD)
+    payload["id"] = f"count_{uuid.uuid4().hex[:8]}"
+    return payload
+
+
+def _new_chart_payload():
+    """A fresh copy of the default chart payload with a real generated id."""
+    payload = dict(DEFAULT_CHART_PAYLOAD)
+    payload["id"] = f"chart_{uuid.uuid4().hex[:8]}"
+    payload["filters"] = dict(DEFAULT_CHART_PAYLOAD["filters"])
+    return payload
+
+
+def _new_section_wrapper(chart_item, section=None):
+    """The section-level object shown in the editor around a single chart item.
+    Reuses an existing section's metadata (and real section_id) when given one."""
+    section = section or {}
+    return {
+        "section_id": section.get("section_id") or f"section_{uuid.uuid4().hex[:8]}",
+        "section_name": section.get("section_name", ""),
+        "display": section.get("display", "True"),
+        "chart_items_per_row": section.get("chart_items_per_row", 2),
+        "items": [chart_item],
+    }
+
+
+def _ensure_section_id(dashboards_data, sections, section_index):
+    """Backfill a missing section_id on an existing section and persist it immediately,
+    so Save can reliably match this section by id afterward."""
+    section = sections[section_index]
+    if not section.get("section_id"):
+        section["section_id"] = f"section_{uuid.uuid4().hex[:8]}"
+        save_dashboards_to_file(dashboards_data)
+    return section
+
+
+@callback(
+    Output("metric-json-editor", "value"),
+    Output("metric-editor-target", "data"),
+    Output("metric-editor-status", "children"),
+    Output("metric-json-editor", "readOnly"),
+    Input({"type": "count-edit", "index": ALL}, "n_clicks"),
+    Input("add-count-btn", "n_clicks"),
+    State("dashboard-selector", "value"),
+    State("report-id-input", "value"),
+    State("dashboard-type-selector", "value"),
+    State("dashboard-tab-selector", "value"),
+    prevent_initial_call=True,
+)
+def open_metric_editor(count_edit_clicks, add_clicks, selector_value, report_id, dashboard_type, active_tab):
+    triggered_id = ctx.triggered_id
+    tab_id = active_tab if dashboard_type == "tabs" else None
+
+    if triggered_id == "add-count-btn":
+        if not add_clicks:
+            raise PreventUpdate
+        return (json.dumps(_new_metric_payload(), indent=2),
+                {"kind": "metric", "mode": "new", "index": None, "tab_id": tab_id},
+                "Editing new metric (unsaved).",
+                False)
+
     if isinstance(triggered_id, dict) and triggered_id.get("type") == "count-edit":
-        if not any(c for c in (count_clicks or []) if c and c > 0):
+        if not any(c for c in (count_edit_clicks or []) if c and c > 0):
             raise PreventUpdate
-        clicked_index = triggered_id["index"]
-        try:
-            count_form = create_count_item(counts[clicked_index], clicked_index)
-        except (IndexError, Exception):
-            count_form = []
-        return (*meta, count_form, dash.no_update, dash.no_update)
-
-    # ── section-edit ──────────────────────────────────────────────────────────
-    if isinstance(triggered_id, dict) and triggered_id.get("type") == "section-edit":
-        if not any(c for c in (section_clicks or []) if c and c > 0):
+        idx = triggered_id["index"]
+        dashboards_data = load_dashboards_from_file()
+        dashboard_index = _find_dashboard_index(dashboards_data, selector_value, report_id)
+        if dashboard_index is None:
             raise PreventUpdate
-        clicked_index = triggered_id["index"]
-        try:
-            section_form = create_section(sections[clicked_index], clicked_index)
-        except (IndexError, Exception):
-            section_form = []
-        return (*meta, dash.no_update, section_form, dash.no_update)
-
-    # ── chart-edit ────────────────────────────────────────────────────────────
-    if isinstance(triggered_id, dict) and triggered_id.get("type") == "chart-edit":
-        if not any(c for c in (chart_clicks or []) if c and c > 0):
+        counts = _get_active_viz_types(dashboards_data[dashboard_index], tab_id).get("counts", [])
+        if not (0 <= idx < len(counts)):
             raise PreventUpdate
-        section_idx = triggered_id["section"]
-        chart_idx   = triggered_id["chart"]
-        try:
-            section_form = create_section(sections[section_idx], section_idx, active_chart_index=chart_idx)
-        except (IndexError, Exception):
-            section_form = []
-        return (*meta, dash.no_update, section_form, dash.no_update)
+        return (json.dumps(counts[idx], indent=2),
+                {"kind": "metric", "mode": "edit", "index": idx, "tab_id": tab_id},
+                f"Editing metric: {counts[idx].get('name', '')}",
+                True)
 
     raise PreventUpdate
 
 
-# ── Close buttons for edit forms ─────────────────────────────────────────────
 @callback(
-    Output("counts-container", "children", allow_duplicate=True),
-    Input({"type": "close-count-form", "index": dash.ALL}, "n_clicks"),
+    Output("metric-json-editor", "value", allow_duplicate=True),
+    Output("metric-editor-target", "data", allow_duplicate=True),
+    Output("metric-editor-status", "children", allow_duplicate=True),
+    Output("metric-json-editor", "readOnly", allow_duplicate=True),
+    Input("add-section-btn", "n_clicks"),
+    Input({"type": "add-chart-btn", "index": ALL}, "n_clicks"),
+    Input({"type": "chart-edit", "section": ALL, "chart": ALL}, "n_clicks"),
+    State("dashboard-selector", "value"),
+    State("report-id-input", "value"),
+    State("dashboard-type-selector", "value"),
+    State("dashboard-tab-selector", "value"),
     prevent_initial_call=True,
 )
-def close_count_form(n_clicks):
-    if not any(c for c in (n_clicks or []) if c and c > 0):
-        raise PreventUpdate
-    return []
-
-
-@callback(
-    Output("sections-container", "children", allow_duplicate=True),
-    Input({"type": "close-section-form", "index": dash.ALL}, "n_clicks"),
-    prevent_initial_call=True,
-)
-def close_section_form(n_clicks):
-    if not any(c for c in (n_clicks or []) if c and c > 0):
-        raise PreventUpdate
-    return []
-
-
-# ── Count: add / save / delete ────────────────────────────────────────────────
-@callback(
-    Output("counts-container", "children", allow_duplicate=True),
-    [Input("add-count-btn", "n_clicks"),
-     Input({"type": "save-count",   "index": dash.ALL}, "n_clicks"),
-     Input({"type": "remove-count", "index": dash.ALL}, "n_clicks")],
-    [State("dashboard-selector", "value"),
-     State("report-id-input", "value"),
-     State("report-name-input", "value"),
-     State("date-created-input", "value"),
-     State({"type": "count-id",     "index": dash.ALL}, "value"),
-     State({"type": "count-name",   "index": dash.ALL}, "value"),
-     State({"type": "count-aggregations","index": dash.ALL}, "value"),
-     State({"type": "count-unique", "index": dash.ALL}, "value"),
-     State({"type": "count-level",          "index": dash.ALL}, "value"),
-     State({"type": "count-flag",           "index": dash.ALL}, "value"),
-     State({"type": "count-display-average","index": dash.ALL}, "value"),
-     State({"type": "count-href",           "index": dash.ALL}, "value"),
-     State({"type": "count-href-name",      "index": dash.ALL}, "value"),
-     State({"type": "count-var", "count": dash.ALL, "filter": dash.ALL}, "value"),
-     State({"type": "count-val", "count": dash.ALL, "filter": dash.ALL}, "value"),
-     State("counts-container", "children")],
-    prevent_initial_call=True
-)
-def manage_counts(add_clicks, save_clicks, remove_clicks,
-                  selector_value, report_id, report_name, date_created,
-                  count_ids, count_names, count_aggr, count_uniques,
-                  count_levels, count_flags, count_display_averages,
-                  count_hrefs, count_href_names,
-                  count_var_values, count_val_values,
-                  current_counts):
-    if not ctx.triggered:
-        raise PreventUpdate
-
+def open_chart_editor(add_section_clicks, add_chart_clicks, chart_edit_clicks, selector_value, report_id,
+                       dashboard_type, active_tab):
     triggered_id = ctx.triggered_id
-    # Dash returns a dict (not a list) when the container has exactly one child
-    if isinstance(current_counts, dict):
-        current_counts = [current_counts]
-    current_counts = current_counts or []
+    tab_id = active_tab if dashboard_type == "tabs" else None
 
-    # ── Add new blank count to the UI only (saved on "Save Count") ────────────
-    if triggered_id == "add-count-btn":
-        if add_clicks and add_clicks > 0:
-            new_count = create_count_item(index=len(current_counts))
-            return current_counts + [new_count]
-        raise PreventUpdate
-
-    # ── Save count: update the JSON file by count id ──────────────────────────
-    if isinstance(triggered_id, dict) and triggered_id.get("type") == "save-count":
-        if not any(c for c in (save_clicks or []) if c and c > 0):
+    if triggered_id == "add-section-btn":
+        if not add_section_clicks:
             raise PreventUpdate
-        ui_index = triggered_id["index"]
-        dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
-            selector_value, report_id, report_name, date_created
+        chart = _new_chart_payload()
+        wrapper = _new_section_wrapper(chart)
+        return (json.dumps(wrapper, indent=2),
+                {"kind": "chart", "mode": "new_section", "section_index": None, "chart_index": None, "tab_id": tab_id},
+                "Editing new chart in a new section (unsaved).",
+                False)
+
+    dashboards_data = load_dashboards_from_file()
+    dashboard_index = _find_dashboard_index(dashboards_data, selector_value, report_id)
+    if dashboard_index is None:
+        raise PreventUpdate
+    sections = _get_active_viz_types(dashboards_data[dashboard_index], tab_id).get("charts", {}).get("sections", [])
+
+    if isinstance(triggered_id, dict) and triggered_id.get("type") == "add-chart-btn":
+        if not any(c for c in (add_chart_clicks or []) if c and c > 0):
+            raise PreventUpdate
+        section_idx = triggered_id["index"]
+        if not (0 <= section_idx < len(sections)):
+            raise PreventUpdate
+        section = _ensure_section_id(dashboards_data, sections, section_idx)
+        chart = _new_chart_payload()
+        wrapper = _new_section_wrapper(chart, section)
+        return (json.dumps(wrapper, indent=2),
+                {"kind": "chart", "mode": "new_chart", "section_index": section_idx, "chart_index": None, "tab_id": tab_id},
+                f"Adding a new chart to '{section.get('section_name', 'section')}' (unsaved).",
+                False)
+
+    if isinstance(triggered_id, dict) and triggered_id.get("type") == "chart-edit":
+        if not any(c for c in (chart_edit_clicks or []) if c and c > 0):
+            raise PreventUpdate
+        section_idx = triggered_id["section"]
+        chart_idx = triggered_id["chart"]
+        if not (0 <= section_idx < len(sections)):
+            raise PreventUpdate
+        section = _ensure_section_id(dashboards_data, sections, section_idx)
+        items = section.get("items", [])
+        if not (0 <= chart_idx < len(items)):
+            raise PreventUpdate
+        wrapper = _new_section_wrapper(items[chart_idx], section)
+        return (json.dumps(wrapper, indent=2),
+                {"kind": "chart", "mode": "edit", "section_index": section_idx, "chart_index": chart_idx, "tab_id": tab_id},
+                f"Editing chart: {items[chart_idx].get('name', '')}",
+                True)
+
+    raise PreventUpdate
+
+
+@callback(
+    Output("metric-json-editor", "readOnly", allow_duplicate=True),
+    Input("metric-editor-edit-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+def enable_metric_editing(n_clicks):
+    if not n_clicks:
+        raise PreventUpdate
+    return False
+
+
+@callback(
+    Output("metric-json-editor", "value", allow_duplicate=True),
+    Output("metric-editor-status", "children", allow_duplicate=True),
+    Input("metric-editor-format-btn", "n_clicks"),
+    State("metric-json-editor", "value"),
+    prevent_initial_call=True,
+)
+def format_metric_json(n_clicks, current_value):
+    if not n_clicks:
+        raise PreventUpdate
+    try:
+        parsed = json.loads(current_value or "{}")
+    except (TypeError, json.JSONDecodeError) as e:
+        return dash.no_update, f"Cannot format — invalid JSON: {e}"
+    return json.dumps(parsed, indent=2), "Formatted."
+
+
+@callback(
+    Output("metric-json-editor", "value", allow_duplicate=True),
+    Output("metric-editor-target", "data", allow_duplicate=True),
+    Output("metric-editor-status", "children", allow_duplicate=True),
+    Output("metric-json-editor", "readOnly", allow_duplicate=True),
+    Input("metric-editor-reset-btn", "n_clicks"),
+    State("metric-editor-target", "data"),
+    prevent_initial_call=True,
+)
+def reset_metric_json(n_clicks, target):
+    if not n_clicks:
+        raise PreventUpdate
+    tab_id = target.get("tab_id") if target else None
+    if target and target.get("kind") == "chart":
+        wrapper = _new_section_wrapper(_new_chart_payload())
+        return (json.dumps(wrapper, indent=2),
+                {"kind": "chart", "mode": "new_section", "section_index": None, "chart_index": None, "tab_id": tab_id},
+                "Reset to default chart payload.",
+                False)
+    return (json.dumps(_new_metric_payload(), indent=2),
+            {"kind": "metric", "mode": "new", "index": None, "tab_id": tab_id},
+            "Reset to default payload.",
+            False)
+
+
+def _save_metric(editor_value, selector_value, report_id, report_name, date_created, tab_id=None):
+    try:
+        metric = json.loads(editor_value or "{}")
+    except (TypeError, json.JSONDecodeError) as e:
+        return dash.no_update, dash.no_update, f"Cannot save — invalid JSON: {e}", dash.no_update
+    if not isinstance(metric, dict):
+        return dash.no_update, dash.no_update, "Cannot save — metric must be a JSON object.", dash.no_update
+
+    name = (metric.get("name") or "").strip()
+    if not name:
+        return dash.no_update, dash.no_update, "Cannot save — 'name' is required.", dash.no_update
+
+    filters = metric.get("filters")
+    if not isinstance(filters, dict) or not filters:
+        return dash.no_update, dash.no_update, "Cannot save — 'filters' is required.", dash.no_update
+
+    if not filters.get("measure"):
+        return dash.no_update, dash.no_update, "Cannot save — 'filters.measure' is required.", dash.no_update
+
+    dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
+        selector_value, report_id, report_name, date_created
+    )
+    counts = _get_active_viz_types(dashboard, tab_id).get("counts", [])
+
+    original_id = metric.get("id")
+    if any(c.get("name") == name and c.get("id") != original_id for c in counts):
+        return dash.no_update, dash.no_update, f"Cannot save — a metric named '{name}' already exists in this dashboard.", dash.no_update
+
+    metric_id = original_id
+    if not metric_id or metric_id == DEFAULT_METRIC_PAYLOAD["id"]:
+        metric_id = f"count_{uuid.uuid4().hex[:8]}"
+        metric["id"] = metric_id
+
+    matched = False
+    for i, c in enumerate(counts):
+        if c.get("id") == metric_id:
+            counts[i] = metric
+            matched = True
+            break
+    if not matched:
+        counts.append(metric)
+
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    dashboard["date_updated"] = timestamp
+    dashboards_data[dashboard_index] = dashboard
+    save_dashboards_to_file(dashboards_data)
+
+    new_index = next(i for i, c in enumerate(counts) if c.get("id") == metric_id)
+    return (json.dumps(metric, indent=2),
+            {"kind": "metric", "mode": "edit", "index": new_index, "tab_id": tab_id},
+            f"Saved '{metric.get('name', '')}' at {timestamp}.",
+            True)
+
+
+def _save_chart(editor_value, selector_value, report_id, report_name, date_created, tab_id=None):
+    try:
+        payload = json.loads(editor_value or "{}")
+    except (TypeError, json.JSONDecodeError) as e:
+        return dash.no_update, dash.no_update, f"Cannot save — invalid JSON: {e}", dash.no_update
+    if not isinstance(payload, dict):
+        return dash.no_update, dash.no_update, "Cannot save — must be a JSON object.", dash.no_update
+
+    items = payload.get("items")
+    if not isinstance(items, list) or not items:
+        return dash.no_update, dash.no_update, "Cannot save — 'items' must contain at least one chart.", dash.no_update
+
+    for item in items:
+        if not isinstance(item, dict):
+            return dash.no_update, dash.no_update, "Cannot save — each item in 'items' must be a JSON object.", dash.no_update
+
+        chart_filters = item.get("filters")
+        if not isinstance(chart_filters, dict) or not chart_filters:
+            return dash.no_update, dash.no_update, "Cannot save — each chart 'filters' is required.", dash.no_update
+
+        # 'name' and 'filters.title' represent the same thing — keep them in sync,
+        # whichever one the user actually filled in (name wins if both differ).
+        name = (item.get("name") or "").strip()
+        title = (chart_filters.get("title") or "").strip()
+        if name and not title:
+            title = name
+        elif title and not name:
+            name = title
+        elif name and title and name != title:
+            title = name
+        item["name"] = name
+        chart_filters["title"] = title
+
+        if not name:
+            return dash.no_update, dash.no_update, "Cannot save — 'name' (or filters.title) is required.", dash.no_update
+        if not item.get("type"):
+            return dash.no_update, dash.no_update, "Cannot save — each chart 'type' is required.", dash.no_update
+        if not chart_filters.get("measure"):
+            return dash.no_update, dash.no_update, "Cannot save — each chart 'filters.measure' is required.", dash.no_update
+
+    dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
+        selector_value, report_id, report_name, date_created
+    )
+    sections = _get_active_viz_types(dashboard, tab_id).get("charts", {}).get("sections", [])
+
+    section_id = payload.get("section_id")
+    section_idx = next((i for i, s in enumerate(sections) if s.get("section_id") == section_id), None)
+    if section_idx is None:
+        sections.append({
+            "section_id": section_id or f"section_{uuid.uuid4().hex[:8]}",
+            "section_name": payload.get("section_name", ""),
+            "display": payload.get("display", "True"),
+            "chart_items_per_row": payload.get("chart_items_per_row", 2),
+            "items": [],
+        })
+        section_idx = len(sections) - 1
+    else:
+        sections[section_idx]["section_name"] = payload.get("section_name", sections[section_idx].get("section_name", ""))
+        sections[section_idx]["display"] = payload.get("display", sections[section_idx].get("display", "True"))
+        sections[section_idx]["chart_items_per_row"] = payload.get(
+            "chart_items_per_row", sections[section_idx].get("chart_items_per_row", 2)
         )
-        counts = dashboard.get("visualization_types", {}).get("counts", [])
-        count_id = count_ids[0] if count_ids else f"count_{uuid.uuid4().hex[:8]}"
 
-        # ── Build filter pairs from pattern-matched states ────────────────────
-        var_state_list = ctx.states_list[-3]  # count-var states
-        val_state_list = ctx.states_list[-2]  # count-val states
+    section = sections[section_idx]
+    section_items = section.setdefault("items", [])
 
-        # Group by filter index for this specific count (ui_index is the count's actual index)
-        pairs = {}
-        for s in var_state_list:
-            if s["id"]["count"] == ui_index:
-                pairs.setdefault(s["id"]["filter"], ["", ""])[0] = s["value"] or ""
-        for s in val_state_list:
-            if s["id"]["count"] == ui_index:
-                pairs.setdefault(s["id"]["filter"], ["", ""])[1] = s["value"] or ""
-
-        filter_dict = {
-            "measure":  count_aggr[0]    if len(count_aggr)    > 0 else "nunique",
-            "unique":   count_uniques[0] if len(count_uniques) > 0 else "person_id",
-        }
-        for i, fi in enumerate(sorted(pairs.keys()), start=1):
-            var, val = pairs[fi]
-            if var:
-                filter_dict[f"variable{i}"] = var
-                if val not in (None, ""):
-                    filter_dict[f"value{i}"] = val
-
-        updated = {
-            "id":   count_id,
-            "name": count_names[0] if len(count_names) > 0 else "",
-            "level":           count_levels[0]           if len(count_levels)           > 0 else "facility",
-            "flag":            count_flags[0]             if len(count_flags)            > 0 else None,
-            "display_average": count_display_averages[0]  if len(count_display_averages) > 0 else None,
-            "href":            count_hrefs[0]             if len(count_hrefs)            > 0 else "",
-            "href_name":       count_href_names[0]        if len(count_href_names)       > 0 else "",
-            "filters":         filter_dict,
-        }
-        # Remove None/empty optional top-level fields
-        for k in ["flag", "display_average", "href", "href_name"]:
-            if updated[k] in (None, ""):
-                updated.pop(k)
-
-        # Find and replace by id, or append if new
+    last_saved_id = None
+    for item in items:
+        item_id = item.get("id")
+        if not item_id or item_id == DEFAULT_CHART_PAYLOAD["id"]:
+            item_id = f"chart_{uuid.uuid4().hex[:8]}"
+            item["id"] = item_id
         matched = False
-        for i, c in enumerate(counts):
-            if c.get("id") == count_id:
-                counts[i] = updated
+        for i, existing in enumerate(section_items):
+            if existing.get("id") == item_id:
+                section_items[i] = item
                 matched = True
                 break
         if not matched:
-            if updated["name"] !="":
-                counts.append(updated)
+            section_items.append(item)
+        last_saved_id = item_id
 
-        dashboard["visualization_types"]["counts"] = counts 
-        dashboards_data[dashboard_index] = dashboard
-        save_dashboards_to_file(dashboards_data)
-        return [create_count_item(c, i) for i, c in enumerate(counts)]
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    dashboard["date_updated"] = timestamp
+    dashboards_data[dashboard_index] = dashboard
+    save_dashboards_to_file(dashboards_data)
 
-    # ── Delete count: remove from JSON by count id ────────────────────────────
-    if isinstance(triggered_id, dict) and triggered_id.get("type") == "remove-count":
-        if not any(c for c in (remove_clicks or []) if c and c > 0):
-            raise PreventUpdate
-        ui_index = triggered_id["index"]
-        dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
-            selector_value, report_id, report_name, date_created
-        )
-        counts = dashboard.get("visualization_types", {}).get("counts", [])
-
-        count_id = count_ids[0] if count_ids else None
-        if count_id:
-            counts = [c for c in counts if c.get("id") != count_id]
-        else:
-            # Fallback: remove by position if id is missing (new unsaved count)
-            counts = [c for i, c in enumerate(counts) if i != ui_index]
-
-        dashboard["visualization_types"]["counts"] = counts
-        dashboards_data[dashboard_index] = dashboard
-        save_dashboards_to_file(dashboards_data)
-
-        return [create_count_item(c, i) for i, c in enumerate(counts)]
-
-    raise PreventUpdate
+    new_chart_idx = next(i for i, c in enumerate(section_items) if c.get("id") == last_saved_id)
+    wrapper = _new_section_wrapper(section_items[new_chart_idx], section)
+    return (json.dumps(wrapper, indent=2),
+            {"kind": "chart", "mode": "edit", "section_index": section_idx, "chart_index": new_chart_idx, "tab_id": tab_id},
+            f"Saved chart '{section_items[new_chart_idx].get('name', '')}' in section "
+            f"'{section.get('section_name', '')}' at {timestamp}.",
+            True)
 
 
 @callback(
-    Output({"type": "count-filters-container", "count": MATCH}, "children"),
-    [Input({"type": "count-add-filter",    "count": MATCH}, "n_clicks"),
-     Input({"type": "count-remove-filter", "count": MATCH, "filter": ALL}, "n_clicks"),
-     Input({"type": "count-var",           "count": MATCH, "filter": ALL}, "value")],
-    State({"type": "count-val", "count": MATCH, "filter": ALL}, "value"),
+    Output("metric-json-editor", "value", allow_duplicate=True),
+    Output("metric-editor-target", "data", allow_duplicate=True),
+    Output("metric-editor-status", "children", allow_duplicate=True),
+    Output("metric-json-editor", "readOnly", allow_duplicate=True),
+    Input("metric-editor-save-btn", "n_clicks"),
+    State("metric-json-editor", "value"),
+    State("metric-editor-target", "data"),
+    State("dashboard-selector", "value"),
+    State("report-id-input", "value"),
+    State("report-name-input", "value"),
+    State("date-created-input", "value"),
     prevent_initial_call=True,
 )
-def manage_count_filters(add_clicks, remove_clicks, var_values, val_values):
-    if not ctx.triggered:
+def save_metric_json(n_clicks, editor_value, target, selector_value, report_id, report_name, date_created):
+    if not n_clicks:
         raise PreventUpdate
+    tab_id = target.get("tab_id") if target else None
+    if target and target.get("kind") == "chart":
+        return _save_chart(editor_value, selector_value, report_id, report_name, date_created, tab_id)
+    return _save_metric(editor_value, selector_value, report_id, report_name, date_created, tab_id)
+
+
+@callback(
+    Output("metric-json-editor", "value", allow_duplicate=True),
+    Output("metric-editor-target", "data", allow_duplicate=True),
+    Output("metric-editor-status", "children", allow_duplicate=True),
+    Output("metric-json-editor", "readOnly", allow_duplicate=True),
+    Input("metric-editor-delete-btn", "n_clicks"),
+    State("metric-editor-target", "data"),
+    State("dashboard-selector", "value"),
+    State("report-id-input", "value"),
+    prevent_initial_call=True,
+)
+def delete_metric_json(n_clicks, target, selector_value, report_id):
+    if not n_clicks:
+        raise PreventUpdate
+
+    tab_id = target.get("tab_id") if target else None
+
+    if target and target.get("kind") == "chart":
+        if target.get("mode") != "edit" or target.get("section_index") is None or target.get("chart_index") is None:
+            return "", None, "Nothing to delete — clear the unsaved draft with Reset instead.", True
+
+        dashboards_data = load_dashboards_from_file()
+        dashboard_index = _find_dashboard_index(dashboards_data, selector_value, report_id)
+        if dashboard_index is None:
+            raise PreventUpdate
+        dashboard = dashboards_data[dashboard_index]
+        sections = _get_active_viz_types(dashboard, tab_id).get("charts", {}).get("sections", [])
+        section_idx = target["section_index"]
+        if not (0 <= section_idx < len(sections)):
+            raise PreventUpdate
+        items = sections[section_idx].get("items", [])
+        chart_idx = target["chart_index"]
+        if not (0 <= chart_idx < len(items)):
+            raise PreventUpdate
+
+        removed = items.pop(chart_idx)
+        if items:
+            sections[section_idx]["items"] = items
+        else:
+            sections.pop(section_idx)
+
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        dashboard["date_updated"] = timestamp
+        dashboards_data[dashboard_index] = dashboard
+        save_dashboards_to_file(dashboards_data)
+
+        return "", None, f"Deleted chart '{removed.get('name', 'chart')}' at {timestamp}.", True
+
+    if not target or target.get("mode") != "edit" or target.get("index") is None:
+        return "", None, "Nothing to delete — clear the unsaved draft with Reset instead.", True
+
+    dashboards_data = load_dashboards_from_file()
+    dashboard_index = _find_dashboard_index(dashboards_data, selector_value, report_id)
+    if dashboard_index is None:
+        raise PreventUpdate
+    dashboard = dashboards_data[dashboard_index]
+    counts = _get_active_viz_types(dashboard, tab_id).get("counts", [])
+    idx = target["index"]
+    if not (0 <= idx < len(counts)):
+        raise PreventUpdate
+
+    removed = counts.pop(idx)
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    dashboard["date_updated"] = timestamp
+    dashboards_data[dashboard_index] = dashboard
+    save_dashboards_to_file(dashboards_data)
+
+    return "", None, f"Deleted '{removed.get('name', 'metric')}' at {timestamp}.", True
+
+
+@callback(
+    Output("metric-json-editor", "theme"),
+    Output("metric-editor-theme-btn", "children"),
+    Input("metric-editor-theme-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+def toggle_metric_editor_theme(n_clicks):
+    if not n_clicks:
+        raise PreventUpdate
+    dark = n_clicks % 2 == 1
+    theme = "monokai" if dark else "github"
+    icon = nav_icon("lucide:sun") if dark else nav_icon("lucide:moon")
+    return theme, [icon]
+
+
+# ── Suggested keys (derived from what's already used across saved metrics/charts) ──
+@callback(
+    Output("metric-editor-known-keys", "data"),
+    Input("metric-editor-target", "data"),
+)
+def refresh_known_metric_keys(_target):
+    return {"metrics": discover_metric_keys(), "charts": discover_chart_keys()}
+
+
+@callback(
+    Output("metric-editor-suggestions", "children"),
+    Input("metric-json-editor", "value"),
+    Input("metric-editor-known-keys", "data"),
+    Input("metric-editor-target", "data"),
+)
+def render_metric_suggestions(editor_value, known_keys, target):
+    known_keys = known_keys or {}
+    is_chart = bool(target and target.get("kind") == "chart")
+
+    try:
+        parsed = json.loads(editor_value or "{}")
+        if not isinstance(parsed, dict):
+            parsed = {}
+    except (TypeError, json.JSONDecodeError):
+        parsed = {}
+
+    if is_chart:
+        chart_known = known_keys.get("charts", {})
+        items = parsed.get("items")
+        item = items[0] if isinstance(items, list) and items and isinstance(items[0], dict) else {}
+        filters = item.get("filters") if isinstance(item.get("filters"), dict) else {}
+        missing_top = [k for k in chart_known.get("top_level", []) if k not in item]
+        missing_filters = [k for k in chart_known.get("by_type", {}).get(item.get("type"), []) if k not in filters]
+    else:
+        metric_known = known_keys.get("metrics", {})
+        filters = parsed.get("filters") if isinstance(parsed.get("filters"), dict) else {}
+        missing_top = [k for k in metric_known.get("top_level", []) if k not in parsed]
+        missing_filters = [k for k in metric_known.get("filters", []) if k not in filters]
+
+    if not missing_top and not missing_filters:
+        return []
+
+    chips = [html.Span("Suggested keys:", style={"fontSize": "11px", "color": "#9ca3af"})]
+    for k in missing_top:
+        chips.append(html.Button(f"+ {k}", id={"type": "metric-suggest-toplevel", "key": k},
+                                  n_clicks=0, className="suggestion-chip"))
+    for k in missing_filters:
+        chips.append(html.Button(f"+ filters.{k}", id={"type": "metric-suggest-filter", "key": k},
+                                  n_clicks=0, className="suggestion-chip"))
+    return chips
+
+
+@callback(
+    Output("metric-json-editor", "value", allow_duplicate=True),
+    Output("metric-json-editor", "readOnly", allow_duplicate=True),
+    Input({"type": "metric-suggest-toplevel", "key": ALL}, "n_clicks"),
+    Input({"type": "metric-suggest-filter", "key": ALL}, "n_clicks"),
+    State("metric-json-editor", "value"),
+    State("metric-editor-target", "data"),
+    prevent_initial_call=True,
+)
+def apply_metric_suggestion(top_clicks, filter_clicks, editor_value, target):
     triggered_id = ctx.triggered_id
-    count_idx = triggered_id["count"]
-    current_pairs = list(zip(
-        [v or "" for v in (var_values or [])],
-        [v or "" for v in (val_values or [])],
-    ))
-    if not current_pairs:
-        current_pairs = [("", "")]
-    if triggered_id.get("type") == "count-add-filter":
-        current_pairs.append(("", ""))
-    elif triggered_id.get("type") == "count-remove-filter":
-        fi = triggered_id["filter"]
-        if len(current_pairs) > 1:
-            current_pairs = [p for i, p in enumerate(current_pairs) if i != fi]
-    elif triggered_id.get("type") == "count-var":
-        # Column changed — clear only that filter's value so the input type refreshes
-        fi = triggered_id["filter"]
-        current_pairs = [(v, "" if i == fi else val) for i, (v, val) in enumerate(current_pairs)]
-    return render_filter_rows(count_idx, current_pairs)
+    if not isinstance(triggered_id, dict) or not ctx.triggered[0]["value"]:
+        raise PreventUpdate
+    try:
+        parsed = json.loads(editor_value or "{}")
+        if not isinstance(parsed, dict):
+            raise PreventUpdate
+    except (TypeError, json.JSONDecodeError):
+        raise PreventUpdate
+
+    key = triggered_id["key"]
+    is_chart = bool(target and target.get("kind") == "chart")
+
+    if is_chart:
+        items = parsed.get("items")
+        if not isinstance(items, list) or not items or not isinstance(items[0], dict):
+            raise PreventUpdate
+        target_obj = items[0]
+    else:
+        target_obj = parsed
+
+    if triggered_id["type"] == "metric-suggest-toplevel":
+        target_obj.setdefault(key, "")
+    else:
+        if not isinstance(target_obj.get("filters"), dict):
+            target_obj["filters"] = {}
+        target_obj["filters"].setdefault(key, "")
+
+    return json.dumps(parsed, indent=2), False
+
+
+dash.clientside_callback(
+    """
+    function(n_clicks) {
+        if (!n_clicks) { return window.dash_clientside.no_update; }
+        var container = document.getElementById('metric-json-editor');
+        if (container && window.ace) {
+            var editorNode = container.querySelector('.ace_editor') || container;
+            window.ace.edit(editorNode).undo();
+        }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("metric-editor-js-dummy", "children"),
+    Input("metric-editor-undo-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+
+dash.clientside_callback(
+    """
+    function(n_clicks) {
+        if (!n_clicks) { return window.dash_clientside.no_update; }
+        var container = document.getElementById('metric-json-editor');
+        if (container && window.ace) {
+            var editorNode = container.querySelector('.ace_editor') || container;
+            window.ace.edit(editorNode).redo();
+        }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("metric-editor-js-dummy", "children", allow_duplicate=True),
+    Input("metric-editor-redo-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+
+# Ace measures character/line metrics at mount time. The editor mounts while the modal is
+# still display:none, so those metrics are wrong until it's forced to remeasure once visible/editable
+# — otherwise the caret renders at a drifted position from where edits actually apply.
+dash.clientside_callback(
+    """
+    function(modalStyle, readOnly) {
+        setTimeout(function() {
+            var container = document.getElementById('metric-json-editor');
+            if (container && window.ace) {
+                var editorNode = container.querySelector('.ace_editor') || container;
+                var editor = window.ace.edit(editorNode);
+                editor.resize(true);
+                if (editor.renderer) { editor.renderer.updateFull(); }
+            }
+        }, 60);
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("metric-editor-js-dummy", "children", allow_duplicate=True),
+    Input("modal-content", "style"),
+    Input("metric-json-editor", "readOnly"),
+    prevent_initial_call=True,
+)
 
 
 @callback(
@@ -2588,370 +3060,6 @@ def manage_mnid_indicators(add_clicks, save_clicks, remove_clicks,
         return render(indicators), json.dumps(indicators, indent=2) if indicators else ""
 
     raise PreventUpdate
-
-@callback(
-    Output("sections-container", "children", allow_duplicate=True),
-    [Input("add-section-btn", "n_clicks"),
-     Input({"type": "remove-section", "index": dash.ALL}, "n_clicks"),
-     Input({"type": "add-chart-btn",  "index": dash.ALL}, "n_clicks"),
-     Input({"type": "save-chart",   "section": dash.ALL, "index": dash.ALL}, "n_clicks"),
-     Input({"type": "remove-chart", "section": dash.ALL, "index": dash.ALL}, "n_clicks")],
-    [State("dashboard-selector", "value"),
-     State("report-id-input", "value"),
-     State("report-name-input", "value"),
-     State("date-created-input", "value"),
-     State({"type": "section-name",  "index": dash.ALL}, "value"),
-     # Chart form states - using index-based identification
-     State({"type": "chart-id",      "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-name",    "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-type",    "section": dash.ALL, "index": dash.ALL}, "value"),
-    #  State({"type": "chart-title",   "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-date_col","section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-y_col",   "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-x_col",   "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-x_title", "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-y_title", "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-unique_column",  "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-legend_title",   "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-color",          "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-label_col",      "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-value_col",      "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-top_n",          "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-names_col",      "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-values_col",     "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-age_col",        "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-gender_col",     "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-bin_size",       "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-index_col1",     "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-columns",        "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-aggfunc",        "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-duration_default","section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-colormap",       "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-filter_col1",    "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-filter_val1",    "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-filter_col2",    "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-filter_val2",    "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-filter_col3",    "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-filter_val3",    "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-filter_col4",    "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-filter_val4",    "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-filter_col5",    "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "chart-filter_val5",    "section": dash.ALL, "index": dash.ALL}, "value"),
-     State({"type": "section-chart-items-per-row", "index": dash.ALL}, "value"),
-     State({"type": "chart-level", "section": dash.ALL, "index": dash.ALL}, "value"),
-     State("sections-container", "children")],
-    prevent_initial_call=True
-)
-def manage_sections(add_section_clicks, remove_section_clicks,
-                    add_chart_clicks, save_chart_clicks, remove_chart_clicks,
-                    selector_value, report_id, report_name, date_created, section_names,
-                    chart_ids, chart_names, chart_types,
-                    # chart_titles,
-                    chart_date_cols, chart_y_cols, chart_x_cols,
-                    chart_x_titles, chart_y_titles,
-                    chart_unique_columns, chart_legend_titles, chart_colors,
-                    chart_label_cols, chart_value_cols, chart_top_ns,
-                    chart_names_cols, chart_values_cols,
-                    chart_age_cols, chart_gender_cols, chart_bin_sizes,
-                    chart_index_col1s, chart_columns, chart_aggfuncs,
-                    chart_duration_defaults, chart_colormaps,
-                    chart_filter_col1s, chart_filter_val1s,
-                    chart_filter_col2s, chart_filter_val2s,
-                    chart_filter_col3s, chart_filter_val3s,
-                    chart_filter_col4s, chart_filter_val4s,
-                    chart_filter_col5s, chart_filter_val5s,
-                    section_chart_items_per_row_values, chart_levels,
-                    current_sections):
-    
-    if not ctx.triggered:
-        raise PreventUpdate
- 
-    triggered_id = ctx.triggered_id
- 
-    def get(lst, i, default=None):
-        return lst[i] if lst and i < len(lst) else default
-
-    def calculate_flat_index(section_idx, chart_idx):
-        """Calculate the flat index of a chart in the form state lists"""
-        flat_idx = 0
-        for s_i, s in enumerate(sections):
-            if s_i == section_idx:
-                return flat_idx + chart_idx
-            flat_idx += len(s.get("items", []))
-        return None
-
-    def build_chart_data_from_index(section_idx, chart_id, flat_idx, form_data):
-        """Build chart data using flat index"""
-        chart_type = get(chart_types, flat_idx, "Bar")
-        
-        # Build filters with all possible fields
-        filters = {
-            "measure": "nunique",
-            "unique": "any",
-            "duration_default": get(chart_duration_defaults, flat_idx, "any") or "any",
-            "title": get(chart_names, flat_idx, ""),
-            "unique_column": get(chart_unique_columns, flat_idx, "person_id"),
-            # Filters
-            "filter_col1": _normalize_filter_value(get(chart_filter_col1s, flat_idx, [])),
-            "filter_val1": _normalize_filter_value(get(chart_filter_val1s, flat_idx, "")),
-            "filter_col2": _normalize_filter_value(get(chart_filter_col2s, flat_idx, [])),
-            "filter_val2": _normalize_filter_value(get(chart_filter_val2s, flat_idx, "")),
-            "filter_col3": _normalize_filter_value(get(chart_filter_col3s, flat_idx, [])),
-            "filter_val3": _normalize_filter_value(get(chart_filter_val3s, flat_idx, "")),
-            "filter_col4": _normalize_filter_value(get(chart_filter_col4s, flat_idx, [])),
-            "filter_val4": _normalize_filter_value(get(chart_filter_val4s, flat_idx, "")),
-            "filter_col5": _normalize_filter_value(get(chart_filter_col5s, flat_idx, [])),
-            "filter_val5": _normalize_filter_value(get(chart_filter_val5s, flat_idx, "")),
-        }
-
-        # Add chart type specific fields
-        if chart_type == "Line":
-            filters.update({
-                "date_col": get(chart_date_cols, flat_idx, ""),
-                "y_col": get(chart_y_cols, flat_idx, ""),
-                "x_title": get(chart_x_titles, flat_idx, ""),
-                "y_title": get(chart_y_titles, flat_idx, ""),
-                "legend_title": get(chart_legend_titles, flat_idx, ""),
-                "color": get(chart_colors, flat_idx, "")
-            })
-        elif chart_type == "Bar":
-            filters.update({
-                "label_col": get(chart_label_cols, flat_idx, ""),
-                "value_col": get(chart_value_cols, flat_idx, ""),
-                "top_n": get(chart_top_ns, flat_idx, 10),
-                "x_title": get(chart_x_titles, flat_idx, ""),
-                "y_title": get(chart_y_titles, flat_idx, ""),
-            })
-        elif chart_type == "Pie":
-            filters.update({
-                "names_col": get(chart_names_cols, flat_idx, ""),
-                "values_col": get(chart_values_cols, flat_idx, ""),
-                "colormap": _safe_json_loads(get(chart_colormaps, flat_idx, {}), {})
-            })
-        elif chart_type == "Column":
-            filters.update({
-                "y_col": get(chart_y_cols, flat_idx, ""),
-                "x_col": get(chart_x_cols, flat_idx, ""),
-                "x_title": get(chart_x_titles, flat_idx, ""),
-                "y_title": get(chart_y_titles, flat_idx, ""),
-                "legend_title": get(chart_legend_titles, flat_idx, ""),
-                "color": get(chart_colors, flat_idx, "")
-            })
-        elif chart_type == "Histogram":
-            filters.update({
-                "age_col": get(chart_age_cols, flat_idx, "Age"),
-                "gender_col": get(chart_gender_cols, flat_idx, "Gender"),
-                "bin_size": get(chart_bin_sizes, flat_idx, 5),
-                "color": get(chart_colors, flat_idx, "")
-            })
-        elif chart_type == "PivotTable":
-            filters.update({
-                "index_col1": _normalize_filter_value(get(chart_index_col1s, flat_idx, "")),
-                "columns": _normalize_filter_value(get(chart_columns, flat_idx, "")),
-                "aggfunc": get(chart_aggfuncs, flat_idx, "count"),
-                "values_col": get(chart_values_cols, flat_idx, ""),
-            })
-        
-        return {
-            "id": chart_id,
-            "name": get(chart_names, flat_idx, ""),
-            "type": chart_type,
-            "level": get(chart_levels, flat_idx, "facility"),
-            "filters": filters
-        }
-
-    def render_sections(sections, active_state=None):
-        """Render sections; active_state = {section_idx: chart_idx} controls which chart is open."""
-        active_state = active_state or {}
-        return [create_section(s, i, active_chart_index=active_state.get(i)) for i, s in enumerate(sections)]
-
-    # Handle triggers
-    if triggered_id == "add-section-btn":
-        if add_section_clicks and add_section_clicks > 0:
-            dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
-                selector_value, report_id, report_name, date_created
-            )
-            sections = dashboard.get("visualization_types", {}).get("charts", {}).get("sections", [])
-
-            new_section_index = len(sections)
-            new_section = {
-                "section_name": f"Section {new_section_index + 1}",
-                "chart_items_per_row": 2,
-                "items": [
-                    {
-                        "id": f"chart_{uuid.uuid4().hex[:8]}",
-                        "name": "",
-                        "type": "Bar",
-                        "level": "facility",
-                        "filters": {}
-                    }
-                ]
-            }
-
-            sections.append(new_section)
-            dashboard["visualization_types"]["charts"]["sections"] = sections
-            dashboards_data[dashboard_index] = dashboard
-            save_dashboards_to_file(dashboards_data)
-            # Open the blank chart that was just created in the new section
-            return render_sections(sections, {new_section_index: 0})
-        raise PreventUpdate
-
-    if isinstance(triggered_id, dict) and triggered_id.get("type") == "remove-section":
-        if not any(c for c in (remove_section_clicks or []) if c and c > 0):
-            raise PreventUpdate
-
-        section_ui_idx = triggered_id["index"]
-        dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
-            selector_value, report_id, report_name, date_created
-        )
-        sections = dashboard.get("visualization_types", {}).get("charts", {}).get("sections", [])
-
-        if 0 <= section_ui_idx < len(sections):
-            sections.pop(section_ui_idx)
-            dashboard["visualization_types"]["charts"]["sections"] = sections
-            dashboards_data[dashboard_index] = dashboard
-            save_dashboards_to_file(dashboards_data)
-
-        return render_sections(sections)
-
-    if isinstance(triggered_id, dict) and triggered_id.get("type") == "add-chart-btn":
-        if not any(c for c in (add_chart_clicks or []) if c and c > 0):
-            raise PreventUpdate
-
-        section_ui_idx = triggered_id["index"]
-        dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
-            selector_value, report_id, report_name, date_created
-        )
-        sections = dashboard.get("visualization_types", {}).get("charts", {}).get("sections", [])
-
-        if 0 <= section_ui_idx < len(sections):
-            new_chart = {
-                "id": f"chart_{uuid.uuid4().hex[:8]}",
-                "name": "",
-                "type": "Bar",
-                "filters": {}
-            }
-            sections[section_ui_idx].setdefault("items", []).append(new_chart)
-            dashboard["visualization_types"]["charts"]["sections"] = sections
-            dashboards_data[dashboard_index] = dashboard
-            save_dashboards_to_file(dashboards_data)
-            # Show only the new blank chart; hide any previously open chart
-            new_chart_idx = len(sections[section_ui_idx]["items"]) - 1
-            return render_sections(sections, {section_ui_idx: new_chart_idx})
-
-        return render_sections(sections)
-
-    if isinstance(triggered_id, dict) and triggered_id.get("type") == "save-chart":
-        if not any(c for c in (save_chart_clicks or []) if c and c > 0):
-            raise PreventUpdate
-
-        section_ui_idx = triggered_id["section"]
-        chart_ui_idx = triggered_id["index"]
-
-        dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
-            selector_value, report_id, report_name, date_created
-        )
-        sections = dashboard.get("visualization_types", {}).get("charts", {}).get("sections", [])
-
-        # Validate section and chart
-        if section_ui_idx >= len(sections):
-            raise PreventUpdate
-
-        items = sections[section_ui_idx].get("items", [])
-        if chart_ui_idx >= len(items):
-            raise PreventUpdate
-
-        # Calculate flat index
-        flat_idx = calculate_flat_index(section_ui_idx, chart_ui_idx)
-        if flat_idx is None:
-            raise PreventUpdate
-
-        # Update section name
-        section_name = get(section_names, section_ui_idx, "")
-        if section_name and section_name.strip():
-            sections[section_ui_idx]["section_name"] = section_name
-
-        # Update section chart_items_per_row
-        raw_cipr = get(section_chart_items_per_row_values, section_ui_idx, 2)
-        sections[section_ui_idx]["chart_items_per_row"] = int(raw_cipr or 2)
-
-        # Build and save chart
-        form_data = items[chart_ui_idx]
-        chart_id = form_data.get("id", f"chart_{uuid.uuid4().hex[:8]}")
-        updated_chart = build_chart_data_from_index(section_ui_idx, chart_id, flat_idx, form_data)
-
-        if updated_chart:
-            items[chart_ui_idx] = updated_chart
-            sections[section_ui_idx]["items"] = items
-            dashboard["visualization_types"]["charts"]["sections"] = sections
-            dashboards_data[dashboard_index] = dashboard
-            save_dashboards_to_file(dashboards_data)
-
-        # Keep the saved chart open after save
-        return render_sections(sections, {section_ui_idx: chart_ui_idx})
-
-    if isinstance(triggered_id, dict) and triggered_id.get("type") == "remove-chart":
-        if not any(c for c in (remove_chart_clicks or []) if c and c > 0):
-            raise PreventUpdate
-
-        section_ui_idx = triggered_id["section"]
-        chart_ui_idx = triggered_id["index"]
-
-        dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
-            selector_value, report_id, report_name, date_created
-        )
-        sections = dashboard.get("visualization_types", {}).get("charts", {}).get("sections", [])
-
-        if section_ui_idx < len(sections):
-            items = sections[section_ui_idx].get("items", [])
-            if 0 <= chart_ui_idx < len(items):
-                items.pop(chart_ui_idx)
-
-            if len(items) == 0:
-                sections.pop(section_ui_idx)
-            else:
-                sections[section_ui_idx]["items"] = items
-
-            dashboard["visualization_types"]["charts"]["sections"] = sections
-            dashboards_data[dashboard_index] = dashboard
-            save_dashboards_to_file(dashboards_data)
-
-        return render_sections(sections)
- 
-    raise PreventUpdate
-
-@callback(
-    Output({"type": "chart-fields", "section": dash.MATCH, "index": dash.MATCH}, "children"),
-    [Input({"type": "chart-type", "section": dash.MATCH, "index": dash.MATCH}, "value")],
-    [State("dashboard-selector", "value"),
-     State("report-id-input", "value")],
-    prevent_initial_call=True
-)
-def update_chart_fields(chart_type, selector_value, report_id):
-    if not chart_type:
-        return dash.no_update
-    
-    triggered_id = ctx.triggered_id
-    section_index = triggered_id['section']
-    chart_index = triggered_id['index']
-    
-    # Load existing chart data to preserve values
-    try:
-        dashboards_data = load_dashboards_from_file()
-        dashboard_index = _find_dashboard_index(dashboards_data, selector_value, report_id)
-        if dashboard_index is not None and dashboard_index < len(dashboards_data):
-            current_dashboard = dashboards_data[dashboard_index]
-            sections = current_dashboard.get("visualization_types", {}).get("charts", {}).get("sections", [])
-            if section_index < len(sections):
-                items = sections[section_index].get("items", [])
-                if chart_index < len(items):
-                    existing_chart = items[chart_index]
-                    return create_chart_fields(chart_type, existing_chart, section_index, chart_index)
-    except Exception as e:
-        print(f"Error loading existing chart data: {e}")
-    
-    return create_chart_fields(chart_type, None, section_index, chart_index)
-
 
 @callback(
     [Output("dashboard-selector", "options", allow_duplicate=True),
@@ -3101,52 +3209,73 @@ def save_dashboard_config(save_clicks, selector_value, report_id, report_name, d
     )
 
 @callback(
-    [Output("dashboard-selector", "options", allow_duplicate=True),
-     Output("modal-backdrop", "style", allow_duplicate=True),
-     Output("modal-content", "style", allow_duplicate=True)],
-    [Input("delete-btn", "n_clicks")],
-    [State("current-dashboard-index", "data"),
-     State("dashboard-selector", "value"),
-     State("report-id-input", "value")],
-    prevent_initial_call=True
+    Output("delete-confirmation-modal", "style", allow_duplicate=True),
+    Output("delete-confirmation-text", "children"),
+    Input("delete-btn", "n_clicks"),
+    State("dashboard-selector", "value"),
+    State("report-id-input", "value"),
+    prevent_initial_call=True,
 )
-def delete_dashboard(delete_clicks, current_index, selector_value, report_id):
+def open_delete_confirmation(n_clicks, selector_value, report_id):
+    if not n_clicks:
+        raise PreventUpdate
     dashboards_data = load_dashboards_from_file()
-    if delete_clicks and delete_clicks > 0:
-        # Check if we have a valid dashboard to delete
-        if current_index is not None and current_index >= 0 and current_index < len(dashboards_data):
-            # Remove the dashboard from the data
-            dashboards_data.pop(current_index)
-            
-            # Save the updated data to file
-            try:
-                with open(dashboards_json_path, 'w') as f:
-                    json.dump(dashboards_data, f, indent=2)
-            except Exception as e:
-                print(f"Error saving after deletion: {e}")
-            
-            # Update dropdown options
-            options = [{"label": f"📋 {d.get('report_name', 'Unnamed')} (ID: {d.get('report_id', '?')})", 
-                       "value": i} for i, d in enumerate(dashboards_data)] + \
-                      [{"label": "➕ Create New Dashboard", "value": "new"}]
-            
-            return options, {"display": "none"}, {"display": "none"}
-        
-        else:
-            # If no valid dashboard is selected, just close the modal
-            return dash.no_update, {"display": "none"}, {"display": "none"}
-    
-    return dash.no_update, dash.no_update, dash.no_update
+    dashboard_index = _find_dashboard_index(dashboards_data, selector_value, report_id)
+    if dashboard_index is None:
+        raise PreventUpdate
+    dashboard = dashboards_data[dashboard_index]
+    name = dashboard.get("report_name", "Unnamed")
+    rid = dashboard.get("report_id", "?")
+    text = (f"Delete the dashboard \"{name}\" (ID: {rid}) and all of its metrics and charts? "
+            f"This will remove it from the file.")
+    return {"display": "flex"}, text
+
 
 @callback(
-    Output("delete-confirmation-modal", "style"),
-    Input("delete-confirmation", "data")
+    Output("delete-confirmation-modal", "style", allow_duplicate=True),
+    Input("cancel-delete-btn", "n_clicks"),
+    Input("close-confirmation-btn", "n_clicks"),
+    prevent_initial_call=True,
 )
-def toggle_confirmation_modal(show_confirmation):
-    if show_confirmation:
-        return {"display": "block", "position": "fixed", "top": "50%", "left": "50%", "transform": "translate(-50%, -50%)", "zIndex": "1000", "background": "white", "padding": "20px", "borderRadius": "5px", "boxShadow": "0 2px 10px rgba(0,0,0,0.1)"}
-    else:
-        return {"display": "none"}
+def close_delete_confirmation(_cancel_clicks, _close_clicks):
+    return {"display": "none"}
+
+
+@callback(
+    Output("dashboard-selector", "options", allow_duplicate=True),
+    Output("dashboard-selector", "value", allow_duplicate=True),
+    Output("modal-backdrop", "style", allow_duplicate=True),
+    Output("modal-content", "style", allow_duplicate=True),
+    Output("delete-confirmation-modal", "style", allow_duplicate=True),
+    Input("confirm-delete-btn", "n_clicks"),
+    State("dashboard-selector", "value"),
+    State("report-id-input", "value"),
+    prevent_initial_call=True,
+)
+def confirm_delete_dashboard(n_clicks, selector_value, report_id):
+    if not n_clicks:
+        raise PreventUpdate
+    dashboards_data = load_dashboards_from_file()
+    dashboard_index = _find_dashboard_index(dashboards_data, selector_value, report_id)
+    if dashboard_index is None:
+        raise PreventUpdate
+
+    dashboards_data.pop(dashboard_index)
+    save_dashboards_to_file(dashboards_data)
+
+    options = _dashboard_selector_options(dashboards_data)
+    return options, "new", {"display": "none"}, {"display": "none"}, {"display": "none"}
+
+
+@callback(
+    Output("download-dashboards-file", "data"),
+    Input("download-dashboards-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+def download_dashboards_file(n_clicks):
+    if not n_clicks:
+        raise PreventUpdate
+    return dcc.send_file(dashboards_json_path)
 
 
 # 1. Toggle panel visibility — show user config, hide main content area (and vice-versa)

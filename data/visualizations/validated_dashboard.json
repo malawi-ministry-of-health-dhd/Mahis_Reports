@@ -239,6 +239,23 @@
           },
           "group_by": "Program",
           "custom_sql": "SELECT DISTINCT v.person_id, v.Date FROM 'data' v INNER JOIN (SELECT DISTINCT person_id, MIN(Date) AS first_visit_date FROM 'data' GROUP BY person_id) fv ON v.person_id = fv.person_id WHERE v.date > fv.first_visit_date "
+        },
+        {
+          "id": "count_6a279ec6",
+          "display": "True",
+          "name": "",
+          "level": "facility",
+          "flag": "",
+          "display_average": "False",
+          "href": "",
+          "drill_down": "False",
+          "show_trend": "False",
+          "group_by": "",
+          "custom_sql": "",
+          "filters": {
+            "measure": "count",
+            "unique": "person_id"
+          }
         }
       ],
       "charts": {
@@ -251,7 +268,7 @@
               {
                 "id": "chart_pivot_summary",
                 "display": "True",
-                "name": "Locations",
+                "name": "Attendance by Health Facility and Program",
                 "type": "CrossTab",
                 "level": "facility",
                 "filters": {
@@ -301,7 +318,8 @@
                   }
                 }
               }
-            ]
+            ],
+            "section_id": "section_3e21a503"
           },
           {
             "section_name": "Facility Performance Heatmap",
@@ -871,7 +889,8 @@
           }
         ]
       }
-    }
+    },
+    "date_updated": "2026-09-08 12:18:02"
   },
   {
     "report_id": "report_20c213d4",
@@ -7326,5 +7345,81 @@
       "IPD Program"
     ],
     "access": "global"
+  },
+  {
+    "report_id": "report_ee84a62b",
+    "report_name": "Tab Test",
+    "date_created": "2026-09-08",
+    "visualization_types": {
+      "counts": [],
+      "charts": {
+        "sections": []
+      }
+    },
+    "dashboard_type": "tabs",
+    "visualization_tabs": [
+      {
+        "tab_id": "tab_b81d1d51",
+        "display": "True",
+        "tab_name": "OPD Program",
+        "visualization_types": {
+          "counts": [
+            {
+              "id": "count_b30ea825",
+              "display": "True",
+              "name": "All Attendance",
+              "level": "facility",
+              "flag": "ok",
+              "drill_down": "True",
+              "filters": {
+                "measure": "nunique",
+                "unique": "person_id",
+                "variable1": "Program",
+                "value1": [
+                  "OPD Program"
+                ],
+                "variable2": "Encounter",
+                "variable3": "concept_name",
+                "variable4": "obs_value_coded",
+                "variable5": "ValueN",
+                "variable6": "Value",
+                "variable7": "Gender",
+                "variable8": "Age_Group"
+              }
+            }
+          ],
+          "charts": {
+            "sections": []
+          }
+        }
+      },
+      {
+        "tab_id": "tab_82f0b0fe",
+        "display": "True",
+        "tab_name": "NCD Program",
+        "visualization_types": {
+          "counts": [
+            {
+              "id": "count_45fd3805",
+              "display": "True",
+              "name": "Total NCD Attendance",
+              "level": "facility",
+              "flag": "ok",
+              "display_average": "True",
+              "drill_down": "True",
+              "filters": {
+                "measure": "nunique",
+                "unique": "person_id",
+                "variable1": "Program",
+                "value1": "NCD PROGRAM"
+              }
+            }
+          ],
+          "charts": {
+            "sections": []
+          }
+        }
+      }
+    ]
   }
 ]
