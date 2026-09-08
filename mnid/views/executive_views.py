@@ -289,29 +289,37 @@ def _metric_snapshot(df: pd.DataFrame) -> dict:
     maternal_mask = _service_mask(df, ["ANC", "Labour", "PNC"])
     newborn_mask = _service_mask(df, ["Newborn"])
     labour_mask = _service_mask(df, ["Labour"])
+    # "Baby general condition at birth" is the real Labour concept; "Outcome
+    # of the delivery" is actually PNC's -- both kept, doesn't hurt either way.
+    _birth_outcome_concepts = ["Outcome of the delivery", "Baby general condition at birth"]
+    _birth_concepts = _birth_outcome_concepts + ["Status of baby", "Admission outcome"]
     live_birth_mask = (
-        _contains_mask(df, "concept_name", ["Outcome of the delivery"])
-        & _contains_mask(df, "obs_value_coded", ["Live birth", "Live births", "Alive"])
+        _contains_mask(df, "concept_name", _birth_outcome_concepts)
+        & _contains_mask(df, "obs_value_coded", ["Live birth", "Live births", "Alive", "Live full term", "Live preterm"])
     )
     fresh_stillbirth_mask = (
-        _contains_mask(df, "concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"])
+        _contains_mask(df, "concept_name", _birth_concepts)
         & _contains_mask(df, "obs_value_coded", ["Fresh stillbirth", "Fresh still birth"])
     )
     macerated_stillbirth_mask = (
-        _contains_mask(df, "concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"])
+        _contains_mask(df, "concept_name", _birth_concepts)
         & _contains_mask(df, "obs_value_coded", ["Macerated stillbirth", "Macerated still birth"])
     )
     stillbirth_mask = _yn_mask(df, "mnid_labour_stillbirth") | (
-        _contains_mask(df, "concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"])
+        _contains_mask(df, "concept_name", _birth_concepts)
         & _contains_mask(df, "obs_value_coded", ["Stillbirth", "Fresh stillbirth", "Macerated stillbirth", "Fresh still birth", "Macerated still birth"])
     )
     maternal_death_mask = _yn_mask(df, "mnid_pnc_maternal_death") | (
         _contains_mask(df, "concept_name", ["Status of the mother"])
         & _contains_mask(df, "obs_value_coded", ["Dead", "Died", "Maternal death"])
     )
+    # Real Neonatal concept is "outcome" (Discharge category), not "Admission outcome".
     neonatal_death_mask = (
-        _contains_mask(df, "concept_name", ["Admission outcome", "Status of baby"])
-        & _contains_mask(df, "obs_value_coded", ["Died", "Dead", "Death", "Neonatal death"])
+        _contains_mask(df, "concept_name", ["Admission outcome", "outcome", "Status of baby"])
+        & _contains_mask(df, "obs_value_coded", [
+            "Died", "Dead", "Death", "Neonatal death",
+            "Death < 24hrs", "Death > 24hrs", "Died during Admission", "Brought in dead",
+        ])
     )
 
     maternal_admissions = _unique_count(df, maternal_mask, encounter_col)
@@ -1170,19 +1178,21 @@ def render_country_profile(
         neonatal_death_mask_spec = _contains_spec("obs_value_coded", ["Died", "Dead", "Death", "Neonatal death"])
         neonatal_death_series = _monthly_series(df, _mask_from_spec(df, neonatal_death_mask_spec), "person_id", grain=_fetch_grain)
         neonatal_death_recipe = {**_recipe_base, "kind": "raw_single", "df_key": _cp_df_key, "mask_spec": neonatal_death_mask_spec}
+        # "Baby general condition at birth" is the real Labour concept for
+        # this; "Outcome of the delivery" is actually PNC's -- both kept.
+        _birth_outcome_concepts = ["Outcome of the delivery", "Baby general condition at birth"]
+        _birth_concepts = _birth_outcome_concepts + ["Status of baby", "Admission outcome"]
+        _live_birth_values = ["Live birth", "Live births", "Alive", "Live full term", "Live preterm"]
         live_birth_denominator_mask = (
-            _contains_mask(df, "concept_name", ["Outcome of the delivery"])
-            & _contains_mask(df, "obs_value_coded", ["Live birth", "Live births", "Alive"])
+            _contains_mask(df, "concept_name", _birth_outcome_concepts)
+            & _contains_mask(df, "obs_value_coded", _live_birth_values)
         )
         total_birth_denominator_mask = (
-            _contains_mask(df, "concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"])
+            _contains_mask(df, "concept_name", _birth_concepts)
             & _contains_mask(
                 df,
                 "obs_value_coded",
-                [
-                    "Live birth",
-                    "Live births",
-                    "Alive",
+                _live_birth_values + [
                     "Stillbirth",
                     "Fresh stillbirth",
                     "Macerated stillbirth",
@@ -1191,7 +1201,7 @@ def render_country_profile(
                 ],
             )
         )
-        total_births_mask_spec = _contains_spec("concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"])
+        total_births_mask_spec = _contains_spec("concept_name", _birth_concepts)
         total_births_series = _monthly_multiseries({"Total births": (
             _mask_from_spec(df, total_births_mask_spec),
             PRIMARY_GREEN,
@@ -1210,15 +1220,14 @@ def render_country_profile(
 
     chart_scope_label = _chart_scope_label(scope_meta)
     total_birth_denominator_spec = _and_spec(
-        _contains_spec("concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"]),
-        _contains_spec("obs_value_coded", [
-            "Live birth", "Live births", "Alive", "Stillbirth",
-            "Fresh stillbirth", "Macerated stillbirth", "Fresh still birth", "Macerated still birth",
+        _contains_spec("concept_name", _birth_concepts),
+        _contains_spec("obs_value_coded", _live_birth_values + [
+            "Stillbirth", "Fresh stillbirth", "Macerated stillbirth", "Fresh still birth", "Macerated still birth",
         ]),
     ) if not use_dhis2 else None
     live_birth_denominator_spec = _and_spec(
-        _contains_spec("concept_name", ["Outcome of the delivery"]),
-        _contains_spec("obs_value_coded", ["Live birth", "Live births", "Alive"]),
+        _contains_spec("concept_name", _birth_outcome_concepts),
+        _contains_spec("obs_value_coded", _live_birth_values),
     ) if not use_dhis2 else None
     maternal_complication_specs = [
         ("Pre-eclampsia and Eclampsia", MORTALITY_ROSE, _yn_mask(df, "mnid_labour_eclampsia") | _contains_mask(df, "obs_value_coded", ["Pre-eclampsia", "Pre eclampsia", "Preeclampsia", "Eclampsia"]),

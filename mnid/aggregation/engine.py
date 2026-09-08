@@ -260,7 +260,17 @@ def run_aggregation(
 
     agg_df.to_parquet(str(parquet_out), index=False, engine='pyarrow')
 
-    from config import USE_DEMO_DATA
+    # Defensive: this is only for a cosmetic meta.json stat, not needed for the
+    # aggregate itself, which is already written above. A missing/renamed
+    # constant here shouldn't turn an otherwise-successful run into a reported
+    # failure -- that happened for real (config.py on a deployed server missing
+    # USE_DEMO_DATA), silently going stale for weeks because every retry kept
+    # crashing on this exact line after doing all the real work.
+    try:
+        from config import USE_DEMO_DATA
+    except ImportError:
+        _LOG.warning("config.USE_DEMO_DATA not found; recording use_demo_data=None in meta.json")
+        USE_DEMO_DATA = None
 
     elapsed = (datetime.utcnow() - started_at).total_seconds()
     meta = {

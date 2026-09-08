@@ -635,8 +635,9 @@ def _program_based_priority_indicators(categories: list[str] | None = None) -> l
                 'target_mode': 'min',
                 'status': 'tracked',
                 'sub_category': 'outcomes',
+                # Denominator is total births, not all Labour clients.
                 'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_fresh_stillbirth', 'value1': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_total_birth', 'value1': 'Yes'},
             },
             {
                 'id': 'mnid_lab_moh_018',
@@ -647,7 +648,7 @@ def _program_based_priority_indicators(categories: list[str] | None = None) -> l
                 'status': 'tracked',
                 'sub_category': 'outcomes',
                 'numerator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_macerated_stillbirth', 'value1': 'Yes'},
-                'denominator_filters': {'unique': 'person_id', 'variable1': 'Service_Area', 'value1': 'Labour'},
+                'denominator_filters': {'unique': 'person_id', 'variable1': 'mnid_labour_total_birth', 'value1': 'Yes'},
             },
             {
                 'id': 'mnid_lab_moh_019',

@@ -19,5 +19,6 @@ duckdb
 diskcache
 geopandas
  
-pdfkit 
+pdfkit
+xhtml2pdf
 dash-iconify

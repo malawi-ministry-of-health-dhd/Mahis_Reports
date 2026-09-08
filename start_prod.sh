@@ -18,8 +18,8 @@ exec python -m gunicorn \
     --workers 4 \
     --threads 2 \
     --worker-class gthread \
-    --timeout 120 \
-    --graceful-timeout 120 \
+    --timeout 300 \
+    --graceful-timeout 300 \
     --keep-alive 5 \
     --bind 0.0.0.0:8040 \
     --log-level debug \

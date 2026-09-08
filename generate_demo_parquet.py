@@ -159,7 +159,6 @@ def _make_row(
         "User": "demo_user",
         "Reporting_Program": "",
         "Source_Program": "",
-        "": "",
     }
 
 
@@ -690,7 +689,7 @@ STR_COLS = [
     "Facility_CODE", "District", "Facility_Type", "Encounter", "new_revisit", "Gender",
     "Home_district", "TA", "Village", "concept_name", "obs_value_coded",
     "Value", "DrugName", "Value_name", "Order_Name", "person_id_key",
-    "months", "User", "Reporting_Program", "Source_Program", "",
+    "months", "User", "Reporting_Program", "Source_Program",
 ]
 for col in STR_COLS:
     if col in df.columns:

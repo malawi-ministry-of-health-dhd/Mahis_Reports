@@ -51,7 +51,12 @@ class ReportTableBuilder:
         self.report_name = pd.read_excel(xls, sheet_name="REPORT_NAME", engine="openpyxl")
         self.report_name.columns = [str(c).strip() for c in self.report_name.columns]
         self.facilities = pd.read_csv(self.facilities_path)
-        self.location_name = self.facilities.set_index('location_id')['name'].to_dict().get(int(self.location), "")
+        # location_id isn't always numeric (some routes use alphanumeric facility
+        # codes, e.g. "SA091312") -- match as strings instead of assuming int().
+        facilities_by_code = self.facilities.set_index(
+            self.facilities['location_id'].astype(str)
+        )['name'].to_dict()
+        self.location_name = facilities_by_code.get(str(self.location), "")
         self._build_filters_map()
 
     def _build_filters_map(self) -> None:
@@ -274,7 +279,11 @@ class ReportTableBuilder:
         else:
             result, patient_ids = ("","")
 
-        if patient_ids:
+        # `is not None` (not truthiness) -- a legitimate zero-match query returns an
+        # empty list, which must still be cached as an empty set. Falling through to
+        # None here made calculated_intersection silently drop a zero-match filter
+        # from the intersection instead of correctly zeroing the result out.
+        if patient_ids is not None:
             self._patient_ids_cache[filter_name] = [str(p) for p in patient_ids]
 
         result_str = "" if result is None else str(result)
@@ -291,7 +300,28 @@ class ReportTableBuilder:
             return "Report"
         vals = [str(v).strip() for v in self.report_name["name"].tolist() if str(v).strip()]
         return vals[0] if vals else "Report"
-    
+
+    # (dark, light) header shade per program -- matches the MNH-MoH dashboard's
+    # own ANC/Labour/Newborn/PNC colors (mnid/dashboards/MNH-MoH/layout.py) so an
+    # HMIS report reads as the same program at a glance. Non-MNH programs keep
+    # the original neutral navy/gray.
+    _PROGRAM_HEADER_COLORS = {
+        "anc program": ("#14532D", "#1A7C4F"),                  
+        "labour and delivery program": ("#7C4D0A", "#D97706"),  
+        "maternity program": ("#7C4D0A", "#D97706"),
+        "neonatal program": ("#4C1D95", "#7C3AED"),             
+        "pnc program": ("#1E3A8A", "#2563EB"),                  
+    }
+    _DEFAULT_HEADER_COLORS = ("#1f2937", "#374151")
+
+    def _header_colors(self) -> Tuple[str, str]:
+        if self.report_name is not None and "programs" in self.report_name.columns:
+            programs = [str(v).strip().lower() for v in self.report_name["programs"].tolist() if str(v).strip()]
+            for program in programs:
+                if program in self._PROGRAM_HEADER_COLORS:
+                    return self._PROGRAM_HEADER_COLORS[program]
+        return self._DEFAULT_HEADER_COLORS
+
     def _page_design(self) -> str:
         if self.report_name is None or "page_design" not in self.report_name.columns:
             return "portrait"
@@ -971,15 +1001,16 @@ class ReportTableBuilder:
         if refs_df is not None:
             refs_records = refs_df.to_dict("records")
 
+        header_dark, header_light = self._header_colors()
         th_base = {
             "padding": "9px 12px", "border": "1px solid #4b5563",
             "fontSize": "11px", "fontWeight": "700", "letterSpacing": "0.4px",
-            "backgroundColor": "#374151", "color": "#f9fafb",
+            "backgroundColor": header_light, "color": "#f9fafb",
         }
         header_row = html.Tr([
             html.Th(
                 section_title.upper() if section_title else "Data Element",
-                style={**th_base, "textAlign": "left", "backgroundColor": "#1f2937",
+                style={**th_base, "textAlign": "left", "backgroundColor": header_dark,
                        "width": f"{de_width}px", "minWidth": "180px"},
             ),
             *[html.Th(col.upper(), style={**th_base, "textAlign": "center",
