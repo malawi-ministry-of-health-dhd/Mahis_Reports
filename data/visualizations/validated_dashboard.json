@@ -7348,7 +7348,7 @@
   },
   {
     "report_id": "report_ee84a62b",
-    "report_name": "Tab Test",
+    "report_name": "AETC",
     "date_created": "2026-09-08",
     "visualization_types": {
       "counts": [],
@@ -7356,12 +7356,59 @@
         "sections": []
       }
     },
-    "dashboard_type": "tabs",
     "visualization_tabs": [
+      {
+        "tab_id": "tab_82f0b0fe",
+        "display": "True",
+        "tab_name": "Screening",
+        "visualization_types": {
+          "counts": [
+            {
+              "id": "count_45fd3805",
+              "display": "True",
+              "name": "Total Patients at Arrival",
+              "level": "facility",
+              "flag": "ok",
+              "display_average": "True",
+              "drill_down": "True",
+              "filters": {
+                "measure": "nunique",
+                "unique": "visit_id",
+                "variable1": "Program",
+                "value1": "AETC PROGRAM"
+              }
+            },
+            {
+              "id": "count_507ec30f",
+              "display": "True",
+              "name": "Total Screened Patients",
+              "level": "facility",
+              "flag": "",
+              "display_average": "False",
+              "href": "",
+              "drill_down": "False",
+              "show_trend": "False",
+              "group_by": "",
+              "custom_sql": "",
+              "filters": {
+                "measure": "count",
+                "unique": "visit_id",
+                "variable1": "Program",
+                "value1": "AETC PROGRAM",
+                "variable2": "concept_name",
+                "value2": "Is Situation Urgent"
+              }
+            }
+          ],
+          "charts": {
+            "sections": []
+          }
+        }
+      },
       {
         "tab_id": "tab_b81d1d51",
         "display": "True",
-        "tab_name": "OPD Program",
+        "tab_name": "Registration",
         "visualization_types": {
           "counts": [
             {
@@ -7394,32 +7441,53 @@
         }
       },
       {
-        "tab_id": "tab_82f0b0fe",
+        "tab_id": "tab_b51deba3",
         "display": "True",
-        "tab_name": "NCD Program",
+        "tab_name": "Triage",
         "visualization_types": {
-          "counts": [
-            {
-              "id": "count_45fd3805",
-              "display": "True",
-              "name": "Total NCD Attendance",
-              "level": "facility",
-              "flag": "ok",
-              "display_average": "True",
-              "drill_down": "True",
-              "filters": {
-                "measure": "nunique",
-                "unique": "person_id",
-                "variable1": "Program",
-                "value1": "NCD PROGRAM"
-              }
-            }
-          ],
+          "counts": [],
+          "charts": {
+            "sections": []
+          }
+        }
+      },
+      {
+        "tab_id": "tab_8273e104",
+        "display": "True",
+        "tab_name": "Assessment",
+        "visualization_types": {
+          "counts": [],
+          "charts": {
+            "sections": []
+          }
+        }
+      },
+      {
+        "tab_id": "tab_df620ba4",
+        "display": "True",
+        "tab_name": "Laboratory",
+        "visualization_types": {
+          "counts": [],
+          "charts": {
+            "sections": []
+          }
+        }
+      },
+      {
+        "tab_id": "tab_968c9dcc",
+        "display": "True",
+        "tab_name": "Daily Report",
+        "visualization_types": {
+          "counts": [],
           "charts": {
             "sections": []
           }
         }
       }
-    ]
+    ],
+    "count_items_per_row": 5,
+    "associated_programs": [],
+    "access": "global",
+    "date_updated": "2026-09-08 17:49:35"
   }
 ]

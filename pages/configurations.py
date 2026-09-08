@@ -1386,6 +1386,79 @@ def rename_dashboard_tab(n_clicks, tab_id, new_name, selector_value, report_id, 
 
 
 @callback(
+    Output("dashboard-tab-selector", "options", allow_duplicate=True),
+    Output("dashboard-tab-selector", "value", allow_duplicate=True),
+    Input("move-tab-left-btn", "n_clicks"),
+    Input("move-tab-right-btn", "n_clicks"),
+    State("dashboard-tab-selector", "value"),
+    State("dashboard-selector", "value"),
+    State("report-id-input", "value"),
+    State("report-name-input", "value"),
+    State("date-created-input", "value"),
+    prevent_initial_call=True,
+)
+def move_dashboard_tab(left_clicks, right_clicks, tab_id, selector_value, report_id, report_name, date_created):
+    triggered_id = ctx.triggered_id
+    if not tab_id:
+        raise PreventUpdate
+    if triggered_id == "move-tab-left-btn" and not left_clicks:
+        raise PreventUpdate
+    if triggered_id == "move-tab-right-btn" and not right_clicks:
+        raise PreventUpdate
+    direction = -1 if triggered_id == "move-tab-left-btn" else 1
+
+    dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
+        selector_value, report_id, report_name, date_created
+    )
+    tabs = dashboard.get("visualization_tabs", [])
+    idx = next((i for i, t in enumerate(tabs) if t.get("tab_id") == tab_id), None)
+    if idx is None:
+        raise PreventUpdate
+    new_idx = idx + direction
+    if not (0 <= new_idx < len(tabs)):
+        raise PreventUpdate
+
+    tabs[idx], tabs[new_idx] = tabs[new_idx], tabs[idx]
+    dashboards_data[dashboard_index] = dashboard
+    save_dashboards_to_file(dashboards_data)
+
+    return _dashboard_tab_options(dashboard), tab_id
+
+
+@callback(
+    Output("dashboard-tab-selector", "options", allow_duplicate=True),
+    Output("dashboard-tab-selector", "value", allow_duplicate=True),
+    Input("delete-tab-btn", "n_clicks"),
+    State("dashboard-tab-selector", "value"),
+    State("dashboard-selector", "value"),
+    State("report-id-input", "value"),
+    State("report-name-input", "value"),
+    State("date-created-input", "value"),
+    prevent_initial_call=True,
+)
+def delete_dashboard_tab(n_clicks, tab_id, selector_value, report_id, report_name, date_created):
+    if not n_clicks or not tab_id:
+        raise PreventUpdate
+
+    dashboards_data, dashboard, dashboard_index = _ensure_dashboard_for_edit(
+        selector_value, report_id, report_name, date_created
+    )
+    tabs = dashboard.get("visualization_tabs", [])
+    idx = next((i for i, t in enumerate(tabs) if t.get("tab_id") == tab_id), None)
+    if idx is None:
+        raise PreventUpdate
+
+    tabs.pop(idx)
+    dashboard["date_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    dashboards_data[dashboard_index] = dashboard
+    save_dashboards_to_file(dashboards_data)
+
+    options = _dashboard_tab_options(dashboard)
+    new_value = options[0]["value"] if options else None
+    return options, new_value
+
+
+@callback(
     Output("current-dashboard-index", "data", allow_duplicate=True),
     Input("dashboard-selector", "value"),
     prevent_initial_call=True

@@ -1179,26 +1179,7 @@ def create_edit_modal():
                                             className="dashboard-card",
                                             style={"flex": "1", "display": "flex", "flexDirection": "column", "minHeight": "0"},
                                             children=[
-                                                html.Div(
-                                                    className="dashboard-card-header",
-                                                    style={"display": "flex", "alignItems": "center",
-                                                           "justifyContent": "space-between", "flexShrink": "0"},
-                                                    children=[
-                                                        html.H4("Dashboard Items", className="dashboard-card-title"),
-                                                        html.Div(style={"display": "flex", "gap": "6px"}, children=[
-                                                            html.Button([nav_icon("lucide:plus"), "Metric"],
-                                                                        id="add-count-btn",
-                                                                        n_clicks=0,
-                                                                        className="btn-primary-modern btn-small",
-                                                                        title="Add a new metric/count"),
-                                                            html.Button([nav_icon("lucide:plus"), "Charts"],
-                                                                        id="add-section-btn",
-                                                                        n_clicks=0,
-                                                                        className="btn-primary-modern btn-small",
-                                                                        title="Add a new chart section"),
-                                                        ]),
-                                                    ],
-                                                ),
+                                                
                                                 # Tab management — only shown when Dashboard Type = Tab Outlook
                                                 html.Div(
                                                     id="tabs-management-section",
@@ -1226,6 +1207,15 @@ def create_edit_modal():
                                                             html.Button(nav_icon("lucide:save"), id="rename-tab-btn",
                                                                         n_clicks=0, className="icon-toolbar-btn",
                                                                         title="Save tab name"),
+                                                            html.Button(nav_icon("lucide:chevron-left"), id="move-tab-left-btn",
+                                                                        n_clicks=0, className="icon-toolbar-btn",
+                                                                        title="Move tab earlier"),
+                                                            html.Button(nav_icon("lucide:chevron-right"), id="move-tab-right-btn",
+                                                                        n_clicks=0, className="icon-toolbar-btn",
+                                                                        title="Move tab later"),
+                                                            html.Button(nav_icon("lucide:trash-2"), id="delete-tab-btn",
+                                                                        n_clicks=0, className="icon-toolbar-btn",
+                                                                        title="Delete tab"),
                                                             html.Button([nav_icon("lucide:plus"), "Add Tab"],
                                                                         id="add-tab-btn", n_clicks=0,
                                                                         className="btn-primary-modern btn-small",
@@ -1233,6 +1223,26 @@ def create_edit_modal():
                                                         ]),
                                                     ],
                                                 ),
+                                                html.Div(
+                                                    className="dashboard-card-header",
+                                                    style={"display": "flex", "alignItems": "center",
+                                                          "justifyContent": "space-between", "flexShrink": "0"},
+                                                          children=[
+                                                                html.H4("Dashboard Items", className="dashboard-card-title"),
+                                                                html.Div(style={"display": "flex", "gap": "6px"}, 
+                                                                    children=[
+                                                                        html.Button([nav_icon("lucide:plus"), "Metric"],
+                                                                                id="add-count-btn",
+                                                                                n_clicks=0,
+                                                                                className="btn-primary-modern btn-small",
+                                                                                title="Add a new metric/count"),
+                                                                        html.Button([nav_icon("lucide:plus"), "Charts"],
+                                                                                id="add-section-btn",
+                                                                                n_clicks=0,
+                                                                                className="btn-primary-modern btn-small",
+                                                                                title="Add a new chart section"),
+                                                                                ]),
+                                                ],),
                                                 html.Div(
                                                     id="dashboard-items-container",
                                                     className="dashboard-card-body",
