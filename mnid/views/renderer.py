@@ -16,7 +16,7 @@ from mnid.core.cache import (
     _executive_view_cache_key, _country_profile_cache_key,
     _load_dashboard_tab_config,
     _get_network_df_from_state,
-    _MNID_EXECUTIVE_DISK_CACHE, _MNID_UI_CACHE_TTL_SECONDS,
+    _MNID_EXECUTIVE_DISK_CACHE, _MNID_DATA_DISK_CACHE, _MNID_UI_CACHE_TTL_SECONDS,
     _network_df_cache, _NETWORK_DF_CACHE_MAX,
     _worker_view_cache, _WORKER_VIEW_CACHE_MAX,
     _EXECUTIVE_RENDER_VERSION,
@@ -142,14 +142,14 @@ def _prewarm_country_profile() -> bool:
                 scope_meta, opd_key, start_date, end_date, config.get('report_name'),
             )
             _cp_disk_key = _dk('cp', cp_key)
-            if _worker_view_cache.get(_cp_disk_key) or _MNID_EXECUTIVE_DISK_CACHE.get(_cp_disk_key):
+            if _worker_view_cache.get(_cp_disk_key) or _MNID_DATA_DISK_CACHE.get(_cp_disk_key):
                 _LOGGER.info('MNID country-profile pre-warm: already cached')
                 return False
 
             _LOGGER.info('MNID country-profile pre-warm: rendering...')
             country_label = 'Maternal & Newborn' if config.get('report_name') == 'Maternal Health' else 'Maternal'
             cp_view = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label, start_date=start_date, end_date=end_date)
-            _MNID_EXECUTIVE_DISK_CACHE.set(_cp_disk_key, cp_view, expire=_MNID_UI_CACHE_TTL_SECONDS)
+            _MNID_DATA_DISK_CACHE.set(_cp_disk_key, cp_view, expire=_MNID_UI_CACHE_TTL_SECONDS)
             _worker_view_cache[_cp_disk_key] = cp_view
             _trim_cache(_worker_view_cache, _WORKER_VIEW_CACHE_MAX)
             _LOGGER.info('MNID country-profile pre-warm: complete')
@@ -158,6 +158,30 @@ def _prewarm_country_profile() -> bool:
     except Exception as exc:
         _LOGGER.warning('MNID country-profile pre-warm failed: %s', exc)
     return False
+
+
+# Per-etv-key locks so two concurrent requests for the *same* tab (e.g. the
+# background-preload thread and a direct tab click landing close together)
+# don't both do the full KPI/coverage/heatmap computation independently --
+# confirmed live: the same maternal-dashboard build ran 4 times within one
+# second. The disk-cache write being sync vs async doesn't fix this on its
+# own since the *build* itself (0.5-0.7s) is the race window, not the write --
+# the second request needs to wait for the first's result, not just its write.
+_ETV_LOCKS: dict[str, threading.Lock] = {}
+_ETV_LOCKS_GUARD = threading.Lock()
+
+
+def _get_etv_lock(key: str) -> threading.Lock:
+    with _ETV_LOCKS_GUARD:
+        lock = _ETV_LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _ETV_LOCKS[key] = lock
+            # Bounded so a long-idle deployment doesn't accumulate one lock
+            # per distinct scope/tab combination forever.
+            if len(_ETV_LOCKS) > 256:
+                _ETV_LOCKS.pop(next(iter(_ETV_LOCKS)), None)
+        return lock
 
 
 def _build_executive_tab_view(
@@ -192,7 +216,7 @@ def _build_executive_tab_view(
 
     cached_view = _worker_view_cache.get(_etv_key)
     if cached_view is None and _use_disk_cache:
-        cached_view = _MNID_EXECUTIVE_DISK_CACHE.get(_etv_key)
+        cached_view = _MNID_DATA_DISK_CACHE.get(_etv_key)
         if cached_view is not None:
             _worker_view_cache[_etv_key] = cached_view
             _trim_cache(_worker_view_cache, _WORKER_VIEW_CACHE_MAX)
@@ -201,102 +225,120 @@ def _build_executive_tab_view(
             views[selected] = cached_view
         return cached_view
 
-    _etv_t0    = _time.monotonic()
-    network_df = _get_network_df_from_state(state)
-    _LOGGER.info('MNID tab timing: ndf fetch %.2fs (selected=%s)', _time.monotonic() - _etv_t0, selected)
-    _fdf_t0    = _time.monotonic()
-    facility_df = _get_facility_df_from_state(state, network_df=network_df)
-    _LOGGER.info('MNID tab timing: facility_df %.2fs (selected=%s)', _time.monotonic() - _fdf_t0, selected)
-
-    def _cache_view(view):
-        _worker_view_cache[_etv_key] = view
-        _trim_cache(_worker_view_cache, _WORKER_VIEW_CACHE_MAX)
-        if _use_disk_cache:
-            def _async_write():
-                try:
-                    _MNID_EXECUTIVE_DISK_CACHE.set(_etv_key, view, expire=_MNID_UI_CACHE_TTL_SECONDS)
-                except Exception:
-                    pass
-            threading.Thread(target=_async_write, daemon=True).start()
-
-    if selected == 'country-profile' and facility_df is not None:
-        _cp_t0 = _time.monotonic()
-        try:
-            cp_key = _country_profile_cache_key(
-                scope_meta, state.get('opd_key'), start_date, end_date,
-                config.get('report_name') if config else None,
-                (scope_meta or {}).get('selected_facilities') or (),
-                (scope_meta or {}).get('selected_districts') or (),
-            )
-            _cp_disk_key = _dk('cp', cp_key)
-            cp_cached    = _worker_view_cache.get(_cp_disk_key)
-            if cp_cached is None:
-                cp_cached = _MNID_EXECUTIVE_DISK_CACHE.get(_cp_disk_key)
-            if cp_cached is None:
-                cp_cached = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label, start_date=start_date, end_date=end_date)
-                _MNID_EXECUTIVE_DISK_CACHE.set(_cp_disk_key, cp_cached, expire=_MNID_UI_CACHE_TTL_SECONDS)
-            _worker_view_cache[_cp_disk_key] = cp_cached
-            _trim_cache(_worker_view_cache, _WORKER_VIEW_CACHE_MAX)
-            views[selected] = cp_cached
-            _LOGGER.info('MNID tab timing: country-profile build %.2fs', _time.monotonic() - _cp_t0)
-            return cp_cached
-        except Exception:
-            _LOGGER.exception('MNID country-profile build failed (selected=%s)', selected)
-            raise
-
-    if selected == 'operational-readiness' and facility_df is not None:
-        _rd_t0 = _time.monotonic()
-        try:
-            rendered_view = render_operational_readiness(
-                facility_df, supply_inds=supply_inds, wf_inds=wf_inds, dq_inds=dq_inds,
-                scope_meta=scope_meta, start_date=start_date, end_date=end_date,
-            )
+    _lock = _get_etv_lock(_etv_key)
+    _lock.acquire()
+    try:
+        # Double-check: another thread may have finished computing and
+        # cached this exact view while we were waiting for the lock.
+        cached_view = _worker_view_cache.get(_etv_key)
+        if cached_view is None and _use_disk_cache:
+            cached_view = _MNID_DATA_DISK_CACHE.get(_etv_key)
+            if cached_view is not None:
+                _worker_view_cache[_etv_key] = cached_view
+                _trim_cache(_worker_view_cache, _WORKER_VIEW_CACHE_MAX)
+        if cached_view is not None:
             if store_in_views:
-                views[selected] = rendered_view
-            _cache_view(rendered_view)
-            _LOGGER.info('MNID tab timing: operational-readiness build %.2fs', _time.monotonic() - _rd_t0)
-            return rendered_view
-        except Exception:
-            _LOGGER.exception('MNID operational-readiness build failed (selected=%s)', selected)
-            raise
+                views[selected] = cached_view
+            return cached_view
 
-    if selected == 'maternal-dashboard' and network_df is not None and config is not None:
-        _mat_t0 = _time.monotonic()
-        bundle = _build_mnid_indicator_content(
-            network_df=network_df, config=config,
-            facility_code=facility_code,
-            start_date=start_date, end_date=end_date,
-            scope_meta=scope_meta, include_content=True,
-        )
-        rendered_view = bundle.get('indicator_content', html.Div())
-        _LOGGER.info('MNID tab timing: maternal build %.2fs', _time.monotonic() - _mat_t0)
-        if store_in_views:
-            views[selected] = rendered_view
-        _cache_view(rendered_view)
-        return rendered_view
+        _etv_t0    = _time.monotonic()
+        network_df = _get_network_df_from_state(state)
+        _LOGGER.info('MNID tab timing: ndf fetch %.2fs (selected=%s)', _time.monotonic() - _etv_t0, selected)
+        _fdf_t0    = _time.monotonic()
+        facility_df = _get_facility_df_from_state(state, network_df=network_df)
+        _LOGGER.info('MNID tab timing: facility_df %.2fs (selected=%s)', _time.monotonic() - _fdf_t0, selected)
 
-    if selected == 'newborn-dashboard':
-        newborn_config    = state.get('newborn_config')
-        newborn_scope_meta = state.get('newborn_scope_meta')
-        if network_df is not None and newborn_config is not None:
+        def _cache_view(view):
+            _worker_view_cache[_etv_key] = view
+            _trim_cache(_worker_view_cache, _WORKER_VIEW_CACHE_MAX)
+            if _use_disk_cache:
+                def _async_write():
+                    try:
+                        _MNID_DATA_DISK_CACHE.set(_etv_key, view, expire=_MNID_UI_CACHE_TTL_SECONDS)
+                    except Exception:
+                        pass
+                threading.Thread(target=_async_write, daemon=True).start()
+
+        if selected == 'country-profile' and facility_df is not None:
+            _cp_t0 = _time.monotonic()
+            try:
+                cp_key = _country_profile_cache_key(
+                    scope_meta, state.get('opd_key'), start_date, end_date,
+                    config.get('report_name') if config else None,
+                    (scope_meta or {}).get('selected_facilities') or (),
+                    (scope_meta or {}).get('selected_districts') or (),
+                )
+                _cp_disk_key = _dk('cp', cp_key)
+                cp_cached    = _worker_view_cache.get(_cp_disk_key)
+                if cp_cached is None:
+                    cp_cached = _MNID_DATA_DISK_CACHE.get(_cp_disk_key)
+                if cp_cached is None:
+                    cp_cached = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label, start_date=start_date, end_date=end_date)
+                    _MNID_DATA_DISK_CACHE.set(_cp_disk_key, cp_cached, expire=_MNID_UI_CACHE_TTL_SECONDS)
+                _worker_view_cache[_cp_disk_key] = cp_cached
+                _trim_cache(_worker_view_cache, _WORKER_VIEW_CACHE_MAX)
+                views[selected] = cp_cached
+                _LOGGER.info('MNID tab timing: country-profile build %.2fs', _time.monotonic() - _cp_t0)
+                return cp_cached
+            except Exception:
+                _LOGGER.exception('MNID country-profile build failed (selected=%s)', selected)
+                raise
+
+        if selected == 'operational-readiness' and facility_df is not None:
+            _rd_t0 = _time.monotonic()
+            try:
+                rendered_view = render_operational_readiness(
+                    facility_df, supply_inds=supply_inds, wf_inds=wf_inds, dq_inds=dq_inds,
+                    scope_meta=scope_meta, start_date=start_date, end_date=end_date,
+                )
+                if store_in_views:
+                    views[selected] = rendered_view
+                _cache_view(rendered_view)
+                _LOGGER.info('MNID tab timing: operational-readiness build %.2fs', _time.monotonic() - _rd_t0)
+                return rendered_view
+            except Exception:
+                _LOGGER.exception('MNID operational-readiness build failed (selected=%s)', selected)
+                raise
+
+        if selected == 'maternal-dashboard' and network_df is not None and config is not None:
+            _mat_t0 = _time.monotonic()
             bundle = _build_mnid_indicator_content(
-                network_df=network_df, config=newborn_config,
+                network_df=network_df, config=config,
                 facility_code=facility_code,
                 start_date=start_date, end_date=end_date,
-                scope_meta=newborn_scope_meta, include_content=True,
+                scope_meta=scope_meta, include_content=True,
             )
             rendered_view = bundle.get('indicator_content', html.Div())
+            _LOGGER.info('MNID tab timing: maternal build %.2fs', _time.monotonic() - _mat_t0)
             if store_in_views:
                 views[selected] = rendered_view
             _cache_view(rendered_view)
             return rendered_view
 
-    _LOGGER.warning(
-        'MNID tab %s fell through to blank -- facility_df=%s network_df=%s config=%s newborn_config=%s',
-        selected, facility_df is not None, network_df is not None,
-        config is not None, state.get('newborn_config') is not None,
-    )
-    return views.get('country-profile', html.Div())
+        if selected == 'newborn-dashboard':
+            newborn_config    = state.get('newborn_config')
+            newborn_scope_meta = state.get('newborn_scope_meta')
+            if network_df is not None and newborn_config is not None:
+                bundle = _build_mnid_indicator_content(
+                    network_df=network_df, config=newborn_config,
+                    facility_code=facility_code,
+                    start_date=start_date, end_date=end_date,
+                    scope_meta=newborn_scope_meta, include_content=True,
+                )
+                rendered_view = bundle.get('indicator_content', html.Div())
+                if store_in_views:
+                    views[selected] = rendered_view
+                _cache_view(rendered_view)
+                return rendered_view
+
+        _LOGGER.warning(
+            'MNID tab %s fell through to blank -- facility_df=%s network_df=%s config=%s newborn_config=%s',
+            selected, facility_df is not None, network_df is not None,
+            config is not None, state.get('newborn_config') is not None,
+        )
+        return views.get('country-profile', html.Div())
+    finally:
+        _lock.release()
 
 
 def _render_beginnings_shell(initial_tab: str, hidden_mnid_tabs: set[str], newborn_config, initial_children=None, scope_meta: dict | None = None) -> html.Div:
@@ -437,6 +479,10 @@ def render_mnid_dashboard(filtered, data_opd, data_path, config,
 
     route = (scope_meta or {}).get('route', 'default')
     source = get_mnid_data_source(route, source='dhis2' if route == 'dhis2' else 'mahis')
+    # Captured before data_opd gets overwritten by its own query result below --
+    # this is the recipe _get_network_df_from_state needs to rebuild network_df
+    # on a cache miss instead of returning None (see that function's docstring).
+    _data_opd_sql = data_opd if isinstance(filtered, str) else None
     if isinstance(filtered, str):
         source_path = Path(data_path)
         if not source_path.is_absolute():
@@ -523,6 +569,8 @@ def render_mnid_dashboard(filtered, data_opd, data_path, config,
             'opd_key':           _opd_key,
             'route':             route,
             'config':            config,
+            'ndf_rebuild_sql':   _data_opd_sql,
+            'ndf_rebuild_path':  data_path,
             'facility_code':     facility_code,
             'start_date':        start_date,
             'end_date':          end_date,
@@ -540,27 +588,33 @@ def render_mnid_dashboard(filtered, data_opd, data_path, config,
     )
 
     _ndf_key = _dk('ndf', _opd_key)
-    if _MNID_EXECUTIVE_DISK_CACHE.get(_ndf_key) is None:
-        _ndf_snap    = network_df
-        _opd_key_snap = _opd_key
-        def _async_write_ndf():
-            try:
-                _MNID_EXECUTIVE_DISK_CACHE.set(_ndf_key, _ndf_snap, expire=_MNID_UI_CACHE_TTL_SECONDS)
-                _MNID_EXECUTIVE_DISK_CACHE.set('ndf:latest_key',     _ndf_key,     expire=_MNID_UI_CACHE_TTL_SECONDS)
-                _MNID_EXECUTIVE_DISK_CACHE.set('ndf:latest_opd_key', _opd_key_snap, expire=_MNID_UI_CACHE_TTL_SECONDS)
-            except Exception:
-                pass
-        threading.Thread(target=_async_write_ndf, daemon=True).start()
+    if _MNID_DATA_DISK_CACHE.get(_ndf_key) is None:
+        # Was fire-and-forget in a background thread -- with --workers 4, any
+        # tab click or the background-preload timer landing on a *different*
+        # worker process (their own in-memory _network_df_cache never had
+        # this opd_key) depended entirely on this write finishing first.
+        # Confirmed live: every tab (maternal/newborn/country-profile/
+        # operational-readiness) fell through blank with network_df=None
+        # right after a slow ("Last 3 Months") page load, because this write
+        # hadn't landed yet. Writing synchronously costs a bit more on this
+        # one first request but means every other worker can see it
+        # immediately after.
+        try:
+            _MNID_DATA_DISK_CACHE.set(_ndf_key, network_df, expire=_MNID_UI_CACHE_TTL_SECONDS)
+            _MNID_DATA_DISK_CACHE.set('ndf:latest_key',     _ndf_key, expire=_MNID_UI_CACHE_TTL_SECONDS)
+            _MNID_DATA_DISK_CACHE.set('ndf:latest_opd_key', _opd_key, expire=_MNID_UI_CACHE_TTL_SECONDS)
+        except Exception:
+            _LOGGER.exception('Failed to write network_df to disk cache for opd_key=%s', _opd_key)
 
     _target_tab = initial_tab if initial_tab in {'country-profile', 'operational-readiness', 'maternal-dashboard', 'newborn-dashboard'} else 'country-profile'
     if _target_tab == 'country-profile':
         _cp_disk_key = _dk('cp', _country_profile_cache_key(
             scope_meta, _opd_key, start_date, end_date, config.get('report_name'),
         ))
-        cp_cached = _MNID_EXECUTIVE_DISK_CACHE.get(_cp_disk_key)
+        cp_cached = _MNID_DATA_DISK_CACHE.get(_cp_disk_key)
         if cp_cached is None:
             cp_cached = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label, start_date=start_date, end_date=end_date)
-            _MNID_EXECUTIVE_DISK_CACHE.set(_cp_disk_key, cp_cached, expire=_MNID_UI_CACHE_TTL_SECONDS)
+            _MNID_DATA_DISK_CACHE.set(_cp_disk_key, cp_cached, expire=_MNID_UI_CACHE_TTL_SECONDS)
         executive_content['country-profile'] = cp_cached
         _initial_ec = [executive_content['country-profile']]
     else:

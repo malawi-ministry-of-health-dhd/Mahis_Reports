@@ -16,7 +16,7 @@ from mnid.core.cache import (  # noqa: F401
     _executive_view_cache_key, _country_profile_cache_key,
     _load_dashboard_tab_config, _resolve_scope_filters,
     _get_network_df_from_state, clear_runtime_caches,
-    _MNID_EXECUTIVE_DISK_CACHE, _MNID_UI_CACHE_TTL_SECONDS,
+    _MNID_EXECUTIVE_DISK_CACHE, _MNID_DATA_DISK_CACHE, _MNID_UI_CACHE_TTL_SECONDS,
     _network_df_cache, _NETWORK_DF_CACHE_MAX,
     _worker_view_cache, _WORKER_VIEW_CACHE_MAX,
     _MNID_WARNED_MESSAGES, _COUNTRY_PROFILE_RENDER_VERSION,

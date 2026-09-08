@@ -20,7 +20,31 @@ _MNID_UI_CACHE_TTL_SECONDS = 3600
 _EXECUTIVE_CACHE_DIR = os.environ.get('MNID_EXEC_CACHE_DIR') or os.path.join(
     os.path.dirname(os.path.abspath(__file__)), '..', '..', '.mnid_exec_cache'
 )
-_MNID_EXECUTIVE_DISK_CACHE = diskcache.Cache(_EXECUTIVE_CACHE_DIR, size_limit=512 * 1024 * 1024)
+_DATA_CACHE_DIR = os.environ.get('MNID_DATA_CACHE_DIR') or os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), '..', '..', '.mnid_data_cache'
+)
+# Two separate stores, split by size/criticality rather than sharing one pool:
+#
+# _MNID_EXECUTIVE_DISK_CACHE ("state"): ec:/ed: keys only -- the small
+# per-tab-session dicts (facility_code, dates, config, the ndf rebuild
+# recipe...). A few KB each. Losing one silently blanks every executive tab
+# for that browser session with no error (see _build_executive_tab_view's
+# fallthrough logging), so it gets a small, cheap-to-honour size limit of its
+# own that nothing else can eat into.
+#
+# _MNID_DATA_DISK_CACHE ("data"): ndf:/etv:/cp:/hms: and _remember_ui_payload
+# keys -- the large, disposable stuff (raw network_df DataFrames, easily
+# 50-150MB+ pickled for a wide multi-month scope; rendered tab/chart
+# content). Every one of these already has (or, for network_df, now has --
+# see _get_network_df_from_state) a rebuild-on-miss path, so evicting them
+# under size pressure just costs one slower request, never a blank page.
+#
+# Before this split both lived in one 512MB-limited cache, and a couple of
+# large DataFrames were confirmed live to evict a tab's own state entry well
+# before its 1h TTL ('config' went from present to missing for the same
+# executive_token within ~2 minutes).
+_MNID_EXECUTIVE_DISK_CACHE = diskcache.Cache(_EXECUTIVE_CACHE_DIR, size_limit=256 * 1024 * 1024)
+_MNID_DATA_DISK_CACHE      = diskcache.Cache(_DATA_CACHE_DIR, size_limit=3 * 1024 * 1024 * 1024)
 _MNID_WARNED_MESSAGES: set = set()
 _COUNTRY_PROFILE_RENDER_VERSION = "country-profile-v51-dark-hover-median-line"
 _EXECUTIVE_RENDER_VERSION = "executive-v58-denominator-fixes"
@@ -210,16 +234,49 @@ def _resolve_scope_filters(df: pd.DataFrame, scope_meta: dict | None = None) -> 
 
 
 def _get_network_df_from_state(state: dict):
-    """Return network_df: check per-worker cache first, then shared diskcache."""
+    """Return network_df: check per-worker cache, then shared diskcache, then
+    rebuild from source as a last resort.
+
+    Before the rebuild fallback, a miss on both caches (eviction under the
+    disk cache's size limit, a race with the write that populates it, a
+    worker restart, ...) meant every executive tab (Country Profile,
+    Operational Readiness, Maternal, Newborn alike) silently fell through to
+    a blank div with no error -- confirmed live via
+    mnid.views.renderer._build_executive_tab_view's fallthrough logging.
+    Rebuilding here means a cache miss just costs one slow request instead of
+    a broken page until a full reload.
+    """
     opd_key = state.get('opd_key')
     if opd_key is None:
         return None
     if opd_key in _network_df_cache:
         return _network_df_cache[opd_key]
-    ndf = _MNID_EXECUTIVE_DISK_CACHE.get(_dk('ndf', opd_key))
+    ndf = _MNID_DATA_DISK_CACHE.get(_dk('ndf', opd_key))
     if ndf is not None:
         _network_df_cache[opd_key] = ndf
         _trim_cache(_network_df_cache, _NETWORK_DF_CACHE_MAX)
+        return ndf
+
+    rebuild_sql  = state.get('ndf_rebuild_sql')
+    rebuild_path = state.get('ndf_rebuild_path')
+    if not rebuild_sql or not rebuild_path:
+        return None
+    try:
+        _LOGGER.warning('network_df cache miss for opd_key=%s, rebuilding from source.', opd_key)
+        from data_storage import DataStorage as _DS
+        from mnid.core.data_utils import prepare_mnid_dataframe as _prepare_mnid_dataframe
+        data_opd = _DS.query_duckdb(f"SELECT * FROM '{rebuild_path}' WHERE {rebuild_sql}")
+        ndf = _prepare_mnid_dataframe(data_opd, route=state.get('route', 'default'))
+    except Exception:
+        _LOGGER.exception('network_df rebuild failed for opd_key=%s', opd_key)
+        return None
+
+    _network_df_cache[opd_key] = ndf
+    _trim_cache(_network_df_cache, _NETWORK_DF_CACHE_MAX)
+    try:
+        _MNID_DATA_DISK_CACHE.set(_dk('ndf', opd_key), ndf, expire=_MNID_UI_CACHE_TTL_SECONDS)
+    except Exception:
+        pass
     return ndf
 
 
@@ -228,6 +285,10 @@ def clear_runtime_caches() -> None:
     _worker_view_cache.clear()
     try:
         _MNID_EXECUTIVE_DISK_CACHE.clear()
+    except Exception:
+        pass
+    try:
+        _MNID_DATA_DISK_CACHE.clear()
     except Exception:
         pass
     from mnid.aggregation.store import invalidate_cache as _agg_invalidate
@@ -287,13 +348,13 @@ def _warm_worker_ndf_from_diskcache() -> None:
     """Load the most-recently-written network_df into this worker's in-memory cache."""
     def _load():
         try:
-            ndf_key = _MNID_EXECUTIVE_DISK_CACHE.get('ndf:latest_key')
-            opd_key = _MNID_EXECUTIVE_DISK_CACHE.get('ndf:latest_opd_key')
+            ndf_key = _MNID_DATA_DISK_CACHE.get('ndf:latest_key')
+            opd_key = _MNID_DATA_DISK_CACHE.get('ndf:latest_opd_key')
             if ndf_key is None or opd_key is None:
                 return
             if opd_key in _network_df_cache:
                 return
-            ndf = _MNID_EXECUTIVE_DISK_CACHE.get(ndf_key)
+            ndf = _MNID_DATA_DISK_CACHE.get(ndf_key)
             if ndf is None:
                 return
             _network_df_cache[opd_key] = ndf

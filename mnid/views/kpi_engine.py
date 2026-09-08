@@ -10,7 +10,7 @@ from dash import html
 from mnid.core.cache import (
     _dk, _trim_cache, _agg_version_stamp,
     _resolve_scope_filters,
-    _MNID_EXECUTIVE_DISK_CACHE, _MNID_UI_CACHE_TTL_SECONDS,
+    _MNID_DATA_DISK_CACHE, _MNID_UI_CACHE_TTL_SECONDS,
     _network_df_cache, _NETWORK_DF_CACHE_MAX,
     _get_network_df_from_state,
 )
@@ -832,7 +832,7 @@ def _resolve_heatmap_store(network_df: pd.DataFrame, all_inds: list,
         _s_key, _e_key,
     )
     _hms_key = _dk('hms', cache_key)
-    cached_hms = _MNID_EXECUTIVE_DISK_CACHE.get(_hms_key)
+    cached_hms = _MNID_DATA_DISK_CACHE.get(_hms_key)
     if cached_hms is None:
         # Same window the KPI cards use (facility_df) -- the heatmap is no
         # longer an independent "all time" view with its own Year selector.
@@ -862,5 +862,5 @@ def _resolve_heatmap_store(network_df: pd.DataFrame, all_inds: list,
             cached_hms = _compute_heatmap_store(row_level_df, tracked, facility_code)
         if selected_districts:
             cached_hms['current_district'] = selected_districts[0]
-        _MNID_EXECUTIVE_DISK_CACHE.set(_hms_key, cached_hms, expire=_MNID_UI_CACHE_TTL_SECONDS)
+        _MNID_DATA_DISK_CACHE.set(_hms_key, cached_hms, expire=_MNID_UI_CACHE_TTL_SECONDS)
     return cached_hms
