@@ -220,33 +220,45 @@ def _build_executive_tab_view(
             threading.Thread(target=_async_write, daemon=True).start()
 
     if selected == 'country-profile' and facility_df is not None:
-        cp_key = _country_profile_cache_key(
-            scope_meta, state.get('opd_key'), start_date, end_date,
-            config.get('report_name') if config else None,
-            (scope_meta or {}).get('selected_facilities') or (),
-            (scope_meta or {}).get('selected_districts') or (),
-        )
-        _cp_disk_key = _dk('cp', cp_key)
-        cp_cached    = _worker_view_cache.get(_cp_disk_key)
-        if cp_cached is None:
-            cp_cached = _MNID_EXECUTIVE_DISK_CACHE.get(_cp_disk_key)
-        if cp_cached is None:
-            cp_cached = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label, start_date=start_date, end_date=end_date)
-            _MNID_EXECUTIVE_DISK_CACHE.set(_cp_disk_key, cp_cached, expire=_MNID_UI_CACHE_TTL_SECONDS)
-        _worker_view_cache[_cp_disk_key] = cp_cached
-        _trim_cache(_worker_view_cache, _WORKER_VIEW_CACHE_MAX)
-        views[selected] = cp_cached
-        return cp_cached
+        _cp_t0 = _time.monotonic()
+        try:
+            cp_key = _country_profile_cache_key(
+                scope_meta, state.get('opd_key'), start_date, end_date,
+                config.get('report_name') if config else None,
+                (scope_meta or {}).get('selected_facilities') or (),
+                (scope_meta or {}).get('selected_districts') or (),
+            )
+            _cp_disk_key = _dk('cp', cp_key)
+            cp_cached    = _worker_view_cache.get(_cp_disk_key)
+            if cp_cached is None:
+                cp_cached = _MNID_EXECUTIVE_DISK_CACHE.get(_cp_disk_key)
+            if cp_cached is None:
+                cp_cached = render_country_profile(facility_df, scope_meta=scope_meta, indicator_label=country_label, start_date=start_date, end_date=end_date)
+                _MNID_EXECUTIVE_DISK_CACHE.set(_cp_disk_key, cp_cached, expire=_MNID_UI_CACHE_TTL_SECONDS)
+            _worker_view_cache[_cp_disk_key] = cp_cached
+            _trim_cache(_worker_view_cache, _WORKER_VIEW_CACHE_MAX)
+            views[selected] = cp_cached
+            _LOGGER.info('MNID tab timing: country-profile build %.2fs', _time.monotonic() - _cp_t0)
+            return cp_cached
+        except Exception:
+            _LOGGER.exception('MNID country-profile build failed (selected=%s)', selected)
+            raise
 
     if selected == 'operational-readiness' and facility_df is not None:
-        rendered_view = render_operational_readiness(
-            facility_df, supply_inds=supply_inds, wf_inds=wf_inds, dq_inds=dq_inds,
-            scope_meta=scope_meta, start_date=start_date, end_date=end_date,
-        )
-        if store_in_views:
-            views[selected] = rendered_view
-        _cache_view(rendered_view)
-        return rendered_view
+        _rd_t0 = _time.monotonic()
+        try:
+            rendered_view = render_operational_readiness(
+                facility_df, supply_inds=supply_inds, wf_inds=wf_inds, dq_inds=dq_inds,
+                scope_meta=scope_meta, start_date=start_date, end_date=end_date,
+            )
+            if store_in_views:
+                views[selected] = rendered_view
+            _cache_view(rendered_view)
+            _LOGGER.info('MNID tab timing: operational-readiness build %.2fs', _time.monotonic() - _rd_t0)
+            return rendered_view
+        except Exception:
+            _LOGGER.exception('MNID operational-readiness build failed (selected=%s)', selected)
+            raise
 
     if selected == 'maternal-dashboard' and network_df is not None and config is not None:
         _mat_t0 = _time.monotonic()
@@ -279,6 +291,11 @@ def _build_executive_tab_view(
             _cache_view(rendered_view)
             return rendered_view
 
+    _LOGGER.warning(
+        'MNID tab %s fell through to blank -- facility_df=%s network_df=%s config=%s newborn_config=%s',
+        selected, facility_df is not None, network_df is not None,
+        config is not None, state.get('newborn_config') is not None,
+    )
     return views.get('country-profile', html.Div())
 
 
