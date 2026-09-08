@@ -386,8 +386,3 @@ if __name__ == "__main__":
             transactional.fetch_transactional_data(date_column="encounter_datetime", incremental_id_column="encounter_id")
         except Exception as e:
             print(e)
-
-
-        # if CONCEPTS:
-        #     concepts = DataStorage(query=CONCEPTS)
-        #     concepts.fetch_and_save_single_table(table_name="concepts_data")

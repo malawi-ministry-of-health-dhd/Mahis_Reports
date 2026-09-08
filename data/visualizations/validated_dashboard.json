@@ -7370,12 +7370,14 @@
               "level": "facility",
               "flag": "ok",
               "display_average": "True",
-              "drill_down": "True",
+              "drill_down": "False",
               "filters": {
                 "measure": "nunique",
                 "unique": "visit_id",
                 "variable1": "Program",
-                "value1": "AETC PROGRAM"
+                "value1": "AETC PROGRAM",
+                "variable2": "Encounter",
+                "value2": "Visit"
               }
             },
             {
@@ -7397,6 +7399,96 @@
                 "value1": "AETC PROGRAM",
                 "variable2": "concept_name",
                 "value2": "Is Situation Urgent"
+              }
+            },
+            {
+              "id": "count_a70e7e4e",
+              "display": "True",
+              "name": "Urgent",
+              "level": "facility",
+              "flag": "",
+              "display_average": "False",
+              "href": "",
+              "drill_down": "False",
+              "show_trend": "False",
+              "group_by": "",
+              "custom_sql": "",
+              "filters": {
+                "measure": "count",
+                "unique": "visit_id",
+                "variable1": "Program",
+                "value1": "AETC PROGRAM",
+                "variable2": "concept_name",
+                "value2": "Is Situation Urgent",
+                "variable3": "Value",
+                "value3": "Yes"
+              }
+            },
+            {
+              "id": "count_e83afc4d",
+              "display": "True",
+              "name": "Not Urgent",
+              "level": "facility",
+              "flag": "",
+              "display_average": "False",
+              "href": "",
+              "drill_down": "False",
+              "show_trend": "False",
+              "group_by": "",
+              "custom_sql": "",
+              "filters": {
+                "measure": "count",
+                "unique": "visit_id",
+                "variable1": "Program",
+                "value1": "AETC PROGRAM",
+                "variable2": "concept_name",
+                "value2": "Is Situation Urgent",
+                "variable3": "Value",
+                "value3": "No"
+              }
+            },
+            {
+              "id": "count_41dfcf23",
+              "display": "True",
+              "name": "Elective",
+              "level": "facility",
+              "flag": "",
+              "display_average": "False",
+              "href": "",
+              "drill_down": "False",
+              "show_trend": "False",
+              "group_by": "",
+              "custom_sql": "",
+              "filters": {
+                "measure": "count",
+                "unique": "visit_id",
+                "variable1": "Program",
+                "value1": "AETC PROGRAM",
+                "variable2": "concept_name",
+                "value2": "Is Situation Urgent",
+                "variable3": "Value",
+                "value3": "Elective"
+              }
+            },
+            {
+              "id": "count_d91a2391",
+              "display": "True",
+              "name": "Screened In",
+              "level": "facility",
+              "flag": "",
+              "display_average": "False",
+              "href": "",
+              "drill_down": "False",
+              "show_trend": "False",
+              "group_by": "",
+              "custom_sql": "",
+              "filters": {
+                "measure": "count",
+                "unique": "visit_id",
+                "variable1": "Program",
+                "value1": "AETC PROGRAM",
+                "variable2": "concept_name",
+                "value2": "!=Patient Referred To"
               }
             }
           ],
@@ -7485,9 +7577,9 @@
         }
       }
     ],
-    "count_items_per_row": 5,
+    "count_items_per_row": 6,
     "associated_programs": [],
     "access": "global",
-    "date_updated": "2026-09-08 17:49:35"
+    "date_updated": "2026-09-08 20:20:02"
   }
 ]
