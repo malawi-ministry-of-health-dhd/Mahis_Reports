@@ -239,23 +239,6 @@
           },
           "group_by": "Program",
           "custom_sql": "SELECT DISTINCT v.person_id, v.Date FROM 'data' v INNER JOIN (SELECT DISTINCT person_id, MIN(Date) AS first_visit_date FROM 'data' GROUP BY person_id) fv ON v.person_id = fv.person_id WHERE v.date > fv.first_visit_date "
-        },
-        {
-          "id": "count_6a279ec6",
-          "display": "True",
-          "name": "",
-          "level": "facility",
-          "flag": "",
-          "display_average": "False",
-          "href": "",
-          "drill_down": "False",
-          "show_trend": "False",
-          "group_by": "",
-          "custom_sql": "",
-          "filters": {
-            "measure": "count",
-            "unique": "person_id"
-          }
         }
       ],
       "charts": {
@@ -890,7 +873,9 @@
         ]
       }
     },
-    "date_updated": "2026-09-08 12:18:02"
+    "date_updated": "2026-09-08 21:24:45",
+    "associated_programs": [],
+    "access": "global"
   },
   {
     "report_id": "report_20c213d4",
@@ -7488,7 +7473,9 @@
                 "variable1": "Program",
                 "value1": "AETC PROGRAM",
                 "variable2": "concept_name",
-                "value2": "!=Patient Referred To"
+                "value2": "!=Patient Referred To",
+                "variable3": "Encounter",
+                "value3": "Screening"
               }
             }
           ],
@@ -7580,6 +7567,6 @@
     "count_items_per_row": 6,
     "associated_programs": [],
     "access": "global",
-    "date_updated": "2026-09-08 20:20:02"
+    "date_updated": "2026-09-08 20:34:27"
   }
 ]

@@ -99,3 +99,9 @@ saved_queries.json.mnid_exec_cache/
 .temp/
 logs/
 /mnid/dhis2/config/source
+
+# DuckDB storage experiment
+# data_storage_duckdb.py
+# db_services_duckdb.py
+data/*/duckdb/
+INSTRUCTION.md 

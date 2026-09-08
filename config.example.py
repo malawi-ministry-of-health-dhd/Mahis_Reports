@@ -26,6 +26,13 @@ MNH_DHIS2_PASSWORD = 'Password'
 # mnid/dhis2, see mnid/dhis2/mnid_publish.py).
 MNID_DATA_SOURCE = 'mahis'
 
+# DUCKDB
+DUCKDB_DIR_NAME      = "duckdb" 
+DUCKDB_FILE_NAME     = "mahis.duckdb"
+DUCKDB_TABLE_NAME    = "encounters"
+DUCKDB_KEY_COLUMNS   = ["obs_id"] 
+DUCKDB_LOOKBACK_DAYS = 7 
+
 # REFERENCE COLUMNS
 FIRST_NAME_ = 'given_name'
 LAST_NAME_ = 'family_name'
@@ -41,12 +48,12 @@ NEW_REVISIT_ = 'new_revisit'
 HOME_DISTRICT_ = 'Home_district'
 TA_ = 'TA'
 VILLAGE_ = 'Village'
+BIRTHDATE_ = 'birthdate'
+CELL_ = 'cell'
 FACILITY_CODE_ = 'Facility_CODE'
 OBS_VALUE_CODED_ = 'obs_value_coded'
 OBS_DATETIME_ = 'obs_datetime'
 VALUE_DATETIME_ = 'value_datetime'
-BIRTHDATE_ = 'birthdate'
-CELL_ = 'cell'
 CONCEPT_NAME_ = 'concept_name'
 VALUE_ = 'Value'
 VALUE_NUMERIC_ = 'ValueN'

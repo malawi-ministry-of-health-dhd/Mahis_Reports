@@ -1,0 +1,298 @@
+"""
+DuckDB-file-backed alternative to DataStorage (see data_storage.py) — fully self-contained,
+imports nothing from data_storage.py or db_services.py.
+
+Instead of scanning month-partitioned parquet files on every query, this keeps one persisted
+DuckDB database file per route (data/<route>/duckdb/mahis.duckdb) with a single table holding
+the harmonized obs-level data. New rows are inserted; rows that already exist (matched by
+config.DUCKDB_KEY_COLUMNS) are overwritten with the latest values, so edits made in OpenMRS
+after the original fetch get reconciled instead of silently missed.
+
+Like data_storage.py, this reads configurations.json for the list of data sources to pull
+(creating a default entry if the file doesn't exist yet), fetches each source's small lookup
+tables (programs, concepts, encounter types, locations, drugs, order types, users) to CSV,
+harmonizes the raw transactional fetch against them, then upserts the result.
+
+See INSTRUCTION.md for how this plugs into the app in place of DataStorage.query_duckdb.
+"""
+import os
+import json
+import duckdb
+import pandas as pd
+import config as cfg
+from db_services_duckdb import DataFetcherDuckDB
+
+CONFIGURATIONS_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configurations.json")
+
+
+def load_or_create_configurations():
+    """Same configurations.json used by data_storage.py's __main__ — shared data, not code.
+    Creates a single default entry (mirroring data_storage.py's fallback) if the file doesn't
+    exist yet."""
+    if os.path.exists(CONFIGURATIONS_PATH):
+        with open(CONFIGURATIONS_PATH) as f:
+            configurations = json.load(f)
+        # JSON serialises tuples as arrays; restore remote_bind_address to a tuple
+        for item in configurations:
+            ssh = item.get("ssh_config")
+            if isinstance(ssh, dict) and isinstance(ssh.get("remote_bind_address"), list):
+                ssh["remote_bind_address"] = tuple(ssh["remote_bind_address"])
+        return configurations
+
+    configurations = [{
+        "uuid": "uuid_default",
+        "name": "Default Configuration",
+        "use_localhost": cfg.USE_LOCALHOST,
+        "start_date": cfg.START_DATE,
+        "load_fresh_data": cfg.LOAD_FRESH_DATA,
+        "data_path": "default",
+        "base_query": cfg.QUERY_OBS_HARMONIZED_DUCKDB,
+        "pause_data_source": False,
+        "batch_size": cfg.BATCH_SIZE,
+        "db_config": cfg.DB_CONFIG,
+        "ssh_config": None if cfg.USE_LOCALHOST else cfg.SSH_CONFIG,
+    }]
+    with open(CONFIGURATIONS_PATH, 'w') as f:
+        json.dump(configurations, f, indent=2)
+    return configurations
+
+
+# (csv filename without extension, query, dict key column, dict value column)
+_SINGLE_TABLE_SPECS = [
+    ("programs_data",        cfg.QUERY_PROGRAMS,        "program_id",       "name"),
+    ("concept_names_data",   cfg.QUERY_CONCEPT_NAMES,   "concept_id",       "name"),
+    ("encounter_types_data", cfg.QUERY_ENCOUNTER_TYPES, "encounter_type_id", "name"),
+    ("locations_data",       cfg.QUERY_LOCATIONS,       "location_id",      "name"),
+    ("drugs_data",           cfg.QUERY_DRUGS,           "drug_id",          "name"),
+    ("order_types_data",     cfg.QUERY_ORDER_TYPES,     "order_type_id",    "name"),
+    ("users_data",           cfg.QUERY_USERS,           "user_id",          "User"),
+    ("user_programs_data",   cfg.QUERY_USER_PROGRAMS,   None,               None),  # fetched for parity; unused by harmonize (matches data_storage.py)
+]
+if not cfg.IS_HARMONIZED_MAHIS:
+    _SINGLE_TABLE_SPECS.insert(4, ("facilities_data", cfg.QUERY_FACILITIES, "code", "name"))
+
+
+class DataStorage:
+    def __init__(self, data_dir=cfg.DATA_PATH_, db_config=cfg.DB_CONFIG, ssh_config=cfg.SSH_CONFIG,
+                 load_fresh_data=cfg.LOAD_FRESH_DATA, use_localhost=cfg.USE_LOCALHOST,
+                 batch_size=cfg.BATCH_SIZE, start_date=cfg.START_DATE,
+                 table_name=cfg.DUCKDB_TABLE_NAME, key_columns=None):
+        self.script_dir = os.path.dirname(os.path.realpath(__file__))
+        self.duckdb_dir = os.path.join(self.script_dir, data_dir, cfg.DUCKDB_DIR_NAME)
+        self.tables_dir = os.path.join(self.duckdb_dir, "single_tables")
+        os.makedirs(self.duckdb_dir, exist_ok=True)
+        os.makedirs(self.tables_dir, exist_ok=True)
+        self.db_path = os.path.join(self.duckdb_dir, cfg.DUCKDB_FILE_NAME)
+
+        self.table_name = table_name
+        self.key_columns = key_columns or cfg.DUCKDB_KEY_COLUMNS
+        self.db_config = db_config
+        self.ssh_config = ssh_config
+        self.load_fresh_data = load_fresh_data
+        self.use_localhost = use_localhost
+        self.batch_size = batch_size
+        self.start_date = start_date
+
+    @classmethod
+    def from_config_entry(cls, entry):
+        """Build an instance from one configurations.json entry."""
+        return cls(
+            data_dir=f"data/{entry.get('data_path')}",
+            db_config=entry.get("db_config"),
+            ssh_config=entry.get("ssh_config"),
+            load_fresh_data=entry.get("load_fresh_data", True),
+            use_localhost=entry.get("use_localhost", True),
+            batch_size=entry.get("batch_size", 1000),
+            start_date=entry.get("start_date", "2026-01-01"),
+        )
+
+    def _make_fetcher(self):
+        return DataFetcherDuckDB(
+            use_localhost=self.use_localhost, ssh_config=self.ssh_config, db_config=self.db_config,
+            start_date=self.start_date, load_fresh_data=self.load_fresh_data,
+            batch_size=self.batch_size, batch_folder=os.path.join(self.duckdb_dir, "_tmp_batches"),
+            duckdb_path=self.db_path, duckdb_table=self.table_name,
+        )
+
+    def fetch_single_tables(self, fetcher=None):
+        """Fetch each lookup/dimension table fresh and save it as CSV under
+        data/<route>/duckdb/single_tables/ — separate from data_storage.py's own
+        data/<route>/single_tables/, so the two pipelines never interfere with each other.
+        Returns {csv_name: DataFrame}."""
+        fetcher = fetcher or self._make_fetcher()
+        tables = {}
+        for csv_name, query, *_ in _SINGLE_TABLE_SPECS:
+            df = fetcher.fetch_single_table(csv_name, query)
+            df.to_csv(os.path.join(self.tables_dir, f"{csv_name}.csv"), index=False)
+            tables[csv_name] = df
+        return tables
+
+    def _load_single_tables_from_csv(self):
+        """Read back whatever single tables are on disk (from the most recent
+        fetch_single_tables() call, this run or a previous one)."""
+        tables = {}
+        for csv_name, *_ in _SINGLE_TABLE_SPECS:
+            path = os.path.join(self.tables_dir, f"{csv_name}.csv")
+            if os.path.exists(path):
+                tables[csv_name] = pd.read_csv(path)
+        return tables
+
+    def harmonize(self, df: pd.DataFrame, tables: dict) -> pd.DataFrame:
+        """Map raw OpenMRS IDs to names, using pandas .map() against the small lookup tables
+        already fetched to CSV — the same approach data_storage.py uses. For this shape (a
+        large transactional batch joined against small dimension tables that fit comfortably
+        in memory), vectorized dict lookups are as fast as or faster than a SQL join's
+        round-trip/plan overhead, and they make it straightforward to preserve the exact same
+        value-resolution order as data_storage.py (see the note on Service_Area below).
+
+        NOTE: replicates data_storage.py's existing order exactly, including one quirk worth
+        flagging — Service_Area is computed from the *raw* Encounter id (Encounter isn't
+        mapped to its name until the line after), so CUSTOM_MNID_MAP_SERVICE_AREA (keyed by
+        encounter type *names* like "ANC VISIT") never actually matches anything there and it
+        silently falls back to Program every time. Kept as-is for parity with data_storage.py
+        rather than silently changed — flag it if that's not intended and I'll fix both.
+        """
+        if df is None or df.empty:
+            return df
+
+        df = df.copy()
+
+        def dict_from(csv_name, key_col, val_col):
+            t = tables.get(csv_name)
+            if t is None or key_col not in t.columns or val_col not in t.columns:
+                return {}
+            return t.set_index(key_col)[val_col].to_dict()
+
+        programs_dict        = dict_from("programs_data", "program_id", "name")
+        concepts_dict         = dict_from("concept_names_data", "concept_id", "name")
+        encounter_types_dict  = dict_from("encounter_types_data", "encounter_type_id", "name")
+        drugs_name_dict       = dict_from("drugs_data", "drug_id", "name")
+        drugs_unit_dict       = dict_from("drugs_data", "drug_id", "units")
+        order_type_dict       = dict_from("order_types_data", "order_type_id", "name")
+        username_dict         = dict_from("users_data", "user_id", "User")
+
+        locations_t = tables.get("locations_data")
+        facilities_t = tables.get("facilities_data")
+        if facilities_t is not None:
+            facilities_t = facilities_t.copy()
+            facilities_t["code"] = facilities_t["code"].astype(str)
+            facilities_dict = facilities_t.set_index("code")["name"].to_dict()
+            facility_districts_dict = facilities_t.set_index("code")["district"].to_dict()
+        elif locations_t is not None:
+            locations_t = locations_t.copy()
+            locations_t["location_id"] = locations_t["location_id"].astype(str)
+            facilities_dict = locations_t.set_index("location_id")["name"].to_dict()
+            facility_districts_dict = locations_t.set_index("location_id")["county_district"].to_dict()
+        else:
+            facilities_dict = {}
+            facility_districts_dict = {}
+
+        df["Gender"] = df["Gender"].map(cfg.CUSTOM_GENDER_MAP).fillna(df["Gender"])
+        df["Program"] = df["Program"].map(programs_dict)
+        df["Source_Program"] = df["Program"]
+        df["Reporting_Program"] = df["Source_Program"].map(cfg.CUSTOM_MNID_MAP_PROGRAM).fillna(df["Source_Program"])
+        df["Service_Area"] = (df["Encounter"].map(cfg.CUSTOM_MNID_MAP_SERVICE_AREA)
+                               .map({"NEONATAL PROGRAM": "NEONATAL"}).fillna(df["Program"]))
+        df["new_revisit"] = ""
+        df["concept_name"] = df["concept_name"].map(concepts_dict)
+        df["obs_value_coded"] = df["obs_value_coded"].map(concepts_dict)
+        df["Encounter"] = df["Encounter"].map(encounter_types_dict)
+        df["DrugUnits"] = df["DrugName"].map(drugs_unit_dict)
+        df["DrugName"] = df["DrugName"].map(drugs_name_dict)
+        df["User"] = df["creator"].map(username_dict)
+        df["Facility_CODE"] = df["location_id"]
+        df["Facility"] = df["Facility_CODE"].map(facilities_dict)
+        df["District"] = df["Facility_CODE"].map(facility_districts_dict)
+        df["Order_Type"] = df["Order_Type"].map(order_type_dict)
+        df["Order_Name"] = df["Order_Name"].map(concepts_dict)
+        return df.reset_index(drop=True)
+
+    def upsert_dataframe(self, df: pd.DataFrame) -> int:
+        """Insert new rows, overwrite rows that already exist (matched by key_columns).
+        Returns the number of incoming rows processed."""
+        if df is None or df.empty:
+            return 0
+
+        con = duckdb.connect(self.db_path)
+        try:
+            con.register("incoming_df", df)
+            table_exists = con.sql(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = ?",
+                params=[self.table_name],
+            ).fetchone()[0] > 0
+
+            if not table_exists:
+                con.execute(f"CREATE TABLE {self.table_name} AS SELECT * FROM incoming_df")
+                key_clause = ", ".join(self.key_columns)
+                con.execute(
+                    f"CREATE UNIQUE INDEX idx_{self.table_name}_key ON {self.table_name} ({key_clause})"
+                )
+                return len(df)
+
+            key_clause = ", ".join(self.key_columns)
+            update_cols = [c for c in df.columns if c not in self.key_columns]
+            set_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
+            con.execute(f"""
+                INSERT INTO {self.table_name}
+                SELECT * FROM incoming_df
+                ON CONFLICT ({key_clause}) DO UPDATE SET {set_clause}
+            """)
+            return len(df)
+        finally:
+            con.close()
+
+    def fetch_and_upsert(self, base_query=None, date_column="encounter_datetime", id_column="encounter_id",
+                          lookback_days=None, refresh_single_tables=True) -> int:
+        """Full pipeline for this route: fetch single tables (unless told not to), fetch the
+        trailing lookback window of transactional data, harmonize it against the single
+        tables, then upsert. Returns the number of rows upserted (0 if nothing new/changed)."""
+        base_query = base_query or cfg.QUERY_OBS_HARMONIZED_DUCKDB
+        if "obs_id" not in base_query:
+            print("WARNING: base_query has no obs_id column — falling back to "
+                  "config.QUERY_OBS_HARMONIZED_DUCKDB so the upsert key stays valid.")
+            base_query = cfg.QUERY_OBS_HARMONIZED_DUCKDB
+
+        fetcher = self._make_fetcher()
+
+        if refresh_single_tables:
+            tables = self.fetch_single_tables(fetcher)
+        else:
+            tables = self._load_single_tables_from_csv()
+
+        raw_df = fetcher.fetch_incremental(base_query, date_column=date_column,
+                                            id_column=id_column, lookback_days=lookback_days)
+        harmonized_df = self.harmonize(raw_df, tables)
+        return self.upsert_dataframe(harmonized_df)
+
+    @staticmethod
+    def query_duckdb(sql: str, data_dir: str = cfg.DATA_PATH_) -> pd.DataFrame:
+        """Same signature and return type as DataStorage.query_duckdb — see INSTRUCTION.md
+        for the one thing that does need to change at call sites: the FROM clause must
+        reference the table (cfg.DUCKDB_TABLE_NAME) instead of a parquet path/glob."""
+        script_dir = os.path.dirname(os.path.realpath(__file__))
+        db_path = os.path.join(script_dir, data_dir, cfg.DUCKDB_DIR_NAME, cfg.DUCKDB_FILE_NAME)
+        con = duckdb.connect(db_path, read_only=True)
+        try:
+            return con.execute(sql).df()
+        finally:
+            con.close()
+
+
+def run_all_configured_sources():
+    """Mirrors data_storage.py's __main__ loop: read (or create) configurations.json, run the
+    full fetch+harmonize+upsert pipeline for every entry that isn't paused."""
+    for entry in load_or_create_configurations():
+        if entry.get("pause_data_source"):
+            continue
+        try:
+            store = DataStorage.from_config_entry(entry)
+            rows = store.fetch_and_upsert(base_query=entry.get("base_query"))
+            print(f"[{entry.get('name', entry.get('uuid'))}] upserted {rows} rows into {store.db_path}")
+        except Exception as e:
+            print(f"[{entry.get('name', entry.get('uuid'))}] error: {e}")
+
+
+if __name__ == "__main__":
+    # `python data_storage_duckdb.py` — path is testable at data/default/duckdb
+    # (cfg.DATA_PATH_ defaults to "data/default").
+    run_all_configured_sources()
