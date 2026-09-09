@@ -5214,6 +5214,60 @@
           "variable1": "Service_Area",
           "value1": "PNC"
         }
+      },
+      {
+        "id": "mnid_nb_core_complicationasphyxia",
+        "label": "Birth asphyxia rate",
+        "category": "Newborn",
+        "target": 0,
+        "status": "tracked",
+        "numerator_filters": {
+          "unique": "person_id",
+          "variable1": "mnid_newborn_birth_asphyxia",
+          "value1": "Yes"
+        },
+        "denominator_filters": {
+          "unique": "person_id",
+          "variable1": "mnid_labour_live_birth",
+          "value1": "Yes"
+        },
+        "note": "Added to back Country Profile Run Chart toggle -- was previously only computed as a raw-row chart, not a tracked KPI/aggregate indicator. Target benchmark not yet reviewed."
+      },
+      {
+        "id": "mnid_nb_core_complicationprematurity",
+        "label": "Preterm birth rate",
+        "category": "Newborn",
+        "target": 0,
+        "status": "tracked",
+        "numerator_filters": {
+          "unique": "person_id",
+          "variable1": "mnid_labour_preterm",
+          "value1": "Yes"
+        },
+        "denominator_filters": {
+          "unique": "person_id",
+          "variable1": "mnid_labour_live_birth",
+          "value1": "Yes"
+        },
+        "note": "Added to back Country Profile Run Chart toggle -- was previously only computed as a raw-row chart, not a tracked KPI/aggregate indicator. Target benchmark not yet reviewed."
+      },
+      {
+        "id": "mnid_nb_core_complicationsepsis",
+        "label": "Neonatal sepsis rate",
+        "category": "Newborn",
+        "target": 0,
+        "status": "tracked",
+        "numerator_filters": {
+          "unique": "person_id",
+          "variable1": "mnid_newborn_sepsis",
+          "value1": "Yes"
+        },
+        "denominator_filters": {
+          "unique": "person_id",
+          "variable1": "mnid_labour_live_birth",
+          "value1": "Yes"
+        },
+        "note": "Added to back Country Profile Run Chart toggle -- was previously only computed as a raw-row chart, not a tracked KPI/aggregate indicator. Target benchmark not yet reviewed."
       }
     ],
     "mnid_categories": [
@@ -7049,6 +7103,60 @@
           "variable1": "Service_Area",
           "value1": "PNC"
         }
+      },
+      {
+        "id": "mnid_nb_core_complicationasphyxia",
+        "label": "Birth asphyxia rate",
+        "category": "Newborn",
+        "target": 0,
+        "status": "tracked",
+        "numerator_filters": {
+          "unique": "person_id",
+          "variable1": "mnid_newborn_birth_asphyxia",
+          "value1": "Yes"
+        },
+        "denominator_filters": {
+          "unique": "person_id",
+          "variable1": "mnid_labour_live_birth",
+          "value1": "Yes"
+        },
+        "note": "Added to back Country Profile Run Chart toggle -- was previously only computed as a raw-row chart, not a tracked KPI/aggregate indicator. Target benchmark not yet reviewed."
+      },
+      {
+        "id": "mnid_nb_core_complicationprematurity",
+        "label": "Preterm birth rate",
+        "category": "Newborn",
+        "target": 0,
+        "status": "tracked",
+        "numerator_filters": {
+          "unique": "person_id",
+          "variable1": "mnid_labour_preterm",
+          "value1": "Yes"
+        },
+        "denominator_filters": {
+          "unique": "person_id",
+          "variable1": "mnid_labour_live_birth",
+          "value1": "Yes"
+        },
+        "note": "Added to back Country Profile Run Chart toggle -- was previously only computed as a raw-row chart, not a tracked KPI/aggregate indicator. Target benchmark not yet reviewed."
+      },
+      {
+        "id": "mnid_nb_core_complicationsepsis",
+        "label": "Neonatal sepsis rate",
+        "category": "Newborn",
+        "target": 0,
+        "status": "tracked",
+        "numerator_filters": {
+          "unique": "person_id",
+          "variable1": "mnid_newborn_sepsis",
+          "value1": "Yes"
+        },
+        "denominator_filters": {
+          "unique": "person_id",
+          "variable1": "mnid_labour_live_birth",
+          "value1": "Yes"
+        },
+        "note": "Added to back Country Profile Run Chart toggle -- was previously only computed as a raw-row chart, not a tracked KPI/aggregate indicator. Target benchmark not yet reviewed."
       }
     ],
     "mnid_categories": [

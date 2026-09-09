@@ -663,8 +663,11 @@ def _refetch_series(recipe: dict, grain: str) -> pd.DataFrame:
     end = pd.to_datetime(recipe.get("end")) if recipe.get("end") else None
     kind = recipe.get("kind")
 
-    if route == "dhis2":
-        agg_df = _get_aggregate(route="dhis2")
+    if kind in ("agg_single", "agg_multi"):
+        # Not DHIS2-specific any more -- any route with a populated aggregate
+        # uses this (see render_country_profile's _agg_ready), matching Run
+        # Charts, which always prefers the aggregate regardless of route.
+        agg_df = _get_aggregate(route=route or "default")
         if kind == "agg_single":
             return _agg_monthly_series(
                 agg_df, recipe["mnid_id"], start, end, facility_codes, districts,
@@ -1011,9 +1014,20 @@ def render_country_profile(
     # actually reflects MNID_DATA_SOURCE='dhis2' like the rest of MNID
     # already does. Falls back to the existing row-level path if the
     # aggregate isn't published yet, so this never breaks the page.
-    agg_df = _get_aggregate(route='dhis2') if (scope_meta or {}).get('route') == 'dhis2' else None
-    use_dhis2 = agg_df is not None and not agg_df.empty
-    if use_dhis2:
+    _cp_route = (scope_meta or {}).get('route', 'default')
+    agg_df = _get_aggregate(route=_cp_route)
+    use_dhis2 = _cp_route == 'dhis2' and agg_df is not None and not agg_df.empty
+    # Same ids now have real MAHIS numerator/denominator filters too (see
+    # validated_dashboard.json), and the aggregate carries a real 'daily'
+    # grain -- unlike the raw-row recall (_remember_ui_payload/_cp_df_key),
+    # it's disk-persisted with no session-cache TTL/eviction risk, exactly
+    # what Run Charts already relies on for its own Daily toggle (trends.py's
+    # update_trend_chart: agg_df first, fallback_df second). Trend charts
+    # below use this instead of a raw scan whenever it's populated,
+    # regardless of route -- only the DHIS2-only facility/district crosswalk
+    # counting further down stays gated on use_dhis2 specifically.
+    _agg_ready = agg_df is not None and not agg_df.empty
+    if _agg_ready:
         # Narrow to just the ~11 indicators Country Profile needs, once, up
         # front. query_coverage/query_time_series each re-filter by exact
         # indicator_id internally (an object-dtype string comparison, slow
@@ -1028,9 +1042,14 @@ def render_country_profile(
         )
         agg_df = agg_df[agg_df['indicator_id'].isin(_cp_agg_ids)]
     facility_codes = districts = None
+    if _agg_ready:
+        # Needed to correctly scope agg_df to the selected facility/district
+        # for the trend-chart path below, regardless of use_dhis2 -- without
+        # this a MAHIS-route aggregate fetch would silently ignore the
+        # selection and return the whole route's totals instead.
+        _, facility_codes, districts = _resolve_scope_filters(df, scope_meta or {})
 
     if use_dhis2:
-        _, facility_codes, districts = _resolve_scope_filters(df, scope_meta or {})
         start = pd.to_datetime(start_date) if start_date else None
         end = pd.to_datetime(end_date) if end_date else None
         if start is None or end is None:
@@ -1146,7 +1165,7 @@ def render_country_profile(
     # Shared with every chart's "recipe" below (route/scope don't vary per
     # chart) -- see _refetch_series's module note for why these exist.
     _recipe_base = {
-        "route": "dhis2" if use_dhis2 else "default",
+        "route": _cp_route,
         "facility_codes": facility_codes,
         "districts": districts,
         "start": start.isoformat() if start is not None else None,
@@ -1157,10 +1176,11 @@ def render_country_profile(
     # copy in the disk cache. Longer TTL than the 1h default: this is what
     # the Daily grain toggle recalls to refetch real day-level detail, and
     # there's no rebuild-on-miss for it (unlike network_df) -- see
-    # _remember_ui_payload's docstring.
-    _cp_df_key = None if use_dhis2 else _remember_ui_payload("cp", df, expire=6 * 3600)
+    # _remember_ui_payload's docstring. Not needed at all once _agg_ready,
+    # since those charts refetch from the aggregate instead.
+    _cp_df_key = None if _agg_ready else _remember_ui_payload("cp", df, expire=6 * 3600)
 
-    if use_dhis2:
+    if _agg_ready:
         total_births_series = _agg_monthly_series(agg_df, "mnid_lab_core_totalbirths", start, end, facility_codes, districts, grain=_fetch_grain)
         total_births_recipe = {**_recipe_base, "kind": "agg_single", "mnid_id": "mnid_lab_core_totalbirths"}
         maternal_death_series = _agg_monthly_series(agg_df, "mnid_pnc_overview_004", start, end, facility_codes, districts, grain=_fetch_grain)
@@ -1271,7 +1291,7 @@ def render_country_profile(
     maternal_complication_cards = []
     for title, color, mask, mask_spec in maternal_complication_specs:
         chart_key = _chart_key_slug(title)
-        if use_dhis2:
+        if _agg_ready:
             mnid_id = _AGG_MATERNAL_COMPLICATION_IDS.get(title)
             series_df = (
                 _agg_monthly_series(agg_df, mnid_id, start, end, facility_codes, districts, value_field="pct", include_counts=True, grain=_fetch_grain)
@@ -1298,7 +1318,7 @@ def render_country_profile(
     neonatal_complication_cards = []
     for title, color, mask, mask_spec in neonatal_complication_specs:
         chart_key = _chart_key_slug(title)
-        if use_dhis2:
+        if _agg_ready:
             mnid_id = _AGG_NEONATAL_COMPLICATION_IDS.get(title)
             series_df = (
                 _agg_monthly_series(agg_df, mnid_id, start, end, facility_codes, districts, value_field="pct", include_counts=True, grain=_fetch_grain)
