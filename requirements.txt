@@ -20,4 +20,4 @@ diskcache
 geopandas
 dash-ace
 pdfkit 
-dash-iconify
+xhtml2pdf
