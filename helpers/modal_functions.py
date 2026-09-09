@@ -1457,7 +1457,7 @@ def _build_ds_list(sources):
                              style={"fontSize": "11px", "color": "#9ca3af"}),
                 ]),
                 html.Button([nav_icon("mdi:pencil"), ""], id={"type": "ds-edit-btn", "index": i},
-                            n_clicks=0, className="btn-secondary btn-small",
+                            n_clicks=0,
                             title="Edit"),
             ],
         ))

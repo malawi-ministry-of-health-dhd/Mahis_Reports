@@ -983,7 +983,8 @@ layout = html.Div(
                                     ]),
                                 ],
                             ),
-                            html.Div(className="dashboard-card-body", children=[
+                            html.Div(className="dashboard-card-body",
+                                     style={"maxHeight": "70vh", "overflowY": "auto"}, children=[
                                 html.Div(style={"display": "flex", "gap": "24px", "alignItems": "flex-start"}, children=[
 
                                     # ── Left: saved datasources list ──────────────────────
@@ -1207,7 +1208,15 @@ layout = html.Div(
                                                                     "color": "#006401", "padding": "6px 0"}),
                                                 html.Div(style={"marginTop": "10px"}, children=[
                                                     html.Span("Use {date_filter} as a placeholder where the date "
-                                                              "range WHERE condition will be injected.",
+                                                              "range WHERE condition will be injected. "
+                                                              "If this data source is also read by the DuckDB "
+                                                              "pipeline (data_storage_duckdb.py), it needs the "
+                                                              "query to select obs_id and paginate via a "
+                                                              "{batch_size} placeholder on a subquery of "
+                                                              "encounter_ids (see config.NEW_HARMONIZED_QUERY) — "
+                                                              "leave this blank or without obs_id and that "
+                                                              "pipeline falls back to NEW_HARMONIZED_QUERY "
+                                                              "automatically.",
                                                               style={"fontSize": "12px", "color": "#6b7280"}),
                                                     dcc.Textarea(id="ds-base-query",
                                                                  placeholder="SELECT ... FROM encounter e\n"
@@ -4013,10 +4022,14 @@ _refresh_processes: dict = {}
      Output("ds-refresh-summary",  "children", allow_duplicate=True)],
     Input("ds-run-btn", "n_clicks"),
     State("ds-refresh-store", "data"),
+    State("ds-uuid", "value"),
+    State("ds-name", "value"),
+    State("ds-data-file-name", "value"),
     prevent_initial_call=True,
 )
-def start_data_refresh(n_clicks, store):
-    """Launch data_storage.py as a background subprocess and lock the button."""
+def start_data_refresh(n_clicks, store, ds_uuid, ds_name, ds_data_path):
+    """Launch data_storage.py --uuid <the currently loaded data source> as a background
+    subprocess and lock the button — refreshes only that one source, not every configured one."""
     if not n_clicks:
         raise PreventUpdate
 
@@ -4025,10 +4038,15 @@ def start_data_refresh(n_clicks, store):
     if store.get("running"):
         return (store, True, True, "🔄 Refreshing...",
                 "⚠ A refresh is already running.")
+
+    if not ds_uuid:
+        return (store, True, False, "🔄 Refresh Data",
+                "⚠ Select or save a data source first — Refresh targets whichever one is loaded.")
+
     script_path = os.path.join(path, "data_storage.py")
     try:
         proc = _subprocess.Popen(
-            [_sys.executable, script_path],
+            [_sys.executable, script_path, "--uuid", ds_uuid],
             stdout=_subprocess.PIPE,
             stderr=_subprocess.PIPE,
         )
@@ -4040,9 +4058,9 @@ def start_data_refresh(n_clicks, store):
     start_ts = _time.time()
     _refresh_processes[proc.pid] = (proc, start_ts)
 
-    new_store = {"running": True, "pid": proc.pid,
-                 "start_time": start_ts}
-    return (new_store, False, True, "🔄 Refreshing...", "⏳ Running…")
+    new_store = {"running": True, "pid": proc.pid, "start_time": start_ts,
+                 "uuid": ds_uuid, "name": ds_name or ds_uuid, "data_path": ds_data_path or "default"}
+    return (new_store, False, True, "🔄 Refreshing...", f"⏳ Running for '{new_store['name']}'…")
 
 
 @callback(
@@ -4069,7 +4087,8 @@ def poll_data_refresh(n_intervals, store):
     if entry is None:
         # Process not found — treat as completed (e.g. after a server restart)
         return ({"running": False, "pid": None, "start_time": None},
-                True, False, "🔄 Refresh Data", "✓ Completed (process not found).")
+                True, False, "🔄 Refresh Data",
+                f"✓ '{store.get('name', 'data source')}' completed (process not found).")
 
     proc, _ = entry
     retcode  = proc.poll()   # None = still running
@@ -4077,17 +4096,17 @@ def poll_data_refresh(n_intervals, store):
     if retcode is None:
         elapsed = _time.time() - start_time
         return (store, False, True, "🔄 Refreshing…",
-                f"⏳ Running… ({elapsed:.0f}s)")
+                f"⏳ Running for '{store.get('name', '?')}'… ({elapsed:.0f}s)")
 
     # ── Process finished ──────────────────────────────────────────────────────
     elapsed  = round(_time.time() - start_time, 1)
     _refresh_processes.pop(pid, None)
 
-    # Count rows in the parquet file
+    # Count rows in the parquet file for the route that was actually targeted
     row_count = "—"
     try:
         from data_storage import DataStorage
-        _route    = "default"
+        _route    = store.get("data_path") or "default"
         pq_path   = os.path.join(path, "data", _route, "parquet")
         if os.path.isdir(pq_path) or os.path.exists(pq_path):
             count_df  = DataStorage.query_duckdb(
@@ -4097,11 +4116,12 @@ def poll_data_refresh(n_intervals, store):
     except Exception:
         pass
 
+    target_name = store.get("name", "data source")
     if retcode == 0:
-        summary = (f"✓ Completed in {elapsed}s — {row_count} rows in dataset")
+        summary = (f"✓ '{target_name}' completed in {elapsed}s — {row_count} rows in dataset")
     else:
         stderr_out = proc.stderr.read().decode(errors="replace")[-300:] if proc.stderr else ""
-        summary    = f"✗ Failed (exit {retcode}) after {elapsed}s. {stderr_out}"
+        summary    = f"✗ '{target_name}' failed (exit {retcode}) after {elapsed}s. {stderr_out}"
 
     done_store = {"running": False, "pid": None, "start_time": None}
     return (done_store, True, False, "🔄 Refresh Data", summary)

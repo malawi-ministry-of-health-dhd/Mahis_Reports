@@ -46,7 +46,7 @@ def load_or_create_configurations():
         "start_date": cfg.START_DATE,
         "load_fresh_data": cfg.LOAD_FRESH_DATA,
         "data_path": "default",
-        "base_query": cfg.QUERY_OBS_HARMONIZED_DUCKDB,
+        "base_query": cfg.NEW_HARMONIZED_QUERY,
         "pause_data_source": False,
         "batch_size": cfg.BATCH_SIZE,
         "db_config": cfg.DB_CONFIG,
@@ -246,11 +246,11 @@ class DataStorage:
         """Full pipeline for this route: fetch single tables (unless told not to), fetch the
         trailing lookback window of transactional data, harmonize it against the single
         tables, then upsert. Returns the number of rows upserted (0 if nothing new/changed)."""
-        base_query = base_query or cfg.QUERY_OBS_HARMONIZED_DUCKDB
+        base_query = base_query or cfg.NEW_HARMONIZED_QUERY
         if "obs_id" not in base_query:
             print("WARNING: base_query has no obs_id column — falling back to "
-                  "config.QUERY_OBS_HARMONIZED_DUCKDB so the upsert key stays valid.")
-            base_query = cfg.QUERY_OBS_HARMONIZED_DUCKDB
+                  "config.NEW_HARMONIZED_QUERY so the upsert key stays valid.")
+            base_query = cfg.NEW_HARMONIZED_QUERY
 
         fetcher = self._make_fetcher()
 
@@ -261,6 +261,32 @@ class DataStorage:
 
         raw_df = fetcher.fetch_incremental(base_query, date_column=date_column,
                                             id_column=id_column, lookback_days=lookback_days)
+        harmonized_df = self.harmonize(raw_df, tables)
+        return self.upsert_dataframe(harmonized_df)
+
+    def reload_historical(self, start_date, end_date=None, base_query=None,
+                           date_column="encounter_datetime", id_column="encounter_id",
+                           refresh_single_tables=True) -> int:
+        """Bulk (re)load history from start_date through end_date (default: today), paginating
+        straight through by id_column instead of day-by-day — for a full or partial historical
+        backfill/reload, not routine updates (use fetch_and_upsert for that). Always explicit
+        about which range to (re)load; never runs on its own. Returns the number of rows
+        upserted."""
+        base_query = base_query or cfg.NEW_HARMONIZED_QUERY
+        if "obs_id" not in base_query:
+            print("WARNING: base_query has no obs_id column — falling back to "
+                  "config.NEW_HARMONIZED_QUERY so the upsert key stays valid.")
+            base_query = cfg.NEW_HARMONIZED_QUERY
+
+        fetcher = self._make_fetcher()
+
+        if refresh_single_tables:
+            tables = self.fetch_single_tables(fetcher)
+        else:
+            tables = self._load_single_tables_from_csv()
+
+        raw_df = fetcher.fetch_bulk(base_query, date_column=date_column, id_column=id_column,
+                                     start_date=start_date, end_date=end_date)
         harmonized_df = self.harmonize(raw_df, tables)
         return self.upsert_dataframe(harmonized_df)
 
@@ -278,10 +304,18 @@ class DataStorage:
             con.close()
 
 
-def run_all_configured_sources():
+def run_all_configured_sources(uuid=None):
     """Mirrors data_storage.py's __main__ loop: read (or create) configurations.json, run the
-    full fetch+harmonize+upsert pipeline for every entry that isn't paused."""
-    for entry in load_or_create_configurations():
+    full fetch+harmonize+upsert pipeline for every entry that isn't paused — or, if `uuid` is
+    given, just the one entry matching it (still skipped if that entry is itself paused, same
+    as data_storage.py's --uuid behavior)."""
+    entries = load_or_create_configurations()
+    if uuid:
+        entries = [e for e in entries if e.get("uuid") == uuid]
+        if not entries:
+            print(f"No data source found with uuid={uuid}")
+
+    for entry in entries:
         if entry.get("pause_data_source"):
             continue
         try:
@@ -293,6 +327,11 @@ def run_all_configured_sources():
 
 
 if __name__ == "__main__":
+    import argparse
+    _parser = argparse.ArgumentParser(description="Fetch/harmonize/upsert OpenMRS data into DuckDB.")
+    _parser.add_argument("--uuid", default=None,
+                          help="Only run the configurations.json entry with this uuid, instead of all of them.")
+    _args = _parser.parse_args()
     # `python data_storage_duckdb.py` — path is testable at data/default/duckdb
     # (cfg.DATA_PATH_ defaults to "data/default").
-    run_all_configured_sources()
+    run_all_configured_sources(uuid=_args.uuid)

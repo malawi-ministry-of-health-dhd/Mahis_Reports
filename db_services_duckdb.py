@@ -231,8 +231,16 @@ class DataFetcherDuckDB:
                 date_filter = (f"AND {date_column} >= '{date_start_midnight}' "
                                 f"AND {date_column} <= '{date_end_midnight}' "
                                 f"AND e.{id_column} > {last_id_for_date}")
-                query = query_template.format(date_filter=date_filter)
-                full_query = f"{query} ORDER BY e.{id_column} LIMIT {self.batch_size}"
+                if "{batch_size}" in query_template:
+                    # Query already LIMITs a subquery of distinct encounter_ids before joining
+                    # out to obs/orders/etc — the fan-out join can't split an encounter across
+                    # a batch boundary this way. See config.NEW_HARMONIZED_QUERY.
+                    full_query = query_template.format(date_filter=date_filter, batch_size=self.batch_size)
+                else:
+                    # Legacy shape: LIMIT applied directly to the joined (obs-level) result set,
+                    # which can split a single encounter's obs rows across a batch boundary.
+                    query = query_template.format(date_filter=date_filter)
+                    full_query = f"{query} ORDER BY e.{id_column} LIMIT {self.batch_size}"
 
                 try:
                     batch_df = pd.read_sql(full_query, conn)
@@ -260,6 +268,105 @@ class DataFetcherDuckDB:
                     has_more_data = False
 
             current_date += timedelta(days=1)
+
+        return batch_paths
+
+    def fetch_bulk(self, query_template: str, date_column: str = 'Date', id_column: str = 'encounter_id',
+                    start_date=None, end_date=None) -> pd.DataFrame:
+        """Bulk historical (re)load: paginate straight through by id_column across the whole
+        [start_date, end_date] range in one continuous sweep — no day-by-day chunking.
+
+        _fetch_in_batches's per-day loop exists to keep each query's date window tight for
+        small incremental fetches; for a multi-year historical load it just adds one round
+        trip per calendar day even on days with no data. This is a separate, explicitly
+        invoked path — it doesn't touch load_fresh_data/self.start_date at all, you always
+        say exactly which start_date (and optionally end_date) to (re)load from.
+        """
+        if start_date is None:
+            raise ValueError("fetch_bulk() requires an explicit start_date")
+        start_date = start_date if isinstance(start_date, datetime) else pd.to_datetime(start_date)
+        end_date = (end_date if isinstance(end_date, datetime) else pd.to_datetime(end_date)) if end_date else datetime.now()
+
+        batch_paths = []
+        try:
+            if self.use_localhost:
+                conn = self._get_db_connection()
+                batch_paths = self._fetch_bulk_batches(conn, query_template, date_column, id_column, start_date, end_date)
+                conn.close()
+            elif self.ssh_config:
+                _tunnel_host, _tunnel_kwargs = self._build_tunnel_kwargs()
+                with SSHTunnelForwarder(_tunnel_host, **_tunnel_kwargs) as tunnel:
+                    logger.info(f"SSH tunnel established on port {tunnel.local_bind_port}")
+                    conn = self._get_db_connection(tunnel)
+                    batch_paths = self._fetch_bulk_batches(conn, query_template, date_column, id_column, start_date, end_date)
+                    conn.close()
+            else:
+                conn = self._get_db_connection()
+                batch_paths = self._fetch_bulk_batches(conn, query_template, date_column, id_column, start_date, end_date)
+                conn.close()
+
+            if batch_paths:
+                logger.info(f"Merging {len(batch_paths)} batch files...")
+                final_df = self._load_batches_from_files(batch_paths)
+                if not final_df.empty:
+                    final_df.drop_duplicates(inplace=True)
+                    logger.info(f"Final dataframe contains {len(final_df)} rows after deduplication")
+                self.cleanup_batches()
+                return final_df
+            logger.info("No data fetched for the given range")
+            self.cleanup_batches()
+            return pd.DataFrame()
+        except Exception as e:
+            logger.error(f"Error in fetch_bulk: {e}")
+            raise
+
+    def _fetch_bulk_batches(self, conn: pymysql.Connection, query_template: str,
+                             date_column: str, id_column: str,
+                             start_date: datetime, end_date: datetime) -> list:
+        """The continuous (non-day-chunked) pagination loop backing fetch_bulk()."""
+        range_start = start_date.strftime('%Y-%m-%d 00:00:00')
+        range_end = end_date.strftime('%Y-%m-%d 23:59:59')
+        logger.info(f"Bulk fetch: {range_start} through {range_end}")
+
+        batch_paths = []
+        has_more_data = True
+        last_id = 0
+        batch_count = 0
+
+        while has_more_data:
+            date_filter = (f"AND {date_column} >= '{range_start}' "
+                            f"AND {date_column} <= '{range_end}' "
+                            f"AND e.{id_column} > {last_id}")
+            if "{batch_size}" in query_template:
+                full_query = query_template.format(date_filter=date_filter, batch_size=self.batch_size)
+            else:
+                query = query_template.format(date_filter=date_filter)
+                full_query = f"{query} ORDER BY e.{id_column} LIMIT {self.batch_size}"
+
+            try:
+                batch_df = pd.read_sql(full_query, conn)
+
+                if batch_df.empty:
+                    has_more_data = False
+                    logger.info(f"Bulk fetch complete — {batch_count} batches fetched")
+                else:
+                    last_id = batch_df[id_column].max()
+                    batch_size = len(batch_df)
+
+                    batch_filename = f"bulk_b{batch_count:05d}_{batch_size}.parquet"
+                    batch_path = os.path.join(self.path, self.batch_folder, batch_filename)
+                    batch_df.to_parquet(batch_path, index=False, engine='pyarrow')
+
+                    logger.info(f"Saved bulk batch {batch_count}: {batch_path} ({batch_size} rows, last_id={last_id})")
+                    batch_paths.append(batch_path)
+                    batch_count += 1
+                    del batch_df
+
+            except Exception as e:
+                logger.error(f"Error fetching bulk batch {batch_count}: {e}")
+                import traceback
+                traceback.print_exc()
+                has_more_data = False
 
         return batch_paths
 

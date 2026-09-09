@@ -695,7 +695,6 @@ def sync_filters_from_crosstab_click(active_cells, table_data_list, table_ids, s
 
 def build_charts_from_json(filtered_query, filtered_with_range_query, delta_days, dashboards_json, filter_summary=None,
                           start_date=None, end_date=None, data_path=DATA_PATH_, facility_code=None, scope_meta=None, url_object=None, initial_tab=None):
-
     try:
         config = dashboards_json
         count_items_per_row = config.get("count_items_per_row") or 5
