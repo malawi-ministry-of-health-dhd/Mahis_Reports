@@ -340,7 +340,6 @@ class DataStorage:
             route = _normalize_route(data_dir or cfg.DATA_PATH_)
         if route == 'mahis':
             print("Data Dir is",route, rewritten_sql)
-            exit()
         script_dir = os.path.dirname(os.path.realpath(__file__))
         db_path = os.path.join(script_dir, "data", route, cfg.DUCKDB_DIR_NAME, cfg.DUCKDB_FILE_NAME)
         con = duckdb.connect(db_path, read_only=True)

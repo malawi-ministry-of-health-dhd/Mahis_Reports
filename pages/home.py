@@ -2189,6 +2189,7 @@ def update_dashboard(gen, menu_clicks, pathname, urlparams, clear_clicks, crosst
                     f"SELECT DISTINCT {FACILITY_} FROM '{DATA_PATH_}'"
                     f" WHERE {FACILITY_CODE_} = '{location}' LIMIT 1"
                 )
+                print(_fac_lookup)
                 if not _fac_lookup.empty:
                     facility_names = _fac_lookup[FACILITY_].dropna().tolist()
             except Exception:
