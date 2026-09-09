@@ -588,7 +588,12 @@ def _monthly_rate_series(
     merged["numerator"] = pd.to_numeric(merged["numerator"], errors="coerce").fillna(0)
     merged["denominator"] = pd.to_numeric(merged["denominator"], errors="coerce").fillna(0)
     merged["value"] = merged.apply(
-        lambda row: round((row["numerator"] / row["denominator"]) * scale, 1) if row["denominator"] > 0 else 0.0,
+        # min(..., scale) -- a thin-sample month (e.g. 2 flagged out of 1
+        # matched denominator row) can put numerator > denominator, producing
+        # a >100% rate on screen; the aggregate-based KPI path already caps
+        # the same way (_build_agg_batch's .clip(upper=100.0)) so this
+        # matches that instead of showing e.g. 200%.
+        lambda row: round(min((row["numerator"] / row["denominator"]) * scale, scale), 1) if row["denominator"] > 0 else 0.0,
         axis=1,
     )
     return merged[cols]
@@ -1149,8 +1154,11 @@ def render_country_profile(
     }
     # A single stable-per-render key so every raw-row recipe below recalls
     # the exact same dataframe instead of each stashing its own duplicate
-    # copy in the disk cache.
-    _cp_df_key = None if use_dhis2 else _remember_ui_payload("cp", df)
+    # copy in the disk cache. Longer TTL than the 1h default: this is what
+    # the Daily grain toggle recalls to refetch real day-level detail, and
+    # there's no rebuild-on-miss for it (unlike network_df) -- see
+    # _remember_ui_payload's docstring.
+    _cp_df_key = None if use_dhis2 else _remember_ui_payload("cp", df, expire=6 * 3600)
 
     if use_dhis2:
         total_births_series = _agg_monthly_series(agg_df, "mnid_lab_core_totalbirths", start, end, facility_codes, districts, grain=_fetch_grain)
@@ -1229,14 +1237,26 @@ def render_country_profile(
         _contains_spec("concept_name", _birth_outcome_concepts),
         _contains_spec("obs_value_coded", _live_birth_values),
     ) if not use_dhis2 else None
+    # Real MAHIS concept for all four below is "Obstetric complications"
+    # (verified against MAHIS Concept Sheets.xlsx), with option values
+    # including "obstructed labour"/"prolonged labour"/"Pre-eclampsia"/
+    # "ruptured uterus" -- previously matched via a bare obs_value_coded
+    # search with no concept_name scoping at all, which could in principle
+    # match an unrelated question that happened to share the same wording.
+    # mnid_labour_eclampsia/mnid_labour_obstructed_labour (data_utils.py) are
+    # the same real concept already properly scoped, kept as-is and only
+    # widened for the sibling condition each label also covers.
+    _obs_complications_spec = _contains_spec("concept_name", ["Obstetric complications"])
+    def _obs_complications_mask(values):
+        return _contains_mask(df, "concept_name", ["Obstetric complications"]) & _contains_mask(df, "obs_value_coded", values)
     maternal_complication_specs = [
-        ("Pre-eclampsia and Eclampsia", MORTALITY_ROSE, _yn_mask(df, "mnid_labour_eclampsia") | _contains_mask(df, "obs_value_coded", ["Pre-eclampsia", "Pre eclampsia", "Preeclampsia", "Eclampsia"]),
-         _or_spec(_yn_spec("mnid_labour_eclampsia"), _contains_spec("obs_value_coded", ["Pre-eclampsia", "Pre eclampsia", "Preeclampsia", "Eclampsia"]))),
+        ("Pre-eclampsia and Eclampsia", MORTALITY_ROSE, _yn_mask(df, "mnid_labour_eclampsia") | _obs_complications_mask(["Pre-eclampsia"]),
+         _or_spec(_yn_spec("mnid_labour_eclampsia"), _and_spec(_obs_complications_spec, _contains_spec("obs_value_coded", ["Pre-eclampsia"])))),
         ("Postpartum Haemorrhage", WARNING_AMBER, _yn_mask(df, "mnid_labour_pph"), _yn_spec("mnid_labour_pph")),
         ("Maternal Sepsis", "#B91C1C", _yn_mask(df, "mnid_labour_maternal_sepsis"), _yn_spec("mnid_labour_maternal_sepsis")),
-        ("Obstructed or Prolonged Labour", "#7C3AED", _yn_mask(df, "mnid_labour_obstructed_labour") | _contains_mask(df, "obs_value_coded", ["Obstructed labour", "Prolonged labour", "Prolonged Labor"]),
-         _or_spec(_yn_spec("mnid_labour_obstructed_labour"), _contains_spec("obs_value_coded", ["Obstructed labour", "Prolonged labour", "Prolonged Labor"]))),
-        ("Ruptured Uterus", "#475569", _contains_mask(df, "obs_value_coded", ["Ruptured uterus", "Uterine rupture"]), _contains_spec("obs_value_coded", ["Ruptured uterus", "Uterine rupture"])),
+        ("Obstructed or Prolonged Labour", "#7C3AED", _yn_mask(df, "mnid_labour_obstructed_labour") | _obs_complications_mask(["prolonged labour"]),
+         _or_spec(_yn_spec("mnid_labour_obstructed_labour"), _and_spec(_obs_complications_spec, _contains_spec("obs_value_coded", ["prolonged labour"])))),
+        ("Ruptured Uterus", "#475569", _obs_complications_mask(["ruptured uterus"]), _and_spec(_obs_complications_spec, _contains_spec("obs_value_coded", ["ruptured uterus"]))),
     ]
     neonatal_complication_specs = [
         ("Birth Asphyxia", "#D97706", _yn_mask(df, "mnid_newborn_birth_asphyxia"), _yn_spec("mnid_newborn_birth_asphyxia")),

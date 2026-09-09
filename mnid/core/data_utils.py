@@ -11,7 +11,7 @@ pd.options.mode.chained_assignment = None
 from mnid.core.cache import _MNID_DATA_DISK_CACHE, _MNID_UI_CACHE_TTL_SECONDS
 
 
-def _remember_ui_payload(prefix: str, records_or_fn, stable_key: str | None = None) -> str:
+def _remember_ui_payload(prefix: str, records_or_fn, stable_key: str | None = None, expire: int | None = None) -> str:
     """Stash a DataFrame payload the trend/compare/Nest360 callbacks need to
     restore later, in the shared "data" disk cache (large/disposable, kept
     separate from the small per-session state cache so it can never evict
@@ -19,12 +19,20 @@ def _remember_ui_payload(prefix: str, records_or_fn, stable_key: str | None = No
     here was only ever visible to the one worker process that built it -
     under multiple Gunicorn workers, any other worker handling the
     follow-up callback would silently get an empty DataFrame back (no error,
-    just "no data" shown) instead of the real payload."""
+    just "no data" shown) instead of the real payload.
+
+    `expire` overrides the default 1h TTL -- Country Profile's own working
+    dataframe (prefix "cp") uses a longer one: this is the payload its Daily
+    grain toggle recalls to refetch real day-level detail (see
+    _refetch_series's module note), and there's no rebuild-on-miss for it
+    the way there now is for network_df, so an analyst leaving the tab open
+    past 1h silently lost the Daily option with no error -- confirmed as the
+    "Daily graph doesn't work" symptom."""
     cache_key = f'{prefix}:{stable_key}' if stable_key else f'{prefix}:{uuid.uuid4().hex}'
     if _MNID_DATA_DISK_CACHE.get(cache_key) is not None:
         return cache_key
     records = records_or_fn() if callable(records_or_fn) else records_or_fn
-    _MNID_DATA_DISK_CACHE.set(cache_key, records, expire=_MNID_UI_CACHE_TTL_SECONDS)
+    _MNID_DATA_DISK_CACHE.set(cache_key, records, expire=expire if expire is not None else _MNID_UI_CACHE_TTL_SECONDS)
     return cache_key
 
 
