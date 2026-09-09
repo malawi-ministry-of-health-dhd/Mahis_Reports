@@ -1,20 +1,3 @@
-"""
-DuckDB-file-backed alternative to DataStorage (see data_storage.py) — fully self-contained,
-imports nothing from data_storage.py or db_services.py.
-
-Instead of scanning month-partitioned parquet files on every query, this keeps one persisted
-DuckDB database file per route (data/<route>/duckdb/mahis.duckdb) with a single table holding
-the harmonized obs-level data. New rows are inserted; rows that already exist (matched by
-config.DUCKDB_KEY_COLUMNS) are overwritten with the latest values, so edits made in OpenMRS
-after the original fetch get reconciled instead of silently missed.
-
-Like data_storage.py, this reads configurations.json for the list of data sources to pull
-(creating a default entry if the file doesn't exist yet), fetches each source's small lookup
-tables (programs, concepts, encounter types, locations, drugs, order types, users) to CSV,
-harmonizes the raw transactional fetch against them, then upserts the result.
-
-See INSTRUCTION.md for how this plugs into the app in place of DataStorage.query_duckdb.
-"""
 import os
 import re
 import json
@@ -106,6 +89,15 @@ _SINGLE_TABLE_SPECS = [
 ]
 if not cfg.IS_HARMONIZED_MAHIS:
     _SINGLE_TABLE_SPECS.insert(4, ("facilities_data", cfg.QUERY_FACILITIES, "code", "name"))
+
+# Datetime columns produced by NEW_HARMONIZED_QUERY that come from LEFT JOINs (visit, obs,
+# orders) and so can be entirely NULL within any one small batch. pandas then infers those
+# columns as dtype 'object' (all-None) rather than datetime64, which DuckDB in turn registers
+# as INTEGER on first CREATE TABLE — a later batch with real timestamps then fails to
+# insert/upsert with "Conversion Error: Unimplemented type for cast (TIMESTAMP_NS -> INTEGER)".
+# Coercing explicitly keeps the dtype (and therefore the DuckDB column type) consistent across
+# batches regardless of which batch happens to create the table.
+_DATETIME_COLUMNS = ["date_started", "date_stopped", "birthdate", "Date", "obs_datetime", "value_datetime"]
 
 
 class DataStorage:
@@ -249,6 +241,18 @@ class DataStorage:
         if df is None or df.empty:
             return 0
 
+        for col in _DATETIME_COLUMNS:
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col], errors="coerce")
+
+        if "obs_id" in self.key_columns and "obs_id" in df.columns and "encounter_id" in df.columns:
+            # obs is LEFT JOINed — an encounter with no obs rows yields obs_id = NULL. A UNIQUE
+            # index/ON CONFLICT never treats two NULLs as equal, so that encounter would be
+            # re-inserted as a new row every time it's re-fetched instead of upserted in place.
+            # Fill with a deterministic, non-null, non-colliding stand-in (obs_id is always a
+            # positive OpenMRS id) so repeated fetches of the same no-obs encounter collide.
+            df["obs_id"] = df["obs_id"].fillna(-df["encounter_id"])
+
         con = duckdb.connect(self.db_path)
         try:
             con.register("incoming_df", df)
@@ -265,6 +269,28 @@ class DataStorage:
                 )
                 return len(df)
 
+            # Self-heal tables created before the coercion above existed: an all-NULL datetime
+            # column got stuck as INTEGER at CREATE TABLE time (see _DATETIME_COLUMNS), which
+            # only ever holds if every existing value in it is NULL — a real timestamp would
+            # have hit this exact conversion error on insert and never made it in. Safe to
+            # widen back to TIMESTAMP before inserting real values now.
+            existing_types = dict(con.execute(
+                "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = ?",
+                [self.table_name],
+            ).fetchall())
+            cols_to_fix = [c for c in _DATETIME_COLUMNS
+                           if c in df.columns and existing_types.get(c, "").upper() == "INTEGER"]
+            if cols_to_fix:
+                # DuckDB refuses ALTER COLUMN TYPE while the unique index depends on the table
+                # — drop and recreate it around the type fix.
+                con.execute(f"DROP INDEX IF EXISTS idx_{self.table_name}_key")
+                for col in cols_to_fix:
+                    con.execute(f'ALTER TABLE {self.table_name} ALTER COLUMN "{col}" TYPE TIMESTAMP')
+                key_clause = ", ".join(self.key_columns)
+                con.execute(
+                    f"CREATE UNIQUE INDEX idx_{self.table_name}_key ON {self.table_name} ({key_clause})"
+                )
+
             key_clause = ", ".join(self.key_columns)
             update_cols = [c for c in df.columns if c not in self.key_columns]
             set_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
@@ -277,11 +303,26 @@ class DataStorage:
         finally:
             con.close()
 
+    def _make_batch_processor(self, tables):
+        """Returns an on_batch callback that harmonizes and upserts each fetched batch
+        immediately, plus a 0-element list used as a mutable counter of rows upserted so far
+        (fetch_incremental/fetch_bulk stream batches straight to this instead of buffering the
+        whole result set in RAM before harmonizing/upserting it in one shot)."""
+        total_upserted = [0]
+
+        def _process_batch(batch_df):
+            harmonized_df = self.harmonize(batch_df, tables)
+            total_upserted[0] += self.upsert_dataframe(harmonized_df)
+
+        return _process_batch, total_upserted
+
     def fetch_and_upsert(self, base_query=None, date_column="encounter_datetime", id_column="encounter_id",
                           lookback_days=None, refresh_single_tables=True) -> int:
-        """Full pipeline for this route: fetch single tables (unless told not to), fetch the
-        trailing lookback window of transactional data, harmonize it against the single
-        tables, then upsert. Returns the number of rows upserted (0 if nothing new/changed)."""
+        """Full pipeline for this route: fetch single tables (unless told not to), then stream
+        the trailing lookback window of transactional data — each batch is harmonized against
+        the single tables and upserted as soon as it's fetched, rather than accumulating every
+        batch in RAM before a single harmonize+upsert at the end. Returns the number of rows
+        upserted (0 if nothing new/changed)."""
         base_query = base_query or cfg.NEW_HARMONIZED_QUERY
         if "obs_id" not in base_query:
             print("WARNING: base_query has no obs_id column — falling back to "
@@ -295,10 +336,10 @@ class DataStorage:
         else:
             tables = self._load_single_tables_from_csv()
 
-        raw_df = fetcher.fetch_incremental(base_query, date_column=date_column,
-                                            id_column=id_column, lookback_days=lookback_days)
-        harmonized_df = self.harmonize(raw_df, tables)
-        return self.upsert_dataframe(harmonized_df)
+        on_batch, total_upserted = self._make_batch_processor(tables)
+        fetcher.fetch_incremental(base_query, date_column=date_column, id_column=id_column,
+                                   lookback_days=lookback_days, on_batch=on_batch)
+        return total_upserted[0]
 
     def reload_historical(self, start_date, end_date=None, base_query=None,
                            date_column="encounter_datetime", id_column="encounter_id",
@@ -306,7 +347,8 @@ class DataStorage:
         """Bulk (re)load history from start_date through end_date (default: today), paginating
         straight through by id_column instead of day-by-day — for a full or partial historical
         backfill/reload, not routine updates (use fetch_and_upsert for that). Always explicit
-        about which range to (re)load; never runs on its own. Returns the number of rows
+        about which range to (re)load; never runs on its own. Streams each batch through
+        harmonize+upsert immediately, same as fetch_and_upsert. Returns the number of rows
         upserted."""
         base_query = base_query or cfg.NEW_HARMONIZED_QUERY
         if "obs_id" not in base_query:
@@ -321,10 +363,10 @@ class DataStorage:
         else:
             tables = self._load_single_tables_from_csv()
 
-        raw_df = fetcher.fetch_bulk(base_query, date_column=date_column, id_column=id_column,
-                                     start_date=start_date, end_date=end_date)
-        harmonized_df = self.harmonize(raw_df, tables)
-        return self.upsert_dataframe(harmonized_df)
+        on_batch, total_upserted = self._make_batch_processor(tables)
+        fetcher.fetch_bulk(base_query, date_column=date_column, id_column=id_column,
+                            start_date=start_date, end_date=end_date, on_batch=on_batch)
+        return total_upserted[0]
 
     @staticmethod
     def query_duckdb(sql: str, data_dir: str = None) -> pd.DataFrame:

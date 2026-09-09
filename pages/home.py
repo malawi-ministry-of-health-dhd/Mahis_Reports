@@ -17,7 +17,11 @@ from dashboard_layouts import build_premium_dashboard
 from helpers.visualizations import create_line_list_basic_modal
 from datetime import datetime
 from datetime import datetime as dt
-from data_storage import DataStorage
+import config as cfg
+if cfg.USE_DUCKDB_STORAGE:
+    from data_storage_duckdb import DataStorage
+else:
+    from data_storage import DataStorage
 from config import CUSTOM_GENDER_MAP
 import warnings
 import duckdb

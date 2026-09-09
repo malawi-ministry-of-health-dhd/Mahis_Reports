@@ -3,7 +3,11 @@ from dash import html, dcc
 import pandas as pd
 import plotly.graph_objects as go
 from itertools import chain
-from data_storage import DataStorage
+import config as cfg
+if cfg.USE_DUCKDB_STORAGE:
+    from data_storage_duckdb import DataStorage
+else:
+    from data_storage import DataStorage
 import logging
 from helpers.visualizations import (create_column_chart,
                           create_count,

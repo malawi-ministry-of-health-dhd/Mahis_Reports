@@ -14,7 +14,11 @@ from helpers.helpers import (build_single_chart,
                              create_linelist_from_config,
                              create_crosstab_from_config)
 from datetime import datetime, timedelta
-from data_storage import DataStorage
+import config as cfg
+if cfg.USE_DUCKDB_STORAGE:
+    from data_storage_duckdb import DataStorage
+else:
+    from data_storage import DataStorage
 import warnings
 warnings.filterwarnings("ignore")
 from config import (actual_keys_in_data,

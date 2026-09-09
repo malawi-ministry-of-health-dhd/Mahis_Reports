@@ -30,7 +30,11 @@ from reportlab.lib import colors
 from reportlab.lib.units import inch
 import io
 import base64
-from data_storage import DataStorage
+import config as cfg
+if cfg.USE_DUCKDB_STORAGE:
+    from data_storage_duckdb import DataStorage
+else:
+    from data_storage import DataStorage
 
 from config import (DATE_, FACILITY_, AGE_GROUP_, GENDER_, PROGRAM_,PERSON_ID_,ENCOUNTER_ID_,
                     NEW_REVISIT_, HOME_DISTRICT_, TA_, VILLAGE_, CONCEPT_NAME_,VALUE_DATETIME_,
