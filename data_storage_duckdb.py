@@ -16,6 +16,7 @@ harmonizes the raw transactional fetch against them, then upserts the result.
 See INSTRUCTION.md for how this plugs into the app in place of DataStorage.query_duckdb.
 """
 import os
+import re
 import json
 import duckdb
 import pandas as pd
@@ -23,6 +24,41 @@ import config as cfg
 from db_services_duckdb import DataFetcherDuckDB
 
 CONFIGURATIONS_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configurations.json")
+
+# Every existing DataStorage.query_duckdb call site embeds the route straight into the SQL
+# text — e.g. f"SELECT ... FROM '{data_path}'" where data_path is often built per-request
+# from a URL param (f"data/{route}/parquet"), not passed as a separate argument. A data_dir
+# *parameter* can never track that; these two patterns detect it the same way
+# data_storage.py's _expand_dir_paths does, so query_duckdb stays a true drop-in replacement.
+_FROM_READ_PARQUET_RE = re.compile(r"FROM\s+read_parquet\(\s*(['\"])(.+?)\1[^()]*\)", re.IGNORECASE)
+_FROM_QUOTED_PATH_RE = re.compile(r"FROM\s+(['\"])(.+?)\1", re.IGNORECASE)
+_ROUTE_IN_PATH_RE = re.compile(r"data/([^/'\"]+)/parquet")
+
+
+def _extract_route_and_rewrite(sql):
+    """Find a data/<route>/parquet reference embedded in the SQL (bare quoted directory or a
+    read_parquet(...) call) and rewrite that FROM clause to reference the persisted table
+    instead. Returns (route, rewritten_sql), or (None, sql) unchanged if no such reference is
+    found (e.g. the caller already wrote table-native SQL)."""
+    for pattern in (_FROM_READ_PARQUET_RE, _FROM_QUOTED_PATH_RE):
+        match = pattern.search(sql)
+        if not match:
+            continue
+        route_match = _ROUTE_IN_PATH_RE.search(match.group(2))
+        if not route_match:
+            continue
+        rewritten, _n = pattern.subn(f"FROM {cfg.DUCKDB_TABLE_NAME}", sql)
+        return route_match.group(1), rewritten
+    return None, sql
+
+
+def _normalize_route(value):
+    """Accept either a bare route name ('mahisuat') or a full path ('data/mahisuat') and
+    return the bare route name."""
+    value = value.strip("/")
+    if value.startswith("data/"):
+        value = value[len("data/"):]
+    return value
 
 
 def load_or_create_configurations():
@@ -291,15 +327,25 @@ class DataStorage:
         return self.upsert_dataframe(harmonized_df)
 
     @staticmethod
-    def query_duckdb(sql: str, data_dir: str = cfg.DATA_PATH_) -> pd.DataFrame:
-        """Same signature and return type as DataStorage.query_duckdb — see INSTRUCTION.md
-        for the one thing that does need to change at call sites: the FROM clause must
-        reference the table (cfg.DUCKDB_TABLE_NAME) instead of a parquet path/glob."""
+    def query_duckdb(sql: str, data_dir: str = None) -> pd.DataFrame:
+        """True drop-in for DataStorage.query_duckdb(sql) — same signature, same return type,
+        and now the same calling convention too: the route is detected directly from the SQL
+        text (see _extract_route_and_rewrite), matching how every existing call site already
+        embeds data/<route>/parquet in the query string. `data_dir` is only a fallback for the
+        rare query that doesn't reference a route at all, and cfg.DATA_PATH_ is read fresh here
+        (not baked into the signature at import time), so it reflects whatever it's currently
+        set to."""
+        route, rewritten_sql = _extract_route_and_rewrite(sql)
+        if route is None:
+            route = _normalize_route(data_dir or cfg.DATA_PATH_)
+        if route == 'mahis':
+            print("Data Dir is",route, rewritten_sql)
+            exit()
         script_dir = os.path.dirname(os.path.realpath(__file__))
-        db_path = os.path.join(script_dir, data_dir, cfg.DUCKDB_DIR_NAME, cfg.DUCKDB_FILE_NAME)
+        db_path = os.path.join(script_dir, "data", route, cfg.DUCKDB_DIR_NAME, cfg.DUCKDB_FILE_NAME)
         con = duckdb.connect(db_path, read_only=True)
         try:
-            return con.execute(sql).df()
+            return con.execute(rewritten_sql).df()
         finally:
             con.close()
 

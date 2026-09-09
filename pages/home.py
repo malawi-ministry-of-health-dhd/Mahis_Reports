@@ -21,6 +21,7 @@ from data_storage import DataStorage
 from config import CUSTOM_GENDER_MAP
 import warnings
 import duckdb
+import logging
 warnings.filterwarnings("ignore")
 from helpers.date_ranges import (
                     get_relative_date_range,
@@ -91,7 +92,6 @@ def _start_mnid_prewarm(version: str | None = None):
     """Kick off MNID cache pre-warm in a daemon background thread at server startup."""
     import sys
     import threading
-    import logging
     global _MNID_PREWARM_STARTED
     _log = logging.getLogger(__name__)
 
@@ -697,6 +697,7 @@ def build_charts_from_json(filtered_query, filtered_with_range_query, delta_days
                           start_date=None, end_date=None, data_path=DATA_PATH_, facility_code=None, scope_meta=None, url_object=None, initial_tab=None):
     try:
         config = dashboards_json
+        logging.getLogger(__name__).info(f"build_charts_from_json: rendering report_name={config.get('report_name')!r}")
         count_items_per_row = config.get("count_items_per_row") or 5
 
         # Route MNID dashboard configs to the dedicated MNID renderer.
