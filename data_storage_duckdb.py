@@ -137,10 +137,19 @@ class DataStorage:
     def _make_fetcher(self):
         return DataFetcherDuckDB(
             use_localhost=self.use_localhost, ssh_config=self.ssh_config, db_config=self.db_config,
-            start_date=self.start_date, load_fresh_data=self.load_fresh_data,
-            batch_size=self.batch_size, batch_folder=os.path.join(self.duckdb_dir, "_tmp_batches"),
-            duckdb_path=self.db_path, duckdb_table=self.table_name,
+            start_date=self.start_date, batch_size=self.batch_size,
+            batch_folder=os.path.join(self.duckdb_dir, "_tmp_batches"),
+            duckdb_path=self.db_path,
         )
+
+    def fetch_and_create_table(self, query, table_name, unique_index, last_id=0) -> int:
+        """Thin wrapper around DataFetcherDuckDB.fetch_tables() for this route's duckdb file
+        (self.db_path) — incrementally syncs an arbitrary table by id, independent of the main
+        encounters/obs pipeline. See fetch_tables for the create/resume semantics: unique_index
+        doubles as the persisted cursor column once the table exists; last_id is only the
+        starting point for a brand-new table. Returns the number of rows fetched."""
+        fetcher = self._make_fetcher()
+        return fetcher.fetch_tables(query, table_name, unique_index, last_id)
 
     def fetch_single_tables(self, fetcher=None):
         """Fetch each lookup/dimension table fresh and save it as CSV under
@@ -291,6 +300,23 @@ class DataStorage:
                     f"CREATE UNIQUE INDEX idx_{self.table_name}_key ON {self.table_name} ({key_clause})"
                 )
 
+            # Self-heal a table left without its unique index: CREATE TABLE and CREATE UNIQUE
+            # INDEX are separate statements, so a prior run whose source data had duplicate
+            # keys could have the CREATE TABLE succeed and only the index creation fail,
+            # leaving the table permanently without it (ON CONFLICT then has no index to
+            # target). Recreate it here — if the data is now clean this just works; if it's
+            # still not, this raises the real "duplicate keys" error instead of the more
+            # confusing missing-index one.
+            index_exists = con.execute(
+                "SELECT count(*) FROM duckdb_indexes() WHERE table_name = ? AND index_name = ?",
+                [self.table_name, f"idx_{self.table_name}_key"],
+            ).fetchone()[0] > 0
+            if not index_exists:
+                key_clause = ", ".join(self.key_columns)
+                con.execute(
+                    f"CREATE UNIQUE INDEX idx_{self.table_name}_key ON {self.table_name} ({key_clause})"
+                )
+
             key_clause = ", ".join(self.key_columns)
             update_cols = [c for c in df.columns if c not in self.key_columns]
             set_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
@@ -300,6 +326,28 @@ class DataStorage:
                 ON CONFLICT ({key_clause}) DO UPDATE SET {set_clause}
             """)
             return len(df)
+        finally:
+            con.close()
+
+    def delete_from_date(self, start_date, date_column=None) -> int:
+        """Delete existing rows at/after start_date (matched by the harmonized encounter date
+        column, cfg.DATE_) — used when load_fresh_data is True so a full reload from
+        start_date reflects deletions/voids made in OpenMRS too, not just inserts/updates.
+        No-op (returns 0) if the table doesn't exist yet. Returns the number of rows deleted."""
+        date_column = date_column or cfg.DATE_
+        start_date_str = pd.Timestamp(start_date).strftime("%Y-%m-%d %H:%M:%S")
+        con = duckdb.connect(self.db_path)
+        try:
+            table_exists = con.sql(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = ?",
+                params=[self.table_name],
+            ).fetchone()[0] > 0
+            if not table_exists:
+                return 0
+            result = con.execute(
+                f"DELETE FROM {self.table_name} WHERE {date_column} >= ?", [start_date_str]
+            ).fetchone()
+            return result[0] if result else 0
         finally:
             con.close()
 
@@ -319,10 +367,15 @@ class DataStorage:
     def fetch_and_upsert(self, base_query=None, date_column="encounter_datetime", id_column="encounter_id",
                           lookback_days=None, refresh_single_tables=True) -> int:
         """Full pipeline for this route: fetch single tables (unless told not to), then stream
-        the trailing lookback window of transactional data — each batch is harmonized against
-        the single tables and upserted as soon as it's fetched, rather than accumulating every
-        batch in RAM before a single harmonize+upsert at the end. Returns the number of rows
-        upserted (0 if nothing new/changed)."""
+        transactional data — each batch is harmonized against the single tables and upserted
+        as soon as it's fetched, rather than accumulating every batch in RAM before a single
+        harmonize+upsert at the end. Returns the number of rows upserted (0 if nothing
+        new/changed).
+
+        If self.load_fresh_data is True, this first deletes every existing row at/after
+        self.start_date (so deletions/voids in OpenMRS are reflected, not just inserts/
+        updates), then refetches that entire range from scratch. Otherwise it only re-pulls
+        the trailing DUCKDB_LOOKBACK_DAYS window, which is the routine/repeatable path."""
         base_query = base_query or cfg.NEW_HARMONIZED_QUERY
         if "obs_id" not in base_query:
             print("WARNING: base_query has no obs_id column — falling back to "
@@ -337,8 +390,16 @@ class DataStorage:
             tables = self._load_single_tables_from_csv()
 
         on_batch, total_upserted = self._make_batch_processor(tables)
-        fetcher.fetch_incremental(base_query, date_column=date_column, id_column=id_column,
-                                   lookback_days=lookback_days, on_batch=on_batch)
+
+        if self.load_fresh_data:
+            deleted = self.delete_from_date(self.start_date)
+            print(f"load_fresh_data: deleted {deleted} existing rows from {self.start_date} "
+                  f"onward before reload")
+            fetcher.fetch_bulk(base_query, date_column=date_column, id_column=id_column,
+                                start_date=self.start_date, on_batch=on_batch)
+        else:
+            fetcher.fetch_incremental(base_query, date_column=date_column, id_column=id_column,
+                                       lookback_days=lookback_days, on_batch=on_batch)
         return total_upserted[0]
 
     def reload_historical(self, start_date, end_date=None, base_query=None,
@@ -421,4 +482,19 @@ if __name__ == "__main__":
     _args = _parser.parse_args()
     # `python data_storage_duckdb.py` — path is testable at data/default/duckdb
     # (cfg.DATA_PATH_ defaults to "data/default").
-    run_all_configured_sources(uuid=_args.uuid)
+    # run_all_configured_sources(uuid=_args.uuid)
+
+    # Standalone test of fetch_and_create_table, independent of the uuid-based pipeline above.
+    queries = {
+        "program":{"query":cfg.QUERY_PROGRAMS, "table":"program", "index": "program_id"},
+        "concept_names":{"query":cfg.QUERY_CONCEPT_NAMES, "table":"concept_names", "index": "concept_id"},
+        "encounter_types":{"query":cfg.QUERY_ENCOUNTER_TYPES, "table":"encounter_type", "index": "encounter_type_id"},
+        "locations":{"query":cfg.QUERY_LOCATIONS, "table":"locations", "index": "location_id"},
+        "user_programs":{"query":cfg.QUERY_USER_PROGRAMS, "table":"user_programs", "index": "id"},
+        }
+    for table, query in queries.items():  
+        print(query)
+        _rows = DataStorage().fetch_and_create_table(
+        query=query['query'], table_name=query['table'], unique_index=query['index'], last_id=0
+        )
+        print(f"fetch_and_create_table: fetched {_rows} rows into Programs")
