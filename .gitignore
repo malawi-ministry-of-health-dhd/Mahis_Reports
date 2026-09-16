@@ -93,6 +93,7 @@ __pycache__/
 CLAUDE.md
 data/visualizations/dashboard_tabs_config.json
 .mnid_exec_cache/
+.mnid_data_cache/
 /.junie/
 /.idea/
 saved_queries.json.mnid_exec_cache/

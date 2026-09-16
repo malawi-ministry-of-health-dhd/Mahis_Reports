@@ -289,29 +289,37 @@ def _metric_snapshot(df: pd.DataFrame) -> dict:
     maternal_mask = _service_mask(df, ["ANC", "Labour", "PNC"])
     newborn_mask = _service_mask(df, ["Newborn"])
     labour_mask = _service_mask(df, ["Labour"])
+    # "Baby general condition at birth" is the real Labour concept; "Outcome
+    # of the delivery" is actually PNC's -- both kept, doesn't hurt either way.
+    _birth_outcome_concepts = ["Outcome of the delivery", "Baby general condition at birth"]
+    _birth_concepts = _birth_outcome_concepts + ["Status of baby", "Admission outcome"]
     live_birth_mask = (
-        _contains_mask(df, "concept_name", ["Outcome of the delivery"])
-        & _contains_mask(df, "obs_value_coded", ["Live birth", "Live births", "Alive"])
+        _contains_mask(df, "concept_name", _birth_outcome_concepts)
+        & _contains_mask(df, "obs_value_coded", ["Live birth", "Live births", "Alive", "Live full term", "Live preterm"])
     )
     fresh_stillbirth_mask = (
-        _contains_mask(df, "concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"])
+        _contains_mask(df, "concept_name", _birth_concepts)
         & _contains_mask(df, "obs_value_coded", ["Fresh stillbirth", "Fresh still birth"])
     )
     macerated_stillbirth_mask = (
-        _contains_mask(df, "concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"])
+        _contains_mask(df, "concept_name", _birth_concepts)
         & _contains_mask(df, "obs_value_coded", ["Macerated stillbirth", "Macerated still birth"])
     )
     stillbirth_mask = _yn_mask(df, "mnid_labour_stillbirth") | (
-        _contains_mask(df, "concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"])
+        _contains_mask(df, "concept_name", _birth_concepts)
         & _contains_mask(df, "obs_value_coded", ["Stillbirth", "Fresh stillbirth", "Macerated stillbirth", "Fresh still birth", "Macerated still birth"])
     )
     maternal_death_mask = _yn_mask(df, "mnid_pnc_maternal_death") | (
         _contains_mask(df, "concept_name", ["Status of the mother"])
         & _contains_mask(df, "obs_value_coded", ["Dead", "Died", "Maternal death"])
     )
+    # Real Neonatal concept is "outcome" (Discharge category), not "Admission outcome".
     neonatal_death_mask = (
-        _contains_mask(df, "concept_name", ["Admission outcome", "Status of baby"])
-        & _contains_mask(df, "obs_value_coded", ["Died", "Dead", "Death", "Neonatal death"])
+        _contains_mask(df, "concept_name", ["Admission outcome", "outcome", "Status of baby"])
+        & _contains_mask(df, "obs_value_coded", [
+            "Died", "Dead", "Death", "Neonatal death",
+            "Death < 24hrs", "Death > 24hrs", "Died during Admission", "Brought in dead",
+        ])
     )
 
     maternal_admissions = _unique_count(df, maternal_mask, encounter_col)
@@ -580,7 +588,12 @@ def _monthly_rate_series(
     merged["numerator"] = pd.to_numeric(merged["numerator"], errors="coerce").fillna(0)
     merged["denominator"] = pd.to_numeric(merged["denominator"], errors="coerce").fillna(0)
     merged["value"] = merged.apply(
-        lambda row: round((row["numerator"] / row["denominator"]) * scale, 1) if row["denominator"] > 0 else 0.0,
+        # min(..., scale) -- a thin-sample month (e.g. 2 flagged out of 1
+        # matched denominator row) can put numerator > denominator, producing
+        # a >100% rate on screen; the aggregate-based KPI path already caps
+        # the same way (_build_agg_batch's .clip(upper=100.0)) so this
+        # matches that instead of showing e.g. 200%.
+        lambda row: round(min((row["numerator"] / row["denominator"]) * scale, scale), 1) if row["denominator"] > 0 else 0.0,
         axis=1,
     )
     return merged[cols]
@@ -650,8 +663,11 @@ def _refetch_series(recipe: dict, grain: str) -> pd.DataFrame:
     end = pd.to_datetime(recipe.get("end")) if recipe.get("end") else None
     kind = recipe.get("kind")
 
-    if route == "dhis2":
-        agg_df = _get_aggregate(route="dhis2")
+    if kind in ("agg_single", "agg_multi"):
+        # Not DHIS2-specific any more -- any route with a populated aggregate
+        # uses this (see render_country_profile's _agg_ready), matching Run
+        # Charts, which always prefers the aggregate regardless of route.
+        agg_df = _get_aggregate(route=route or "default")
         if kind == "agg_single":
             return _agg_monthly_series(
                 agg_df, recipe["mnid_id"], start, end, facility_codes, districts,
@@ -998,9 +1014,20 @@ def render_country_profile(
     # actually reflects MNID_DATA_SOURCE='dhis2' like the rest of MNID
     # already does. Falls back to the existing row-level path if the
     # aggregate isn't published yet, so this never breaks the page.
-    agg_df = _get_aggregate(route='dhis2') if (scope_meta or {}).get('route') == 'dhis2' else None
-    use_dhis2 = agg_df is not None and not agg_df.empty
-    if use_dhis2:
+    _cp_route = (scope_meta or {}).get('route', 'default')
+    agg_df = _get_aggregate(route=_cp_route)
+    use_dhis2 = _cp_route == 'dhis2' and agg_df is not None and not agg_df.empty
+    # Same ids now have real MAHIS numerator/denominator filters too (see
+    # validated_dashboard.json), and the aggregate carries a real 'daily'
+    # grain -- unlike the raw-row recall (_remember_ui_payload/_cp_df_key),
+    # it's disk-persisted with no session-cache TTL/eviction risk, exactly
+    # what Run Charts already relies on for its own Daily toggle (trends.py's
+    # update_trend_chart: agg_df first, fallback_df second). Trend charts
+    # below use this instead of a raw scan whenever it's populated,
+    # regardless of route -- only the DHIS2-only facility/district crosswalk
+    # counting further down stays gated on use_dhis2 specifically.
+    _agg_ready = agg_df is not None and not agg_df.empty
+    if _agg_ready:
         # Narrow to just the ~11 indicators Country Profile needs, once, up
         # front. query_coverage/query_time_series each re-filter by exact
         # indicator_id internally (an object-dtype string comparison, slow
@@ -1015,9 +1042,14 @@ def render_country_profile(
         )
         agg_df = agg_df[agg_df['indicator_id'].isin(_cp_agg_ids)]
     facility_codes = districts = None
+    if _agg_ready:
+        # Needed to correctly scope agg_df to the selected facility/district
+        # for the trend-chart path below, regardless of use_dhis2 -- without
+        # this a MAHIS-route aggregate fetch would silently ignore the
+        # selection and return the whole route's totals instead.
+        _, facility_codes, districts = _resolve_scope_filters(df, scope_meta or {})
 
     if use_dhis2:
-        _, facility_codes, districts = _resolve_scope_filters(df, scope_meta or {})
         start = pd.to_datetime(start_date) if start_date else None
         end = pd.to_datetime(end_date) if end_date else None
         if start is None or end is None:
@@ -1133,7 +1165,7 @@ def render_country_profile(
     # Shared with every chart's "recipe" below (route/scope don't vary per
     # chart) -- see _refetch_series's module note for why these exist.
     _recipe_base = {
-        "route": "dhis2" if use_dhis2 else "default",
+        "route": _cp_route,
         "facility_codes": facility_codes,
         "districts": districts,
         "start": start.isoformat() if start is not None else None,
@@ -1141,10 +1173,14 @@ def render_country_profile(
     }
     # A single stable-per-render key so every raw-row recipe below recalls
     # the exact same dataframe instead of each stashing its own duplicate
-    # copy in the disk cache.
-    _cp_df_key = None if use_dhis2 else _remember_ui_payload("cp", df)
+    # copy in the disk cache. Longer TTL than the 1h default: this is what
+    # the Daily grain toggle recalls to refetch real day-level detail, and
+    # there's no rebuild-on-miss for it (unlike network_df) -- see
+    # _remember_ui_payload's docstring. Not needed at all once _agg_ready,
+    # since those charts refetch from the aggregate instead.
+    _cp_df_key = None if _agg_ready else _remember_ui_payload("cp", df, expire=6 * 3600)
 
-    if use_dhis2:
+    if _agg_ready:
         total_births_series = _agg_monthly_series(agg_df, "mnid_lab_core_totalbirths", start, end, facility_codes, districts, grain=_fetch_grain)
         total_births_recipe = {**_recipe_base, "kind": "agg_single", "mnid_id": "mnid_lab_core_totalbirths"}
         maternal_death_series = _agg_monthly_series(agg_df, "mnid_pnc_overview_004", start, end, facility_codes, districts, grain=_fetch_grain)
@@ -1170,19 +1206,21 @@ def render_country_profile(
         neonatal_death_mask_spec = _contains_spec("obs_value_coded", ["Died", "Dead", "Death", "Neonatal death"])
         neonatal_death_series = _monthly_series(df, _mask_from_spec(df, neonatal_death_mask_spec), "person_id", grain=_fetch_grain)
         neonatal_death_recipe = {**_recipe_base, "kind": "raw_single", "df_key": _cp_df_key, "mask_spec": neonatal_death_mask_spec}
+        # "Baby general condition at birth" is the real Labour concept for
+        # this; "Outcome of the delivery" is actually PNC's -- both kept.
+        _birth_outcome_concepts = ["Outcome of the delivery", "Baby general condition at birth"]
+        _birth_concepts = _birth_outcome_concepts + ["Status of baby", "Admission outcome"]
+        _live_birth_values = ["Live birth", "Live births", "Alive", "Live full term", "Live preterm"]
         live_birth_denominator_mask = (
-            _contains_mask(df, "concept_name", ["Outcome of the delivery"])
-            & _contains_mask(df, "obs_value_coded", ["Live birth", "Live births", "Alive"])
+            _contains_mask(df, "concept_name", _birth_outcome_concepts)
+            & _contains_mask(df, "obs_value_coded", _live_birth_values)
         )
         total_birth_denominator_mask = (
-            _contains_mask(df, "concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"])
+            _contains_mask(df, "concept_name", _birth_concepts)
             & _contains_mask(
                 df,
                 "obs_value_coded",
-                [
-                    "Live birth",
-                    "Live births",
-                    "Alive",
+                _live_birth_values + [
                     "Stillbirth",
                     "Fresh stillbirth",
                     "Macerated stillbirth",
@@ -1191,7 +1229,7 @@ def render_country_profile(
                 ],
             )
         )
-        total_births_mask_spec = _contains_spec("concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"])
+        total_births_mask_spec = _contains_spec("concept_name", _birth_concepts)
         total_births_series = _monthly_multiseries({"Total births": (
             _mask_from_spec(df, total_births_mask_spec),
             PRIMARY_GREEN,
@@ -1210,24 +1248,35 @@ def render_country_profile(
 
     chart_scope_label = _chart_scope_label(scope_meta)
     total_birth_denominator_spec = _and_spec(
-        _contains_spec("concept_name", ["Outcome of the delivery", "Status of baby", "Admission outcome"]),
-        _contains_spec("obs_value_coded", [
-            "Live birth", "Live births", "Alive", "Stillbirth",
-            "Fresh stillbirth", "Macerated stillbirth", "Fresh still birth", "Macerated still birth",
+        _contains_spec("concept_name", _birth_concepts),
+        _contains_spec("obs_value_coded", _live_birth_values + [
+            "Stillbirth", "Fresh stillbirth", "Macerated stillbirth", "Fresh still birth", "Macerated still birth",
         ]),
     ) if not use_dhis2 else None
     live_birth_denominator_spec = _and_spec(
-        _contains_spec("concept_name", ["Outcome of the delivery"]),
-        _contains_spec("obs_value_coded", ["Live birth", "Live births", "Alive"]),
+        _contains_spec("concept_name", _birth_outcome_concepts),
+        _contains_spec("obs_value_coded", _live_birth_values),
     ) if not use_dhis2 else None
+    # Real MAHIS concept for all four below is "Obstetric complications"
+    # (verified against MAHIS Concept Sheets.xlsx), with option values
+    # including "obstructed labour"/"prolonged labour"/"Pre-eclampsia"/
+    # "ruptured uterus" -- previously matched via a bare obs_value_coded
+    # search with no concept_name scoping at all, which could in principle
+    # match an unrelated question that happened to share the same wording.
+    # mnid_labour_eclampsia/mnid_labour_obstructed_labour (data_utils.py) are
+    # the same real concept already properly scoped, kept as-is and only
+    # widened for the sibling condition each label also covers.
+    _obs_complications_spec = _contains_spec("concept_name", ["Obstetric complications"])
+    def _obs_complications_mask(values):
+        return _contains_mask(df, "concept_name", ["Obstetric complications"]) & _contains_mask(df, "obs_value_coded", values)
     maternal_complication_specs = [
-        ("Pre-eclampsia and Eclampsia", MORTALITY_ROSE, _yn_mask(df, "mnid_labour_eclampsia") | _contains_mask(df, "obs_value_coded", ["Pre-eclampsia", "Pre eclampsia", "Preeclampsia", "Eclampsia"]),
-         _or_spec(_yn_spec("mnid_labour_eclampsia"), _contains_spec("obs_value_coded", ["Pre-eclampsia", "Pre eclampsia", "Preeclampsia", "Eclampsia"]))),
+        ("Pre-eclampsia and Eclampsia", MORTALITY_ROSE, _yn_mask(df, "mnid_labour_eclampsia") | _obs_complications_mask(["Pre-eclampsia"]),
+         _or_spec(_yn_spec("mnid_labour_eclampsia"), _and_spec(_obs_complications_spec, _contains_spec("obs_value_coded", ["Pre-eclampsia"])))),
         ("Postpartum Haemorrhage", WARNING_AMBER, _yn_mask(df, "mnid_labour_pph"), _yn_spec("mnid_labour_pph")),
         ("Maternal Sepsis", "#B91C1C", _yn_mask(df, "mnid_labour_maternal_sepsis"), _yn_spec("mnid_labour_maternal_sepsis")),
-        ("Obstructed or Prolonged Labour", "#7C3AED", _yn_mask(df, "mnid_labour_obstructed_labour") | _contains_mask(df, "obs_value_coded", ["Obstructed labour", "Prolonged labour", "Prolonged Labor"]),
-         _or_spec(_yn_spec("mnid_labour_obstructed_labour"), _contains_spec("obs_value_coded", ["Obstructed labour", "Prolonged labour", "Prolonged Labor"]))),
-        ("Ruptured Uterus", "#475569", _contains_mask(df, "obs_value_coded", ["Ruptured uterus", "Uterine rupture"]), _contains_spec("obs_value_coded", ["Ruptured uterus", "Uterine rupture"])),
+        ("Obstructed or Prolonged Labour", "#7C3AED", _yn_mask(df, "mnid_labour_obstructed_labour") | _obs_complications_mask(["prolonged labour"]),
+         _or_spec(_yn_spec("mnid_labour_obstructed_labour"), _and_spec(_obs_complications_spec, _contains_spec("obs_value_coded", ["prolonged labour"])))),
+        ("Ruptured Uterus", "#475569", _obs_complications_mask(["ruptured uterus"]), _and_spec(_obs_complications_spec, _contains_spec("obs_value_coded", ["ruptured uterus"]))),
     ]
     neonatal_complication_specs = [
         ("Birth Asphyxia", "#D97706", _yn_mask(df, "mnid_newborn_birth_asphyxia"), _yn_spec("mnid_newborn_birth_asphyxia")),
@@ -1242,7 +1291,7 @@ def render_country_profile(
     maternal_complication_cards = []
     for title, color, mask, mask_spec in maternal_complication_specs:
         chart_key = _chart_key_slug(title)
-        if use_dhis2:
+        if _agg_ready:
             mnid_id = _AGG_MATERNAL_COMPLICATION_IDS.get(title)
             series_df = (
                 _agg_monthly_series(agg_df, mnid_id, start, end, facility_codes, districts, value_field="pct", include_counts=True, grain=_fetch_grain)
@@ -1269,7 +1318,7 @@ def render_country_profile(
     neonatal_complication_cards = []
     for title, color, mask, mask_spec in neonatal_complication_specs:
         chart_key = _chart_key_slug(title)
-        if use_dhis2:
+        if _agg_ready:
             mnid_id = _AGG_NEONATAL_COMPLICATION_IDS.get(title)
             series_df = (
                 _agg_monthly_series(agg_df, mnid_id, start, end, facility_codes, districts, value_field="pct", include_counts=True, grain=_fetch_grain)
