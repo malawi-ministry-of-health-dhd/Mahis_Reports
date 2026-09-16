@@ -222,7 +222,6 @@ def parse_filter_value(filter_val):
 
 def create_count_from_config(df, data_path, filters, group_by=None, custom_sql=None):
     """Create count based on JSON filter configuration"""
-
     unique_col = filters.get("unique", "")
     aggregation = filters.get("measure", "count")
 

@@ -300,6 +300,12 @@ class DataStorage:
 
 
 if __name__ == "__main__":
+    import argparse
+    _parser = argparse.ArgumentParser(description="Fetch/refresh OpenMRS data into parquet.")
+    _parser.add_argument("--uuid", default=None,
+                          help="Only run the configurations.json entry with this uuid, instead of all of them.")
+    _args = _parser.parse_args()
+
     # check if config file exists and load it, if not log an error and exit
     if os.path.exists(os.path.join(os.path.dirname(os.path.realpath(__file__)), "configurations.json")):
         with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "configurations.json")) as f:
@@ -328,6 +334,11 @@ if __name__ == "__main__":
         ]
         with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "configurations.json"), 'w') as f:
             json.dump(global_configurations, f, indent=2)
+
+    if _args.uuid:
+        global_configurations = [c for c in global_configurations if c.get("uuid") == _args.uuid]
+        if not global_configurations:
+            print(f"No data source found with uuid={_args.uuid}")
 
     for items in global_configurations:
 
@@ -386,8 +397,3 @@ if __name__ == "__main__":
             transactional.fetch_transactional_data(date_column="encounter_datetime", incremental_id_column="encounter_id")
         except Exception as e:
             print(e)
-
-
-        # if CONCEPTS:
-        #     concepts = DataStorage(query=CONCEPTS)
-        #     concepts.fetch_and_save_single_table(table_name="concepts_data")

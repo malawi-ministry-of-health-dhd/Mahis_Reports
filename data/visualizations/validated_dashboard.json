@@ -251,7 +251,7 @@
               {
                 "id": "chart_pivot_summary",
                 "display": "True",
-                "name": "Locations",
+                "name": "Attendance by Health Facility and Program",
                 "type": "CrossTab",
                 "level": "facility",
                 "filters": {
@@ -301,7 +301,8 @@
                   }
                 }
               }
-            ]
+            ],
+            "section_id": "section_3e21a503"
           },
           {
             "section_name": "Facility Performance Heatmap",
@@ -871,7 +872,10 @@
           }
         ]
       }
-    }
+    },
+    "date_updated": "2026-09-08 21:24:45",
+    "associated_programs": [],
+    "access": "global"
   },
   {
     "report_id": "report_20c213d4",
@@ -9810,5 +9814,243 @@
       "IPD Program"
     ],
     "access": "global"
+  },
+  {
+    "report_id": "report_ee84a62b",
+    "report_name": "AETC",
+    "date_created": "2026-09-08",
+    "visualization_types": {
+      "counts": [],
+      "charts": {
+        "sections": []
+      }
+    },
+    "visualization_tabs": [
+      {
+        "tab_id": "tab_82f0b0fe",
+        "display": "True",
+        "tab_name": "Screening",
+        "visualization_types": {
+          "counts": [
+            {
+              "id": "count_45fd3805",
+              "display": "True",
+              "name": "Total Patients at Arrival",
+              "level": "facility",
+              "flag": "ok",
+              "display_average": "True",
+              "drill_down": "False",
+              "filters": {
+                "measure": "nunique",
+                "unique": "visit_id",
+                "variable1": "Program",
+                "value1": "AETC PROGRAM",
+                "variable2": "Encounter",
+                "value2": "Visit"
+              }
+            },
+            {
+              "id": "count_507ec30f",
+              "display": "True",
+              "name": "Total Screened Patients",
+              "level": "facility",
+              "flag": "",
+              "display_average": "False",
+              "href": "",
+              "drill_down": "False",
+              "show_trend": "False",
+              "group_by": "",
+              "custom_sql": "",
+              "filters": {
+                "measure": "count",
+                "unique": "visit_id",
+                "variable1": "Program",
+                "value1": "AETC PROGRAM",
+                "variable2": "concept_name",
+                "value2": "Is Situation Urgent"
+              }
+            },
+            {
+              "id": "count_a70e7e4e",
+              "display": "True",
+              "name": "Urgent",
+              "level": "facility",
+              "flag": "",
+              "display_average": "False",
+              "href": "",
+              "drill_down": "False",
+              "show_trend": "False",
+              "group_by": "",
+              "custom_sql": "",
+              "filters": {
+                "measure": "count",
+                "unique": "visit_id",
+                "variable1": "Program",
+                "value1": "AETC PROGRAM",
+                "variable2": "concept_name",
+                "value2": "Is Situation Urgent",
+                "variable3": "Value",
+                "value3": "Yes"
+              }
+            },
+            {
+              "id": "count_e83afc4d",
+              "display": "True",
+              "name": "Not Urgent",
+              "level": "facility",
+              "flag": "",
+              "display_average": "False",
+              "href": "",
+              "drill_down": "False",
+              "show_trend": "False",
+              "group_by": "",
+              "custom_sql": "",
+              "filters": {
+                "measure": "count",
+                "unique": "visit_id",
+                "variable1": "Program",
+                "value1": "AETC PROGRAM",
+                "variable2": "concept_name",
+                "value2": "Is Situation Urgent",
+                "variable3": "Value",
+                "value3": "No"
+              }
+            },
+            {
+              "id": "count_41dfcf23",
+              "display": "True",
+              "name": "Elective",
+              "level": "facility",
+              "flag": "",
+              "display_average": "False",
+              "href": "",
+              "drill_down": "False",
+              "show_trend": "False",
+              "group_by": "",
+              "custom_sql": "",
+              "filters": {
+                "measure": "count",
+                "unique": "visit_id",
+                "variable1": "Program",
+                "value1": "AETC PROGRAM",
+                "variable2": "concept_name",
+                "value2": "Is Situation Urgent",
+                "variable3": "Value",
+                "value3": "Elective"
+              }
+            },
+            {
+              "id": "count_d91a2391",
+              "display": "True",
+              "name": "Screened In",
+              "level": "facility",
+              "flag": "",
+              "display_average": "False",
+              "href": "",
+              "drill_down": "False",
+              "show_trend": "False",
+              "group_by": "",
+              "custom_sql": "",
+              "filters": {
+                "measure": "count",
+                "unique": "visit_id",
+                "variable1": "Program",
+                "value1": "AETC PROGRAM",
+                "variable2": "concept_name",
+                "value2": "!=Patient Referred To",
+                "variable3": "Encounter",
+                "value3": "Screening"
+              }
+            }
+          ],
+          "charts": {
+            "sections": []
+          }
+        }
+      },
+      {
+        "tab_id": "tab_b81d1d51",
+        "display": "True",
+        "tab_name": "Registration",
+        "visualization_types": {
+          "counts": [
+            {
+              "id": "count_b30ea825",
+              "display": "True",
+              "name": "All Attendance",
+              "level": "facility",
+              "flag": "ok",
+              "drill_down": "True",
+              "filters": {
+                "measure": "nunique",
+                "unique": "person_id",
+                "variable1": "Program",
+                "value1": [
+                  "OPD Program"
+                ],
+                "variable2": "Encounter",
+                "variable3": "concept_name",
+                "variable4": "obs_value_coded",
+                "variable5": "ValueN",
+                "variable6": "Value",
+                "variable7": "Gender",
+                "variable8": "Age_Group"
+              }
+            }
+          ],
+          "charts": {
+            "sections": []
+          }
+        }
+      },
+      {
+        "tab_id": "tab_b51deba3",
+        "display": "True",
+        "tab_name": "Triage",
+        "visualization_types": {
+          "counts": [],
+          "charts": {
+            "sections": []
+          }
+        }
+      },
+      {
+        "tab_id": "tab_8273e104",
+        "display": "True",
+        "tab_name": "Assessment",
+        "visualization_types": {
+          "counts": [],
+          "charts": {
+            "sections": []
+          }
+        }
+      },
+      {
+        "tab_id": "tab_df620ba4",
+        "display": "True",
+        "tab_name": "Laboratory",
+        "visualization_types": {
+          "counts": [],
+          "charts": {
+            "sections": []
+          }
+        }
+      },
+      {
+        "tab_id": "tab_968c9dcc",
+        "display": "True",
+        "tab_name": "Daily Report",
+        "visualization_types": {
+          "counts": [],
+          "charts": {
+            "sections": []
+          }
+        }
+      }
+    ],
+    "count_items_per_row": 6,
+    "associated_programs": [],
+    "access": "global",
+    "date_updated": "2026-09-08 20:34:27"
   }
 ]

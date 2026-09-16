@@ -1,6 +1,7 @@
 import dash
 from dash import html, dcc, dash_table, Input, Output, State, callback
 from dash_iconify import DashIconify
+from dash_ace import DashAceEditor
 import json
 import os
 import pandas as pd
@@ -46,7 +47,6 @@ else:
 drop_down_programs = dcc_json['programs']
 drop_down_encounters = dcc_json['encounters']
 drop_down_concepts = dcc_json['concepts']
-aggregations = ["nunique", "sum", "count", "mean", "min", "max","time_diff_mins","time_diff_hour","std","var","list"]
 user_levels = ['national', 'district', 'facility']
 
 # DATASET
@@ -444,555 +444,6 @@ def archive_report(report_id):
     
     save_reports_data(data)
 
-# DASHBOARDS 
-def create_chart_fields(chart_type, chart_data=None, section_index=None, chart_index=None):
-    chart_data = chart_data or {}
-    filters = chart_data.get("filters", {})
-
-    # if chart_type not in CHART_TEMPLATES:
-    #     return html.Div("Invalid chart type")
-
-    template = CHART_TEMPLATES["Chart"]
-    dropdown_options = ['Date','person_id', 'encounter_id', 'Gender', 'Program', 'Encounter',
-                        'obs_value_coded', 'concept_name', 'Value', 'ValueN', 'DrugName', 'Value_name','User']
-    
-    # Define which fields are relevant for each chart type
-    chart_type_fields = {
-        "Line": ["date_col", "y_col", "x_title", "y_title", "legend_title", "color", "unique_column"],
-        "Bar": ["label_col", "value_col", "x_title", "y_title", "top_n", "unique_column"],
-        "Pie": ["names_col", "values_col", "colormap", "unique_column"],
-        "Column": ["x_col", "y_col", "x_title", "y_title", "legend_title", "color", "unique_column"],
-        "Histogram": ["age_col", "gender_col", "bin_size", "color", "unique_column"],
-        "PivotTable": ["index_col1", "columns", "values_col", "aggfunc", "unique_column"]
-    }
-    
-    # Common fields for all chart types
-    common_fields = ["title", "duration_default", "filter_col1", "filter_val1", "filter_col2", "filter_val2", 
-                     "filter_col3", "filter_val3", "filter_col4", "filter_val4", "filter_col5", "filter_val5",
-                     "custom_fields"]
-    
-    # Combine all fields that should be visible for this chart type
-    visible_fields = set(chart_type_fields.get(chart_type, []) + common_fields)
-    
-    # All possible fields (complete list)
-    all_fields = [
-        "date_col", "y_col", "x_col", "label_col", "value_col", "names_col", "values_col",
-        "age_col", "gender_col", "index_col1", "columns", "aggfunc",
-        "x_title", "y_title", "legend_title", "color", "top_n", "bin_size", "colormap",
-        "unique_column", "title", "duration_default",
-        "filter_col1", "filter_val1", "filter_col2", "filter_val2", "filter_col3", "filter_val3",
-        "filter_col4", "filter_val4", "filter_col5", "filter_val5","custom_fields"
-    ]
-    
-    FIELD_CONFIG = {
-        "date_col": {"type": "single", "options": ["Date"]},
-        "y_col": {"type": "single", "options": dropdown_options},
-        "unique_column": {"type": "single", "options": ["person_id", "encounter_id"]},
-        "label_col": {"type": "single", "options": dropdown_options},
-        "value_col": {"type": "single", "options": dropdown_options},
-        "names_col": {"type": "single", "options": dropdown_options},
-        "values_col": {"type": "single", "options": dropdown_options},
-        "x_col": {"type": "single", "options": dropdown_options},
-        "age_col": {"type": "single", "options": ["Age"]},
-        "gender_col": {"type": "single", "options": ["Gender"]},
-        "index_col1": {"type": "multi", "options": dropdown_options},
-        "columns": {"type": "multi", "options": dropdown_options},
-        "aggfunc": {"type": "multi", "options": aggregations},
-        "filter_col1": {"type": "multi", "options": dropdown_options},
-        "filter_col2": {"type": "multi", "options": dropdown_options},
-        "filter_col3": {"type": "multi", "options": dropdown_options},
-        "filter_col4": {"type": "multi", "options": dropdown_options},
-        "filter_col5": {"type": "multi", "options": dropdown_options},
-        "filter_val1": {"type": "", "options": None},
-        "filter_val2": {"type": "", "options": None},
-        "filter_val3": {"type": "", "options": None},
-        "filter_val4": {"type": "", "options": None},
-        "filter_val5": {"type": "", "options": None},
-        "custom_fields": {"type": "", "options": None},
-        "duration_default": {"type": "single", "options": ["any", "7days", "30days", "90days"]},
-        "top_n": {"type": "single", "options": None},
-        "colormap": {"type": "textarea", "options": None},
-        "bin_size": {"type": "single", "options": None},
-        "color": {"type": "single", "options": None},
-        "x_title": {"type": "single", "options": None},
-        "y_title": {"type": "single", "options": None},
-        "legend_title": {"type": "single", "options": None},
-        "title": {"type": "single", "options": None},
-    }
-
-    grid_items = []
-
-    # Render ALL fields, but hide irrelevant ones with CSS
-    for element in all_fields:
-        if element not in template:
-            continue
-            
-        current_value = filters.get(element, template.get(element, ""))
-        
-        if current_value is None:
-            current_value = "" if FIELD_CONFIG.get(element, {}).get("type") == "single" else []
-        
-        # Use section and index for field IDs
-        field_id = {"type": f"chart-{element}", "section": section_index, "index": chart_index}
-        
-        # Determine if this field should be visible
-        is_visible = element in visible_fields
-        display_style = "" if is_visible else "none"
-        
-        if element in FIELD_CONFIG:
-            config = FIELD_CONFIG[element]
-            field_type = config.get("type", "single")
-            
-            if field_type == "multi":
-                options = config["options"] if config.get("options") else []
-                dropdown_opts = [{"label": opt, "value": opt} for opt in options] if options else []
-                
-                if isinstance(current_value, str) and current_value:
-                    current_value = [current_value]
-                elif not isinstance(current_value, list):
-                    current_value = []
-                
-                component = html.Div(
-                    className="chart-field",
-                    style={"display": display_style},
-                    children=[
-                        html.Label(element.replace("_", " ").title(), className="form-label"),
-                        dcc.Dropdown(
-                            id=field_id,
-                            options=dropdown_opts,
-                            value=current_value,
-                            placeholder=f"Select {element.replace('_', ' ')}",
-                            className="form-input",
-                            multi=True,
-                            clearable=True
-                        )
-                    ]
-                )
-            
-            elif field_type == "single" and config.get("options"):
-                dropdown_opts = [{"label": opt, "value": opt} for opt in config["options"]]
-                
-                component = html.Div(
-                    className="chart-field",
-                    style={"display": display_style},
-                    children=[
-                        html.Label(element.replace("_", " ").title(), className="form-label"),
-                        dcc.Dropdown(
-                            id=field_id,
-                            options=dropdown_opts,
-                            value=current_value if current_value else None,
-                            placeholder=f"Select {element.replace('_', ' ')}",
-                            className="form-input",
-                            clearable=True
-                        )
-                    ]
-                )
-            
-            elif field_type == "textarea":
-                component = html.Div(
-                    className="chart-field",
-                    style={"display": display_style},
-                    children=[
-                        html.Label(element.replace("_", " ").title(), className="form-label"),
-                        dcc.Textarea(
-                            id=field_id,
-                            value=json.dumps(current_value if isinstance(current_value, dict) else {}, indent=2),
-                            className="form-input",
-                            style={"height": "80px", "resize": "vertical"}
-                        )
-                    ]
-                )
-            
-            else:
-                component = html.Div(
-                    className="chart-field",
-                    style={"display": display_style},
-                    children=[
-                        html.Label(element.replace("_", " ").title(), className="form-label"),
-                        dcc.Input(
-                            id=field_id,
-                            value=str(current_value) if current_value else "",
-                            placeholder=f"Enter {element.replace('_', ' ')}",
-                            className="form-input",
-                            type="text"
-                        )
-                    ]
-                )
-        grid_items.append(component)
-    
-    return html.Div(className="chart-grid", children=grid_items)
-
-_DROPDOWN_BACKED_VARS = {
-    "Program":         ("programs",   True),
-    "Encounter":       ("encounters", True),
-    "concept_name":    ("concepts",   True),
-    "obs_value_coded": ("concept_answers", True),
-    "Gender":          ("gender",     False),
-    "DrugName":        ("DrugName",   True),
-}
-
-
-def _val_input(count_idx, fi, var, val):
-    """Return a dropdown or text input for the filter value depending on column type."""
-    backed = _DROPDOWN_BACKED_VARS.get(var)
-    if backed:
-        key, is_multi = backed
-        opts = [{"label": v, "value": v} for v in (dcc_json.get(key) or [])]
-        existing = val if isinstance(val, list) else ([val] if val else None)
-        return dcc.Dropdown(
-            id={"type": "count-val", "count": count_idx, "filter": fi},
-            value=existing,
-            options=opts,
-            placeholder="Select value(s)",
-            className="form-input",
-            multi=is_multi,
-            clearable=True,
-            style={"flex": "1"},
-        )
-    return dcc.Input(
-        id={"type": "count-val", "count": count_idx, "filter": fi},
-        value=str(val) if val not in (None, "") else "",
-        placeholder="Value (use * prefix for wildcard)",
-        className="form-input",
-        type="text",
-        style={"flex": "1"},
-    )
-
-
-def render_filter_rows(count_idx, filter_pairs):
-    """Render the dynamic variable/value filter rows for a count item."""
-    col_options = [{"label": k, "value": k} for k in actual_keys_in_data]
-    rows = []
-    for fi, (var, val) in enumerate(filter_pairs):
-        remove_btn = html.Button(
-            "×",
-            id={"type": "count-remove-filter", "count": count_idx, "filter": fi},
-            n_clicks=0,
-            className="btn-danger btn-small",
-            style={"flexShrink": "0", "height": "32px"},
-        ) if len(filter_pairs) > 1 else html.Div(style={"width": "32px"})
-
-        rows.append(html.Div(
-            style={"display": "flex", "gap": "6px", "alignItems": "center", "marginBottom": "6px"},
-            children=[
-                dcc.Dropdown(
-                    id={"type": "count-var", "count": count_idx, "filter": fi},
-                    value=var if var else None,
-                    options=col_options,
-                    placeholder="Select column",
-                    className="form-input",
-                    clearable=True,
-                    style={"flex": "1", "minWidth": "140px"},
-                ),
-                _val_input(count_idx, fi, var, val),
-                remove_btn,
-            ]
-        ))
-    return rows
-
-
-def create_count_item(count_data=None, index=None):
-    count_data = count_data or {}
-    filters = count_data.get("filters", {})
-
-    # Collect existing variable/value pairs from the filters dict
-    filter_pairs = []
-    for i in range(1, 11):
-        var_key = f"variable{i}"
-        val_key = f"value{i}"
-        if var_key in filters:
-            var = filters[var_key] or ""
-            val = filters.get(val_key, "")
-            if isinstance(val, list):
-                val = ", ".join(str(v) for v in val if v not in (None, ""))
-            filter_pairs.append((var, str(val) if val not in (None, "") else ""))
-    if not filter_pairs:
-        filter_pairs = [("", "")]
-
-    return html.Div(className="count-item", children=[
-        # ── Close bar ────────────────────────────────────────────────────────
-        html.Div(
-            style={"display": "flex", "justifyContent": "space-between", "alignItems": "center",
-                   "marginBottom": "8px", "paddingBottom": "6px", "borderBottom": "1px solid #e5e7eb"},
-            children=[
-                html.Span(
-                    f"Metric: {count_data.get('name', 'New Metric') or 'New Metric'}",
-                    style={"fontSize": "13px", "fontWeight": "600", "color": "#374151"},
-                ),
-                html.Button(
-                    "✕ Close",
-                    id={"type": "close-count-form", "index": index},
-                    n_clicks=0,
-                    className="btn-secondary btn-small",
-                    title="Close this form",
-                    style={"fontSize": "12px"},
-                ),
-            ],
-        ),
-        # ── Row 1: metadata ──────────────────────────────────────────────────
-        html.Div(style={"display": "flex", "gap": "5px", "flexWrap": "wrap"}, children=[
-            html.Div(className="count-col", style={"display": "none"}, children=[
-                html.Label("ID *", className="form-label-disabled"),
-                dcc.Input(
-                    id={"type": "count-id", "index": index},
-                    value=count_data.get("id", f"count_{uuid.uuid4().hex[:8]}"),
-                    disabled=True,
-                    className="form-input",
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Metric Title *", className="form-label"),
-                dcc.Input(
-                    id={"type": "count-name", "index": index},
-                    value=count_data.get("name", ""),
-                    placeholder="e.g. All Attendance",
-                    className="form-input",
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Aggregation", className="form-label"),
-                dcc.Dropdown(
-                    id={"type": "count-aggregations", "index": index},
-                    value=filters.get("measure", "nunique"),
-                    options=[{"label": a, "value": a} for a in aggregations],
-                    className="form-input",
-                    clearable=False,
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Using Column", className="form-label"),
-                dcc.Dropdown(
-                    id={"type": "count-unique", "index": index},
-                    value=filters.get("unique", "person_id"),
-                    options=[{"label": k, "value": k} for k in actual_keys_in_data],
-                    className="form-input",
-                    clearable=False,
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Level", className="form-label"),
-                dcc.Dropdown(
-                    id={"type": "count-level", "index": index},
-                    value=count_data.get("level", "facility"),
-                    options=[{"label": v, "value": v} for v in ["facility", "district", "national"]],
-                    className="form-input",
-                    clearable=False,
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Flag", className="form-label"),
-                dcc.Dropdown(
-                    id={"type": "count-flag", "index": index},
-                    value=count_data.get("flag", None),
-                    options=[{"label": v, "value": v} for v in ["ok", "warn", "danger"]],
-                    className="form-input",
-                    clearable=True,
-                    placeholder="None",
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Display Average", className="form-label"),
-                dcc.Dropdown(
-                    id={"type": "count-display-average", "index": index},
-                    value=count_data.get("display_average", None),
-                    options=[{"label": "Yes", "value": "True"}, {"label": "No", "value": "False"}],
-                    className="form-input",
-                    clearable=True,
-                    placeholder="None",
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Link (href)", className="form-label"),
-                dcc.Input(
-                    id={"type": "count-href", "index": index},
-                    value=count_data.get("href", ""),
-                    placeholder="e.g. program_reports",
-                    className="form-input",
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Link Label", className="form-label"),
-                dcc.Input(
-                    id={"type": "count-href-name", "index": index},
-                    value=count_data.get("href_name", ""),
-                    placeholder="e.g. view patients",
-                    className="form-input",
-                ),
-            ]),
-            html.Div(className="count-col", children=[
-                html.Label("Actions", className="form-label"),
-                html.Button(
-                    "Save",
-                    id={"type": "save-count", "index": index},
-                    n_clicks=0,
-                    className="btn-save btn-small",
-                ),
-                html.Button(
-                    "🗑️",
-                    id={"type": "remove-count", "index": index},
-                    n_clicks=0,
-                    className="btn-danger btn-small",
-                ),
-            ]),
-        ]),
-
-        # ── Row 2: dynamic filters ────────────────────────────────────────────
-        html.Div(style={"marginTop": "10px", "padding": "10px", "background": "#f9fafb",
-                         "borderRadius": "6px", "border": "1px solid #e5e7eb"}, children=[
-            html.Div(style={"display": "flex", "alignItems": "center", "marginBottom": "8px",
-                             "gap": "10px"}, children=[
-                html.Label("Filters", className="form-label",
-                           style={"margin": "0", "fontWeight": "600"}),
-                html.Button(
-                    "+ Add Filter",
-                    id={"type": "count-add-filter", "count": index},
-                    n_clicks=0,
-                    className="btn-primary btn-small",
-                ),
-            ]),
-            html.Div(
-                id={"type": "count-filters-container", "count": index},
-                children=render_filter_rows(index, filter_pairs),
-            ),
-        ]),
-    ])
-
-def create_chart_item(chart_data=None, section_index=None, chart_index=None):
-    chart_data = chart_data or {}
-    chart_type = chart_data.get('type', 'Bar')
-    chart_id = chart_data.get('id', f'chart_{uuid.uuid4().hex[:8]}')
-    
-    return html.Div(className="chart-item", children=[
-        html.Div(style={"display": "flex","gap":"5px"}, children=[
-            html.Div(className="chart-col", children=[
-                html.Label("Chart ID *", className="form-label-disabled"),
-                dcc.Input(
-                    id={"type": "chart-id", "section": section_index, "index": chart_index},
-                    value=chart_id,
-                    placeholder="chart_id",
-                    disabled=True,
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="chart-col", children=[
-                html.Label("Chart Name *", className="form-label"),
-                dcc.Input(
-                    id={"type": "chart-name", "section": section_index, "index": chart_index},
-                    value=chart_data.get('name', ''),
-                    placeholder="Chart Display Name",
-                    className="form-input"
-                ),
-            ]),
-            html.Div(className="chart-col", children=[
-                html.Label("Chart Type *", className="form-label"),
-                dcc.Dropdown(
-                    id={"type": "chart-type", "section": section_index, "index": chart_index},
-                    options=[{'label': t, 'value': t} for t in CHART_TEMPLATES_ORIGINAL.keys()],
-                    value=chart_type,
-                    className="dropdown"
-                ),
-            ]),
-            html.Div(className="chart-col", children=[
-                html.Label("Level", className="form-label"),
-                dcc.Dropdown(
-                    id={"type": "chart-level", "section": section_index, "index": chart_index},
-                    value=chart_data.get('level', 'facility'),
-                    options=[{'label': v, 'value': v} for v in ['facility', 'district', 'national']],
-                    className="dropdown",
-                    clearable=False,
-                ),
-            ]),
-            html.Div(className="chart-col", children=[
-                html.Label("Actions", className="form-label"),
-                html.Button(
-                    "Save", 
-                    id={"type": "save-chart", "section": section_index, "index": chart_index},
-                    n_clicks=0,
-                    className="btn-save btn-small"
-                ),
-                html.Button(
-                    "Delete", 
-                    id={"type": "remove-chart", "section": section_index, "index": chart_index},
-                    n_clicks=0,
-                    className="btn-danger btn-small"
-                )
-            ]),
-        ]),
-        html.Div(
-            id={"type": "chart-fields", "section": section_index, "index": chart_index},
-            children=create_chart_fields(chart_type, chart_data, section_index, chart_index)
-        ),
-    ])
-
-def create_section(section_data=None, index=None, active_chart_index=None):
-    section_data = section_data or {}
-    items = section_data.get('items', [])
-
-    # Only render the one active chart (or none)
-    if active_chart_index is not None and 0 <= active_chart_index < len(items):
-        initial_charts = [create_chart_item(items[active_chart_index], index, active_chart_index)]
-    else:
-        initial_charts = []
-
-    chart_count_label = html.Span(
-        f"{len(items)} chart(s) in section — click a chart in the list to edit",
-        style={"fontSize": "12px", "color": "#6b7280", "marginLeft": "8px"}
-    ) if items and not initial_charts else None
-
-    return html.Div(className="section-item", children=[
-        html.Div(className="card-header", children=[
-            html.Div(className="section-header", children=[
-                html.Div(className="section-col", children=[
-                    html.Label("Section Name *", className="form-label"),
-                    dcc.Input(
-                        id={"type": "section-name", "index": index},
-                        value=section_data.get('section_name', ' '),
-                        placeholder="e.g Attendance",
-                        className="form-input"
-                    ),
-                ]),
-                html.Div(className="section-col", children=[
-                    html.Label("Charts Per Row", className="form-label"),
-                    dcc.Input(
-                        id={"type": "section-chart-items-per-row", "index": index},
-                        value=section_data.get('chart_items_per_row', 2),
-                        type="number",
-                        min=1,
-                        max=6,
-                        placeholder="2",
-                        className="form-input",
-                        style={"width": "80px"},
-                    ),
-                ]),
-                html.Div(className="section-col", children=[
-                    html.Label("Actions", className="form-label"),
-                    html.Button("🗑️ Remove Section",
-                              id={"type": "remove-section", "index": index},
-                              n_clicks=0,
-                              className="btn-danger"),
-                    html.Button("✕ Close",
-                              id={"type": "close-section-form", "index": index},
-                              n_clicks=0,
-                              className="btn-secondary btn-small",
-                              title="Close this form",
-                              style={"marginLeft": "6px", "fontSize": "12px"}),
-                ]),
-            ]),
-        ]),
-        html.Div(className="card-body", children=[
-            html.Div(style={"display": "flex", "alignItems": "center", "marginBottom": "8px"}, children=[
-                html.Button("+ Add Chart",
-                          id={"type": "add-chart-btn", "index": index},
-                          n_clicks=0,
-                          className="btn-primary"),
-                chart_count_label,
-            ]),
-            html.Div(id={"type": "charts-container", "index": index, "section": index},
-                    className="charts-container",
-                    children=initial_charts),
-        ]),
-    ])
-
 def _create_mnid_filter_group(filters, index, scope):
     scope_key = scope.lower()
     variable_options = [{'label': item, 'value': item} for item in actual_keys_in_data]
@@ -1128,188 +579,10 @@ def create_mnid_indicator_item(indicator_data=None, index=None):
         ])
     ])
 
-CHART_TEMPLATES = {
-    "Chart": {
-        "measure": "chart",
-        "unique": "any",
-        "duration_default": "7days",
-        "date_col": "Date",
-        "y_col": "",
-        "title": "",
-        "x_title": "Date",
-        "y_title": "Number of Patients",
-        "unique_column": "person_id",
-        "legend_title": "Legend",
-        "color": "",
-        # Bar chart fields (included but not used)
-        "label_col": "",
-        "value_col": "",
-        "top_n": 10,
-        # Pie chart fields
-        "names_col": "",
-        "values_col": "",
-        "colormap": {},
-        # Column chart fields
-        "x_col": "",
-        # Histogram fields
-        "age_col": "Age",
-        "gender_col": "Gender",
-        "bin_size": 5,
-        # PivotTable fields
-        "index_col1": "",
-        "columns": "",
-        "aggfunc": "count",
-        # Common filters
-        "filter_col1": "",
-        "filter_val1": "",
-        "filter_col2": "",
-        "filter_val2": "",
-        "filter_col3": "",
-        "filter_val3": "",
-        "filter_col4": "",
-        "filter_val4": "",
-        "filter_col5": "",
-        "filter_val5": "",
-        "custom_fields": ""
-    }
-}
-
-CHART_TEMPLATES_ORIGINAL = {
-    "Line": {
-        "measure": "chart",
-        "unique": "any",
-        "duration_default": "7days",
-        "date_col": "Date",
-        "y_col": "",
-        "title": "",
-        "x_title": "Date",
-        "y_title": "Number of Patients",
-        "unique_column": "person_id",
-        "legend_title": "Legend",
-        "color": "",
-        "filter_col1": "",
-        "filter_val1": "",
-        "filter_col2": "",
-        "filter_val2": "",
-        "filter_col3": "",
-        "filter_val3": "",
-        "filter_col4": "",
-        "filter_val4": "",
-        "filter_col5": "",
-        "filter_val5": ""
-    },
-    "Bar": {
-        "measure": "chart",
-        "unique": "any",
-        "duration_default": "any",
-        "label_col": "",
-        "value_col": "",
-        "title": "",
-        "x_title": "",
-        "y_title": "",
-        "top_n": 10,
-        "filter_col1": "",
-        "filter_val1": "",
-        "filter_col2": "",
-        "filter_val2": "",
-        "filter_col3": "",
-        "filter_val3": "",
-        "filter_col4": "",
-        "filter_val4": "",
-        "filter_col5": "",
-        "filter_val5": ""
-    },
-    "Pie": {
-        "measure": "chart",
-        "unique": "any",
-        "duration_default": "any",
-        "names_col": "",
-        "values_col": "",
-        "title": "",
-        "unique_column": "person_id",
-        "filter_col1": "",
-        "filter_val1": "",
-        "filter_col2": "",
-        "filter_val2": "",
-        "filter_col3": "",
-        "filter_val3": "",
-        "filter_col4": "",
-        "filter_val4": "",
-        "filter_col5": "",
-        "filter_val5": "",
-        "colormap": {}
-    },
-    "Column": {
-        "measure": "chart",
-        "unique": "any",
-        "duration_default": "any",
-        "x_col": "",
-        "y_col": "",
-        "title": "",
-        "x_title": "",
-        "y_title": "",
-        "unique_column": "person_id",
-        "legend_title": "Legend",
-        "color": "",
-        "filter_col1": "",
-        "filter_val1": "",
-        "filter_col2": "",
-        "filter_val2": "",
-        "filter_col3": "",
-        "filter_val3": "",
-        "filter_col4": "",
-        "filter_val4": "",
-        "filter_col5": "",
-        "filter_val5": ""
-    },
-    "Histogram": {
-        "measure": "chart",
-        "unique": "any",
-        "duration_default": "any",
-        "age_col": "Age",
-        "gender_col": "Gender",
-        "title": "",
-        "x_title": "Program",
-        "y_title": "Number of Patients",
-        "bin_size": 5,
-        "filter_col1": "",
-        "filter_val1": "",
-        "filter_col2": "",
-        "filter_val2": "",
-        "filter_col3": "",
-        "filter_val3": "",
-        "filter_col4": "",
-        "filter_val4": "",
-        "filter_col5": "",
-        "filter_val5": ""
-    },
-    "PivotTable": {
-        "measure": "chart",
-        "unique": "any",
-        "duration_default": "any",
-        "index_col1": "",
-        "columns": "",
-        "values_col": "",
-        "title": "",
-        "unique_column": "person_id",
-        "aggfunc": "count",
-        "filter_col1": "",
-        "filter_val1": "",
-        "filter_col2": "",
-        "filter_val2": "",
-        "filter_col3": "",
-        "filter_val3": "",
-        "filter_col4": "",
-        "filter_val4": "",
-        "filter_col5": "",
-        "filter_val5": ""
-    }
-}
-
 # ---------------------------------------------------------------------------
 # UI-builder helpers moved from pages/configurations.py
 # ---------------------------------------------------------------------------
-from helpers.config_helper import load_dashboards_from_file
+from helpers.config_helper import load_dashboards_from_file, _get_active_viz_types
 
 dashboards_data = load_dashboards_from_file()
 
@@ -1532,10 +805,12 @@ def create_preview_table(df):
     )
 
 
-def generate_dashboard_items_list(dashboard):
-    """Generate the HTML for dashboard items list"""
-    counts = dashboard.get('visualization_types', {}).get('counts', [])
-    sections = dashboard.get('visualization_types', {}).get('charts', {}).get('sections', [])
+def generate_dashboard_items_list(dashboard, tab_id=None):
+    """Generate the HTML for dashboard items list.
+    tab_id scopes the list to one tab's visualization_types (Tab Outlook dashboards)."""
+    viz = _get_active_viz_types(dashboard, tab_id)
+    counts = viz.get('counts', [])
+    sections = viz.get('charts', {}).get('sections', [])
     priority_indicators = dashboard.get('priority_indicators', [])
 
     if not counts and not sections and not priority_indicators:
@@ -1595,11 +870,6 @@ def generate_dashboard_items_list(dashboard):
                             id={"type": "count-edit", "index": idx},
                             n_clicks=0
                         ),
-                        # html.Button(
-                        #     "🗑",
-                        #     id={"type": "count-delete", "index": idx},
-                        #     n_clicks=0
-                        # )
                     ])
                 ],
                 style={
@@ -1630,16 +900,12 @@ def generate_dashboard_items_list(dashboard):
                     ]),
                     html.Div(className="list-item-actions", children=[
                         html.Button(
-                            [nav_icon("mdi:pencil"), ""],
-                            id={"type": "section-edit", "index": section_idx},
+                            nav_icon("lucide:plus"),
+                            id={"type": "add-chart-btn", "index": section_idx},
                             n_clicks=0,
+                            title="Add a chart to this section",
                         ),
-                        # html.Button(
-                        #     "🗑",
-                        #     id={"type": "section-delete", "index": section_idx},
-                        #     n_clicks=0,
-                        # )
-                    ])
+                    ]),
                 ],
                 style={
                     "display": "flex",
@@ -1668,16 +934,11 @@ def generate_dashboard_items_list(dashboard):
                         ]),
                         html.Div(className="list-item-actions", children=[
                             html.Button(
-                                [nav_icon("mdi:pencil"), ""],
+                                nav_icon("mdi:pencil"),
                                 id={"type": "chart-edit", "section": section_idx, "chart": chart_idx},
                                 n_clicks=0,
                             ),
-                            # html.Button(
-                            #     "🗑",
-                            #     id={"type": "chart-delete", "section": section_idx, "chart": chart_idx},
-                            #     n_clicks=0,
-                            # )
-                        ])
+                        ]),
                     ],
                     style={
                         "display": "flex",
@@ -1696,6 +957,7 @@ def generate_dashboard_items_list(dashboard):
 
 # FOR DASHBOARDS
 def create_edit_modal():
+    dashboards_data = load_dashboards_from_file()  # re-read on every call so newly added dashboards show up without a server restart
     selected_dashboard_index = 0  # Default index, will be updated by callbacks
     current_dashboard = None
     if dashboards_data and len(dashboards_data) > selected_dashboard_index:
@@ -1811,6 +1073,7 @@ def create_edit_modal():
                                                             options=[
                                                                 {"label": "Standard", "value": "standard"},
                                                                 {"label": "MNID Outlook", "value": "mnid"},
+                                                                {"label": "Tab Outlook", "value": "tabs"},
                                                             ],
                                                             value="standard",
                                                             clearable=False,
@@ -1916,26 +1179,70 @@ def create_edit_modal():
                                             className="dashboard-card",
                                             style={"flex": "1", "display": "flex", "flexDirection": "column", "minHeight": "0"},
                                             children=[
+                                                
+                                                # Tab management — only shown when Dashboard Type = Tab Outlook
                                                 html.Div(
-                                                    className="dashboard-card-header",
-                                                    style={"display": "flex", "alignItems": "center",
-                                                           "justifyContent": "space-between", "flexShrink": "0"},
+                                                    id="tabs-management-section",
+                                                    style={"display": "none", "flexShrink": "0", "padding": "10px 16px",
+                                                           "borderBottom": "1px solid #e9ecef", "background": "#fafafa"},
                                                     children=[
-                                                        html.H4("Dashboard Items", className="dashboard-card-title"),
+                                                        html.Div(className="form-group", style={"marginBottom": "8px"}, children=[
+                                                            html.Label("Select Tab:", className="form-label"),
+                                                            dcc.Dropdown(
+                                                                id="dashboard-tab-selector",
+                                                                options=[],
+                                                                value=None,
+                                                                clearable=False,
+                                                                className="modern-dropdown",
+                                                            ),
+                                                        ]),
                                                         html.Div(style={"display": "flex", "gap": "6px"}, children=[
-                                                            html.Button([nav_icon("lucide:plus"), "Metric"],
-                                                                        id="add-count-btn",
-                                                                        n_clicks=0,
+                                                            dcc.Input(
+                                                                id="tab-name-input",
+                                                                type="text",
+                                                                placeholder="Tab name...",
+                                                                className="modern-input",
+                                                                style={"flex": "1"},
+                                                            ),
+                                                            html.Button(nav_icon("lucide:save"), id="rename-tab-btn",
+                                                                        n_clicks=0, className="icon-toolbar-btn",
+                                                                        title="Save tab name"),
+                                                            html.Button(nav_icon("lucide:chevron-left"), id="move-tab-left-btn",
+                                                                        n_clicks=0, className="icon-toolbar-btn",
+                                                                        title="Move tab earlier"),
+                                                            html.Button(nav_icon("lucide:chevron-right"), id="move-tab-right-btn",
+                                                                        n_clicks=0, className="icon-toolbar-btn",
+                                                                        title="Move tab later"),
+                                                            html.Button(nav_icon("lucide:trash-2"), id="delete-tab-btn",
+                                                                        n_clicks=0, className="icon-toolbar-btn",
+                                                                        title="Delete tab"),
+                                                            html.Button([nav_icon("lucide:plus"), "Add Tab"],
+                                                                        id="add-tab-btn", n_clicks=0,
                                                                         className="btn-primary-modern btn-small",
-                                                                        title="Add a new metric/count"),
-                                                            html.Button([nav_icon("lucide:plus"), "Charts"],
-                                                                        id="add-section-btn",
-                                                                        n_clicks=0,
-                                                                        className="btn-primary-modern btn-small",
-                                                                        title="Add a new chart section"),
+                                                                        title="Add a new tab"),
                                                         ]),
                                                     ],
                                                 ),
+                                                html.Div(
+                                                    className="dashboard-card-header",
+                                                    style={"display": "flex", "alignItems": "center",
+                                                          "justifyContent": "space-between", "flexShrink": "0"},
+                                                          children=[
+                                                                html.H4("Dashboard Items", className="dashboard-card-title"),
+                                                                html.Div(style={"display": "flex", "gap": "6px"}, 
+                                                                    children=[
+                                                                        html.Button([nav_icon("lucide:plus"), "Metric"],
+                                                                                id="add-count-btn",
+                                                                                n_clicks=0,
+                                                                                className="btn-primary-modern btn-small",
+                                                                                title="Add a new metric/count"),
+                                                                        html.Button([nav_icon("lucide:plus"), "Charts"],
+                                                                                id="add-section-btn",
+                                                                                n_clicks=0,
+                                                                                className="btn-primary-modern btn-small",
+                                                                                title="Add a new chart section"),
+                                                                                ]),
+                                                ],),
                                                 html.Div(
                                                     id="dashboard-items-container",
                                                     className="dashboard-card-body",
@@ -1947,54 +1254,122 @@ def create_edit_modal():
                                     ],
                                 ),
 
-                                # ── RIGHT PANEL: Edit Forms ──────────────────────
+                                # ── RIGHT PANEL: Metric Editor ──────────────────
                                 html.Div(
                                     style={
                                         "flex": "1",
                                         "display": "flex",
                                         "flexDirection": "column",
-                                        "gap": "16px",
+                                        "gap": "12px",
                                         "height": "100%",
                                         "overflow": "hidden",
                                     },
                                     children=[
-                                        # Panel header
+                                        # Mode toggle row
                                         html.Div(
                                             className="dashboard-card",
-                                            style={"flexShrink": "0", "padding": "12px 16px"},
+                                            style={"flexShrink": "0", "padding": "10px 16px",
+                                                   "display": "flex", "alignItems": "center",
+                                                   "justifyContent": "space-between"},
                                             children=[
-                                                html.Div(style={"display": "flex", "alignItems": "center", "gap": "10px"}, children=[
-                                                    html.Span([nav_icon("mdi:pencil"), ""], style={"fontSize": "18px"}),
-                                                    html.Div(children=[
-                                                        html.H4("Edit Panel", className="dashboard-card-title",
-                                                                style={"margin": "0"}),
-                                                        html.Span("Click an item on the left to open its form here.",
-                                                                  style={"fontSize": "12px", "color": "#6b7280"}),
-                                                    ]),
-                                                ]),
+                                                dcc.Checklist(
+                                                    id="metric-editor-mode-toggle",
+                                                    options=[{"label": " Switch to Json Editor Mode", "value": "json"}],
+                                                    value=["json"],
+                                                    className="json-mode-toggle",
+                                                ),
+                                                html.Button(
+                                                    [nav_icon("lucide:moon")],
+                                                    id="metric-editor-theme-btn",
+                                                    n_clicks=0,
+                                                    className="icon-toolbar-btn",
+                                                    title="Toggle dark/light editor theme",
+                                                ),
                                             ],
                                         ),
-                                        # Count / metric edit area
+
+                                        # JSON Editor Mode panel
                                         html.Div(
-                                            id="counts-container",
-                                            style={
-                                                "flexShrink": "0",
-                                                "overflowY": "auto",
-                                                "maxHeight": "45%",
-                                            },
+                                            id="metric-json-editor-panel",
+                                            style={"flex": "1", "display": "flex", "flexDirection": "column",
+                                                   "gap": "10px", "minHeight": "0"},
+                                            children=[
+                                                html.Div(
+                                                    className="dashboard-card",
+                                                    style={"flexShrink": "0", "padding": "8px 12px",
+                                                           "display": "flex", "gap": "6px", "flexWrap": "wrap"},
+                                                    children=[
+                                                        html.Button(nav_icon("mdi:pencil"),
+                                                                    id="metric-editor-edit-btn", n_clicks=0,
+                                                                    className="icon-toolbar-btn", title="Edit"),
+                                                        html.Button(nav_icon("lucide:save"),
+                                                                    id="metric-editor-save-btn", n_clicks=0,
+                                                                    className="icon-toolbar-btn", title="Save"),
+                                                        html.Button(nav_icon("lucide:align-left"),
+                                                                    id="metric-editor-format-btn", n_clicks=0,
+                                                                    className="icon-toolbar-btn", title="Format"),
+                                                        html.Button(nav_icon("lucide:undo"),
+                                                                    id="metric-editor-undo-btn", n_clicks=0,
+                                                                    className="icon-toolbar-btn", title="Undo"),
+                                                        html.Button(nav_icon("lucide:redo"),
+                                                                    id="metric-editor-redo-btn", n_clicks=0,
+                                                                    className="icon-toolbar-btn", title="Redo"),
+                                                        html.Button(nav_icon("lucide:trash-2"),
+                                                                    id="metric-editor-delete-btn", n_clicks=0,
+                                                                    className="icon-toolbar-btn", title="Delete"),
+                                                        html.Button(nav_icon("lucide:rotate-ccw"),
+                                                                    id="metric-editor-reset-btn", n_clicks=0,
+                                                                    className="icon-toolbar-btn", title="Reset"),
+                                                    ],
+                                                ),
+                                                html.Div(
+                                                    id="metric-editor-status",
+                                                    style={"fontSize": "12px", "color": "#6b7280", "flexShrink": "0"},
+                                                ),
+                                                html.Div(
+                                                    id="metric-editor-suggestions",
+                                                    style={"display": "flex", "flexWrap": "wrap", "gap": "6px",
+                                                           "alignItems": "center", "flexShrink": "0"},
+                                                ),
+                                                dcc.Store(id="metric-editor-known-keys", data=None),
+                                                html.Div(
+                                                    children=[
+                                                        DashAceEditor(
+                                                            id="metric-json-editor",
+                                                            mode="text",
+                                                            theme="github",
+                                                            value="",
+                                                            readOnly=True,
+                                                            showGutter=True,
+                                                            showPrintMargin=False,
+                                                            highlightActiveLine=True,
+                                                            wrapEnabled=True,
+                                                            tabSize=2,
+                                                            fontSize=13,
+                                                            width="100%",
+                                                            height="45vh",
+                                                            style={"borderRadius": "8px", "border": "1px solid #e5e7eb"},
+                                                        ),
+                                                    ],
+                                                ),
+                                            ],
                                         ),
-                                        # Sections / charts edit area (scrollable, vertical)
+
+                                        # Form Editor Mode placeholder (not built yet)
                                         html.Div(
-                                            id="sections-container",
-                                            style={
-                                                "flex": "1",
-                                                "overflowY": "auto",
-                                                "display": "flex",
-                                                "flexDirection": "column",
-                                                "gap": "12px",
-                                                "minHeight": "0",
-                                            },
+                                            id="metric-form-editor-panel",
+                                            style={"display": "none"},
+                                            children=[
+                                                html.Div(
+                                                    "Coming soon: Form Editor Mode",
+                                                    style={"textAlign": "center", "color": "#9ca3af",
+                                                           "padding": "40px"},
+                                                ),
+                                            ],
                                         ),
+
+                                        dcc.Store(id="metric-editor-target", data=None),
+                                        html.Div(id="metric-editor-js-dummy", style={"display": "none"}),
                                     ],
                                 ),
                             ]
@@ -2020,6 +1395,13 @@ def create_edit_modal():
                             n_clicks=0,
                             className="btn-danger-modern"
                         ),
+                        html.Button(
+                            "Download Dashboards",
+                            id="download-dashboards-btn",
+                            n_clicks=0,
+                            className="btn-secondary-modern"
+                        ),
+                        dcc.Download(id="download-dashboards-file"),
                         html.Span(
                             id="dashboard-save-status",
                             style={"fontSize": "12px", "color": "#6b7280", "marginLeft": "auto"},
@@ -2039,7 +1421,7 @@ def create_edit_modal():
                                 html.Button("×", id="close-confirmation-btn", className="confirmation-close-btn")
                             ]),
                             html.Div(className="confirmation-modal-body", children=[
-                                html.P("Are you sure you want to delete this dashboard?"),
+                                html.Div(id="delete-confirmation-text"),
                                 html.P("This action cannot be undone.", style={"color": "#dc3545", "fontSize": "14px"})
                             ]),
                             html.Div(className="confirmation-modal-footer", children=[
@@ -2075,7 +1457,7 @@ def _build_ds_list(sources):
                              style={"fontSize": "11px", "color": "#9ca3af"}),
                 ]),
                 html.Button([nav_icon("mdi:pencil"), ""], id={"type": "ds-edit-btn", "index": i},
-                            n_clicks=0, className="btn-secondary btn-small",
+                            n_clicks=0,
                             title="Edit"),
             ],
         ))
