@@ -17,15 +17,10 @@ from dashboard_layouts import build_premium_dashboard
 from helpers.visualizations import create_line_list_basic_modal
 from datetime import datetime
 from datetime import datetime as dt
-import config as cfg
-if cfg.USE_DUCKDB_STORAGE:
-    from data_storage_duckdb import DataStorage
-else:
-    from data_storage import DataStorage
+from data_storage import DataStorage
 from config import CUSTOM_GENDER_MAP
 import warnings
 import duckdb
-import logging
 warnings.filterwarnings("ignore")
 from helpers.date_ranges import (
                     get_relative_date_range,
@@ -96,6 +91,7 @@ def _start_mnid_prewarm(version: str | None = None):
     """Kick off MNID cache pre-warm in a daemon background thread at server startup."""
     import sys
     import threading
+    import logging
     global _MNID_PREWARM_STARTED
     _log = logging.getLogger(__name__)
 
@@ -698,7 +694,6 @@ def build_charts_from_json(filtered_query, filtered_with_range_query, delta_days
                           start_date=None, end_date=None, data_path=DATA_PATH_, facility_code=None, scope_meta=None, url_object=None, initial_tab=None):
     try:
         config = dashboards_json
-        logging.getLogger(__name__).info(f"build_charts_from_json: rendering report_name={config.get('report_name')!r}")
         count_items_per_row = config.get("count_items_per_row") or 5
 
         # Route MNID dashboard configs to the dedicated MNID renderer.
@@ -2190,7 +2185,6 @@ def update_dashboard(gen, menu_clicks, pathname, urlparams, clear_clicks, crosst
                     f"SELECT DISTINCT {FACILITY_} FROM '{DATA_PATH_}'"
                     f" WHERE {FACILITY_CODE_} = '{location}' LIMIT 1"
                 )
-                print(_fac_lookup)
                 if not _fac_lookup.empty:
                     facility_names = _fac_lookup[FACILITY_].dropna().tolist()
             except Exception:

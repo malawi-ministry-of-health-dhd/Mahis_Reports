@@ -10,6 +10,7 @@ DEMO_UUID = "m3his@dhd"
 DEMO_LOCATION = "LL040033"
 RELATIVE_DAYS = [ 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'This Week', 'Last Week', 'This Month', 'Last Month' ]
 
+# REFERENTIAL COLUMNS - THESE SHOULD MATCH THE QUERY OUTPUT COLUMNS
 DATA_PATH_ = "data/default"
 USE_DEMO_DATA = False
 DATA_FILE_NAME_ = "demo_parquet" if USE_DEMO_DATA else "data/parquet"

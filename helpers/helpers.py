@@ -3,12 +3,7 @@ from dash import html, dcc
 import pandas as pd
 import plotly.graph_objects as go
 from itertools import chain
-import config as cfg
-if cfg.USE_DUCKDB_STORAGE:
-    from data_storage_duckdb import DataStorage
-else:
-    from data_storage import DataStorage
-import logging
+from data_storage import DataStorage
 from helpers.visualizations import (create_column_chart,
                           create_count,
                           create_count_sets,
@@ -53,7 +48,6 @@ def build_metrics_section(filtered_query, filtered_query_data_range, delta_days,
     _patient_ids_map: dict = {}
     _attention_pct_map: dict = {}
     for count_config in counts_config:
-        logging.getLogger(__name__).info(f"build_charts_from_json: rendering metric name={count_config.get('name')!r}")
         measure = count_config.get("filters", {}).get("measure", "count")
         if measure == "calculated":
             continue
@@ -392,7 +386,6 @@ def build_single_chart(filtered_query, network_query, delta_days,data_path, item
     """Build a single chart based on configuration"""
     chart_type = item_config["type"]
     filters = item_config["filters"]
-    logging.getLogger(__name__).info(f"build_charts_from_json: rendering chart name={item_config.get('name')!r} type={chart_type!r}")
 
     if chart_type == "Line":
         figure = create_line_chart_from_config(network_query,data_path, delta_days, filters)

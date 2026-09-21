@@ -21,3 +21,4 @@ geopandas
 dash-ace
 pdfkit 
 xhtml2pdf
+dash-iconify

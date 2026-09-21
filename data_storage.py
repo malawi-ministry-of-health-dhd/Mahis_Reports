@@ -251,11 +251,6 @@ class DataStorage:
 
     @staticmethod
     def query_duckdb(sql: str) -> pd.DataFrame:
-        if cfg.USE_DUCKDB_STORAGE:
-            # all when this switch is actually turned on.
-            from data_storage_duckdb import DataStorage as _DuckDBStorage
-            return _DuckDBStorage.query_duckdb(sql)
-
         cache = DataStorage._query_cache
         mtime_sig = DataStorage._parquet_mtime_signature(sql)
 

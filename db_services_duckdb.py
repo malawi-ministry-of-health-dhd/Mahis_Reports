@@ -1,14 +1,27 @@
+"""
+Fully self-contained DuckDB-targeted OpenMRS fetcher.
+
+Deliberately does not import anything from db_services.py or data_storage.py — the MySQL/SSH
+connection handling and day-by-day batch-pagination logic are inlined here so db_services.py
+and data_storage.py can be retired independently without breaking this file.
+
+fetch_incremental() re-pulls a trailing lookback window (instead of only rows added since the
+last max date) so that rows edited in OpenMRS after their original fetch get picked up again
+and reconciled via upsert in DataStorageDuckDB.
+"""
 import os
 import logging
 import warnings
 from datetime import datetime, timedelta
+from typing import Optional
 
 import duckdb
 import pandas as pd
 import pymysql
 from sshtunnel import SSHTunnelForwarder
 
-from config import BATCH_SIZE, DB_CONFIG, SSH_CONFIG, USE_LOCALHOST, START_DATE, DUCKDB_LOOKBACK_DAYS
+from config import (BATCH_SIZE, DB_CONFIG, SSH_CONFIG, USE_LOCALHOST, START_DATE,
+                     LOAD_FRESH_DATA, DUCKDB_TABLE_NAME, DUCKDB_LOOKBACK_DAYS)
 
 warnings.filterwarnings("ignore")
 logging.basicConfig(level=logging.INFO)
@@ -17,17 +30,22 @@ logger = logging.getLogger(__name__)
 
 class DataFetcherDuckDB:
     def __init__(self, use_localhost=USE_LOCALHOST, ssh_config=SSH_CONFIG,
-                 db_config=DB_CONFIG, start_date=START_DATE, batch_size=BATCH_SIZE,
-                 batch_folder="data/duckdb_batches", duckdb_path=None):
+                 db_config=DB_CONFIG, start_date=START_DATE,
+                 load_fresh_data=LOAD_FRESH_DATA, batch_size=BATCH_SIZE,
+                 batch_folder="data/duckdb_batches",
+                 duckdb_path=None, duckdb_table=DUCKDB_TABLE_NAME):
         self.use_localhost = use_localhost
+        self.load_fresh_data = load_fresh_data
         self.ssh_config = ssh_config
         self.db_config = db_config
         self.batch_size = batch_size
         self.batch_folder = batch_folder
         self.start_date = start_date
-        # Target .duckdb file for fetch_tables() — only required by callers that use it.
-        self.path = os.path.dirname(os.path.realpath(__file__))
+        # Used only to look up the last max date when load_fresh_data=False — queries the
+        # persisted DuckDB table directly, so there's no dependency on parquet output.
         self.duckdb_path = duckdb_path
+        self.duckdb_table = duckdb_table
+        self.path = os.path.dirname(os.path.realpath(__file__))
         os.makedirs(os.path.join(self.path, batch_folder), exist_ok=True)
 
     def _build_tunnel_kwargs(self) -> dict:
@@ -93,6 +111,34 @@ class DataFetcherDuckDB:
             logger.error(f"Database connection failed: {e}")
             raise
 
+    def _get_max_date_from_duckdb(self, date_column: str) -> Optional[datetime]:
+        """DuckDB-native equivalent of 'find where we last left off' — queries the persisted
+        table directly instead of parquet files, so this has no dependency on data_storage.py
+        or on parquet output existing at all."""
+        if not self.duckdb_path or not os.path.exists(self.duckdb_path):
+            return self.start_date
+        try:
+            con = duckdb.connect(self.duckdb_path, read_only=True)
+            try:
+                table_exists = con.sql(
+                    "SELECT count(*) FROM information_schema.tables WHERE table_name = ?",
+                    params=[self.duckdb_table],
+                ).fetchone()[0] > 0
+                if not table_exists:
+                    return self.start_date
+                result = con.execute(
+                    f"SELECT MAX({date_column}) AS max_date FROM {self.duckdb_table}"
+                ).df()
+            finally:
+                con.close()
+            if not result.empty and not result["max_date"].isna().iloc[0]:
+                max_date = pd.to_datetime(result["max_date"].iloc[0])
+                logger.info(f"Found existing data up to {max_date}")
+                return max_date
+        except Exception as e:
+            logger.warning(f"Could not read max date from {self.duckdb_path}: {e}")
+        return self.start_date
+
     def _load_batches_from_files(self, batch_paths: list) -> pd.DataFrame:
         """Load and concatenate all batch files into a single dataframe."""
         if not batch_paths:
@@ -120,42 +166,144 @@ class DataFetcherDuckDB:
             logger.error(f"Error loading batches from files: {e}")
             raise
 
-    def fetch_bulk(self, query_template: str, date_column: str = 'Date', id_column: str = 'encounter_id',
-                    start_date=None, end_date=None, on_batch=None):
-        """Fetch data across the whole [start_date, end_date] range, paginating continuously by
-        id_column (batches are "up to batch_size rows past the last id seen", not chunked by
-        calendar day). Used for both routine incremental fetches (via fetch_incremental) and
-        full historical (re)loads — the caller always says exactly which start_date (and
-        optionally end_date) to (re)load from; this never touches self.start_date.
+    def fetch_data(self, query_template: str, date_column: str = 'Date',
+                    id_column: str = 'encounter_id') -> pd.DataFrame:
+        logger.info("Fetching Started...")
 
-        If on_batch is given, each batch is streamed straight to it as soon as it's fetched
-        and this returns the total row count instead of a DataFrame.
-        """
-        if start_date is None:
-            raise ValueError("fetch_bulk() requires an explicit start_date")
-        start_date = start_date if isinstance(start_date, datetime) else pd.to_datetime(start_date)
-        end_date = (end_date if isinstance(end_date, datetime) else pd.to_datetime(end_date)) if end_date else datetime.now()
+        if not self.load_fresh_data:
+            max_date = self._get_max_date_from_duckdb(date_column)
+            start_date = max_date if isinstance(max_date, datetime) else pd.to_datetime(max_date)
+        else:
+            start_date = self.start_date if isinstance(self.start_date, datetime) else pd.to_datetime(self.start_date)
+            logger.info(f"Forced fresh load. Starting from {start_date}")
 
+        batch_paths = []
         try:
             if self.use_localhost:
                 conn = self._get_db_connection()
-                batch_paths, total_rows = self._fetch_bulk_batches(conn, query_template, date_column, id_column, start_date, end_date, on_batch=on_batch)
+                batch_paths = self._fetch_in_batches(conn, query_template, date_column, id_column, start_date)
                 conn.close()
             elif self.ssh_config:
                 _tunnel_host, _tunnel_kwargs = self._build_tunnel_kwargs()
                 with SSHTunnelForwarder(_tunnel_host, **_tunnel_kwargs) as tunnel:
                     logger.info(f"SSH tunnel established on port {tunnel.local_bind_port}")
                     conn = self._get_db_connection(tunnel)
-                    batch_paths, total_rows = self._fetch_bulk_batches(conn, query_template, date_column, id_column, start_date, end_date, on_batch=on_batch)
+                    batch_paths = self._fetch_in_batches(conn, query_template, date_column, id_column, start_date)
                     conn.close()
             else:
                 conn = self._get_db_connection()
-                batch_paths, total_rows = self._fetch_bulk_batches(conn, query_template, date_column, id_column, start_date, end_date, on_batch=on_batch)
+                batch_paths = self._fetch_in_batches(conn, query_template, date_column, id_column, start_date)
                 conn.close()
 
-            if on_batch is not None:
-                logger.info(f"Streamed {total_rows} rows across batches")
-                return total_rows
+            if batch_paths:
+                logger.info(f"Merging {len(batch_paths)} batch files...")
+                final_df = self._load_batches_from_files(batch_paths)
+                if not final_df.empty:
+                    final_df.drop_duplicates(inplace=True)
+                    logger.info(f"Final dataframe contains {len(final_df)} rows after deduplication")
+                self.cleanup_batches()
+                return final_df
+            logger.info("No new data fetched")
+            self.cleanup_batches()
+            return pd.DataFrame()
+        except Exception as e:
+            logger.error(f"Error in fetch_data: {e}")
+            raise
+
+    def _fetch_in_batches(self, conn: pymysql.Connection, query_template: str,
+                           date_column: str, id_column: str, start_date: datetime) -> list:
+        """Fetch data in batches and save each batch as parquet file without storing in RAM."""
+        batch_paths = []
+        current_date = start_date
+        today = datetime.now()
+
+        while current_date.date() <= today.date():
+            logger.info(f"Processing date: {current_date.strftime('%Y-%m-%d')}")
+
+            date_str = current_date.strftime('%Y-%m-%d')
+            date_start_midnight = current_date.strftime('%Y-%m-%d 00:00:00')
+            date_end_midnight = current_date.strftime('%Y-%m-%d 23:59:59')
+            has_more_data = True
+            batch_count = 0
+            last_id_for_date = 0
+
+            while has_more_data:
+                date_filter = (f"AND {date_column} >= '{date_start_midnight}' "
+                                f"AND {date_column} <= '{date_end_midnight}' "
+                                f"AND e.{id_column} > {last_id_for_date}")
+                if "{batch_size}" in query_template:
+                    # Query already LIMITs a subquery of distinct encounter_ids before joining
+                    # out to obs/orders/etc — the fan-out join can't split an encounter across
+                    # a batch boundary this way. See config.NEW_HARMONIZED_QUERY.
+                    full_query = query_template.format(date_filter=date_filter, batch_size=self.batch_size)
+                else:
+                    # Legacy shape: LIMIT applied directly to the joined (obs-level) result set,
+                    # which can split a single encounter's obs rows across a batch boundary.
+                    query = query_template.format(date_filter=date_filter)
+                    full_query = f"{query} ORDER BY e.{id_column} LIMIT {self.batch_size}"
+
+                try:
+                    batch_df = pd.read_sql(full_query, conn)
+
+                    if batch_df.empty:
+                        has_more_data = False
+                        logger.info(f"Completed {date_str} - {batch_count} batches fetched")
+                    else:
+                        last_id_for_date = batch_df[id_column].max()
+                        batch_size = len(batch_df)
+
+                        batch_filename = f"batch_{date_str}_b{batch_count:04d}_{batch_size}.parquet"
+                        batch_path = os.path.join(self.path, self.batch_folder, batch_filename)
+                        batch_df.to_parquet(batch_path, index=False, engine='pyarrow')
+
+                        logger.info(f"Saved batch {batch_count} for {date_str}: {batch_path} ({batch_size} rows)")
+                        batch_paths.append(batch_path)
+                        batch_count += 1
+                        del batch_df
+
+                except Exception as e:
+                    logger.error(f"Error fetching batch for {date_str}: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    has_more_data = False
+
+            current_date += timedelta(days=1)
+
+        return batch_paths
+
+    def fetch_bulk(self, query_template: str, date_column: str = 'Date', id_column: str = 'encounter_id',
+                    start_date=None, end_date=None) -> pd.DataFrame:
+        """Bulk historical (re)load: paginate straight through by id_column across the whole
+        [start_date, end_date] range in one continuous sweep — no day-by-day chunking.
+
+        _fetch_in_batches's per-day loop exists to keep each query's date window tight for
+        small incremental fetches; for a multi-year historical load it just adds one round
+        trip per calendar day even on days with no data. This is a separate, explicitly
+        invoked path — it doesn't touch load_fresh_data/self.start_date at all, you always
+        say exactly which start_date (and optionally end_date) to (re)load from.
+        """
+        if start_date is None:
+            raise ValueError("fetch_bulk() requires an explicit start_date")
+        start_date = start_date if isinstance(start_date, datetime) else pd.to_datetime(start_date)
+        end_date = (end_date if isinstance(end_date, datetime) else pd.to_datetime(end_date)) if end_date else datetime.now()
+
+        batch_paths = []
+        try:
+            if self.use_localhost:
+                conn = self._get_db_connection()
+                batch_paths = self._fetch_bulk_batches(conn, query_template, date_column, id_column, start_date, end_date)
+                conn.close()
+            elif self.ssh_config:
+                _tunnel_host, _tunnel_kwargs = self._build_tunnel_kwargs()
+                with SSHTunnelForwarder(_tunnel_host, **_tunnel_kwargs) as tunnel:
+                    logger.info(f"SSH tunnel established on port {tunnel.local_bind_port}")
+                    conn = self._get_db_connection(tunnel)
+                    batch_paths = self._fetch_bulk_batches(conn, query_template, date_column, id_column, start_date, end_date)
+                    conn.close()
+            else:
+                conn = self._get_db_connection()
+                batch_paths = self._fetch_bulk_batches(conn, query_template, date_column, id_column, start_date, end_date)
+                conn.close()
 
             if batch_paths:
                 logger.info(f"Merging {len(batch_paths)} batch files...")
@@ -174,15 +322,13 @@ class DataFetcherDuckDB:
 
     def _fetch_bulk_batches(self, conn: pymysql.Connection, query_template: str,
                              date_column: str, id_column: str,
-                             start_date: datetime, end_date: datetime, on_batch=None):
-        """The continuous (non-day-chunked) pagination loop backing fetch_bulk(). Returns
-        (batch_paths, total_rows) — batch_paths stays empty when streaming via on_batch."""
+                             start_date: datetime, end_date: datetime) -> list:
+        """The continuous (non-day-chunked) pagination loop backing fetch_bulk()."""
         range_start = start_date.strftime('%Y-%m-%d 00:00:00')
         range_end = end_date.strftime('%Y-%m-%d 23:59:59')
         logger.info(f"Bulk fetch: {range_start} through {range_end}")
 
         batch_paths = []
-        total_rows = 0
         has_more_data = True
         last_id = 0
         batch_count = 0
@@ -199,7 +345,6 @@ class DataFetcherDuckDB:
 
             try:
                 batch_df = pd.read_sql(full_query, conn)
-                batch_df = batch_df.drop_duplicates(subset='obs_id')
 
                 if batch_df.empty:
                     has_more_data = False
@@ -207,17 +352,13 @@ class DataFetcherDuckDB:
                 else:
                     last_id = batch_df[id_column].max()
                     batch_size = len(batch_df)
-                    total_rows += batch_size
 
-                    if on_batch is not None:
-                        logger.info(f"Streaming bulk batch {batch_count} ({batch_size} rows, last_id={last_id})...")
-                        on_batch(batch_df)
-                    else:
-                        batch_filename = f"bulk_b{batch_count:05d}_{batch_size}.parquet"
-                        batch_path = os.path.join(self.path, self.batch_folder, batch_filename)
-                        batch_df.to_parquet(batch_path, index=False, engine='pyarrow')
-                        logger.info(f"Saved bulk batch {batch_count}: {batch_path} ({batch_size} rows, last_id={last_id})")
-                        batch_paths.append(batch_path)
+                    batch_filename = f"bulk_b{batch_count:05d}_{batch_size}.parquet"
+                    batch_path = os.path.join(self.path, self.batch_folder, batch_filename)
+                    batch_df.to_parquet(batch_path, index=False, engine='pyarrow')
+
+                    logger.info(f"Saved bulk batch {batch_count}: {batch_path} ({batch_size} rows, last_id={last_id})")
+                    batch_paths.append(batch_path)
                     batch_count += 1
                     del batch_df
 
@@ -227,7 +368,7 @@ class DataFetcherDuckDB:
                 traceback.print_exc()
                 has_more_data = False
 
-        return batch_paths, total_rows
+        return batch_paths
 
     def fetch_single_table(self, table_name: str, query: str) -> pd.DataFrame:
         """Fetch a small lookup/dimension table (programs, concepts, encounter types, etc.)
@@ -253,61 +394,6 @@ class DataFetcherDuckDB:
             logger.error(f"Error fetching single table {table_name}: {e}")
             raise
 
-    def fetch_tables(self, query: str, table_name: str, unique_index: str, last_id) -> int:
-        if not self.duckdb_path:
-            raise ValueError("fetch_tables() requires self.duckdb_path to be set")
-        os.makedirs(os.path.dirname(self.duckdb_path), exist_ok=True)
-        con = duckdb.connect(self.duckdb_path)
-        try:
-            table_exists = con.sql(
-                "SELECT count(*) FROM information_schema.tables WHERE table_name = ?",
-                params=[table_name],
-            ).fetchone()[0] > 0
-
-            if table_exists:
-                result = con.execute(f"SELECT MAX({unique_index}) FROM {table_name}").fetchone()
-                if result and result[0] is not None:
-                    last_id = result[0]
-
-            full_query = query.format(last_id=last_id)
-
-            if self.use_localhost:
-                conn = self._get_db_connection()
-                df = pd.read_sql(full_query, conn)
-                conn.close()
-            elif self.ssh_config:
-                _tunnel_host, _tunnel_kwargs = self._build_tunnel_kwargs()
-                with SSHTunnelForwarder(_tunnel_host, **_tunnel_kwargs) as tunnel:
-                    conn = self._get_db_connection(tunnel)
-                    df = pd.read_sql(full_query, conn)
-                    conn.close()
-            else:
-                conn = self._get_db_connection()
-                df = pd.read_sql(full_query, conn)
-                conn.close()
-
-            if df.empty:
-                logger.info(f"fetch_tables: no new rows for {table_name}")
-                return 0
-            df = df.drop_duplicates(subset=unique_index)
-            con.register("incoming_df", df)
-            if not table_exists:
-                con.execute(f"CREATE TABLE {table_name} AS SELECT * FROM incoming_df")
-                con.execute(f"CREATE UNIQUE INDEX idx_{table_name}_key ON {table_name} ({unique_index})")
-            else:
-                con.execute(f"""
-                    INSERT INTO {table_name}
-                    SELECT * FROM incoming_df
-                    ON CONFLICT ({unique_index}) DO NOTHING
-                """)
-            logger.info(f"fetch_tables: inserted {len(df)} rows into {table_name}")
-            return len(df)
-        except Exception as e:
-            logger.error(f"Error in fetch_tables for {table_name}: {e}")
-            raise
-        finally:
-            con.close()
-
     def cleanup_batches(self):
         """Clean up all batch parquet files after successful merge."""
         batch_dir = os.path.join(self.path, self.batch_folder)
@@ -322,14 +408,20 @@ class DataFetcherDuckDB:
             logger.error(f"Error cleaning up batches: {e}")
 
     def fetch_incremental(self, query_template, date_column="Date", id_column="encounter_id",
-                           lookback_days=None, on_batch=None):
+                           lookback_days=None):
         """Fetch rows from `lookback_days` ago through today, regardless of what's already
         stored, so edits made in OpenMRS after the original fetch get picked up again and
-        reconciled via upsert in DataStorageDuckDB. Paginates continuously by id_column (see
-        fetch_bulk) rather than chunking by calendar day."""
+        reconciled via upsert in DataStorageDuckDB."""
         lookback_days = DUCKDB_LOOKBACK_DAYS if lookback_days is None else lookback_days
         lookback_start = datetime.now() - timedelta(days=lookback_days)
         configured_start = pd.to_datetime(self.start_date)
         effective_start = max(lookback_start, configured_start)
-        return self.fetch_bulk(query_template, date_column=date_column, id_column=id_column,
-                                start_date=effective_start, on_batch=on_batch)
+
+        original_load_fresh_data, original_start_date = self.load_fresh_data, self.start_date
+        self.load_fresh_data = True
+        self.start_date = effective_start
+        try:
+            return self.fetch_data(query_template=query_template, date_column=date_column,
+                                    id_column=id_column)
+        finally:
+            self.load_fresh_data, self.start_date = original_load_fresh_data, original_start_date

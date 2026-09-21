@@ -1180,9 +1180,6 @@ def render_country_profile(
     # since those charts refetch from the aggregate instead.
     _cp_df_key = None if _agg_ready else _remember_ui_payload("cp", df, expire=6 * 3600)
 
-    _birth_outcome_concepts = ["Outcome of the delivery", "Baby general condition at birth"]
-    _birth_concepts = _birth_outcome_concepts + ["Status of baby", "Admission outcome"]
-    _live_birth_values = ["Live birth", "Live births", "Alive", "Live full term", "Live preterm"]
     if _agg_ready:
         total_births_series = _agg_monthly_series(agg_df, "mnid_lab_core_totalbirths", start, end, facility_codes, districts, grain=_fetch_grain)
         total_births_recipe = {**_recipe_base, "kind": "agg_single", "mnid_id": "mnid_lab_core_totalbirths"}
