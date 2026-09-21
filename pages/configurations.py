@@ -6,7 +6,11 @@ import os
 import uuid
 import pandas as pd
 from datetime import datetime
-from data_storage import DataStorage
+import config as cfg
+if cfg.USE_DUCKDB_STORAGE:
+    from data_storage_duckdb import DataStorage
+else:
+    from data_storage import DataStorage
 import base64
 import io
 import warnings
@@ -4105,7 +4109,6 @@ def poll_data_refresh(n_intervals, store):
     # Count rows in the parquet file for the route that was actually targeted
     row_count = "—"
     try:
-        from data_storage import DataStorage
         _route    = store.get("data_path") or "default"
         pq_path   = os.path.join(path, "data", _route, "parquet")
         if os.path.isdir(pq_path) or os.path.exists(pq_path):

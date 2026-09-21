@@ -10,6 +10,8 @@ logging.basicConfig(
     format='%(asctime)s %(levelname)s %(name)s %(message)s',
 )
 logging.getLogger('mnid').setLevel(logging.INFO)
+logging.getLogger('pages.home').setLevel(logging.INFO)
+logging.getLogger('helpers.helpers').setLevel(logging.INFO)
 
 # Warm plotly's shared 'plotly_white' template once here, single-threaded,
 # before the dev server starts accepting concurrent requests. Every

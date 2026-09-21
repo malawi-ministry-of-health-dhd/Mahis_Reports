@@ -1,21 +1,5 @@
-"""
-DuckDB-file-backed alternative to DataStorage (see data_storage.py) — fully self-contained,
-imports nothing from data_storage.py or db_services.py.
-
-Instead of scanning month-partitioned parquet files on every query, this keeps one persisted
-DuckDB database file per route (data/<route>/duckdb/mahis.duckdb) with a single table holding
-the harmonized obs-level data. New rows are inserted; rows that already exist (matched by
-config.DUCKDB_KEY_COLUMNS) are overwritten with the latest values, so edits made in OpenMRS
-after the original fetch get reconciled instead of silently missed.
-
-Like data_storage.py, this reads configurations.json for the list of data sources to pull
-(creating a default entry if the file doesn't exist yet), fetches each source's small lookup
-tables (programs, concepts, encounter types, locations, drugs, order types, users) to CSV,
-harmonizes the raw transactional fetch against them, then upserts the result.
-
-See INSTRUCTION.md for how this plugs into the app in place of DataStorage.query_duckdb.
-"""
 import os
+import re
 import json
 import duckdb
 import pandas as pd
@@ -23,6 +7,41 @@ import config as cfg
 from db_services_duckdb import DataFetcherDuckDB
 
 CONFIGURATIONS_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configurations.json")
+
+# Every existing DataStorage.query_duckdb call site embeds the route straight into the SQL
+# text — e.g. f"SELECT ... FROM '{data_path}'" where data_path is often built per-request
+# from a URL param (f"data/{route}/parquet"), not passed as a separate argument. A data_dir
+# *parameter* can never track that; these two patterns detect it the same way
+# data_storage.py's _expand_dir_paths does, so query_duckdb stays a true drop-in replacement.
+_FROM_READ_PARQUET_RE = re.compile(r"FROM\s+read_parquet\(\s*(['\"])(.+?)\1[^()]*\)", re.IGNORECASE)
+_FROM_QUOTED_PATH_RE = re.compile(r"FROM\s+(['\"])(.+?)\1", re.IGNORECASE)
+_ROUTE_IN_PATH_RE = re.compile(r"data/([^/'\"]+)/parquet")
+
+
+def _extract_route_and_rewrite(sql):
+    """Find a data/<route>/parquet reference embedded in the SQL (bare quoted directory or a
+    read_parquet(...) call) and rewrite that FROM clause to reference the persisted table
+    instead. Returns (route, rewritten_sql), or (None, sql) unchanged if no such reference is
+    found (e.g. the caller already wrote table-native SQL)."""
+    for pattern in (_FROM_READ_PARQUET_RE, _FROM_QUOTED_PATH_RE):
+        match = pattern.search(sql)
+        if not match:
+            continue
+        route_match = _ROUTE_IN_PATH_RE.search(match.group(2))
+        if not route_match:
+            continue
+        rewritten, _n = pattern.subn(f"FROM {cfg.DUCKDB_TABLE_NAME}", sql)
+        return route_match.group(1), rewritten
+    return None, sql
+
+
+def _normalize_route(value):
+    """Accept either a bare route name ('mahisuat') or a full path ('data/mahisuat') and
+    return the bare route name."""
+    value = value.strip("/")
+    if value.startswith("data/"):
+        value = value[len("data/"):]
+    return value
 
 
 def load_or_create_configurations():
@@ -71,6 +90,15 @@ _SINGLE_TABLE_SPECS = [
 if not cfg.IS_HARMONIZED_MAHIS:
     _SINGLE_TABLE_SPECS.insert(4, ("facilities_data", cfg.QUERY_FACILITIES, "code", "name"))
 
+# Datetime columns produced by NEW_HARMONIZED_QUERY that come from LEFT JOINs (visit, obs,
+# orders) and so can be entirely NULL within any one small batch. pandas then infers those
+# columns as dtype 'object' (all-None) rather than datetime64, which DuckDB in turn registers
+# as INTEGER on first CREATE TABLE — a later batch with real timestamps then fails to
+# insert/upsert with "Conversion Error: Unimplemented type for cast (TIMESTAMP_NS -> INTEGER)".
+# Coercing explicitly keeps the dtype (and therefore the DuckDB column type) consistent across
+# batches regardless of which batch happens to create the table.
+_DATETIME_COLUMNS = ["date_started", "date_stopped", "birthdate", "Date", "obs_datetime", "value_datetime"]
+
 
 class DataStorage:
     def __init__(self, data_dir=cfg.DATA_PATH_, db_config=cfg.DB_CONFIG, ssh_config=cfg.SSH_CONFIG,
@@ -109,10 +137,19 @@ class DataStorage:
     def _make_fetcher(self):
         return DataFetcherDuckDB(
             use_localhost=self.use_localhost, ssh_config=self.ssh_config, db_config=self.db_config,
-            start_date=self.start_date, load_fresh_data=self.load_fresh_data,
-            batch_size=self.batch_size, batch_folder=os.path.join(self.duckdb_dir, "_tmp_batches"),
-            duckdb_path=self.db_path, duckdb_table=self.table_name,
+            start_date=self.start_date, batch_size=self.batch_size,
+            batch_folder=os.path.join(self.duckdb_dir, "_tmp_batches"),
+            duckdb_path=self.db_path,
         )
+
+    def fetch_and_create_table(self, query, table_name, unique_index, last_id=0) -> int:
+        """Thin wrapper around DataFetcherDuckDB.fetch_tables() for this route's duckdb file
+        (self.db_path) — incrementally syncs an arbitrary table by id, independent of the main
+        encounters/obs pipeline. See fetch_tables for the create/resume semantics: unique_index
+        doubles as the persisted cursor column once the table exists; last_id is only the
+        starting point for a brand-new table. Returns the number of rows fetched."""
+        fetcher = self._make_fetcher()
+        return fetcher.fetch_tables(query, table_name, unique_index, last_id)
 
     def fetch_single_tables(self, fetcher=None):
         """Fetch each lookup/dimension table fresh and save it as CSV under
@@ -213,6 +250,18 @@ class DataStorage:
         if df is None or df.empty:
             return 0
 
+        for col in _DATETIME_COLUMNS:
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col], errors="coerce")
+
+        if "obs_id" in self.key_columns and "obs_id" in df.columns and "encounter_id" in df.columns:
+            # obs is LEFT JOINed — an encounter with no obs rows yields obs_id = NULL. A UNIQUE
+            # index/ON CONFLICT never treats two NULLs as equal, so that encounter would be
+            # re-inserted as a new row every time it's re-fetched instead of upserted in place.
+            # Fill with a deterministic, non-null, non-colliding stand-in (obs_id is always a
+            # positive OpenMRS id) so repeated fetches of the same no-obs encounter collide.
+            df["obs_id"] = df["obs_id"].fillna(-df["encounter_id"])
+
         con = duckdb.connect(self.db_path)
         try:
             con.register("incoming_df", df)
@@ -229,6 +278,45 @@ class DataStorage:
                 )
                 return len(df)
 
+            # Self-heal tables created before the coercion above existed: an all-NULL datetime
+            # column got stuck as INTEGER at CREATE TABLE time (see _DATETIME_COLUMNS), which
+            # only ever holds if every existing value in it is NULL — a real timestamp would
+            # have hit this exact conversion error on insert and never made it in. Safe to
+            # widen back to TIMESTAMP before inserting real values now.
+            existing_types = dict(con.execute(
+                "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = ?",
+                [self.table_name],
+            ).fetchall())
+            cols_to_fix = [c for c in _DATETIME_COLUMNS
+                           if c in df.columns and existing_types.get(c, "").upper() == "INTEGER"]
+            if cols_to_fix:
+                # DuckDB refuses ALTER COLUMN TYPE while the unique index depends on the table
+                # — drop and recreate it around the type fix.
+                con.execute(f"DROP INDEX IF EXISTS idx_{self.table_name}_key")
+                for col in cols_to_fix:
+                    con.execute(f'ALTER TABLE {self.table_name} ALTER COLUMN "{col}" TYPE TIMESTAMP')
+                key_clause = ", ".join(self.key_columns)
+                con.execute(
+                    f"CREATE UNIQUE INDEX idx_{self.table_name}_key ON {self.table_name} ({key_clause})"
+                )
+
+            # Self-heal a table left without its unique index: CREATE TABLE and CREATE UNIQUE
+            # INDEX are separate statements, so a prior run whose source data had duplicate
+            # keys could have the CREATE TABLE succeed and only the index creation fail,
+            # leaving the table permanently without it (ON CONFLICT then has no index to
+            # target). Recreate it here — if the data is now clean this just works; if it's
+            # still not, this raises the real "duplicate keys" error instead of the more
+            # confusing missing-index one.
+            index_exists = con.execute(
+                "SELECT count(*) FROM duckdb_indexes() WHERE table_name = ? AND index_name = ?",
+                [self.table_name, f"idx_{self.table_name}_key"],
+            ).fetchone()[0] > 0
+            if not index_exists:
+                key_clause = ", ".join(self.key_columns)
+                con.execute(
+                    f"CREATE UNIQUE INDEX idx_{self.table_name}_key ON {self.table_name} ({key_clause})"
+                )
+
             key_clause = ", ".join(self.key_columns)
             update_cols = [c for c in df.columns if c not in self.key_columns]
             set_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
@@ -241,11 +329,53 @@ class DataStorage:
         finally:
             con.close()
 
+    def delete_from_date(self, start_date, date_column=None) -> int:
+        """Delete existing rows at/after start_date (matched by the harmonized encounter date
+        column, cfg.DATE_) — used when load_fresh_data is True so a full reload from
+        start_date reflects deletions/voids made in OpenMRS too, not just inserts/updates.
+        No-op (returns 0) if the table doesn't exist yet. Returns the number of rows deleted."""
+        date_column = date_column or cfg.DATE_
+        start_date_str = pd.Timestamp(start_date).strftime("%Y-%m-%d %H:%M:%S")
+        con = duckdb.connect(self.db_path)
+        try:
+            table_exists = con.sql(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = ?",
+                params=[self.table_name],
+            ).fetchone()[0] > 0
+            if not table_exists:
+                return 0
+            result = con.execute(
+                f"DELETE FROM {self.table_name} WHERE {date_column} >= ?", [start_date_str]
+            ).fetchone()
+            return result[0] if result else 0
+        finally:
+            con.close()
+
+    def _make_batch_processor(self, tables):
+        """Returns an on_batch callback that harmonizes and upserts each fetched batch
+        immediately, plus a 0-element list used as a mutable counter of rows upserted so far
+        (fetch_incremental/fetch_bulk stream batches straight to this instead of buffering the
+        whole result set in RAM before harmonizing/upserting it in one shot)."""
+        total_upserted = [0]
+
+        def _process_batch(batch_df):
+            harmonized_df = self.harmonize(batch_df, tables)
+            total_upserted[0] += self.upsert_dataframe(harmonized_df)
+
+        return _process_batch, total_upserted
+
     def fetch_and_upsert(self, base_query=None, date_column="encounter_datetime", id_column="encounter_id",
                           lookback_days=None, refresh_single_tables=True) -> int:
-        """Full pipeline for this route: fetch single tables (unless told not to), fetch the
-        trailing lookback window of transactional data, harmonize it against the single
-        tables, then upsert. Returns the number of rows upserted (0 if nothing new/changed)."""
+        """Full pipeline for this route: fetch single tables (unless told not to), then stream
+        transactional data — each batch is harmonized against the single tables and upserted
+        as soon as it's fetched, rather than accumulating every batch in RAM before a single
+        harmonize+upsert at the end. Returns the number of rows upserted (0 if nothing
+        new/changed).
+
+        If self.load_fresh_data is True, this first deletes every existing row at/after
+        self.start_date (so deletions/voids in OpenMRS are reflected, not just inserts/
+        updates), then refetches that entire range from scratch. Otherwise it only re-pulls
+        the trailing DUCKDB_LOOKBACK_DAYS window, which is the routine/repeatable path."""
         base_query = base_query or cfg.NEW_HARMONIZED_QUERY
         if "obs_id" not in base_query:
             print("WARNING: base_query has no obs_id column — falling back to "
@@ -259,10 +389,18 @@ class DataStorage:
         else:
             tables = self._load_single_tables_from_csv()
 
-        raw_df = fetcher.fetch_incremental(base_query, date_column=date_column,
-                                            id_column=id_column, lookback_days=lookback_days)
-        harmonized_df = self.harmonize(raw_df, tables)
-        return self.upsert_dataframe(harmonized_df)
+        on_batch, total_upserted = self._make_batch_processor(tables)
+
+        if self.load_fresh_data:
+            deleted = self.delete_from_date(self.start_date)
+            print(f"load_fresh_data: deleted {deleted} existing rows from {self.start_date} "
+                  f"onward before reload")
+            fetcher.fetch_bulk(base_query, date_column=date_column, id_column=id_column,
+                                start_date=self.start_date, on_batch=on_batch)
+        else:
+            fetcher.fetch_incremental(base_query, date_column=date_column, id_column=id_column,
+                                       lookback_days=lookback_days, on_batch=on_batch)
+        return total_upserted[0]
 
     def reload_historical(self, start_date, end_date=None, base_query=None,
                            date_column="encounter_datetime", id_column="encounter_id",
@@ -270,7 +408,8 @@ class DataStorage:
         """Bulk (re)load history from start_date through end_date (default: today), paginating
         straight through by id_column instead of day-by-day — for a full or partial historical
         backfill/reload, not routine updates (use fetch_and_upsert for that). Always explicit
-        about which range to (re)load; never runs on its own. Returns the number of rows
+        about which range to (re)load; never runs on its own. Streams each batch through
+        harmonize+upsert immediately, same as fetch_and_upsert. Returns the number of rows
         upserted."""
         base_query = base_query or cfg.NEW_HARMONIZED_QUERY
         if "obs_id" not in base_query:
@@ -285,21 +424,30 @@ class DataStorage:
         else:
             tables = self._load_single_tables_from_csv()
 
-        raw_df = fetcher.fetch_bulk(base_query, date_column=date_column, id_column=id_column,
-                                     start_date=start_date, end_date=end_date)
-        harmonized_df = self.harmonize(raw_df, tables)
-        return self.upsert_dataframe(harmonized_df)
+        on_batch, total_upserted = self._make_batch_processor(tables)
+        fetcher.fetch_bulk(base_query, date_column=date_column, id_column=id_column,
+                            start_date=start_date, end_date=end_date, on_batch=on_batch)
+        return total_upserted[0]
 
     @staticmethod
-    def query_duckdb(sql: str, data_dir: str = cfg.DATA_PATH_) -> pd.DataFrame:
-        """Same signature and return type as DataStorage.query_duckdb — see INSTRUCTION.md
-        for the one thing that does need to change at call sites: the FROM clause must
-        reference the table (cfg.DUCKDB_TABLE_NAME) instead of a parquet path/glob."""
+    def query_duckdb(sql: str, data_dir: str = None) -> pd.DataFrame:
+        """True drop-in for DataStorage.query_duckdb(sql) — same signature, same return type,
+        and now the same calling convention too: the route is detected directly from the SQL
+        text (see _extract_route_and_rewrite), matching how every existing call site already
+        embeds data/<route>/parquet in the query string. `data_dir` is only a fallback for the
+        rare query that doesn't reference a route at all, and cfg.DATA_PATH_ is read fresh here
+        (not baked into the signature at import time), so it reflects whatever it's currently
+        set to."""
+        route, rewritten_sql = _extract_route_and_rewrite(sql)
+        if route is None:
+            route = _normalize_route(data_dir or cfg.DATA_PATH_)
+        if route == 'mahis':
+            print("Data Dir is",route, rewritten_sql)
         script_dir = os.path.dirname(os.path.realpath(__file__))
-        db_path = os.path.join(script_dir, data_dir, cfg.DUCKDB_DIR_NAME, cfg.DUCKDB_FILE_NAME)
+        db_path = os.path.join(script_dir, "data", route, cfg.DUCKDB_DIR_NAME, cfg.DUCKDB_FILE_NAME)
         con = duckdb.connect(db_path, read_only=True)
         try:
-            return con.execute(sql).df()
+            return con.execute(rewritten_sql).df()
         finally:
             con.close()
 
@@ -334,4 +482,19 @@ if __name__ == "__main__":
     _args = _parser.parse_args()
     # `python data_storage_duckdb.py` — path is testable at data/default/duckdb
     # (cfg.DATA_PATH_ defaults to "data/default").
-    run_all_configured_sources(uuid=_args.uuid)
+    # run_all_configured_sources(uuid=_args.uuid)
+
+    # Standalone test of fetch_and_create_table, independent of the uuid-based pipeline above.
+    queries = {
+        "program":{"query":cfg.QUERY_PROGRAMS, "table":"program", "index": "program_id"},
+        "concept_names":{"query":cfg.QUERY_CONCEPT_NAMES, "table":"concept_names", "index": "concept_id"},
+        "encounter_types":{"query":cfg.QUERY_ENCOUNTER_TYPES, "table":"encounter_type", "index": "encounter_type_id"},
+        "locations":{"query":cfg.QUERY_LOCATIONS, "table":"locations", "index": "location_id"},
+        "user_programs":{"query":cfg.QUERY_USER_PROGRAMS, "table":"user_programs", "index": "id"},
+        }
+    for table, query in queries.items():  
+        print(query)
+        _rows = DataStorage().fetch_and_create_table(
+        query=query['query'], table_name=query['table'], unique_index=query['index'], last_id=0
+        )
+        print(f"fetch_and_create_table: fetched {_rows} rows into Programs")
