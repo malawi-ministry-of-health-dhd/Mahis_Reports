@@ -2026,7 +2026,6 @@ def create_pivot_table(query_fiter, data_path, index_col, columns_col, values_co
             "borderLeft": "2px solid #004a01",
             "color": "#004a01",
         })
-    # --- END NEW ---
 
     table = html.Div(
         [
@@ -2050,6 +2049,7 @@ def create_pivot_table(query_fiter, data_path, index_col, columns_col, values_co
                     page_action="native",
                     sort_action="native",
                     sort_mode="multi",
+                    virtualization=False,
                     style_header={
                         "backgroundColor": THEME["table_header"],
                         "color": THEME["table_header_text"],
@@ -2093,6 +2093,7 @@ def create_pivot_table(query_fiter, data_path, index_col, columns_col, values_co
             "borderRadius": "8px",
         },
     )
+
 
     return table, pivot
 
@@ -3103,7 +3104,7 @@ def create_line_list(
         merge_methods: Optional[List[str]] = None,
         message=None,
         custom_fields=None,
-        mask_names: bool = True,
+        mask_names: bool = False,
         anonymize: bool =False,
         **kwargs):
 
@@ -3131,7 +3132,7 @@ def create_line_list(
         group_aggr = kwargs.get(f"group{i}_aggr", {}) or {}
         group_rename_map = kwargs.get(f"group{i}_rename", {}) or {}
 
-        anonymized = ['given_name', 'family_name','person_attribute_name', 'person_attribute_type','User']
+        anonymized = []
         group_cols = [item for item in group_cols if item not in anonymized]
 
         if not group_cols:
