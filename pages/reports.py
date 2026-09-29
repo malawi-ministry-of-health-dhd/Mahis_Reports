@@ -7,6 +7,8 @@ import datetime
 from datetime import datetime as dt
 import os
 import json
+from dash import ctx
+from helpers.visualizations import create_line_list_basic_modal
 from dash.exceptions import PreventUpdate
 from helpers.reports_class import ReportTableBuilder
 # from mnid.views.renderer import prepare_mnid_dataframe
@@ -1006,8 +1008,6 @@ _RPT_PAGE_SIZE = 15
     prevent_initial_call=True,
 )
 def _rpt_patient_modal(n_clicks_list, n_close, n_backdrop, ids_list, id_list, urlparams):
-    from dash import ctx
-    from helpers.visualizations import create_line_list_basic_modal
     triggered = ctx.triggered_id
 
     if triggered in ("rpt-patient-modal-close", "rpt-patient-modal-backdrop"):
@@ -1033,7 +1033,7 @@ def _rpt_patient_modal(n_clicks_list, n_close, n_backdrop, ids_list, id_list, ur
     data_route = (urlparams or {}).get("route", ["default"])[0]
     data_path  = f"data/{data_route}/parquet"
 
-    df = create_line_list_basic_modal(unique_col, data_path, patient_ids)
+    df = create_line_list_basic_modal(unique_col, data_path, patient_ids, None, None)
     title = f"Patient List — ({len(patient_ids):,} Total Records)"
 
     modal_data = {

@@ -11,7 +11,8 @@ import base64
 import io
 import uuid
 from data_storage import DataStorage
-from config import (actual_keys_in_data, 
+from helpers.visualizations import build_filter_query, _normalize_filter_value
+from config import (actual_keys_in_data,
                     DATA_PATH_, 
                     DATE_, PERSON_ID_, ENCOUNTER_ID_,
                     FACILITY_, AGE_GROUP_, AGE_,
@@ -1556,6 +1557,78 @@ def _build_users_table(users, page=1):
     return html.Div([table, pagination])
 
 
+# Query-only mirrors of helpers.visualizations.create_count / create_sum / create_count_sets,
+# for previewing the SQL a report filter would run (e.g. rpt-flt-sql-query) without executing
+# it. Unlike the originals, there is no report run in progress at filter-edit time, so there is
+# no query_fiter (start/end date + facility scoping) to fold in — "1=1" stands in wherever
+# build_filter_query would otherwise splice that clause into the query text, keeping the
+# preview syntactically valid SQL. `measure` is accepted for a uniform calling convention
+# across all three (mirroring reports_class._compute_value_from_filter's dispatch by measure)
+# but doesn't change the query text itself, same as in the originals it mirrors.
+def build_count_query(data_route, measure, unique_column, pairs):
+    """Mirrors create_count()'s default (non-custom_sql, non-group_by) query text."""
+    unique_column = _normalize_filter_value(unique_column)
+    if isinstance(unique_column, list):
+        unique_column = ", ".join(unique_column)
+
+    queries = []
+    for col, val in pairs:
+        col, val = _normalize_filter_value(col), _normalize_filter_value(val)
+        queries.append(build_filter_query(col, val, data_route, unique_column, False, None, None, "1=1"))
+
+    if queries:
+        return f"SELECT DISTINCT {unique_column}, {DATE_}::DATE FROM '{data_route}' WHERE " + " AND ".join(queries)
+    return f"SELECT DISTINCT {unique_column}, {DATE_}::DATE FROM '{data_route}'"
+
+
+def build_sum_query(data_route, measure, unique_column, pairs):
+    """Mirrors create_sum()'s query text. Matches reports_class._compute_value_from_filter's
+    'sum'/'cohort_sum' dispatch, where spec['unique_column'] is actually used as num_field and
+    the identity column is always PERSON_ID_ — so `unique_column` here is the num_field."""
+    num_field = unique_column
+    queries = []
+    for col, val in pairs:
+        col, val = _normalize_filter_value(col), _normalize_filter_value(val)
+        queries.append(build_filter_query(col, val, data_route, [PERSON_ID_, num_field], False, None, None, "1=1"))
+
+    if queries:
+        return f"SELECT DISTINCT {PERSON_ID_}, {num_field} FROM '{data_route}' WHERE " + " AND ".join(queries)
+    return f"SELECT DISTINCT {PERSON_ID_}, {num_field} FROM '{data_route}'"
+
+
+def build_count_sets_query(data_route, measure, unique_column, pairs):
+    """Mirrors create_count_sets()'s default (non-custom_sql, non-same_day, non-group_by)
+    query text."""
+    unique_column = _normalize_filter_value(unique_column)
+    if isinstance(unique_column, list):
+        unique_column = ", ".join(unique_column)
+    pid_col = unique_column.split(",")[0].split("::")[0].strip()
+
+    queries = []
+    for col, val in pairs:
+        col, val = _normalize_filter_value(col), _normalize_filter_value(val)
+        queries.append(build_filter_query(col, val, data_route, unique_column, True, None, None, "1=1"))
+
+    in_clauses = [
+        f"{pid_col} IN (SELECT DISTINCT {pid_col} FROM '{data_route}' WHERE {q.split('WHERE ', 1)[1]})"
+        for q in queries
+    ]
+    if in_clauses:
+        return f"SELECT DISTINCT {pid_col} FROM '{data_route}' WHERE " + " AND ".join(in_clauses)
+    return f"SELECT DISTINCT {pid_col} FROM '{data_route}'"
+
+
+def build_custom_sql_preview(data_route, custom_query):
+    """Mirrors create_count_custom_query()'s `data` placeholder substitution, for previewing a
+    custom_sql/cohort_custom_sql filter's raw query text (held in the unique_column field).
+    No date/location scope exists at filter-edit time (same reasoning as the other builders),
+    so `data` is replaced with the bare, quoted data_route table reference rather than the
+    query_fiter-scoped subquery the real measure execution uses."""
+    if not custom_query:
+        return ""
+    return custom_query.replace("data", f"'{data_route}'")
+
+
 def create_html_report_modal():
     """Full-screen modal for the Create Reports (GUI) feature."""
 
@@ -1734,7 +1807,7 @@ def create_html_report_modal():
         "count", "nunique", "sum", "count_set", "cohort_count", "cohort_count_set",
         "cohort_sum", "cohort_count_defaulter", "count_defaulter", "count_set_defaulter",
         "cohort_count_set_defaulter", "calculated", "calculated_intersection",
-        "calculated_union", "calculated_max", "calculated_min",
+        "calculated_union", "calculated_max", "calculated_min","custom_sql","cohort_custom_sql"
     ]]
     _actual_keys_opts = [{"label": k, "value": k} for k in actual_keys_in_data]
 
@@ -1768,44 +1841,48 @@ def create_html_report_modal():
             html.Div(
                 style={"flex": "1", "overflowY": "auto", "padding": "16px"},
                 children=[
-                    # Display name
-                    html.Div(style={"marginBottom": "12px"}, children=[
-                        html.Label("Display Name",
-                                   style={"fontSize": "12px", "fontWeight": "600",
-                                          "display": "block", "marginBottom": "4px",
-                                          "color": "#374151"}),
-                        dcc.Input(id="rpt-flt-filter-name-desc", value="", debounce=True,
-                                  placeholder="Display name…",disabled=True,
-                                  style={"width": "100%", "padding": "6px 8px",
-                                         "fontSize": "13px", "border": "1px solid #d1d5db",
-                                         "borderRadius": "4px", "boxSizing": "border-box"}),
-                    ]),
-                    # Measure
-                    html.Div(style={"marginBottom": "12px"}, children=[
-                        html.Label("Measure",
-                                   style={"fontSize": "12px", "fontWeight": "600",
-                                          "display": "block", "marginBottom": "4px",
-                                          "color": "#374151"}),
-                        dcc.Dropdown(id="rpt-flt-measure", options=_measure_opts, value=None,
-                                     placeholder="Select measure…", clearable=True,
-                                     style={"fontSize": "13px"}),
-                    ]),
-                    # Unique column (container swapped by callback: dropdown ↔ input)
-                    html.Div(style={"marginBottom": "12px"}, children=[
-                        html.Label("Unique Column",
-                                   style={"fontSize": "12px", "fontWeight": "600",
-                                          "display": "block", "marginBottom": "4px",
-                                          "color": "#374151"}),
-                        html.Div(
-                            id="rpt-flt-unique-col-wrap",
-                            children=[
-                                dcc.Dropdown(id="rpt-flt-unique-col",
-                                             options=_actual_keys_opts, value=None,
-                                             placeholder="Select column…", clearable=True,
+                    # Display name / Measure / Unique column, side by side to save space
+                    html.Div(
+                        style={"display": "flex", "gap": "12px", "marginBottom": "12px"},
+                        children=[
+                            html.Div(style={"flex": "1", "minWidth": "0"}, children=[
+                                html.Label("Display Name",
+                                           style={"fontSize": "12px", "fontWeight": "600",
+                                                  "display": "block", "marginBottom": "4px",
+                                                  "color": "#374151"}),
+                                dcc.Input(id="rpt-flt-filter-name-desc", value="", debounce=True,
+                                          placeholder="Display name…",disabled=True,
+                                          style={"width": "100%", "padding": "6px 8px",
+                                                 "fontSize": "13px", "border": "1px solid #d1d5db",
+                                                 "borderRadius": "4px", "boxSizing": "border-box"}),
+                            ]),
+                            html.Div(style={"flex": "1", "minWidth": "0"}, children=[
+                                html.Label("Measure",
+                                           style={"fontSize": "12px", "fontWeight": "600",
+                                                  "display": "block", "marginBottom": "4px",
+                                                  "color": "#374151"}),
+                                dcc.Dropdown(id="rpt-flt-measure", options=_measure_opts, value=None,
+                                             placeholder="Select measure…", clearable=True,
                                              style={"fontSize": "13px"}),
-                            ],
-                        ),
-                    ]),
+                            ]),
+                            # Unique column (container swapped by callback: dropdown ↔ input)
+                            html.Div(style={"flex": "1", "minWidth": "0"}, children=[
+                                html.Label("Unique Column",
+                                           style={"fontSize": "12px", "fontWeight": "600",
+                                                  "display": "block", "marginBottom": "4px",
+                                                  "color": "#374151"}),
+                                html.Div(
+                                    id="rpt-flt-unique-col-wrap",
+                                    children=[
+                                        dcc.Dropdown(id="rpt-flt-unique-col",
+                                                     options=_actual_keys_opts, value=None,
+                                                     placeholder="Select column…", clearable=True,
+                                                     style={"fontSize": "13px"}),
+                                    ],
+                                ),
+                            ]),
+                        ],
+                    ),
                     html.Hr(style={"margin": "16px 0", "borderColor": "#e5e7eb"}),
                     # Filter rows header
                     html.Div(
@@ -1836,6 +1913,51 @@ def create_html_report_modal():
                     ),
                     # Dynamic filter rows
                     html.Div(id="rpt-filter-rows-container", children=[]),
+
+                    html.Div(style={"marginBottom": "12px"}, children=[
+                            html.Div(
+                                style={"display": "flex", "alignItems": "center",
+                                       "gap": "6px", "marginBottom": "4px"},
+                                children=[
+                                    html.Label("Relevant SQL Query",
+                                               style={"fontSize": "12px", "fontWeight": "600",
+                                                      "color": "#374151"}),
+                                    html.Button(
+                                        DashIconify(icon="lucide:refresh-cw", width=13),
+                                        id="rpt-flt-sql-refresh-btn", n_clicks=0,
+                                        title="Refresh query from current form values",
+                                        style={"padding": "2px 6px", "cursor": "pointer",
+                                               "background": "#f3f4f6",
+                                               "border": "1px solid #d1d5db",
+                                               "borderRadius": "4px", "color": "#374151",
+                                               "display": "flex", "alignItems": "center"}),
+                                ],
+                            ),
+                            html.Div(
+                                style={"display": "flex", "gap": "10px", "alignItems": "flex-start"},
+                                children=[
+                                    html.Div(id="rpt-flt-sql-query",
+                                            style={"flex": "1", "minWidth": "0", "fontSize": "13px",
+                                                   "color": "grey", "wordBreak": "break-word"}),
+                                    html.Div(
+                                        style={"flex": "0 0 140px", "display": "flex",
+                                               "flexDirection": "column", "alignItems": "center",
+                                               "gap": "4px"},
+                                        children=[
+                                            html.Button("Run Count", id="rpt-flt-run-count-btn", n_clicks=0,
+                                                        style={"padding": "3px 10px", "fontSize": "12px",
+                                                               "cursor": "pointer", "background": "#dcfce7",
+                                                               "border": "1px solid #4ade80",
+                                                               "borderRadius": "4px", "color": "#166534",
+                                                               "width": "100%"}),
+                                            html.Div(id="rpt-flt-run-count-output",
+                                                     style={"fontSize": "15px", "color": "#0A0A0B",
+                                                            "textAlign": "center","fontWeight": "600"}),
+                                        ],
+                                    ),
+                                ],
+                            ),
+                        ]),
                 ],
             ),
             # Footer

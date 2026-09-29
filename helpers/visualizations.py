@@ -634,6 +634,21 @@ def create_sum(query_fiter,data_path, unique_column=PERSON_ID_, num_field='Value
     return result[num_field].sum(), unique_patients
 
 
+def create_count_custom_query(query_fiter, custom_query, data_path):
+    """Escape-hatch for a free-form custom SQL query (measure='custom_sql'/'cohort_custom_sql'
+    in reports_class.ReportTableBuilder). The author writes custom_query against a placeholder
+    table named `data`, e.g. "SELECT person_id FROM data WHERE Encounter = 'Complications'" --
+    that placeholder is replaced with a subquery scoped to data_path and the same date/location
+    filter every other measure uses (query_fiter -- filtered_dates for custom_sql, original_dates
+    for cohort_custom_sql), so the custom query's own data volume is bounded the same way.
+    """
+    scoped_data = f"(SELECT * FROM '{data_path}' WHERE {query_fiter})"
+    joined_query = custom_query.replace("data", scoped_data)
+    result = DataStorage.query_duckdb(joined_query)
+    unique_patients = result[PERSON_ID_].unique().tolist() if PERSON_ID_ in result.columns else []
+    return len(result[PERSON_ID_].unique().tolist()), unique_patients
+
+
 def _build_column_figure(query_fiter,data_path, x_col, y_col, title, x_title, y_title,
                         unique_column=PERSON_ID_, legend_title=None,
                         color=None, filter_col1=None, filter_value1=None,
@@ -3324,7 +3339,7 @@ def create_line_list_basic_modal(
     else:
         # If lists are empty, use today's date
         today = datetime.now().strftime('%Y-%m-%d')
-        start_date = f"{today} 00:00:00"
+        start_date = f"2020-01-01 00:00:00"
         end_date = f"{today} 23:59:59"
 
     ids_quoted = ", ".join(f"'{str(i)}'" for i in ids_list)
@@ -3332,7 +3347,6 @@ def create_line_list_basic_modal(
     query = f"""
         SELECT DISTINCT
             {unique_column}                     AS "unique_column",
-            {PROGRAM_}                          AS "Program",
             {IDENTIFIER_}                       AS "Patient ID",
             {FIRST_NAME_}                       AS "First Name",
             {LAST_NAME_}                        AS "Last Name",
@@ -3348,7 +3362,7 @@ def create_line_list_basic_modal(
 
     try:
         result = DataStorage.query_duckdb(query)
-        return result.drop_duplicates(subset=['unique_column', PROGRAM_]).drop(columns='unique_column').iloc[:100]
+        return result.drop_duplicates(subset=['unique_column']).drop(columns='unique_column').iloc[:100]
     except Exception:
         return pd.DataFrame()
 
