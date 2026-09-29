@@ -20,7 +20,9 @@ from helpers.modal_functions import (validate_excel_file, load_reports_data, sav
                         build_reports_table, create_editable_table, create_preview_table,
                         generate_dashboard_items_list, create_edit_modal,
                         _build_ds_list, _build_users_table, create_html_report_modal,
-                        create_prog_report_modal)
+                        create_prog_report_modal, build_count_query, build_sum_query,
+                        build_count_sets_query, build_custom_sql_preview)
+from helpers.reports_class import ReportTableBuilder
 from helpers.config_helper import (load_dashboards_from_file, save_dashboards_to_file,
                         _coerce_list, _normalize_filter_value, _safe_json_loads,
                         _empty_dashboard_structure, _find_dashboard_index,
@@ -5303,9 +5305,10 @@ def _safe_flt_str(val):
 
 
 def _build_unique_col_component(measure, current_val):
-    """Return dcc.Input for calculated measures, dcc.Dropdown otherwise."""
-    is_calc = bool(measure and "calculated" in str(measure).lower())
-    if is_calc:
+    """Return dcc.Input for calculated measures, dcc.Textarea for custom_sql/cohort_custom_sql
+    (raw multi-line SQL), dcc.Dropdown otherwise."""
+    measure_lc = str(measure or "").lower()
+    if "calculated" in measure_lc:
         return dcc.Input(
             id="rpt-flt-unique-col",
             value=current_val or "",
@@ -5314,6 +5317,19 @@ def _build_unique_col_component(measure, current_val):
             style={"width": "100%", "padding": "6px 8px", "fontSize": "13px",
                    "border": "1px solid #38bdf8", "borderRadius": "4px",
                    "boxSizing": "border-box", "background": "#f0f9ff"},
+        )
+    if measure_lc in ("custom_sql", "cohort_custom_sql"):
+        return dcc.Textarea(
+            id="rpt-flt-unique-col",
+            value=current_val or "",
+            placeholder=(
+                "SQL against a placeholder table named `data`, e.g. "
+                "SELECT person_id FROM data WHERE Encounter = 'Complications'"
+            ),
+            style={"width": "100%", "padding": "6px 8px", "fontSize": "13px",
+                   "border": "1px solid #38bdf8", "borderRadius": "4px",
+                   "boxSizing": "border-box", "background": "#f0f9ff",
+                   "minHeight": "70px", "fontFamily": "monospace"},
         )
     key_opts = [{"label": k, "value": k} for k in actual_keys_in_data]
     return dcc.Dropdown(
@@ -5326,6 +5342,46 @@ def _build_unique_col_component(measure, current_val):
     )
 
 
+def _pairs_from_row_values(vars_list, ops_list, vals_list):
+    """Mirror _rpt_save_filter's per-row var/op/val -> (col, val) transform, for building a
+    live (unsaved) SQL preview from the form's current widget values."""
+    pairs = []
+    for var, op, val in zip(vars_list or [], ops_list or [], vals_list or []):
+        var_list = var if isinstance(var, list) else ([var] if var else [])
+        var_list = [v for v in var_list if v]
+        if not var_list:
+            continue
+        var_out = var_list[0] if len(var_list) == 1 else var_list
+
+        op = op or "="
+        val_list = val if isinstance(val, list) else ([val] if val else [])
+        if op != "=":
+            val_list = [f"{op}{v}" for v in val_list] if val_list else [f"{op}"]
+        val_out = val_list[0] if len(val_list) == 1 else val_list
+        pairs.append((var_out, val_out))
+    return pairs
+
+
+def _dispatch_sql_preview(data_route, measure, unique_col, pairs):
+    """Shared measure -> query-builder dispatch for the report filter's SQL preview, mirroring
+    reports_class._compute_value_from_filter's own measure dispatch."""
+    measure_lc = (measure or "").strip().lower()
+    try:
+        if measure_lc in ("sum", "cohort_sum"):
+            return build_sum_query(data_route, measure_lc, unique_col, pairs)
+        if measure_lc in ("count_set", "cohort_count_set",
+                           "count_set_defaulter", "cohort_count_set_defaulter"):
+            return build_count_sets_query(data_route, measure_lc, unique_col, pairs)
+        if measure_lc in ("count", "nunique", "cohort_count",
+                           "cohort_count_defaulter", "count_defaulter"):
+            return build_count_query(data_route, measure_lc, unique_col, pairs)
+        if measure_lc in ("custom_sql", "cohort_custom_sql"):
+            return build_custom_sql_preview(data_route, unique_col)
+        return ""  # literal/percentage/calculated* have no query to preview
+    except Exception as e:
+        return f"(unable to build preview: {e})"
+
+
 # 12g. Load filter form from Excel / saved JSON when a variable is selected
 @callback(
     Output("rpt-flt-title", "children"),
@@ -5334,11 +5390,13 @@ def _build_unique_col_component(measure, current_val):
     Output("rpt-flt-unique-col-wrap", "children"),
     Output("rpt-filter-row-store", "data"),
     Output("rpt-flt-status", "children"),
+    Output("rpt-flt-sql-query", "children"),
     Input("rpt-filter-edit-var", "data"),
     State("rpt-page-name", "data"),
+    State("url-params-store", "data"),
     prevent_initial_call=True,
 )
-def _rpt_load_filter_form(filter_name, page_name):
+def _rpt_load_filter_form(filter_name, page_name, urlparams):
     if not filter_name:
         raise PreventUpdate
 
@@ -5405,7 +5463,63 @@ def _rpt_load_filter_form(filter_name, page_name):
         rows = [{"variable": None, "operator": "=", "input_type": "Multi", "value": []}]
 
     unique_col_component = _build_unique_col_component(measure_val, unique_col_val)
-    return filter_name, desc_val, measure_val, unique_col_component, rows, ""
+
+    # SQL preview -- mirrors reports_class._compute_value_from_filter's updated_spec -> pairs
+    # construction, then dispatches to the query-only builder matching that measure.
+    pairs = []
+    for i in range(1, 11):
+        col = existing_row.get(f"variable{i}", "")
+        val = existing_row.get(f"value{i}", "")
+        if not col:
+            continue
+        pairs.append((ReportTableBuilder._parse_col_value(col), ReportTableBuilder._parse_col_value(val)))
+
+    route = (urlparams or {}).get("route", ["default"])[0]
+    data_route = f"data/{route}/parquet"
+    sql_preview = _dispatch_sql_preview(data_route, measure_val, unique_col_val, pairs)
+
+    return filter_name, desc_val, measure_val, unique_col_component, rows, "", sql_preview
+
+
+# 12g-refresh. Rebuild the SQL preview from the form's current (unsaved) values
+@callback(
+    Output("rpt-flt-sql-query", "children", allow_duplicate=True),
+    Input("rpt-flt-sql-refresh-btn", "n_clicks"),
+    State("rpt-flt-measure", "value"),
+    State("rpt-flt-unique-col", "value"),
+    State({"type": "rpt-fv-var", "index": ALL}, "value"),
+    State({"type": "rpt-fv-op",  "index": ALL}, "value"),
+    State({"type": "rpt-fv-val", "index": ALL}, "value"),
+    State("url-params-store", "data"),
+    prevent_initial_call=True,
+)
+def _rpt_refresh_sql_preview(n_clicks, measure, unique_col, vars_list, ops_list, vals_list, urlparams):
+    if not n_clicks:
+        raise PreventUpdate
+    pairs = _pairs_from_row_values(vars_list, ops_list, vals_list)
+    route = (urlparams or {}).get("route", ["default"])[0]
+    data_route = f"data/{route}/parquet"
+    return _dispatch_sql_preview(data_route, measure, unique_col, pairs)
+
+
+# 12g-quater. Wrap the previewed query in SELECT COUNT(*) and show the resulting count
+@callback(
+    Output("rpt-flt-run-count-output", "children"),
+    Input("rpt-flt-run-count-btn", "n_clicks"),
+    State("rpt-flt-sql-query", "children"),
+    prevent_initial_call=True,
+)
+def _rpt_run_count_query(n_clicks, sql):
+    if not n_clicks:
+        raise PreventUpdate
+    if not sql or not isinstance(sql, str):
+        return "No query"
+    try:
+        count_sql = f"SELECT COUNT(*) AS n FROM ({sql}) AS t"
+        result = DataStorage.query_duckdb(count_sql)
+        return f"{int(result['n'].iloc[0])}"
+    except Exception as e:
+        return f"Error: {e}"
 
 
 # 12g-bis. Swap unique-col widget when measure type changes
@@ -5514,6 +5628,7 @@ def _rpt_render_filter_rows(rows, urlparams):
     data_route = urlparams.get('route', ["default"])[0]
     rows = rows or []
 
+
     key_opts   = [{"label": k, "value": k} for k in actual_keys_in_data]
     op_opts    = [{"label": op, "value": op} for op in ["=", "!=", ">", "<", ">=", "<="]]
     type_opts  = [{"label": t, "value": t} for t in ["Multi", "Single", "Text", "Integer"]]
@@ -5567,14 +5682,10 @@ def _rpt_render_filter_rows(rows, urlparams):
                         clearable=False,
                         style={"flex": "0 0 80px", "fontSize": "12px"},
                     ),
-                    dcc.Input(
-                        id={"type": "rpt-fv-val", "index": i} ,
-                        type="text", 
-                        value=row.get("value"),
-                        placeholder="Value…", debounce=True,
-                        style={"flex": "3", "fontSize": "12px", "minWidth": "140px", "width": "100%", "height": "36px", "padding": "4px 8px",
-                            "border": "1px solid #d1d5db", "borderRadius": "4px",
-                            "boxSizing": "border-box"},
+                    html.Div(
+                        id={"type": "rpt-fv-val-container", "index": i},
+                        style={"flex": "3", "minWidth": "140px"},
+                        children=[_build_val_component(data_route, i, value_type, row.get("value"))],
                     ),
                     html.Button(
                         "✕",
@@ -6387,7 +6498,6 @@ def _prog_rpt_save(
             if ren:
                 payload[f"group{n}_rename"] = ren
         if cols_order:
-            print(cols_order)
             payload["cols_order"] = cols_order
         if merge_methods:
             payload["merge_methods"] = merge_methods

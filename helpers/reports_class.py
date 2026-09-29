@@ -1,7 +1,7 @@
 import pandas as pd
 pd.options.mode.chained_assignment = None
 from typing import Any, Dict, List, Tuple
-from helpers.visualizations import create_sum, create_count, create_count_sets
+from helpers.visualizations import create_sum, create_count, create_count_sets, create_count_custom_query
 from helpers.dhis_integrater import get_dhis_data
 import dash
 import duckdb
@@ -107,7 +107,7 @@ class ReportTableBuilder:
     def _parse_col_value(col: Any) -> Any:
         if isinstance(col, list):
             return col
-        if isinstance(col, str):
+        if isinstance(col, str): 
             s = col.strip()
             if not s:
                 return ""
@@ -245,6 +245,14 @@ class ReportTableBuilder:
             for fcol, fval in spec["pairs"]:
                 args.extend([fcol, fval])
             result, patient_ids = create_count(*args,self.start_date, self.end_date)
+
+        elif measure == "custom_sql":
+            custom_query = str(spec.get("unique_column", "")).strip()
+            result, patient_ids = create_count_custom_query(filtered_dates, custom_query, self.data_route)
+
+        elif measure == "cohort_custom_sql":
+            custom_query = str(spec.get("unique_column", "")).strip()
+            result, patient_ids = create_count_custom_query(original_dates, custom_query, self.data_route)
 
         elif measure == "calculated":
             # Deferred arithmetic expression — resolved in Pass 2 of _precompute_all_filter_values.

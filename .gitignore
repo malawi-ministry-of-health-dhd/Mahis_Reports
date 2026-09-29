@@ -30,10 +30,13 @@ data/dashboards.json
 data/visualizations/dashboards_duplicate.json
 data/visualizations/home.json
 data/visualizations/master.json
-data/visualizations/opd.json
+data/visualizations/
 data/mnid_aggregates/indicator_aggregates.parquet.bak
 data/excel/*.xlsx
 data/excel/*.xls
+data/hmis_reports.json
+data/saved_queries.json
+data/latest_data_opd.parquet
 
 # Demo & generated data
 demo_parquet/
